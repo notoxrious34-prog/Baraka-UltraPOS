@@ -1,0 +1,20 @@
+[package]
+name = "baraka-commands"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Baraka UltraPOS Tauri command layer: typed IPC handlers and DTOs"
+
+[dependencies]
+baraka-domain = { path = "../domain" }
+baraka-application = { path = "../application" }
+tauri = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --baraka-primary: #0f3d5c;
+  --baraka-accent: #f59e0b;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: Inter, Cairo, system-ui, "Segoe UI", Tahoma, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures keep monetary columns from shifting (Tailwind
+   `tabular-nums` also exists; this alias documents the cockpit rule). */
+.cockpit-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.font-arabic {
+  font-family: Cairo, Inter, system-ui, Tahoma, sans-serif;
+}
+
+.font-mono-baraka {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}

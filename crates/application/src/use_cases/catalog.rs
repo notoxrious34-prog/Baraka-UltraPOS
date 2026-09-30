@@ -1,0 +1,937 @@
+//! Catalog use cases: products, units, kits, search.
+//!
+//! Mutations require `StockAdjustment` or `SystemSettingsManage`
+//! (Gerant/Admin). Reads require `PosSell` (all roles).
+
+use baraka_domain::catalog::{
+    validate_kit_edges, validate_unit_set, Barcode, CategoryId, KitItem, Product, ProductId,
+    ProductUnit, Sku, UnitId,
+};
+use baraka_domain::errors::DomainError;
+use baraka_domain::primitives::{FactorMicro, Money, QtyMicro};
+use baraka_domain::role::Permission;
+
+use crate::errors::ApplicationError;
+use crate::ports::{CategoryRepository, ProductRepository, SessionContext};
+
+/// Roles allowed to mutate the catalog.
+const MANAGE_PERMISSIONS: [Permission; 2] = [
+    Permission::StockAdjustment,
+    Permission::SystemSettingsManage,
+];
+
+fn require_any(
+    session: &SessionContext,
+    permissions: &[Permission],
+) -> Result<(), ApplicationError> {
+    if permissions
+        .iter()
+        .any(|permission| session.role.has_permission(*permission))
+    {
+        Ok(())
+    } else {
+        Err(ApplicationError::Unauthorized)
+    }
+}
+
+fn require(session: &SessionContext, permission: Permission) -> Result<(), ApplicationError> {
+    require_any(session, &[permission])
+}
+
+/// One selling/base unit supplied at product creation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewUnitInput {
+    /// Arabic unit name.
+    pub unit_name_ar: String,
+    /// French unit name.
+    pub unit_name_fr: String,
+    /// Base micros per selling unit (`10_000` for the base unit).
+    pub factor_micro: i64,
+    /// Optional barcode resolving to this unit.
+    pub barcode: Option<String>,
+    /// Sell price in centimes.
+    pub sale_price_centimes: i64,
+    /// Purchase price in centimes.
+    pub purchase_price_centimes: i64,
+    /// True for the single base unit.
+    pub is_base_unit: bool,
+    /// Default POS unit.
+    pub is_default_selling: bool,
+}
+
+/// Product creation payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreateProductInput {
+    /// Unique business reference.
+    pub sku: String,
+    /// Optional product-level barcode.
+    pub barcode: Option<String>,
+    /// Arabic display name.
+    pub name_ar: String,
+    /// French display name.
+    pub name_fr: String,
+    /// Owning category.
+    pub category_id: Option<CategoryId>,
+    /// True when the product is a kit header.
+    pub is_kit: bool,
+    /// Full unit set (exactly one base unit).
+    pub units: Vec<NewUnitInput>,
+}
+
+/// Unit upsert for product updates (`None` id allocates a new unit).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnitUpsert {
+    /// Existing unit id, or `None` for a brand-new unit.
+    pub id: Option<UnitId>,
+    /// Replacement unit fields.
+    pub unit: NewUnitInput,
+}
+
+/// Product metadata + unit-set update payload (SKU stays immutable).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateProductInput {
+    /// Product to update.
+    pub id: ProductId,
+    /// Arabic display name.
+    pub name_ar: String,
+    /// French display name.
+    pub name_fr: String,
+    /// Owning category.
+    pub category_id: Option<CategoryId>,
+    /// Active flag.
+    pub is_active: bool,
+    /// Merged unit set after applying upserts.
+    pub units: Vec<UnitUpsert>,
+}
+
+/// One BOM line supplied at kit definition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewKitItemInput {
+    /// Component product.
+    pub component_id: ProductId,
+    /// Component unit the quantity is expressed in.
+    pub unit_id: UnitId,
+    /// Quantity per kit, in unit micros (must be positive).
+    pub quantity_micro: i64,
+}
+
+/// Product with its units and, for kits, its BOM lines.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProductDetail {
+    /// The product itself.
+    pub product: Product,
+    /// All associated units.
+    pub units: Vec<ProductUnit>,
+    /// BOM lines (empty for non-kits).
+    pub kit_items: Vec<KitItem>,
+}
+
+fn build_unit(
+    product_id: ProductId,
+    id: UnitId,
+    input: &NewUnitInput,
+) -> Result<ProductUnit, ApplicationError> {
+    if input.unit_name_ar.trim().is_empty() || input.unit_name_fr.trim().is_empty() {
+        return Err(ApplicationError::Validation(
+            DomainError::InvalidCanonicalString("unit names must not be empty".to_string()),
+        ));
+    }
+    if input.sale_price_centimes < 0 || input.purchase_price_centimes < 0 {
+        return Err(ApplicationError::Validation(
+            DomainError::NegativeMoneyForbidden,
+        ));
+    }
+    let unit_barcode = input
+        .barcode
+        .as_deref()
+        .map(Barcode::new)
+        .transpose()
+        .map_err(ApplicationError::Validation)?;
+    Ok(ProductUnit {
+        id,
+        product_id,
+        unit_name_ar: input.unit_name_ar.trim().to_string(),
+        unit_name_fr: input.unit_name_fr.trim().to_string(),
+        factor_micro: FactorMicro::from_micros(input.factor_micro),
+        barcode: unit_barcode,
+        sale_price: Money::from_centimes(input.sale_price_centimes),
+        purchase_price: Money::from_centimes(input.purchase_price_centimes),
+        is_base_unit: input.is_base_unit,
+        is_default_selling: input.is_default_selling,
+    })
+}
+
+/// Create a product with its full unit set atomically.
+pub struct CreateProductUseCase<'a, P, C>
+where
+    P: ?Sized,
+    C: ?Sized,
+{
+    products: &'a P,
+    categories: &'a C,
+}
+
+impl<'a, P, C> CreateProductUseCase<'a, P, C>
+where
+    P: ProductRepository + ?Sized,
+    C: CategoryRepository + ?Sized,
+{
+    /// Wire the use case to its ports.
+    pub fn new(products: &'a P, categories: &'a C) -> Self {
+        Self {
+            products,
+            categories,
+        }
+    }
+
+    /// Validate, build, and persist a product with its units.
+    /// `terminal_id` is TerminalContext-resolved (never client-supplied).
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        input: CreateProductInput,
+        terminal_id: &str,
+    ) -> Result<ProductId, ApplicationError> {
+        require_any(session, &MANAGE_PERMISSIONS)?;
+        if terminal_id.trim().is_empty() {
+            return Err(ApplicationError::Validation(
+                DomainError::InvalidCanonicalString("INVALID_TERMINAL_ID".to_string()),
+            ));
+        }
+        let sku = Sku::new(&input.sku).map_err(ApplicationError::Validation)?;
+        let barcode = input
+            .barcode
+            .as_deref()
+            .map(Barcode::new)
+            .transpose()
+            .map_err(ApplicationError::Validation)?;
+        Product::validate_names(&input.name_ar, &input.name_fr)
+            .map_err(ApplicationError::Validation)?;
+        if let Some(category_id) = input.category_id {
+            if self.categories.find_category_by_id(category_id)?.is_none() {
+                return Err(ApplicationError::NotFound("category".to_string()));
+            }
+        }
+        let id = ProductId::new();
+        let mut units = Vec::with_capacity(input.units.len());
+        for unit in &input.units {
+            units.push(build_unit(id, UnitId::new(), unit)?);
+        }
+        validate_unit_set(id, &units).map_err(ApplicationError::Validation)?;
+        let product = Product {
+            id,
+            sku,
+            barcode,
+            name_ar: input.name_ar.trim().to_string(),
+            name_fr: input.name_fr.trim().to_string(),
+            category_id: input.category_id,
+            is_kit: input.is_kit,
+            is_active: true,
+        };
+        self.products
+            .create_product(&product, &units, terminal_id.trim())?;
+        Ok(id)
+    }
+}
+
+/// Update product metadata and merge its unit set (SKU immutable).
+pub struct UpdateProductUseCase<'a, P, C>
+where
+    P: ?Sized,
+    C: ?Sized,
+{
+    products: &'a P,
+    categories: &'a C,
+}
+
+impl<'a, P, C> UpdateProductUseCase<'a, P, C>
+where
+    P: ProductRepository + ?Sized,
+    C: CategoryRepository + ?Sized,
+{
+    /// Wire the use case to its ports.
+    pub fn new(products: &'a P, categories: &'a C) -> Self {
+        Self {
+            products,
+            categories,
+        }
+    }
+
+    /// Apply metadata changes and unit upserts atomically.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        input: UpdateProductInput,
+    ) -> Result<(), ApplicationError> {
+        require_any(session, &MANAGE_PERMISSIONS)?;
+        let (mut product, existing_units) = match self.products.find_by_id(input.id)? {
+            Some(found) => found,
+            None => return Err(ApplicationError::NotFound("product".to_string())),
+        };
+        Product::validate_names(&input.name_ar, &input.name_fr)
+            .map_err(ApplicationError::Validation)?;
+        if let Some(category_id) = input.category_id {
+            if self.categories.find_category_by_id(category_id)?.is_none() {
+                return Err(ApplicationError::NotFound("category".to_string()));
+            }
+        }
+        let mut merged = Vec::with_capacity(input.units.len());
+        for upsert in &input.units {
+            let id = match upsert.id {
+                Some(id) if existing_units.iter().any(|unit| unit.id == id) => id,
+                _ => UnitId::new(),
+            };
+            merged.push(build_unit(product.id, id, &upsert.unit)?);
+        }
+        validate_unit_set(product.id, &merged).map_err(ApplicationError::Validation)?;
+        product.name_ar = input.name_ar.trim().to_string();
+        product.name_fr = input.name_fr.trim().to_string();
+        product.category_id = input.category_id;
+        product.is_active = input.is_active;
+        self.products.update_product(&product, &merged)?;
+        Ok(())
+    }
+}
+
+/// Replace a kit's component graph after acyclic validation.
+pub struct DefineKitUseCase<'a, P>
+where
+    P: ?Sized,
+{
+    products: &'a P,
+}
+
+impl<'a, P> DefineKitUseCase<'a, P>
+where
+    P: ProductRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(products: &'a P) -> Self {
+        Self { products }
+    }
+
+    /// Validate structure, activity, and acyclicity, then persist.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        kit_id: ProductId,
+        items: Vec<NewKitItemInput>,
+    ) -> Result<(), ApplicationError> {
+        require_any(session, &MANAGE_PERMISSIONS)?;
+        let (kit, _) = match self.products.find_by_id(kit_id)? {
+            Some(found) => found,
+            None => return Err(ApplicationError::NotFound("kit product".to_string())),
+        };
+        if !kit.is_kit {
+            return Err(ApplicationError::Validation(
+                DomainError::InvalidKitComponent,
+            ));
+        }
+        if items.is_empty() {
+            return Err(ApplicationError::Validation(
+                DomainError::InvalidKitComponent,
+            ));
+        }
+        let mut kit_items = Vec::with_capacity(items.len());
+        let mut components = Vec::with_capacity(items.len());
+        for item in &items {
+            let (component, component_units) = match self.products.find_by_id(item.component_id)? {
+                Some(found) => found,
+                None => {
+                    return Err(ApplicationError::Validation(
+                        DomainError::InvalidKitComponent,
+                    ));
+                }
+            };
+            if !component.is_active {
+                return Err(ApplicationError::Validation(
+                    DomainError::InvalidKitComponent,
+                ));
+            }
+            if !component_units.iter().any(|unit| unit.id == item.unit_id) {
+                return Err(ApplicationError::Validation(
+                    DomainError::InvalidKitComponent,
+                ));
+            }
+            if item.quantity_micro <= 0 {
+                return Err(ApplicationError::Validation(
+                    DomainError::InvalidKitComponent,
+                ));
+            }
+            components.push(item.component_id);
+            kit_items.push(KitItem {
+                kit_product_id: kit_id,
+                component_product_id: item.component_id,
+                unit_id: item.unit_id,
+                quantity_micro: QtyMicro::from_micros(item.quantity_micro),
+            });
+        }
+        // Stored edges of *other* kits only: this kit's previous graph is
+        // being replaced, so its old edges must not poison validation.
+        let stored: Vec<(ProductId, ProductId)> = self
+            .products
+            .get_all_kit_edges()?
+            .into_iter()
+            .filter(|(from, _)| *from != kit_id)
+            .collect();
+        validate_kit_edges(kit_id, &components, &stored).map_err(ApplicationError::Validation)?;
+        self.products.define_kit(kit_id, &kit_items)?;
+        Ok(())
+    }
+}
+
+/// Fetch a product with units and BOM breakdown (kits only).
+pub struct GetProductWithUnitsUseCase<'a, P>
+where
+    P: ?Sized,
+{
+    products: &'a P,
+}
+
+impl<'a, P> GetProductWithUnitsUseCase<'a, P>
+where
+    P: ProductRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(products: &'a P) -> Self {
+        Self { products }
+    }
+
+    /// Load the full product detail view.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        id: ProductId,
+    ) -> Result<ProductDetail, ApplicationError> {
+        require(session, Permission::PosSell)?;
+        let (product, units) = match self.products.find_by_id(id)? {
+            Some(found) => found,
+            None => return Err(ApplicationError::NotFound("product".to_string())),
+        };
+        let kit_items = if product.is_kit {
+            self.products.get_kit_items(id)?
+        } else {
+            Vec::new()
+        };
+        Ok(ProductDetail {
+            product,
+            units,
+            kit_items,
+        })
+    }
+}
+
+/// Barcode-exact and multilingual prefix search.
+pub struct SearchCatalogUseCase<'a, P>
+where
+    P: ?Sized,
+{
+    products: &'a P,
+}
+
+impl<'a, P> SearchCatalogUseCase<'a, P>
+where
+    P: ProductRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(products: &'a P) -> Self {
+        Self { products }
+    }
+
+    /// Search the catalog (blank queries return no rows).
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<(Product, Vec<ProductUnit>)>, ApplicationError> {
+        require(session, Permission::PosSell)?;
+        let trimmed = query.trim();
+        if trimmed.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.products.search(trimmed, limit.clamp(1, 100))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ports::KitComponentRow;
+    use baraka_domain::catalog::{Category, CategoryId};
+    use baraka_domain::role::Role;
+    use baraka_domain::user::UserId;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    use crate::ports::{SessionContext, SessionToken};
+
+    struct FakeCatalog {
+        products: Mutex<HashMap<ProductId, (Product, Vec<ProductUnit>)>>,
+        kit_items: Mutex<HashMap<ProductId, Vec<KitItem>>>,
+        categories: Mutex<HashMap<CategoryId, Category>>,
+    }
+
+    impl FakeCatalog {
+        fn new() -> Self {
+            Self {
+                products: Mutex::new(HashMap::new()),
+                kit_items: Mutex::new(HashMap::new()),
+                categories: Mutex::new(HashMap::new()),
+            }
+        }
+
+        fn seed_product(&self, sku: &str, is_kit: bool, is_active: bool) -> (Product, ProductUnit) {
+            let id = ProductId::new();
+            let product = Product {
+                id,
+                sku: Sku::new(sku).expect("sku"),
+                barcode: None,
+                name_ar: "منتج".to_string(),
+                name_fr: "Produit".to_string(),
+                category_id: None,
+                is_kit,
+                is_active,
+            };
+            let unit = ProductUnit {
+                id: UnitId::new(),
+                product_id: id,
+                unit_name_ar: "قطعة".to_string(),
+                unit_name_fr: "Pièce".to_string(),
+                factor_micro: FactorMicro::from_micros(10_000),
+                barcode: None,
+                sale_price: Money::from_centimes(1_000),
+                purchase_price: Money::from_centimes(800),
+                is_base_unit: true,
+                is_default_selling: true,
+            };
+            self.products
+                .lock()
+                .expect("products")
+                .insert(id, (product.clone(), vec![unit.clone()]));
+            (product, unit)
+        }
+    }
+
+    impl ProductRepository for FakeCatalog {
+        fn create_product(
+            &self,
+            product: &Product,
+            units: &[ProductUnit],
+            _origin_device_id: &str,
+        ) -> Result<(), ApplicationError> {
+            let mut products = self.products.lock().expect("products");
+            if products.values().any(|(p, _)| p.sku == product.sku) {
+                return Err(ApplicationError::Validation(DomainError::DuplicateSku));
+            }
+            products.insert(product.id, (product.clone(), units.to_vec()));
+            Ok(())
+        }
+
+        fn update_product(
+            &self,
+            product: &Product,
+            units: &[ProductUnit],
+        ) -> Result<(), ApplicationError> {
+            let mut products = self.products.lock().expect("products");
+            match products.get_mut(&product.id) {
+                Some(entry) => {
+                    *entry = (product.clone(), units.to_vec());
+                    Ok(())
+                }
+                None => Err(ApplicationError::NotFound("product".to_string())),
+            }
+        }
+
+        fn find_by_id(
+            &self,
+            id: ProductId,
+        ) -> Result<Option<(Product, Vec<ProductUnit>)>, ApplicationError> {
+            Ok(self.products.lock().expect("products").get(&id).cloned())
+        }
+
+        fn find_by_barcode(
+            &self,
+            barcode: &Barcode,
+        ) -> Result<Option<(Product, ProductUnit)>, ApplicationError> {
+            for (product, units) in self.products.lock().expect("products").values() {
+                for unit in units {
+                    if unit.barcode.as_ref() == Some(barcode) {
+                        return Ok(Some((product.clone(), unit.clone())));
+                    }
+                }
+            }
+            Ok(None)
+        }
+
+        fn find_by_sku(
+            &self,
+            sku: &Sku,
+        ) -> Result<Option<(Product, Vec<ProductUnit>)>, ApplicationError> {
+            for (product, units) in self.products.lock().expect("products").values() {
+                if product.sku == *sku {
+                    return Ok(Some((product.clone(), units.clone())));
+                }
+            }
+            Ok(None)
+        }
+
+        fn define_kit(&self, kit_id: ProductId, items: &[KitItem]) -> Result<(), ApplicationError> {
+            self.kit_items
+                .lock()
+                .expect("kits")
+                .insert(kit_id, items.to_vec());
+            Ok(())
+        }
+
+        fn get_kit_items(&self, kit_id: ProductId) -> Result<Vec<KitItem>, ApplicationError> {
+            Ok(self
+                .kit_items
+                .lock()
+                .expect("kits")
+                .get(&kit_id)
+                .cloned()
+                .unwrap_or_default())
+        }
+
+        fn get_all_kit_edges(&self) -> Result<Vec<(ProductId, ProductId)>, ApplicationError> {
+            let mut edges = Vec::new();
+            for (kit, items) in self.kit_items.lock().expect("kits").iter() {
+                for item in items {
+                    edges.push((*kit, item.component_product_id));
+                }
+            }
+            Ok(edges)
+        }
+
+        fn search(
+            &self,
+            query: &str,
+            limit: usize,
+        ) -> Result<Vec<(Product, Vec<ProductUnit>)>, ApplicationError> {
+            let mut out = Vec::new();
+            for (product, units) in self.products.lock().expect("products").values() {
+                if product.sku.as_str().contains(query) {
+                    out.push((product.clone(), units.clone()));
+                }
+                if out.len() >= limit {
+                    break;
+                }
+            }
+            Ok(out)
+        }
+
+        fn get_direct_kit_items(
+            &self,
+            kit_product_id: ProductId,
+        ) -> Result<Vec<KitComponentRow>, ApplicationError> {
+            Ok(self
+                .kit_items
+                .lock()
+                .expect("kits")
+                .get(&kit_product_id)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|item| KitComponentRow {
+                    component_product_id: item.component_product_id,
+                    unit_id: item.unit_id,
+                    quantity_micro: item.quantity_micro.micros(),
+                })
+                .collect())
+        }
+    }
+
+    impl CategoryRepository for FakeCatalog {
+        fn create_category(&self, category: &Category) -> Result<(), ApplicationError> {
+            self.categories
+                .lock()
+                .expect("categories")
+                .insert(category.id, category.clone());
+            Ok(())
+        }
+
+        fn find_category_by_id(
+            &self,
+            id: CategoryId,
+        ) -> Result<Option<Category>, ApplicationError> {
+            Ok(self
+                .categories
+                .lock()
+                .expect("categories")
+                .get(&id)
+                .cloned())
+        }
+
+        fn list_categories(&self) -> Result<Vec<Category>, ApplicationError> {
+            Ok(self
+                .categories
+                .lock()
+                .expect("categories")
+                .values()
+                .cloned()
+                .collect())
+        }
+    }
+
+    fn session_with(role: Role) -> SessionContext {
+        SessionContext {
+            token: SessionToken::new_random(),
+            user_id: UserId::new(),
+            role,
+            expires_at: chrono::Utc::now() + chrono::TimeDelta::hours(1),
+        }
+    }
+
+    fn base_input() -> Vec<NewUnitInput> {
+        vec![NewUnitInput {
+            unit_name_ar: "قطعة".to_string(),
+            unit_name_fr: "Pièce".to_string(),
+            factor_micro: 10_000,
+            barcode: None,
+            sale_price_centimes: 1_000,
+            purchase_price_centimes: 800,
+            is_base_unit: true,
+            is_default_selling: true,
+        }]
+    }
+
+    #[test]
+    fn vendeur_cannot_create_or_define_but_can_read() {
+        let catalog = FakeCatalog::new();
+        let vendeur = session_with(Role::Vendeur);
+        let create = CreateProductUseCase::new(&catalog, &catalog);
+        let input = CreateProductInput {
+            sku: "VIS-8X40".to_string(),
+            barcode: None,
+            name_ar: "برغي".to_string(),
+            name_fr: "Vis".to_string(),
+            category_id: None,
+            is_kit: false,
+            units: base_input(),
+        };
+        assert!(matches!(
+            create.execute(&vendeur, input, "TEST-TERMINAL"),
+            Err(ApplicationError::Unauthorized)
+        ));
+        let define = DefineKitUseCase::new(&catalog);
+        assert!(matches!(
+            define.execute(&vendeur, ProductId::new(), Vec::new()),
+            Err(ApplicationError::Unauthorized)
+        ));
+        let get = GetProductWithUnitsUseCase::new(&catalog);
+        assert!(matches!(
+            get.execute(&vendeur, ProductId::new()),
+            Err(ApplicationError::NotFound(_))
+        ));
+    }
+
+    #[test]
+    fn gerant_creates_and_kit_cycle_rejected_end_to_end() {
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let create = CreateProductUseCase::new(&catalog, &catalog);
+        let mk = |sku: &str, is_kit: bool| {
+            create
+                .execute(
+                    &gerant,
+                    CreateProductInput {
+                        sku: sku.to_string(),
+                        barcode: None,
+                        name_ar: "قطعة".to_string(),
+                        name_fr: "Piece".to_string(),
+                        category_id: None,
+                        is_kit,
+                        units: base_input(),
+                    },
+                    "TEST-TERMINAL",
+                )
+                .expect("create")
+        };
+        let a = mk("KIT-A", true);
+        let b = mk("LEAF-B", false);
+        let define = DefineKitUseCase::new(&catalog);
+        let unit_of = |id: ProductId| {
+            catalog
+                .find_by_id(id)
+                .expect("lookup")
+                .expect("product")
+                .1
+                .into_iter()
+                .next()
+                .expect("base unit")
+                .id
+        };
+        // Self-reference rejected.
+        let itself = define.execute(
+            &gerant,
+            a,
+            vec![NewKitItemInput {
+                component_id: a,
+                unit_id: unit_of(a),
+                quantity_micro: 10_000,
+            }],
+        );
+        assert!(matches!(
+            itself,
+            Err(ApplicationError::Validation(
+                DomainError::SelfReferencingKit
+            ))
+        ));
+        // Valid edge accepted.
+        define
+            .execute(
+                &gerant,
+                a,
+                vec![NewKitItemInput {
+                    component_id: b,
+                    unit_id: unit_of(b),
+                    quantity_micro: 20_000,
+                }],
+            )
+            .expect("valid kit");
+        // Duplicate SKU rejected at the repository seam.
+        let dup = create.execute(
+            &gerant,
+            CreateProductInput {
+                sku: "KIT-A".to_string(),
+                barcode: None,
+                name_ar: "x".to_string(),
+                name_fr: "y".to_string(),
+                category_id: None,
+                is_kit: false,
+                units: base_input(),
+            },
+            "TEST-TERMINAL",
+        );
+        assert!(matches!(
+            dup,
+            Err(ApplicationError::Validation(DomainError::DuplicateSku))
+        ));
+    }
+
+    #[test]
+    fn inactive_component_is_rejected() {
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let kit = catalog.seed_product("KIT-X", true, true).0;
+        let (dead, dead_unit) = catalog.seed_product("DEAD", false, false);
+        let define = DefineKitUseCase::new(&catalog);
+        let rejected = define.execute(
+            &gerant,
+            kit.id,
+            vec![NewKitItemInput {
+                component_id: dead.id,
+                unit_id: dead_unit.id,
+                quantity_micro: 10_000,
+            }],
+        );
+        assert!(matches!(
+            rejected,
+            Err(ApplicationError::Validation(
+                DomainError::InvalidKitComponent
+            ))
+        ));
+    }
+
+    #[test]
+    fn gerant_updates_product_and_repeat_call_is_idempotent() {
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let (product, unit) = catalog.seed_product("VIS-8X40", false, true);
+        let update = UpdateProductUseCase::new(&catalog, &catalog);
+        let payload = || UpdateProductInput {
+            id: product.id,
+            name_ar: "برغي محدث".to_string(),
+            name_fr: "Vis MAJ".to_string(),
+            category_id: None,
+            is_active: true,
+            units: vec![UnitUpsert {
+                id: Some(unit.id),
+                unit: NewUnitInput {
+                    sale_price_centimes: 1_500,
+                    ..base_input().into_iter().next().expect("base")
+                },
+            }],
+        };
+        update.execute(&gerant, payload()).expect("first update");
+        // Identical repeat: same state, no error (idempotent-safe).
+        update.execute(&gerant, payload()).expect("repeat update");
+        let (stored, units) = catalog
+            .find_by_id(product.id)
+            .expect("lookup")
+            .expect("row");
+        assert_eq!(stored.name_fr, "Vis MAJ");
+        assert_eq!(stored.sku.as_str(), "VIS-8X40");
+        assert!(stored.is_active);
+        assert_eq!(units.len(), 1);
+        assert_eq!(units[0].id, unit.id);
+        assert_eq!(units[0].sale_price.centimes(), 1_500);
+    }
+
+    #[test]
+    fn update_rejects_unknown_id_unauthorized_role_and_empty_names() {
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let (product, unit) = catalog.seed_product("VIS-8X40", false, true);
+        let update = UpdateProductUseCase::new(&catalog, &catalog);
+        let payload = |id: ProductId, name_fr: &str| UpdateProductInput {
+            id,
+            name_ar: "برغي".to_string(),
+            name_fr: name_fr.to_string(),
+            category_id: None,
+            is_active: true,
+            units: vec![UnitUpsert {
+                id: Some(unit.id),
+                unit: base_input().into_iter().next().expect("base"),
+            }],
+        };
+        assert!(matches!(
+            update.execute(&gerant, payload(ProductId::new(), "Vis")),
+            Err(ApplicationError::NotFound(_))
+        ));
+        let vendeur = session_with(Role::Vendeur);
+        assert!(matches!(
+            update.execute(&vendeur, payload(product.id, "Vis")),
+            Err(ApplicationError::Unauthorized)
+        ));
+        assert!(matches!(
+            update.execute(&gerant, payload(product.id, "   ")),
+            Err(ApplicationError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn update_rejects_unknown_category_and_clears_on_none() {
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let (product, unit) = catalog.seed_product("VIS-8X40", false, true);
+        let update = UpdateProductUseCase::new(&catalog, &catalog);
+        let payload = |category_id: Option<CategoryId>| UpdateProductInput {
+            id: product.id,
+            name_ar: "برغي".to_string(),
+            name_fr: "Vis".to_string(),
+            category_id,
+            is_active: true,
+            units: vec![UnitUpsert {
+                id: Some(unit.id),
+                unit: base_input().into_iter().next().expect("base"),
+            }],
+        };
+        assert!(matches!(
+            update.execute(
+                &gerant,
+                payload(Some(CategoryId::from(uuid::Uuid::new_v4())))
+            ),
+            Err(ApplicationError::NotFound(_))
+        ));
+        update
+            .execute(&gerant, payload(None))
+            .expect("clear category");
+        let (stored, _) = catalog
+            .find_by_id(product.id)
+            .expect("lookup")
+            .expect("row");
+        assert!(stored.category_id.is_none());
+    }
+}

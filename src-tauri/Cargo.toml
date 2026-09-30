@@ -1,0 +1,31 @@
+[package]
+name = "ultrapos"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Baraka UltraPOS desktop harness (Tauri v2)"
+
+[lib]
+name = "ultrapos_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "ultrapos"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { workspace = true }
+
+[dependencies]
+tauri = { workspace = true }
+baraka-commands = { path = "../crates/commands" }
+baraka-infrastructure = { path = "../crates/infrastructure" }
+baraka-application = { path = "../crates/application" }
+baraka-domain = { path = "../crates/domain" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"

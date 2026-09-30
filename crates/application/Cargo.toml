@@ -1,0 +1,17 @@
+[package]
+name = "baraka-application"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Baraka UltraPOS application layer: use cases, ports and application errors"
+
+[dependencies]
+baraka-domain = { path = "../domain" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -1,0 +1,49 @@
+REPO ROOT: D:/Dev/Baraka UltraPOS
+HEAD: 977a8047411c12f0adb743cbb6e11c942edd2e68
+BRANCH: master
+STATUS_LINES: 3
+LOG5:
+977a804 docs: Executor Constitution v2.1 - carry over v1 safeguards, list obsolete v1 rules
+d0e93ed docs: Executor Constitution v2; archive v1 constitution and AGENTS
+e42aa1e audit: AUD-003 UI audit evidence (layout-only capture; real app not launched)
+05f0f39 baseline: engine complete through TASK-BRK-057 (pre-redesign snapshot)
+REL001_PRESENT:
+d0e93ed docs: Executor Constitution v2; archive v1 constitution and AGENTS
+REL002_PRESENT:
+977a804 docs: Executor Constitution v2.1 - carry over v1 safeguards, list obsolete v1 rules
+STALEPATH_EXISTS: True
+STALEPATH_PARENT_EXISTS: True
+STALE_HAS_GIT: False
+STALE_HAS_AGENTS: True
+STALE_HAS_CONSTITUTION: True
+STALE_HAS_TAURICONF: True
+STALE_TOPLEVEL (name | length | mtime):
+.opencode | 1 | 09/28/2026 12:07:17
+.ruff_cache | 1 | 09/26/2026 15:58:16
+assets | 1 | 09/26/2026 13:29:07
+crates | 1 | 09/25/2026 20:44:16
+dist | 1 | 09/29/2026 17:17:49
+docs | 1 | 09/27/2026 14:19:01
+node_modules | 1 | 09/27/2026 18:03:47
+src | 1 | 09/27/2026 13:47:42
+src-tauri | 1 | 09/25/2026 22:59:40
+target | 1 | 09/25/2026 23:08:49
+.eslintrc.cjs | 631 | 09/25/2026 20:45:05
+.gitignore | 501 | 09/25/2026 22:48:47
+AGENTS.md | 3363 | 09/28/2026 11:04:50
+Cargo.lock | 137723 | 09/29/2026 16:41:30
+Cargo.toml | 806 | 09/26/2026 13:48:29
+CONSTITUTION_OF_EXECUTOR.md | 13720 | 09/25/2026 15:22:52
+index.html | 418 | 09/25/2026 20:44:37
+opencode.json | 3459 | 09/28/2026 11:05:14
+package-lock.json | 170722 | 09/27/2026 18:03:47
+package.json | 1095 | 09/27/2026 18:04:37
+pnpm-lock.yaml | 89345 | 09/27/2026 11:45:12
+pnpm-workspace.yaml | 50 | 09/27/2026 11:45:12
+postcss.config.js | 81 | 09/25/2026 20:43:28
+rust-toolchain.toml | 66 | 09/25/2026 22:42:26
+tailwind.config.js | 932 | 09/26/2026 11:32:14
+tsconfig.json | 660 | 09/25/2026 20:43:28
+tsconfig.node.json | 331 | 09/25/2026 20:43:28
+vite.config.ts | 955 | 09/27/2026 13:46:45
+VERDICT: TWO COPIES - canonical D:/Dev/Baraka UltraPOS is a git repo at 977a804; D:/Baraka Project/Baraka UltraPOS has no .git and file dates 25-29/09/2026 (stale). HEAD-date comparison not applicable (stale copy is not a git repo).

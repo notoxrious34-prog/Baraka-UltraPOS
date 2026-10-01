@@ -1,0 +1,41 @@
+UNIQUE_ADR=36
+ADR-001 | n=1 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1464: 1. `ADR-001` — Tauri v2 + Rust.
+ADR-002 | n=1 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1465: 2. `ADR-002` — SQLite + rusqlite, no runtime ORM.
+ADR-003 | n=2 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1466: 3. `ADR-003` — Money/Qty/Factor fixed-point model.
+ADR-004 | n=4 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1467: 4. `ADR-004` — Typed IPC wire representation.
+ADR-005 | n=1 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1468: 5. `ADR-005` — Atomic Sale / Unit of Work.
+ADR-006 | n=2 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1469: 6. `ADR-006` — Transactional Outbox for printing.
+ADR-007 | n=1 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1470: 7. `ADR-007` — Append-only ledger enforcement.
+ADR-008 | n=2 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1471: 8. `ADR-008` — Gapless committed document numbering.
+ADR-009 | n=1 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1472: 9. `ADR-009` — SQLCipher production profile.
+ADR-010 | n=7 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1473: 10. `ADR-010` — Backup / Recovery protocol.
+ADR-011 | n=1 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1474: 11. `ADR-011` — FTS5 and normalization.
+ADR-012 | n=1 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1475: 12. `ADR-012` — POS keyboard contract.
+ADR-013 | n=7 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1476: 13. `ADR-013` — Tax rule versioning and legal validation gate.
+ADR-014 | n=1 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1477: 14. `ADR-014` — Future synchronization metadata.
+ADR-015 | n=4 | e.g. D:/Dev/Baraka UltraPOS/docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md:1478: 15. `ADR-015` — Performance benchmark methodology.
+ADR-025 | n=9 | e.g. D:/Dev/Baraka UltraPOS/crates/application/src/use_cases/cash.rs:1: //! Cash session lifecycle use cases (ADR-025/026/027).
+ADR-027 | n=4 | e.g. D:/Dev/Baraka UltraPOS/crates/application/src/ports.rs:990: /// ADR-027: the full amount is cash-collected into the active session.
+ADR-028 | n=11 | e.g. D:/Dev/Baraka UltraPOS/docs/audits/TASK-BRK-040-document-conversion-contracts-investigation.md:30: ADR-028).
+ADR-029 | n=15 | e.g. D:/Dev/Baraka UltraPOS/docs/audits/TASK-BRK-050-suppliers-purchases-reports-audit.md:42: FF = single ledger DEBIT, structurally stock-free per ADR-029
+ADR-030 | n=14 | e.g. D:/Dev/Baraka UltraPOS/docs/audits/TASK-BRK-050-suppliers-purchases-reports-audit.md:44: outflow per ADR-030, methods CASH|OTHER only (`:342-422`);
+ADR-031 | n=1 | e.g. D:/Dev/Baraka UltraPOS/crates/infrastructure/tests/supplier_purchase_lifecycle_tests.rs:421: assert_eq!(view.status, "FINALIZED"); // ADR-031: committed == FINALIZED
+ADR-033 | n=1 | e.g. D:/Dev/Baraka UltraPOS/crates/infrastructure/tests/supplier_purchase_lifecycle_tests.rs:462: // Gerant holds Permission::PriceOverride (ADR-033): the use case passes
+ADR-034 | n=2 | e.g. D:/Dev/Baraka UltraPOS/crates/domain/src/sales/document.rs:93: /// Purchase-order rollup: some ordered quantity received (ADR-034).
+ADR-037 | n=10 | e.g. D:/Dev/Baraka UltraPOS/crates/application/src/ports.rs:1759: /// One low-stock row (ADR-037: stockout / depletion signal).
+ADR-039 | n=1 | e.g. D:/Dev/Baraka UltraPOS/src/features/reports/components/report-format.ts:2: * Integer-only display helpers shared by every report screen (ADR-039).
+ADR-040 | n=12 | e.g. D:/Dev/Baraka UltraPOS/crates/application/src/ports.rs:603: /// Execute a single-shot DEVIS-to-BL conversion atomically (ADR-040):
+ADR-044 | n=1 | e.g. D:/Dev/Baraka UltraPOS/crates/infrastructure/src/adapters/sqlite_conversion_repository.rs:747: // q. Print outbox job (checkout RECEIPT pattern, ADR-044).
+ADR-045 | n=4 | e.g. D:/Dev/Baraka UltraPOS/crates/application/src/use_cases/mod.rs:286: /// `terminal_id` is TerminalContext-resolved at the IPC edge (ADR-045).
+ADR-046 | n=9 | e.g. D:/Dev/Baraka UltraPOS/docs/audits/TASK-BRK-040-document-conversion-contracts-investigation.md:174: > "ADR-046 HARD INVARIANT: this method performs ZERO stock writes. Physical
+ADR-048 | n=3 | e.g. D:/Dev/Baraka UltraPOS/docs/audits/WAREHOUSE_LIFECYCLE_AUDIT.md:117: This is the **structural sibling of the ADR-048 Admin-bootstrap gap**: the
+ADR-049 | n=5 | e.g. D:/Dev/Baraka UltraPOS/docs/DEV_RUN_PROTOCOL.md:162: // ADR-049: the SQLite file lives in the OS-standard per-user
+ADR-050 | n=1 | e.g. D:/Dev/Baraka UltraPOS/docs/audits/LOGIN_PIPELINE_TRACE_AUDIT.md:511: ADR-050 shape. Success `T` (`dto.rs:72-84`): `session_token`, `user_id`,
+ADR-062 | n=9 | e.g. D:/Dev/Baraka UltraPOS/crates/application/src/ports.rs:1980: /// Restore (TASK-BRK-054, ADR-062) extends the same port: `precheck_restore`
+ADR-063 | n=4 | e.g. D:/Dev/Baraka UltraPOS/crates/infrastructure/tests/crash_matrix/driver.rs:1: //! Crash-matrix child driver (ADR-063): seed, hook, checkout, die.
+ADR-064 | n=2 | e.g. D:/Dev/Baraka UltraPOS/crates/infrastructure/src/adapters/sqlite_checkout_repository.rs:483: // (ADR-064: the claim check in step 1 and this INSERT are both
+ADR-065 | n=5 | e.g. D:/Dev/Baraka UltraPOS/crates/application/src/use_cases/printing.rs:2: //! and test-print diagnostics (TASK-BRK-056, ADR-065).
+MIN=ADR-001 MAX=ADR-065
+GAPS(29)=ADR-016,ADR-017,ADR-018,ADR-019,ADR-020,ADR-021,ADR-022,ADR-023,ADR-024,ADR-026,ADR-032,ADR-035,ADR-036,ADR-038,ADR-041,ADR-042,ADR-043,ADR-047,ADR-051,ADR-052,ADR-053,ADR-054,ADR-055,ADR-056,ADR-057,ADR-058,ADR-059,ADR-060,ADR-061
+DOCS_ADR_DIR: NOT PRESENT (see S3 listing) - no files, no ADR ids in filenames.
+HIGHEST_ADR: ADR-065

@@ -1,0 +1,12 @@
+TOTAL_COMMITS: 4
+FIRST: 2026-09-30T20:00:19+01:00
+LATEST: 2026-10-01T12:39:01+01:00
+TAGS:
+baseline-engine-pre-redesign
+LAST40:
+977a804 | 2026-10-01T12:39:01+01:00 | docs: Executor Constitution v2.1 - carry over v1 safeguards, list obsolete v1 rules
+d0e93ed | 2026-10-01T12:35:00+01:00 | docs: Executor Constitution v2; archive v1 constitution and AGENTS
+e42aa1e | 2026-10-01T12:33:24+01:00 | audit: AUD-003 UI audit evidence (layout-only capture; real app not launched)
+05f0f39 | 2026-09-30T20:00:19+01:00 | baseline: engine complete through TASK-BRK-057 (pre-redesign snapshot)
+GREP_BRK_ADR:
+05f0f39 baseline: engine complete through TASK-BRK-057 (pre-redesign snapshot)

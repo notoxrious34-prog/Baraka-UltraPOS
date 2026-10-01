@@ -1,0 +1,47 @@
+ROWS=46
+.opencode/skills/baraka-design-excellence/SKILL.md | 529 | # Baraka Design Excellence Skill
+.opencode/skills/baraka-escpos/SKILL.md | 392 | # Baraka ESC/POS Skill
+.opencode/skills/baraka-financial/SKILL.md | 508 | # Baraka Financial Skill
+.opencode/skills/baraka-review/SKILL.md | 298 | # Baraka Review Skill
+.opencode/skills/baraka-sale/SKILL.md | 400 | # Baraka Atomic Sale Skill
+.opencode/skills/baraka-sqlite/SKILL.md | 503 | # Baraka SQLite Skill
+.opencode/skills/baraka-stock/SKILL.md | 395 | # Baraka Stock Skill
+.opencode/skills/baraka-testing/SKILL.md | 368 | # Baraka Testing Skill
+.opencode/skills/baraka-ui/SKILL.md | 457 | # Baraka UI Skill
+AGENTS.md | 5538 | # AGENTS.md - Executor entry point (Baraka UltraPOS)
+assets/fonts/LICENSE-Inter.txt | 4380 | Copyright (c) 2016 The Inter Project Authors (https://github.com/rsms/inter)
+assets/fonts/LICENSE-NotoNaskhArabic.txt | 4475 | Copyright 2022 The Noto Project Authors (https://github.com/notofonts/arabic)
+audit/AUD-004/S1.txt | 2237 | REPO ROOT: D:/Dev/Baraka UltraPOS
+audit/AUD-004/S2.txt | 672 | TOTAL_COMMITS: 4
+audit/AUD-004/S3.txt | 0 | 
+audit/AUD-004/S4.txt | 5999 | UNIQUE_ADR=36
+audit/AUD-004/S5.txt | 7342 | ===== S5a =====
+audit/AUD-004/S6.txt | 3780 | == STRING: Identité & Impression
+audit/AUD-004/S7.txt | 1698 | == audit/AUDIT-REPORT.md
+audit/AUD-004/START-status.txt | 118 | ?? audit/AUD-004/
+audit/AUDIT-REPORT-2.md | 29531 | # AUDIT-REPORT-2 — Safety baseline + static evidence audit (TASK-AUD-002)
+audit/AUDIT-REPORT-3.md | 16950 | # AUDIT-REPORT-3 — read-only UI audit (TASK-AUD-003 + C1)
+audit/AUDIT-REPORT.md | 25717 | # AUDIT-REPORT — Baraka UltraPOS repository, runtime, presentation layer (TASK-AUD-001)
+audit/screenshots/INDEX.md | 13755 | # Screenshots index (TASK-AUD-003)
+docs/DEV_RUN_PROTOCOL.md | 10845 | # Baraka UltraPOS — Verified Local Development Run Protocol
+docs/architecture/CONSTITUTION_OF_EXECUTOR.md | 13720 | # CONSTITUTION OF THE EXECUTOR - Baraka UltraPOS
+docs/architecture/EXECUTOR-CONSTITUTION-v2.md | 12153 | # Executor Constitution v2 - Baraka UltraPOS
+docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md | 39086 | # Baraka UltraPOS — Master Sovereign Architecture & Product Design
+docs/architecture/README.md | 696 | # docs/architecture - index
+docs/architecture/archive/AGENTS.v1.md | 3363 | # Baraka UltraPOS — Executor Engineering Contract
+docs/architecture/archive/CONSTITUTION_OF_EXECUTOR.v1.0.0.md | 13720 | # CONSTITUTION OF THE EXECUTOR - Baraka UltraPOS
+docs/audits/FIRST_LIVE_SALE_TICK_2026_000002_FORENSIC_AUDIT.md | 12207 | # FORENSIC AUDIT — First Live Sale TICK-2026-000002 (TASK-BRK-030)
+docs/audits/LOGIN_PIPELINE_TRACE_AUDIT.md | 23094 | # LOGIN PIPELINE TRACE AUDIT — Silent Failure Diagnosis (TASK-BRK-019)
+docs/audits/PRODUCT_CATALOG_PIPELINE_AUDIT.md | 8896 | # PRODUCT CATALOG PIPELINE AUDIT — Empty Catalog on Fresh Database (TASK-BRK-027)
+docs/audits/TASK-BRK-039-payment-overpayment-investigation.md | 8987 | # TASK-BRK-039 — Payment Overpayment / Change Attribution Investigation
+docs/audits/TASK-BRK-040-document-conversion-contracts-investigation.md | 16088 | # TASK-BRK-040 — Document Conversion IPC Contracts Investigation
+docs/audits/TASK-BRK-041-document-query-audit.md | 4973 | # TASK-BRK-041 — Document Retrieval / Query Capabilities Audit
+docs/audits/TASK-BRK-044-returns-and-avoir-architecture-investigation.md | 9614 | # TASK-BRK-044 — Returns & Avoir Architecture Investigation
+docs/audits/TASK-BRK-048-catalog-stock-warehouse-audit.md | 9345 | # TASK-BRK-048 — Catalog, Stock & Warehouse Capabilities Audit
+docs/audits/TASK-BRK-049-catalog-and-warehouses-audit.md | 9855 | # TASK-BRK-049 — Catalog Product Editing & Multi-Warehouse Capabilities Audit
+docs/audits/TASK-BRK-050-suppliers-purchases-reports-audit.md | 7656 | # TASK-BRK-050 — Suppliers, Purchases, Reporting & Backup Audit
+docs/audits/WAREHOUSE_LIFECYCLE_AUDIT.md | 7633 | # WAREHOUSE LIFECYCLE AUDIT — Empty "Dépôt" Selector on Fresh Database (TASK-BRK-024)
+docs/operations/release-benchmarks-v1.0.0.md | 3987 | # Baraka UltraPOS v1.0.0 — Release Benchmarks (ADR-015)
+docs/operations/release-notes-v1.0.0.md | 5299 | # Baraka UltraPOS v1.0.0 — Notes de version / ملاحظات الإصدار
+docs/operations/release-procedure.md | 4697 | # Baraka UltraPOS — Release Procedure (reproducible v1 recipe)
+docs/operations/thermal-printer-drill.md | 5502 | # Procédure matérielle — imprimante thermique 80 mm (Baraka UltraPOS)

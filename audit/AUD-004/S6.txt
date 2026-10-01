@@ -1,0 +1,70 @@
+== STRING: Identité & Impression
+src/components/pos/modals/StoreIdentityModal.tsx
+src/lib/i18n.ts
+docs/operations/release-notes-v1.0.0.md
+docs/operations/thermal-printer-drill.md
+== STRING: thermal-printer-drill
+src/lib/i18n.ts
+docs/operations/release-notes-v1.0.0.md
+== STRING: printing_test_print
+== STRING: store.name
+crates/infrastructure/src/adapters/sqlite_printer_settings.rs
+== STRING: RESTORE
+crates/application/src/ports.rs
+crates/commands/src/ipc.rs
+crates/infrastructure/src/adapters/sqlite_backup_manager.rs
+crates/infrastructure/tests/restore_tests.rs
+src/components/pos/modals/backup-modal.test.tsx
+== STRING: backups_restore
+crates/commands/src/ipc.rs
+src/lib/ipc-backups.test.ts
+src/lib/ipc.ts
+src-tauri/src/lib.rs
+docs/audits/TASK-BRK-050-suppliers-purchases-reports-audit.md
+== STRING: SESSION-BRK-012
+== STRING: BRK-057
+== Identité & Impression
+src/components/pos/modals/StoreIdentityModal.tsx:4: * "Identité & Impression" section: 8-field identity form in ticket
+src/lib/i18n.ts:121:  "settings.identity.title": "Identité & Impression",
+== printing_test_print
+== backups_restore
+crates/commands/src/ipc.rs:1917:/// `backups_restore_precheck` command: full read-only verification report
+crates/commands/src/ipc.rs:1920:pub fn backups_restore_precheck(
+crates/commands/src/ipc.rs:1932:/// `backups_restore` command: verified destructive restore with quarantine
+crates/commands/src/ipc.rs:1938:pub fn backups_restore(
+src/lib/ipc-backups.test.ts:230:  it("invokes backups_restore_precheck and maps the typed report", async () => {
+== SESSION-BRK-012
+== BRK-057
+== RESTORE lines:
+crates/application/src/ports.rs:2029:    /// it when older, and appends a chain-linked `RESTORE_PERFORMED` audit
+crates/commands/src/ipc.rs:1808:        RestoreError::RestoreInProgress => "RESTORE_IN_PROGRESS".to_string(),
+crates/commands/src/ipc.rs:1809:        RestoreError::SwapFailedAndRolledBack { .. } => "RESTORE_SWAP_FAILED".to_string(),
+crates/commands/src/ipc.rs:1936:/// is the `RESTORE_PERFORMED` event plus the preserved quarantine copy).
+== DRILL:
+total 28
+drwxr-xr-x 1 X1 197121    0 Sep 30 19:07 .
+drwxr-xr-x 1 X1 197121    0 Sep 30 19:57 ..
+-rw-r--r-- 1 X1 197121 3987 Sep 30 19:07 release-benchmarks-v1.0.0.md
+-rw-r--r-- 1 X1 197121 5299 Sep 30 18:30 release-notes-v1.0.0.md
+-rw-r--r-- 1 X1 197121 4697 Sep 30 18:30 release-procedure.md
+-rw-r--r-- 1 X1 197121 5502 Sep 30 16:43 thermal-printer-drill.md
+== BUNDLE:
+BUNDLE_DIR_ABSENT
+src/components/pos/modals/BackupModal.tsx:7: * authoritative), a read-only precheck report, an exact-RESTORE
+src/lib/i18n.ts:224:  "backups.restore.confirm.placeholder": "Tapez RESTORE",
+src/lib/i18n.ts:243:  "backups.restore.error.RESTORE_IN_PROGRESS": "Une restauration est déjà en cours.",
+src/lib/i18n.ts:244:  "backups.restore.error.RESTORE_SWAP_FAILED":
+src/lib/i18n.ts:839:  "backups.restore.confirm.placeholder": "اكتب RESTORE",
+src/lib/i18n.ts:857:  "backups.restore.error.RESTORE_IN_PROGRESS": "استعادة جارية مسبقًا.",
+src/lib/i18n.ts:858:  "backups.restore.error.RESTORE_SWAP_FAILED": "فشل الاستبدال — تمت استعادة القاعدة الحالية.",
+src/lib/i18n.ts:1356:  RESTORE_IN_PROGRESS: "Une restauration est déjà en cours",
+== backup modal restore flow:
+5: * TASK-BRK-054 adds the verified restore flow: per-row restore action
+7: * authoritative), a read-only precheck report, an exact-RESTORE
+8: * confirmation gate, and non-dismissable restoring/success phases.
+11: * restore locked phases, capture guard while busy), bilingual FR/AR
+14: * restore errors use the dedicated restore keys; the backend is final.
+22:  canRestoreForRole,
+24:  describeRestoreWarning,
+26:  isRestoreExecutable,
+src/stores/backup-modal-store.ts:71:  return input.trim() === "RESTORE";

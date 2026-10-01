@@ -1,0 +1,239 @@
+===== S5a =====
+IPC_COUNT=72
+app_health
+auth_login
+auth_logout
+check_first_run_status
+bootstrap_first_admin
+catalog_create_product
+catalog_update_product
+catalog_get_product
+catalog_search
+catalog_define_kit
+warehouses_create
+warehouses_list
+stock_get
+stock_adjust
+stock_transfer
+sales_checkout
+sales_preview_totals
+convert_devis_to_bl
+convert_bl_to_facture
+sales_create_draft
+sales_get
+documents_search
+returns_get_source_summary
+returns_process
+documents_get_return_context
+documents_process_return
+backups_create
+backups_list
+backups_verify
+backups_restore_precheck
+backups_restore
+customers_create
+customers_update
+customers_search
+customers_get
+customers_list
+credit_record_payment
+credit_get_statement
+documents_get_print_status
+documents_reprint
+printer_get_settings
+printer_update_settings
+printer_test_print
+store_identity_get
+store_identity_save
+cash_open
+cash_begin_closing
+cash_cancel_closing
+cash_confirm_closing
+cash_get_active_session
+cash_record_expense
+cash_get_session_report
+suppliers_create
+suppliers_update
+suppliers_get
+suppliers_search
+suppliers_get_statement
+purchases_create_order
+purchases_update_order
+purchases_receive_goods
+purchases_record_invoice
+purchases_record_payment
+purchases_get_document
+reports_daily_sales
+reports_sales_by_product
+reports_sales_by_category
+reports_gross_margin
+reports_credit_outstanding
+reports_stock_movement_history
+reports_cash_sessions_history
+reports_low_stock
+reports_user_activity
+===== S5bc =====
+== S5b migrations:
+
+Name                                     Length
+----                                     ------
+0001_baseline_schema.sql                  15797
+0002_auth_lockout.sql                       274
+0003_stock_engine_schema.sql               2090
+0004_sales_engine_schema.sql               1363
+0005_customer_module_indexes.sql            806
+0006_print_worker_columns.sql               962
+0007_document_language.sql                  540
+0008_cash_session_engine_schema.sql        5956
+0009_supplier_purchase_engine_schema.sql   7470
+0010_reporting_indexes.sql                  960
+0011_add_converted_document_status.sql     2212
+0012_seed_default_warehouse.sql            1218
+0013_add_refund_out_movement_type.sql      3406
+
+
+
+HIGHEST_PREFIX: 0013
+== S5c cargo:
+Cargo.toml:7:  "src-tauri",
+Cargo.toml:18:serde = { version = "1.0", features = ["derive"] }
+Cargo.toml:22:chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+Cargo.toml:23:uuid = { version = "1.10", features = ["v4", "serde"] }
+Cargo.toml:27:rusqlite = { version = "0.32", features = ["bundled", "backup", "modern_sqlite", "hooks"] }
+Cargo.toml:28:tauri = { version = "2.0", features = [] }
+Cargo.toml:29:tauri-build = { version = "2.0" }
+crates/commands/Cargo.toml:7:description = "Baraka UltraPOS Tauri command layer: typed IPC handlers and DTOs"
+crates/commands/Cargo.toml:12:tauri = { workspace = true }
+crates/infrastructure/Cargo.toml:12:rusqlite = { workspace = true }
+crates/infrastructure/Cargo.toml:18:argon2 = { version = "0.5", features = ["std", "password-hash", "rand"] }
+src-tauri/Cargo.toml:7:description = "Baraka UltraPOS desktop harness (Tauri v2)"
+src-tauri/Cargo.toml:18:tauri-build = { workspace = true }
+src-tauri/Cargo.toml:21:tauri = { workspace = true }
+SQLCIPHER_COUNT:
+FTS5_HITS: none
+VERDICT: FTS ABSENT (no fts5 in crates/src/migrations; MATCH hits are JS regex/comments only)
+SQLCIPHER_TOTAL: 0
+===== S5e =====
+== S5e test counts:
+crates/application #[test]=31
+crates/commands #[test]=4
+crates/domain #[test]=54
+crates/infrastructure #[test]=265
+src-tauri #[test]=0
+src test files=21
+src it|test( lines=175
+===== S5f =====
+PKG name=baraka-ultrapos version=1.0.0
+script: dev = vite
+script: build = tsc && vite build
+script: preview = vite preview
+script: lint = eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+script: typecheck = tsc --noEmit
+script: test = vitest run
+script: tauri = tauri
+[workspace]
+members = [
+  "crates/domain",
+  "crates/application",
+  "crates/infrastructure",
+  "crates/commands",
+  "src-tauri",
+]
+resolver = "2"
+
+[workspace.package]
+12:  "app": {
+13-    "windows": [
+14-      {
+15-        "title": "Baraka UltraPOS",
+16-        "width": 1280,
+17-        "height": 800,
+18-        "minWidth": 1024,
+19-        "minHeight": 768,
+20-        "resizable": true,
+21-        "fullscreen": false
+22-      }
+23-    ],
+24-    "security": {
+3:  "productName": "Baraka UltraPOS",
+4:  "version": "1.0.0",
+5:  "identifier": "com.baraka.ultrapos",
+25:      "csp": null
+28:  "bundle": {
+30:    "targets": ["nsis"],
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+0
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "windows": {
+      "webviewInstallMode": { "type": "offlineInstaller", "silent": true },
+      "nsis": {
+        "languages": ["French", "English"],
+        "displayLanguageSelector": false
+      }
+    }
+  }
+}
+===== S5g =====
+DIR components files=1
+DIR components\pos files=11
+DIR components\pos\modals files=28
+DIR features files=0
+DIR features\auth files=2
+DIR features\catalog files=3
+DIR features\health files=1
+DIR features\purchases files=4
+DIR features\reports files=10
+DIR features\reports\components files=2
+DIR features\suppliers files=3
+DIR hooks files=3
+DIR lib files=15
+DIR stores files=17
+DIR types files=5
+MODAL_FILES=17
+components\pos\modals\BackupModal.tsx | 587
+components\pos\modals\CheckoutModal.tsx | 640
+components\pos\modals\CloseCashSessionModal.tsx | 267
+components\pos\modals\CustomerSelectModal.tsx | 371
+components\pos\modals\DiscountModal.tsx | 98
+components\pos\modals\DocumentConversionModal.tsx | 378
+components\pos\modals\OpenCashSessionModal.tsx | 128
+components\pos\modals\ProductEditModal.tsx | 258
+components\pos\modals\QuantityModal.tsx | 93
+components\pos\modals\RecordExpenseModal.tsx | 150
+components\pos\modals\RecordPaymentModal.tsx | 341
+components\pos\modals\ReturnModal.tsx | 446
+components\pos\modals\StockAdjustModal.tsx | 454
+components\pos\modals\StoreIdentityModal.tsx | 245
+components\pos\modals\WarehouseTransferModal.tsx | 429
+features\purchases\RecordSupplierPaymentModal.tsx | 163
+features\suppliers\SupplierFormModal.tsx | 143
+LARGEST20:
+lib\ipc.ts | 2339
+lib\i18n.ts | 1486
+components\pos\modals\CheckoutModal.tsx | 640
+components\pos\modals\BackupModal.tsx | 587
+components\pos\modals\StockAdjustModal.tsx | 454
+components\pos\modals\ReturnModal.tsx | 446
+features\catalog\ProductCreateForm.tsx | 444
+components\pos\modals\backup-modal.test.tsx | 433
+components\pos\modals\WarehouseTransferModal.tsx | 429
+stores\conversion-modal-store.ts | 405
+components\pos\modals\DocumentConversionModal.tsx | 378
+stores\return-modal-store.ts | 377
+components\pos\modals\conversion-modal.test.ts | 373
+stores\backup-modal-store.ts | 373
+components\pos\modals\CustomerSelectModal.tsx | 371
+lib\ipc-backups.test.ts | 365
+lib\ipc-returns.test.ts | 358
+components\pos\modals\RecordPaymentModal.tsx | 341
+stores\warehouse-transfer-store.ts | 328
+stores\store-identity-store.ts | 319
+===== S5h =====
+I18N path=src/lib/i18n.ts lines=1486 bytes=83422
+colon-key matches=1208

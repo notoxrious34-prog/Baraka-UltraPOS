@@ -1,0 +1,41 @@
+== audit/AUDIT-REPORT.md
+-rw-r--r-- 1 X1 197121 25717 Sep 30 19:47 audit/AUDIT-REPORT.md
+== audit/AUDIT-REPORT-2.md
+-rw-r--r-- 1 X1 197121 29531 Sep 30 20:11 audit/AUDIT-REPORT-2.md
+== OTHER audit md:
+audit/AUDIT-REPORT.md
+audit/AUDIT-REPORT-2.md
+audit/AUDIT-REPORT-3.md
+== HEADINGS audit/AUDIT-REPORT.md (bytes=25717)
+H: # AUDIT-REPORT — Baraka UltraPOS repository, runtime, presentation layer (TASK-AUD-001)
+H: ## A. REPOSITORY FACTS
+H: ## B. DEPENDENCY AND WINDOW FACTS
+H: ## C. FRONTEND STRUCTURE
+H: ## D. LAYOUT HAZARDS
+H: ## E. DESIGN SYSTEM FACTS
+H: ## F. IPC CONTRACT VS UI USAGE
+H: ## G. DATA STATE AND THE EMPTY PRODUCT PANEL
+H: ## H. FEATURE PRESENCE MATRIX
+H: ## I. TEST AND QUALITY FACTS
+H: ## J. SECTION 38 EVIDENCE
+H: ## K. RUNTIME CAPTURE
+H: ## L. PRINT OUTPUT
+H: ## APPENDIX — verbatim command outputs (abridged)
+== FLAGS audit/AUDIT-REPORT.md
+FLAG_LINES=0
+== HEADINGS audit/AUDIT-REPORT-2.md (bytes=29531)
+H: # AUDIT-REPORT-2 — Safety baseline + static evidence audit (TASK-AUD-002)
+H: ## STEP 0 — SNAPSHOT
+H: ## STEP 1 — GIT BASELINE
+H: ## A. SCHEMA FACTS (from `crates/infrastructure/migrations/*.sql` only)
+H: ## B. PERMISSION MAP (72 registered commands; method below)
+H: ## C. TEST-TO-COMPONENT COUPLING (21 Vitest files)
+H: ## D. RESOLVED UNKNOWNS
+H: ## E. DATA-DIRECTORY AND STARTUP FACTS
+H: ## F. FORMATTING AND FONT FACTS
+H: ## G. FORENSIC DOCUMENT DIGESTS
+H: ## H. DOCUMENT PRESENCE
+H: ## Acceptance notes
+== FLAGS audit/AUDIT-REPORT-2.md
+177: - `FIRST_LIVE_SALE_TICK_2026_000002_FORENSIC_AUDIT.md` — symptom: first live sale `TICK-2026-000002` correctness under question (schema v12 DB, read-only). Stated outcome: all 10 invariants PASS, key 
+FLAG_LINES=1

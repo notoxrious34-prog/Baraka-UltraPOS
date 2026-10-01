@@ -15,9 +15,10 @@
         "title": "Baraka UltraPOS",
         "create": false,
         "width": 1280,
-        "height": 800,
+        "height": 640,
         "minWidth": 1024,
-        "minHeight": 768,
+        "minHeight": 600,
+        "center": true,
         "resizable": true,
         "fullscreen": false
       }

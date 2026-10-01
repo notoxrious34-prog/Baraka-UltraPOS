@@ -1,0 +1,13 @@
+﻿{
+    "samples":  432,
+    "durationMs":  55000,
+    "hwnd":  1770686,
+    "childFirstMs":  5026,
+    "childCountMax15s":  6,
+    "lines":  [
+                  "INIT {\"t\":\"s\",\"ms\":4960,\"zoomed\":false,\"iconic\":false,\"rect\":\"-11,14,1931,1030\",\"fg\":\"Baraka UltraPOS [BARAKA_DATA_DIR]\",\"fgIsApp\":true}",
+                  "CHANGE {\"t\":\"s\",\"ms\":18887,\"zoomed\":false,\"iconic\":false,\"rect\":\"-11,14,1931,1030\",\"fg\":\"New notification\",\"fgIsApp\":false}",
+                  "CHANGE {\"t\":\"s\",\"ms\":20025,\"zoomed\":false,\"iconic\":false,\"rect\":\"-11,14,1931,1030\",\"fg\":\"Baraka UltraPOS [BARAKA_DATA_DIR]\",\"fgIsApp\":true}",
+                  "FINAL {\"t\":\"f\",\"ms\":59982,\"zoomed\":false,\"iconic\":false,\"rect\":\"-11,14,1931,1030\",\"fg\":\"Baraka UltraPOS [BARAKA_DATA_DIR]\",\"fgIsApp\":true}"
+              ]
+}

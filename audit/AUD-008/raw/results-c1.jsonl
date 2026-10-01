@@ -1,0 +1,13 @@
+{"c1":"step0","head":"938e93e5","status":"only-untracked-audit-AUD-008","forbidden_diff_empty":true,"run3":{"pid":1696,"hwnd":1245926,"alive":true,"cdp_page":true,"port9222_owner":15308},"webview2_pids":[15308,11480,1528,13588,7504,11740]}
+{"c1":"step1","discrepancies":[],"run1_caveat":"run1 COLD recorded with earlier harness (no pageTarget sub-milestone); content 17571 single-source lower confidence"}
+{"c1":"step2","dpi":144,"outerPhysical":[-11,14,1931,1030],"dwmFramePhysical":[-1,14,1921,1020],"clientOriginPhysical":[0,59],"clientLogical":[1280,640],"workPhysical":[0,0,1920,1034],"marginsPhysical":{"left":-1,"right":-1,"top":14,"bottom":14}}
+{"c1":"probeA","method":"SetWindowPos","requested":[800,450],"immediate":[800,450],"after500ms":[800,450],"cdp":[800,450],"verdict":"NOT_CLAMPED"}
+{"c1":"probeB","method":"MoveWindow","requested":[800,450],"immediate":[800,450],"after500ms":[800,450],"cdp":[800,450],"verdict":"NOT_CLAMPED"}
+{"c1":"probeC","method":"SetWindowPos","requested":[1000,580],"immediate":[1000,580],"cdp":[1000,580],"verdict":"NOT_CLAMPED"}
+{"c1":"probeD","zoomed":true,"outerPhysical":[-11,-11,1931,1045],"dwmFramePhysical":[0,0,1920,1034],"marginsVsWork":[0,0,0,0],"clientLogical":[1280,666.7],"cdp":{"iw":1280,"ih":667,"dpr":1.5,"availH":690},"overflow":false,"shotBytes":29863}
+{"c1":"probeD-restore","outerPhysical":[-11,14,1931,1030],"matchesNormal":true,"zoomed":false,"clientLogical":[1280,640]}
+{"c1":"drag-control","grab":[1919,1019],"target":[1150,620],"after":[1150,620],"anchorTopLeftUnchanged":true,"verdict":"PASS"}
+{"c1":"drag-4b-BR","target":[800,450],"after":[1024,600],"outerPhysical":[-11,14,1547,970],"verdict":"CLAMPED"}
+{"c1":"drag-4c-TL","grab":[0,14],"target":[800,450],"after":[1024,600],"outerPhysical":[373,74,1931,1030],"rightBottomUnchanged":true,"verdict":"CLAMPED"}
+{"c1":"drag-reset","clientLogical":[1280,640],"outerPhysical":[373,74,2315,1090],"note":"top-left moved by TL drag; size identical"}
+{"c1":"step5","close":"WM_CLOSE graceful, pid1696 exited","aud008_cmdline_procs":"own shell chain only","port9222":"FREE","fp_appdata_1":"f487a65b08bb140e4a0186aee61102692afd11cf5d95492df5141e9cd2d098f1","fp_appdata_eq":true,"appdata_entries":10,"fp_local_1":"9566ede057b84a9d470eb4d086a616b1569d301b4f6ae6d2d077f82c26bffda3","fp_local_eq":true,"local_entries":1599}

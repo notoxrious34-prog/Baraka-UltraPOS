@@ -1,0 +1,11 @@
+﻿{
+    "samples":  477,
+    "durationMs":  60000,
+    "hwnd":  1245926,
+    "childFirstMs":  4703,
+    "childCountMax15s":  6,
+    "lines":  [
+                  "INIT {\"t\":\"s\",\"ms\":4646,\"zoomed\":false,\"iconic\":false,\"rect\":\"-11,14,1931,1030\",\"fg\":\"Baraka UltraPOS [BARAKA_DATA_DIR]\",\"fgIsApp\":true}",
+                  "FINAL {\"t\":\"f\",\"ms\":64640,\"zoomed\":false,\"iconic\":false,\"rect\":\"-11,14,1931,1030\",\"fg\":\"Baraka UltraPOS [BARAKA_DATA_DIR]\",\"fgIsApp\":true}"
+              ]
+}

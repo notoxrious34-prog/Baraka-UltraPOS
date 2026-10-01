@@ -1,0 +1,16 @@
+{"run":2,"milestone":"c-readyState","elapsedMs":71870}
+{"run":2,"milestone":"d-rootChildren","elapsedMs":71870,"count":1}
+{"run":2,"milestone":"f-bodyText","elapsedMs":71870,"len":138,"head":"ب\nإنشاء حساب المدير\n\nالتشغيل الأول — أنشئ حساب مدير هذه الطرفية\n\nاسم المستخدم\nكلمة المرور\nتأكيد كلمة المرور\nإنشاء الحساب"}
+{"run":2,"milestone":"loopGapMaxMs","value":0}
+{"run":2,"milestone":"g-screenshot","elapsedMs":71974,"bytes":29529}
+{"run":2,"milestone":"harness-done","elapsedMs":71974}
+{"run":2,"milestone":"language-facts","value":{"lang":"fr","dir":"","navLang":"en-GB","navLangs":["en-GB","en","en-US"],"ls":{}},"sessionStorageKeyNames":[]}
+{"run":2,"milestone":"c-pageTarget","elapsedMs":6743,"url":"http://tauri.localhost/","pollCount":1}
+{"run":2,"milestone":"wsOpen","elapsedMs":6752}
+{"run":2,"milestone":"c-readyState","elapsedMs":6758}
+{"run":2,"milestone":"d-rootChildren","elapsedMs":6759,"count":1}
+{"run":2,"milestone":"f-bodyText","elapsedMs":6759,"len":138,"head":"ب\nإنشاء حساب المدير\n\nالتشغيل الأول — أنشئ حساب مدير هذه الطرفية\n\nاسم المستخدم\nكلمة المرور\nتأكيد كلمة المرور\nإنشاء الحساب"}
+{"run":2,"milestone":"loopGapMaxMs","value":0}
+{"run":2,"milestone":"g-screenshot","elapsedMs":6859,"bytes":29529}
+{"run":2,"milestone":"harness-done","elapsedMs":6859}
+{"run":2,"milestone":"language-facts","value":{"lang":"fr","dir":"","navLang":"en-GB","navLangs":["en-GB","en","en-US"],"ls":{}},"sessionStorageKeyNames":[]}

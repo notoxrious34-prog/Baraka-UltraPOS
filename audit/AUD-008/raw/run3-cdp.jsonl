@@ -1,0 +1,8 @@
+{"run":3,"milestone":"c-pageTarget","elapsedMs":6333,"url":"http://tauri.localhost/","pollCount":1}
+{"run":3,"milestone":"wsOpen","elapsedMs":6344}
+{"run":3,"milestone":"c-readyState","elapsedMs":6357}
+{"run":3,"milestone":"d-rootChildren","elapsedMs":6357,"count":1}
+{"run":3,"milestone":"f-bodyText","elapsedMs":6357,"len":138,"head":"ب\nإنشاء حساب المدير\n\nالتشغيل الأول — أنشئ حساب مدير هذه الطرفية\n\nاسم المستخدم\nكلمة المرور\nتأكيد كلمة المرور\nإنشاء الحساب"}
+{"run":3,"milestone":"loopGapMaxMs","value":0}
+{"run":3,"milestone":"g-screenshot","elapsedMs":6445,"bytes":29529}
+{"run":3,"milestone":"harness-done","elapsedMs":6445}

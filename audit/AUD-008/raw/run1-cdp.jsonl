@@ -1,0 +1,7 @@
+{"run":1,"milestone":"c-readyState","elapsedMs":17571}
+{"run":1,"milestone":"d-rootChildren","elapsedMs":17571,"count":1}
+{"run":1,"milestone":"f-bodyText","elapsedMs":17571,"len":138,"head":"ب\nإنشاء حساب المدير\n\nالتشغيل الأول — أنشئ حساب مدير هذه الطرفية\n\nاسم المستخدم\nكلمة المرور\nتأكيد كلمة المرور\nإنشاء الحساب"}
+{"run":1,"milestone":"loopGapMaxMs","value":0}
+{"run":1,"milestone":"g-screenshot","elapsedMs":17676,"bytes":29529}
+{"run":1,"milestone":"harness-done","elapsedMs":17677}
+{"run":1,"milestone":"language-facts","value":{"lang":"fr","dir":"","navLang":"en-GB","navLangs":["en-GB","en","en-US"],"ls":{}},"sessionStorageKeyNames":[]}

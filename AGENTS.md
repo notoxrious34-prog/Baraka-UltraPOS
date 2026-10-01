@@ -1,85 +1,39 @@
-# Baraka UltraPOS — Executor Engineering Contract
+# AGENTS.md - Executor entry point (Baraka UltraPOS)
 
-## Authority
+Status: Executor Constitution v2. It supersedes CONSTITUTION_OF_EXECUTOR.md v1.0.0 and the previous AGENTS.md (both archived in docs/architecture/archive/). Full text: docs/architecture/EXECUTOR-CONSTITUTION-v2.md (read it in full when a task says so). The rules below ALWAYS apply.
 
-`CONSTITUTION_OF_EXECUTOR.md` is the binding executor constitution and must be loaded in full. Do not summarize, replace, or reinterpret it.
+## 1. Authority and obedience
+- Tasks come from the Master Architect and are named TASK-AUD-NNN (read-only audit), TASK-BRK-NNN (engine), TASK-DSN-NNN (presentation), TASK-REL-NNN (release, drills, documents). Execute EXACTLY the task: its scope, its paths, its acceptance criteria. Do not improvise outside scope.
+- Precedence: task text > this file > older documents. If the task contradicts a repository fact, or is ambiguous, stop that part, state the conflict in the report, and continue independent parts. Never guess.
 
-The latest `Baraka UltraPOS — Master Sovereign Architecture & Product Design v1.0.0` is the authoritative technical architecture for this project. It governs later architectural decisions where the older executor constitution contains obsolete implementation details.
+## 2. Workspace and platform
+- Work ONLY in D:/Dev/Baraka UltraPOS (Windows 10). NEVER touch D:/Baraka Project/** (stale copy).
+- Write outside the workspace only where a task explicitly allows it (scratch convention: D:/Dev/_scratch/<TASK-ID>/).
+- Every linking cargo command runs with CARGO_BUILD_JOBS=2 (-j 2) (linker memory limit).
+- NEVER open, read, copy, hash, or modify the owner's live data: %APPDATA%/com.baraka.ultrapos and %LOCALAPPDATA%/com.baraka.ultrapos (metadata listing only, when a task asks).
 
-When a task touches architecture-critical areas, read the relevant architecture source before modifying code.
+## 3. Architecture truth (the code is the truth; old documents are not)
+- Tauri v2 desktop; React 18 + TypeScript strict + Vite + Zustand + Tailwind; Rust workspace crates domain, application, infrastructure, commands (+ src-tauri). NO ORM, NO decimal.js. SQLite via rusqlite.
+- SQLite: WAL, synchronous=FULL, foreign_keys=ON, busy_timeout=5000. Offline-first absolute.
+- Money = i64 centimes (Money type); quantities and factors fixed-point 10^4. NO floats in financial paths. IPC carries money and quantities as canonical strings; the frontend converts with bigint; never parseFloat or Number for money. All rounding is in the domain (ROUND_HALF_UP, i128 intermediates, overflow error).
+- Layers: Presentation -> Application -> Domain -> Infrastructure. React never touches SQL and never computes financial totals. Authorization is decided in Rust use cases; UI gating is convenience only.
+- Migrations are append-only. NEVER edit, re-save, or reformat an existing migration (SHA-256 checksums are verified at startup; CRLF/LF changes break existing databases). New schema = new numbered migration (0014+) plus a data-preservation test on a COPY of a real database.
+- .gitattributes is `* -text`. Never change it.
 
-## Execution
+## 4. Prohibitions
+- No new dependency (npm or cargo) unless the task authorizes it by name and version.
+- No `any`, no TODO, no placeholder code, no warnings, no emoji as UI icons.
+- No `position: fixed` in UI except modal overlays, toasts, and the command palette. No `w-screen`/`h-screen` outside the single app root.
+- No git operation that the task does not list (default: read-only git: status, log, diff, show, rev-parse, ls-files). Never push, tag, stash, reset, clean, rebase, or amend unless told.
+- Never kill processes by image name. Kill only PIDs you started.
+- Never write "100%" or "production ready". State exactly what is done and what is open.
 
-- Execute exactly one `TASK-BRK-XXX` per session command.
-- Never create a second interpretation of the task.
-- Never modify SCOPE-OUT.
-- Never modify `baraka.db`, `*.db-wal`, or `*.db-shm`.
-- Never add dependencies unless the Task Brief explicitly authorizes them.
-- Prefer the smallest correct implementation that completely satisfies the acceptance criteria.
-- Do not ask the user to type `proceed` to recover from a recoverable tool/provider failure.
-- If a provider/tool transport failure cannot be recovered safely, report the exact failure and do not mutate project code as a workaround.
+## 5. Quality gates (code tasks run all unless the task narrows them)
+G1 cargo fmt --check | G2 cargo clippy --all-targets --all-features -- -D warnings | G3 cargo test --workspace -j 2 | G4 npm run lint | G5 npm run typecheck | G6 npm run build | G7 npx vitest run | G8 release bundle (only when the task says).
+Regression law: a bug fix needs a test shown to FAIL on the defective code first. Seeding law: test data must satisfy domain invariants structurally.
 
-## Architecture Baseline
-
-Runtime data path:
-
-React/TypeScript → Typed Tauri IPC → Rust Commands → Rust Application → Rust Domain → Rust Infrastructure → SQLite/SQLCipher.
-
-Do not introduce Drizzle or Prisma into the runtime database path.
-
-Financial representation:
-
-- Rust Money = i64 centimes newtype.
-- Quantity and conversion factor = fixed-point integer newtypes.
-- Do not use JavaScript `number` for monetary values.
-- IPC monetary wire representation must be canonical decimal strings.
-
-Database integrity:
-
-- SQLite is the local source of truth.
-- Financial writes are transactional.
-- Ledgers and audit records are append-only.
-- Finalized financial documents are immutable.
-- Corrections use compensating documents or entries.
-- Sale printing uses a transactional print outbox before COMMIT.
-
-## Quality
-
-- TypeScript strict mode.
-- Zero `any`.
-- Zero `TODO` placeholders.
-- Zero `console.log` in production code.
-- No silent error swallowing in application/domain code.
-- Preserve existing conventions unless the Task Brief explicitly changes them.
-- Run only the verification commands required by the Task Brief and the constitution.
-
-## Skills
-
-Use only `baraka-*` Skills and load them on demand. Do not load every Skill automatically.
-
-Use the smallest relevant Skill set for the current task:
-
-- `baraka-financial`
-- `baraka-sqlite`
-- `baraka-sale`
-- `baraka-stock`
-- `baraka-ui`
-- `baraka-design-excellence`
-- `baraka-escpos`
-- `baraka-testing`
-- `baraka-review`
-
-## Muse Spark Compatibility
-
-Muse Spark 1.3 Contributor via OpenCode Go accepts only `tool_choice: "auto"`. The project-local compatibility plugin sanitizes non-auto values before the request is sent to the Go Responses endpoint.
-
-Do not add `tool_choice` to application code or Task Briefs. This is infrastructure compatibility handling only.
-
-## Usage Discipline
-
-- Keep tool output bounded.
-- Read targeted file ranges instead of entire large files when possible.
-- Prefer `grep`/`glob` before large reads.
-- Do not browse the web unless the Architect explicitly changes the policy.
-- Do not launch subagents.
-- Do not install packages unless explicitly authorized.
+## 6. Evidence and reports
+- A report without PASTED evidence (command output, file:line, numbers, screenshot filenames) is rejected. Unknown = write UNKNOWN.
+- Runner quirks on this machine: process exit codes and captured stdout are unreliable (false "stdin is not a tty" failures). Run Node scripts as: cmd /c "node script.mjs < NUL"; write results with fs.writeFileSync and READ THEM BACK; verify servers with a port check (Get-NetTCPConnection -LocalPort N), not the process list.
+- Delete ad-hoc scripts and scratch directories at the end (NO_LEFTOVERS) unless the task keeps them.
+- If the budget runs out: reply STATE / DONE / REMAINING and stop at a step boundary. The architect continues with the same task id plus -C1, -C2.

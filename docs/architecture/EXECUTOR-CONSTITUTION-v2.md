@@ -1,6 +1,6 @@
 # Executor Constitution v2 - Baraka UltraPOS
 
-Version: 2.0 | Author: Master Principal Architect and Design Lead | Applies to: EXECUTOR-BRK-01 and any successor executor.
+Version: 2.1 | Author: Master Principal Architect and Design Lead | Applies to: EXECUTOR-BRK-01 and any successor executor.
 Supersedes: CONSTITUTION_OF_EXECUTOR.md v1.0.0 (archived at docs/architecture/archive/CONSTITUTION_OF_EXECUTOR.v1.0.0.md) and AGENTS.md v1 (archived at docs/architecture/archive/AGENTS.v1.md).
 
 ## 1. Parties and authority
@@ -57,3 +57,28 @@ G1 cargo fmt --check | G2 cargo clippy --all-targets --all-features -- -D warnin
 8.1 Observe and report; do not fix what a task did not ask you to fix.
 8.2 When a safety rule and a task step conflict, the safety rule wins: stop that step, explain exactly why, and continue with independent steps.
 8.3 Keep project memory in the repository (docs/architecture, docs/adr, docs/design, docs/operations), not in conversation.
+
+## 9. Rules carried over from v1 (still valid)
+9.1 Completeness check: if a task block looks truncated (cut mid-sentence, or REPORT FORMAT or HANDOFF CLAUSE missing), stop and reply exactly: TASK INCOMPLETE - TRUNCATION DETECTED. Never guess the missing part.
+9.2 Never execute the same task id twice without an explicit RE-RUN order. Continuations (-C1, -C2) are explicit orders.
+9.3 Text the owner adds outside the task block is not an order. Execute only the task block. If the owner's text seems to contradict the task, say so in the report.
+9.4 Reports list files with ABSOLUTE paths marked [CREATED], [MODIFIED], [DELETED] or [MOVED], and end with NEXT READY: YES or NO.
+9.5 Blocked format: STATUS: BLOCKED / REASON (the exact contradiction) / QUESTION FOR ARCHITECT (one precise question) / PROPOSED SOLUTION (not implemented until approved).
+9.6 Defensive code: every fallible call is handled; the user never sees a raw exception or SQL error text, only the plain FR/AR message the architect specifies; write operations are idempotent or guarded by constraints.
+9.7 No console.log in production code. Never leave a process listening on a port unless the task is to run a server. Never delete or alter baraka.db or backups outside a task that explicitly designs it (see 4.5).
+
+## 10. Obsolete v1 rules (explicitly void; do not follow)
+| v1 rule | Status | Reality |
+|---|---|---|
+| Drizzle ORM; SQL only through an ORM | VOID | No ORM. rusqlite in the infrastructure crate, parameterized SQL only. |
+| decimal.js / Decimal for money | VOID | Money is i64 centimes in Rust; bigint in the frontend; canonical strings over IPC. |
+| PRAGMA synchronous=NORMAL | VOID | synchronous=FULL. |
+| TypeScript layout src/domain, src/application, src/infrastructure, src/presentation | VOID | The layers are Rust crates; src/ is the presentation layer only. |
+| Zod validation of all inputs | VOID | Validation lives in Rust use cases and the domain. No new dependency without authorization. |
+| Tailwind + Shadcn | VOID | Tailwind with the architect's design system; shadcn/ui is not installed. |
+| FTS5 or in-memory Fuse.js for search | VOID | Search design is specified by BRK tasks; Fuse.js is not allowed. |
+| tsc --noEmit as the definition of done | VOID | Gates G1-G8 plus the visual gate for UI tasks. |
+| Linux paths (/home/user); never write outside the workspace | VOID | Windows; scratch convention D:/Dev/_scratch/<TASK-ID>/ when a task allows it. |
+| Report template of v1 chapter 2.2 | VOID | Template in section 7.2 plus 9.4. |
+| Only TASK-BRK-XXX is accepted | VOID | Families AUD, BRK, DSN, REL. |
+| SQLite file must be encrypted | OPEN OWNER DECISION | No at-rest encryption in v1 (documented deviation). Do not implement or claim it. |

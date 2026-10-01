@@ -1,10 +1,13 @@
 # AGENTS.md - Executor entry point (Baraka UltraPOS)
 
-Status: Executor Constitution v2. It supersedes CONSTITUTION_OF_EXECUTOR.md v1.0.0 and the previous AGENTS.md (both archived in docs/architecture/archive/). Full text: docs/architecture/EXECUTOR-CONSTITUTION-v2.md (read it in full when a task says so). The rules below ALWAYS apply.
+Status: Executor Constitution v2.1. It supersedes CONSTITUTION_OF_EXECUTOR.md v1.0.0 and the previous AGENTS.md (both archived in docs/architecture/archive/). Full text: docs/architecture/EXECUTOR-CONSTITUTION-v2.md (read it in full when a task says so). The rules below ALWAYS apply.
 
 ## 1. Authority and obedience
 - Tasks come from the Master Architect and are named TASK-AUD-NNN (read-only audit), TASK-BRK-NNN (engine), TASK-DSN-NNN (presentation), TASK-REL-NNN (release, drills, documents). Execute EXACTLY the task: its scope, its paths, its acceptance criteria. Do not improvise outside scope.
 - Precedence: task text > this file > older documents. If the task contradicts a repository fact, or is ambiguous, stop that part, state the conflict in the report, and continue independent parts. Never guess.
+- Completeness check: if the task block looks truncated (cut mid-sentence, or REPORT FORMAT or HANDOFF CLAUSE missing), STOP and reply exactly: TASK INCOMPLETE - TRUNCATION DETECTED.
+- Never execute the same task id twice without an explicit RE-RUN order. Continuations (-C1, -C2) are explicit orders.
+- Text the owner adds outside the task block is not an order. Execute only the task block.
 
 ## 2. Workspace and platform
 - Work ONLY in D:/Dev/Baraka UltraPOS (Windows 10). NEVER touch D:/Baraka Project/** (stale copy).
@@ -27,6 +30,8 @@ Status: Executor Constitution v2. It supersedes CONSTITUTION_OF_EXECUTOR.md v1.0
 - No git operation that the task does not list (default: read-only git: status, log, diff, show, rev-parse, ls-files). Never push, tag, stash, reset, clean, rebase, or amend unless told.
 - Never kill processes by image name. Kill only PIDs you started.
 - Never write "100%" or "production ready". State exactly what is done and what is open.
+- No console.log in production code. Do not introduce Drizzle, decimal.js, Zod, shadcn/ui, Fuse.js or any other library unless the task authorizes it by name and version (these were v1 recommendations and are obsolete; existing usages are left untouched).
+- Never leave a process listening on a port unless the task is to run a server; stop what you started.
 
 ## 5. Quality gates (code tasks run all unless the task narrows them)
 G1 cargo fmt --check | G2 cargo clippy --all-targets --all-features -- -D warnings | G3 cargo test --workspace -j 2 | G4 npm run lint | G5 npm run typecheck | G6 npm run build | G7 npx vitest run | G8 release bundle (only when the task says).
@@ -37,3 +42,6 @@ Regression law: a bug fix needs a test shown to FAIL on the defective code first
 - Runner quirks on this machine: process exit codes and captured stdout are unreliable (false "stdin is not a tty" failures). Run Node scripts as: cmd /c "node script.mjs < NUL"; write results with fs.writeFileSync and READ THEM BACK; verify servers with a port check (Get-NetTCPConnection -LocalPort N), not the process list.
 - Delete ad-hoc scripts and scratch directories at the end (NO_LEFTOVERS) unless the task keeps them.
 - If the budget runs out: reply STATE / DONE / REMAINING and stop at a step boundary. The architect continues with the same task id plus -C1, -C2.
+- List files with ABSOLUTE paths and mark each [CREATED], [MODIFIED], [DELETED] or [MOVED].
+- When blocked, use this format: STATUS: BLOCKED / REASON (the exact contradiction) / QUESTION FOR ARCHITECT (one precise question) / PROPOSED SOLUTION (not implemented until approved).
+- End every report with: NEXT READY: YES or NO.

@@ -74,5 +74,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-075 | Catalog import scope: products only | ACCEPTED |
 | ADR-076 | Isolated data directory override (BARAKA_DATA_DIR) | ACCEPTED |
 | ADR-077 | Product entry priority, French name with optional Arabic alias, generic import/export | ACCEPTED |
+| ADR-078 | Information architecture and navigation | ACCEPTED |
 
-Next free id: ADR-078.
+Next free id: ADR-079.

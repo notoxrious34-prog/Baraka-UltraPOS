@@ -1,0 +1,33 @@
+{
+ "lang": "ar",
+ "body": "ERR Cannot read properties of undefined (reading 'nodeId')",
+ "brandGlyph": [
+  {
+   "family": "Tahoma",
+   "glyphs": 1
+  }
+ ],
+ "heroTotal": [
+  {
+   "family": "Courier New",
+   "glyphs": 8
+  }
+ ],
+ "arabicLabel": [],
+ "button": [
+  {
+   "family": "Inter",
+   "glyphs": 1
+  },
+  {
+   "family": "Segoe UI",
+   "glyphs": 9
+  }
+ ],
+ "css": {
+  "faces": [],
+  "n": 0,
+  "body": "Inter, Cairo, system-ui, \"Segoe UI\", Tahoma, sans-serif",
+  "arabic": "Cairo, Inter, system-ui, Tahoma, sans-serif"
+ }
+}

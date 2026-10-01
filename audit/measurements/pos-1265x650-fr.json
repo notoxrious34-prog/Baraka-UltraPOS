@@ -1,0 +1,171 @@
+{
+ "innerWidth": 1265,
+ "innerHeight": 650,
+ "devicePixelRatio": 1,
+ "outerWidth": 1280,
+ "outerHeight": 800,
+ "screenW": 800,
+ "screenH": 600,
+ "availW": 800,
+ "availH": 600,
+ "screenX": 10,
+ "screenY": 10,
+ "deScrollW": 1265,
+ "deClientW": 1250,
+ "deScrollH": 690,
+ "deClientH": 635,
+ "bodyScrollW": 1265,
+ "bodyClientW": 1250,
+ "bodyScrollH": 690,
+ "bodyClientH": 635,
+ "hasHScroll": true,
+ "hasVScroll": true,
+ "nFixed": 6,
+ "fixed": [
+  {
+   "tag": "button",
+   "cls": "fixed bottom-20 end-4 z-40 flex h-12 items-center gap-2 rounded-full bg-primary-",
+   "text": "Convertir",
+   "rect": {
+    "x": 1121,
+    "y": 507,
+    "w": 113,
+    "h": 48,
+    "right": 1234,
+    "bottom": 555
+   }
+  },
+  {
+   "tag": "button",
+   "cls": "fixed bottom-36 end-4 z-40 flex h-12 items-center gap-2 rounded-full bg-amber-60",
+   "text": "Retour & Facture d'Avoir",
+   "rect": {
+    "x": 1019,
+    "y": 443,
+    "w": 215,
+    "h": 48,
+    "right": 1234,
+    "bottom": 491
+   }
+  },
+  {
+   "tag": "button",
+   "cls": "fixed bottom-52 end-4 z-40 flex h-12 items-center gap-2 rounded-full bg-sky-700 ",
+   "text": "Gestion des Dépôts & Transferts",
+   "rect": {
+    "x": 968,
+    "y": 379,
+    "w": 266,
+    "h": 48,
+    "right": 1234,
+    "bottom": 427
+   }
+  },
+  {
+   "tag": "button",
+   "cls": "fixed bottom-[17rem] end-4 z-40 flex h-12 items-center gap-2 rounded-full bg-sla",
+   "text": "Régularisation de Stock",
+   "rect": {
+    "x": 1025,
+    "y": 315,
+    "w": 209,
+    "h": 48,
+    "right": 1234,
+    "bottom": 363
+   }
+  },
+  {
+   "tag": "button",
+   "cls": "fixed bottom-[21rem] end-4 z-40 flex h-12 items-center gap-2 rounded-full bg-eme",
+   "text": "Sauvegardes & Sécurité",
+   "rect": {
+    "x": 1022,
+    "y": 251,
+    "w": 212,
+    "h": 48,
+    "right": 1234,
+    "bottom": 299
+   }
+  },
+  {
+   "tag": "button",
+   "cls": "fixed bottom-[25rem] end-4 z-40 flex h-12 items-center gap-2 rounded-full bg-ind",
+   "text": "Identité & Impression",
+   "rect": {
+    "x": 1041,
+    "y": 187,
+    "w": 193,
+    "h": 48,
+    "right": 1234,
+    "bottom": 235
+   }
+  }
+ ],
+ "totalRect": {
+  "x": 1075,
+  "y": 566,
+  "w": 158,
+  "h": 40,
+  "right": 1233,
+  "bottom": 606
+ },
+ "cartRect": {
+  "x": 741,
+  "y": 136,
+  "w": 516,
+  "h": 490,
+  "right": 1257,
+  "bottom": 626
+ },
+ "topbarRect": {
+  "x": 0,
+  "y": 40,
+  "w": 1265,
+  "h": 56,
+  "right": 1265,
+  "bottom": 96
+ },
+ "logoutRect": {
+  "x": 1163,
+  "y": 56,
+  "w": 90,
+  "h": 24,
+  "right": 1253,
+  "bottom": 80
+ },
+ "logoutVisible": true,
+ "topbarClippedKids": 0,
+ "fixedOvTotal": [],
+ "fixedOvCart": [
+  {
+   "label": "Convertir",
+   "inter": true,
+   "area": 5424
+  },
+  {
+   "label": "Retour & Facture d'Avoir",
+   "inter": true,
+   "area": 10320
+  },
+  {
+   "label": "Gestion des Dépôts & Transferts",
+   "inter": true,
+   "area": 12768
+  },
+  {
+   "label": "Régularisation de Stock",
+   "inter": true,
+   "area": 10032
+  },
+  {
+   "label": "Sauvegardes & Sécurité",
+   "inter": true,
+   "area": 10176
+  },
+  {
+   "label": "Identité & Impression",
+   "inter": true,
+   "area": 9264
+  }
+ ]
+}

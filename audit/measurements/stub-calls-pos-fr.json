@@ -1,0 +1,33 @@
+{
+ "calls": [
+  {
+   "cmd": "check_first_run_status",
+   "keys": []
+  },
+  {
+   "cmd": "auth_login",
+   "keys": [
+    "request"
+   ]
+  },
+  {
+   "cmd": "warehouses_list",
+   "keys": [
+    "session_token"
+   ]
+  },
+  {
+   "cmd": "cash_get_active_session",
+   "keys": [
+    "session_token"
+   ]
+  },
+  {
+   "cmd": "cash_get_active_session",
+   "keys": [
+    "session_token"
+   ]
+  }
+ ],
+ "unknown": []
+}

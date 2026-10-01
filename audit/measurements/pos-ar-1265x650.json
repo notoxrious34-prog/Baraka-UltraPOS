@@ -1,0 +1,180 @@
+{
+ "innerWidth": 1265,
+ "innerHeight": 650,
+ "devicePixelRatio": 1,
+ "outerWidth": 1280,
+ "outerHeight": 800,
+ "deScrollW": 1250,
+ "deClientW": 1250,
+ "deScrollH": 690,
+ "deClientH": 650,
+ "bodyScrollW": 1250,
+ "bodyClientW": 1250,
+ "bodyScrollH": 690,
+ "bodyClientH": 650,
+ "hasHorizontalScroll": false,
+ "hasVerticalScroll": true,
+ "nFixed": 6,
+ "fixed": [
+  {
+   "tag": "button",
+   "text": "تحويل",
+   "rect": {
+    "x": 16,
+    "y": 522,
+    "w": 91,
+    "h": 48,
+    "right": 107,
+    "bottom": 570
+   }
+  },
+  {
+   "tag": "button",
+   "text": "إرجاع بضاعة وإشعار دائن",
+   "rect": {
+    "x": 16,
+    "y": 458,
+    "w": 221,
+    "h": 48,
+    "right": 237,
+    "bottom": 506
+   }
+  },
+  {
+   "tag": "button",
+   "text": "إدارة المستودعات والتحويل المخزني",
+   "rect": {
+    "x": 16,
+    "y": 394,
+    "w": 290,
+    "h": 48,
+    "right": 306,
+    "bottom": 442
+   }
+  },
+  {
+   "tag": "button",
+   "text": "تسوية المخزون والجرد",
+   "rect": {
+    "x": 16,
+    "y": 330,
+    "w": 200,
+    "h": 48,
+    "right": 216,
+    "bottom": 378
+   }
+  },
+  {
+   "tag": "button",
+   "text": "النسخ الاحتياطي والأمان",
+   "rect": {
+    "x": 16,
+    "y": 266,
+    "w": 216,
+    "h": 48,
+    "right": 232,
+    "bottom": 314
+   }
+  },
+  {
+   "tag": "button",
+   "text": "الهوية والطباعة",
+   "rect": {
+    "x": 16,
+    "y": 202,
+    "w": 155,
+    "h": 48,
+    "right": 171,
+    "bottom": 250
+   }
+  }
+ ],
+ "totalRect": {
+  "x": 17,
+  "y": 566,
+  "w": 173,
+  "h": 40,
+  "right": 190,
+  "bottom": 606
+ },
+ "heroText": "0,00 د.ج",
+ "cartRect": {
+  "x": -7,
+  "y": 136,
+  "w": 516,
+  "h": 490,
+  "right": 509,
+  "bottom": 626
+ },
+ "topbarRect": {
+  "x": -15,
+  "y": 40,
+  "w": 1265,
+  "h": 56,
+  "right": 1250,
+  "bottom": 96
+ },
+ "logoutRect": {
+  "x": -3,
+  "y": 56,
+  "w": 85,
+  "h": 24,
+  "right": 82,
+  "bottom": 80
+ },
+ "logoutFullyVisible": false,
+ "topbarClippedKids": [
+  {
+   "text": "الجلسة مغلقةفتح الجلسةدون اتصالالمستودعD",
+   "rect": {
+    "x": -3,
+    "y": 54,
+    "w": 825,
+    "h": 29,
+    "right": 822,
+    "bottom": 82
+   }
+  }
+ ],
+ "fixedOvTotal": [
+  {
+   "label": "تحويل",
+   "inter": true,
+   "area": 360
+  }
+ ],
+ "fixedOvCart": [
+  {
+   "label": "تحويل",
+   "inter": true,
+   "area": 4368
+  },
+  {
+   "label": "إرجاع بضاعة وإشعار دائن",
+   "inter": true,
+   "area": 10608
+  },
+  {
+   "label": "إدارة المستودعات والتحويل المخزني",
+   "inter": true,
+   "area": 13920
+  },
+  {
+   "label": "تسوية المخزون والجرد",
+   "inter": true,
+   "area": 9600
+  },
+  {
+   "label": "النسخ الاحتياطي والأمان",
+   "inter": true,
+   "area": 10368
+  },
+  {
+   "label": "الهوية والطباعة",
+   "inter": true,
+   "area": 7440
+  }
+ ],
+ "bodyTextHead": "الصندوق\nالموردون\nالتقارير\nالكتالوج\nب\n\nبركة UltraPOS\n\nمواد البناء — يعمل دون إنترنت\n\nالجلسة مغلقة\nفتح الجلسة\nدون اتصال\nال",
+ "screen": "pos-ar"
+}

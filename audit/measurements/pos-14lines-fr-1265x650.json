@@ -1,0 +1,162 @@
+{
+ "innerWidth": 1265,
+ "innerHeight": 650,
+ "devicePixelRatio": 1,
+ "outerWidth": 1280,
+ "outerHeight": 800,
+ "deScrollW": 1265,
+ "deClientW": 1250,
+ "deScrollH": 690,
+ "deClientH": 635,
+ "bodyScrollW": 1265,
+ "bodyClientW": 1250,
+ "bodyScrollH": 690,
+ "bodyClientH": 635,
+ "hasHorizontalScroll": true,
+ "hasVerticalScroll": true,
+ "nFixed": 6,
+ "fixed": [
+  {
+   "tag": "button",
+   "text": "Convertir",
+   "rect": {
+    "x": 1121,
+    "y": 507,
+    "w": 113,
+    "h": 48,
+    "right": 1234,
+    "bottom": 555
+   }
+  },
+  {
+   "tag": "button",
+   "text": "Retour & Facture d'Avoir",
+   "rect": {
+    "x": 1019,
+    "y": 443,
+    "w": 215,
+    "h": 48,
+    "right": 1234,
+    "bottom": 491
+   }
+  },
+  {
+   "tag": "button",
+   "text": "Gestion des Dépôts & Transferts",
+   "rect": {
+    "x": 968,
+    "y": 379,
+    "w": 266,
+    "h": 48,
+    "right": 1234,
+    "bottom": 427
+   }
+  },
+  {
+   "tag": "button",
+   "text": "Régularisation de Stock",
+   "rect": {
+    "x": 1025,
+    "y": 315,
+    "w": 209,
+    "h": 48,
+    "right": 1234,
+    "bottom": 363
+   }
+  },
+  {
+   "tag": "button",
+   "text": "Sauvegardes & Sécurité",
+   "rect": {
+    "x": 1022,
+    "y": 251,
+    "w": 212,
+    "h": 48,
+    "right": 1234,
+    "bottom": 299
+   }
+  },
+  {
+   "tag": "button",
+   "text": "Identité & Impression",
+   "rect": {
+    "x": 1041,
+    "y": 187,
+    "w": 193,
+    "h": 48,
+    "right": 1234,
+    "bottom": 235
+   }
+  }
+ ],
+ "totalRect": {
+  "x": 910,
+  "y": 566,
+  "w": 317,
+  "h": 40,
+  "right": 1227,
+  "bottom": 606
+ },
+ "heroText": "1 292 722,19 DZD",
+ "cartRect": {
+  "x": 735,
+  "y": 136,
+  "w": 516,
+  "h": 490,
+  "right": 1251,
+  "bottom": 626
+ },
+ "topbarRect": {
+  "x": -6,
+  "y": 40,
+  "w": 1265,
+  "h": 56,
+  "right": 1259,
+  "bottom": 96
+ },
+ "logoutRect": {
+  "x": 1157,
+  "y": 56,
+  "w": 90,
+  "h": 24,
+  "right": 1247,
+  "bottom": 80
+ },
+ "logoutFullyVisible": true,
+ "topbarClippedKids": [],
+ "fixedOvTotal": [],
+ "fixedOvCart": [
+  {
+   "label": "Convertir",
+   "inter": true,
+   "area": 5424
+  },
+  {
+   "label": "Retour & Facture d'Avoir",
+   "inter": true,
+   "area": 10320
+  },
+  {
+   "label": "Gestion des Dépôts & Transferts",
+   "inter": true,
+   "area": 12768
+  },
+  {
+   "label": "Régularisation de Stock",
+   "inter": true,
+   "area": 10032
+  },
+  {
+   "label": "Sauvegardes & Sécurité",
+   "inter": true,
+   "area": 10176
+  },
+  {
+   "label": "Identité & Impression",
+   "inter": true,
+   "area": 9264
+  }
+ ],
+ "bodyTextHead": "Caisse\nFournisseurs\nRapports\nCatalogue\nب\n\nBaraka UltraPOS\n\nQuincaillerie Générale — Hors-ligne\n\nSession fermée\nOuvrir la",
+ "screen": "pos-14lines-fr"
+}

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Questionnaire pour l'expert-comptable — Baraka UltraPOS</title>
+<style>
+@page { size: A4; margin: 15mm; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #111; line-height: 1.45; margin: 0; }
+h1 { font-size: 18pt; margin: 0 0 2mm 0; }
+.subtitle { font-size: 12pt; margin: 0 0 6mm 0; }
+.idline { margin: 1mm 0; }
+.idline .lab { display: inline-block; min-width: 45mm; font-weight: bold; }
+.idline .fill { display: inline-block; min-width: 100mm; border-bottom: 1px solid #111; }
+.intro { margin: 5mm 0; text-align: justify; }
+.cadre { border: 1px solid #111; padding: 3mm 4mm; margin: 4mm 0 6mm 0; }
+.cadre p { font-weight: bold; margin: 0 0 2mm 0; }
+.cadre ul { margin: 0; padding-left: 6mm; }
+h2 { font-size: 14pt; margin: 7mm 0 3mm 0; border-bottom: 1px solid #111; padding-bottom: 1mm; }
+section.q { break-inside: avoid; margin: 0 0 5mm 0; }
+.qq { margin: 0 0 2mm 0; text-align: justify; }
+.lbl { margin: 2mm 0 1mm 0; font-size: 10pt; }
+.abox { border: 1px solid #111; min-height: 22mm; }
+.rbox { border: 1px solid #111; min-height: 8mm; }
+table.mentions { border-collapse: collapse; width: 100%; margin: 2mm 0; }
+table.mentions th, table.mentions td { border: 1px solid #111; padding: 1.5mm 2mm; font-size: 10pt; text-align: left; }
+table.mentions th.c, table.mentions td.c { text-align: center; width: 22mm; }
+.cb { display: inline-block; width: 3mm; height: 3mm; border: 1px solid #111; }
+pre.code { font-size: 9pt; border: 1px solid #111; padding: 3mm; white-space: pre-wrap; }
+.sig { margin-top: 6mm; }
+.sig .lab { display: inline-block; min-width: 60mm; font-weight: bold; }
+.sig .fill { display: inline-block; min-width: 90mm; border-bottom: 1px solid #111; }
+.annex { break-inside: avoid; }
+ul.fields { margin: 2mm 0; padding-left: 6mm; }
+</style>
+</head>
+<body>
+
+<h1>Questionnaire pour l'expert-comptable</h1>
+<p class="subtitle">Logiciel de caisse et de facturation Baraka UltraPOS — validation avant mise en service</p>
+
+<p class="idline"><span class="lab">Commerçant :</span><span class="fill">&nbsp;</span></p>
+<p class="idline"><span class="lab">Activité :</span><span class="fill">&nbsp;</span></p>
+<p class="idline"><span class="lab">Date :</span><span class="fill">&nbsp;</span></p>
+<p class="idline"><span class="lab">Nom du comptable :</span><span class="fill">&nbsp;</span></p>
+
+<p class="intro">Je mets en service un logiciel de caisse et de gestion de magasin (ventes au comptoir, tickets de caisse 58 mm et 80 mm, factures A4, suivi des clients à crédit). Il est paramétré pour un commerçant relevant de l'Impôt Forfaitaire Unique (IFU), sans calcul de TVA. Avant le lancement, je souhaite vérifier avec vous les règles à respecter. Merci d'indiquer pour chaque question votre réponse et, si possible, la référence du texte applicable. Ce document ne présume aucune conformité : il sert à recueillir votre avis.</p>
+
+<div class="cadre">
+<p>Cadre actuel du logiciel (à confirmer ou corriger)</p>
+<ul>
+<li>Un seul point de vente, un seul poste, un seul vendeur (extensible plus tard).</li>
+<li>Aucune TVA et aucun prix HT/TTC : un seul prix de vente par article.</li>
+<li>Montants en dinars algériens (DA).</li>
+<li>Documents produits : ticket de caisse (58 mm ou 80 mm) et facture A4.</li>
+<li>Paiements prévus : espèces, et vente à crédit avec versements ultérieurs.</li>
+<li>Langues des documents : français et arabe ; chiffres latins (0-9).</li>
+</ul>
+</div>
+
+<h2>A. Régime et identification</h2>
+
+<section class="q"><p class="qq"><strong>Q1.</strong> Confirmez-vous que mon activité relève bien de l'IFU pour l'exercice en cours ? Existe-t-il des conditions (chiffre d'affaires maximal, activités exclues) ou un risque de changement de régime en cours d'année ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q2.</strong> Quels identifiants du vendeur doivent figurer sur les tickets et sur les factures (NIF, NIS, RC, article d'imposition, adresse, autres) ? Lesquels sont obligatoires sur le ticket, lesquels sur la facture ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<h2>B. Documents de vente</h2>
+
+<section class="q"><p class="qq"><strong>Q3.</strong> Dans quels cas la facture est-elle obligatoire (client particulier, client professionnel, montant minimal, sur demande du client) ? Le ticket de caisse seul suffit-il pour les ventes au comptoir à des particuliers ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q4.</strong> Quelles mentions sont obligatoires sur un ticket et sur une facture pour un vendeur soumis à l'IFU ? (Cochez dans le tableau ci-dessous.)</p>
+<table class="mentions">
+<tr><th>Mention</th><th class="c">Ticket</th><th class="c">Facture</th></tr>
+<tr class="mrow"><td>Date et heure</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Numéro d'ordre</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Nom ou raison sociale du vendeur</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Adresse du vendeur</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Identifiants fiscaux du vendeur (NIF, NIS, RC, article d'imposition)</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Identité du client</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Désignation des articles</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Quantités et prix unitaires</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Montant total</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Montant total en toutes lettres</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Mode de règlement</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Mention relative à la TVA ou au régime</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Droit de timbre</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Signature ou cachet</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Autre (à préciser) :</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+</table>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q5.</strong> Quelle est la mention exacte (texte) à porter sur la facture concernant mon régime (par exemple l'absence de TVA) ? Merci de donner le libellé exact en français et, si possible, en arabe.</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q6.</strong> Quelles sont les règles de numérotation des factures et des tickets : numérotation continue obligatoire ? remise à zéro chaque année ? séries séparées pour les tickets et les factures ? Que faire d'un numéro annulé ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q7.</strong> Comment documenter un retour de marchandise ou une annulation après l'émission d'un document (avoir, facture d'annulation, autre) ? Y a-t-il des délais ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<h2>C. Droit de timbre</h2>
+
+<section class="q"><p class="qq"><strong>Q8.</strong> Le droit de timbre s'applique-t-il à mes ventes payées en espèces ? Sur quels documents (ticket, facture) et à partir de quel montant ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q9.</strong> Quel est le barème exact (taux par tranche, minimum, maximum, règle d'arrondi) ? Merci de confirmer ou corriger la règle actuellement programmée (voir Annexe A).</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q10.</strong> À qui incombe le droit de timbre (client ou vendeur), et comment doit-il apparaître sur le document (ligne séparée, inclus dans le total) ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q11.</strong> Pour une vente à crédit réglée plus tard en espèces : sur quel montant et à quel moment le droit de timbre est-il dû ? Qu'en est-il d'un règlement par chèque ou par virement ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<h2>D. Clients professionnels, crédit et paiements en espèces</h2>
+
+<section class="q"><p class="qq"><strong>Q12.</strong> Pour un client professionnel (commerçant, entreprise, artisan) : quelles informations dois-je saisir et faire figurer sur la facture (NIF, RC, article d'imposition, NIS, autres) ? Un client professionnel peut-il exiger d'un vendeur IFU une facture avec TVA ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q13.</strong> Pour les ventes à crédit : quel document est requis (facture, bon de livraison, reconnaissance de dette) ? Un versement ultérieur doit-il donner lieu à un reçu numéroté ? Existe-t-il des limites ou des conditions légales ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q14.</strong> Existe-t-il un plafond légal de paiement en espèces pour une opération commerciale ? Comment dois-je le traiter dans les ventes aux professionnels ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<h2>E. Montants et arrondis</h2>
+
+<section class="q"><p class="qq"><strong>Q15.</strong> Les centimes sont-ils admis sur les prix et les totaux des documents ? Quelle est la règle d'arrondi du total (au dinar, à 5 DA, autre) pour un paiement en espèces ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<h2>F. Conservation, registres et logiciel</h2>
+
+<section class="q"><p class="qq"><strong>Q16.</strong> Quelle est la durée de conservation des documents de vente, et sous quelle forme (électronique seulement, ou impression papier obligatoire) ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q17.</strong> Dois-je tenir un registre ou livre des ventes et des achats ? Sous quelle forme (papier coté et paraphé, ou électronique) ? Le logiciel peut-il le remplacer ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q18.</strong> Existe-t-il une obligation de déclarer, homologuer ou certifier un logiciel de caisse ou de facturation auprès de l'administration ? Une sauvegarde régulière des données suffit-elle ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q19.</strong> Existe-t-il d'autres obligations (affichage, mentions sur le ticket, déclarations) qu'un logiciel de caisse doit respecter ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<p class="lbl">Observations libres :</p><div class="abox"></div>
+
+<p class="sig"><span class="lab">Nom et cachet du comptable :</span><span class="fill">&nbsp;</span></p>
+<p class="sig"><span class="lab">Date :</span><span class="fill">&nbsp;</span></p>
+
+<h2>Annexe A — Règle de droit de timbre actuellement programmée (non validée)</h2>
+<div class="annex">
+<p>La fonction <em>compute_timbre</em> (crates/domain/src/sales/pricing.rs:156-169) reçoit le type de document, le montant réglé en espèces et la base de calcul. Elle ne s'applique qu'aux documents de type Ticket ou Facture, et uniquement lorsque le montant réglé en espèces est strictement supérieur à zéro ; dans tous les autres cas elle retourne 0. Le montant en espèces pris en compte est la somme des parts de paiement dont la méthode est Cash (espèces) ; seule cette méthode est considérée comme espèces (crates/domain/src/sales/payment.rs:10-19 pour les quatre méthodes Cash, Credit, Cheque, Card ; crates/domain/src/sales/payment.rs:48-50 pour la règle). La base de calcul est le sous-total HT augmenté de la TVA totale (crates/domain/src/sales/pricing.rs:334-337) ; dans le parcours d'encaissement actuel le taux de TVA appliqué vaut 0 (crates/application/src/use_cases/sales.rs:103), la base égale donc le sous-total. Le calcul se fait en nombres entiers : ((base + 9 999) / 10 000) × 100 (crates/domain/src/sales/pricing.rs:167), soit 1 % de la base arrondi au multiple supérieur de 100 centimes (1 DA). Le résultat est borné : minimum 500 centimes, soit 5 DA (TIMBRE_MIN_CENTIMES, crates/domain/src/sales/pricing.rs:148) ; maximum 250 000 centimes, soit 2 500 DA (TIMBRE_MAX_CENTIMES, crates/domain/src/sales/pricing.rs:150). Le timbre calculé est ajouté au total du document (crates/domain/src/sales/pricing.rs:338-341). Le calcul exclut tout timbre de sa propre base (non circulaire). Le calcul est effectué au moment du chiffrage du document (<em>price_document</em>, appelé depuis crates/application/src/use_cases/sales.rs:115) à partir des paiements qui accompagnent la vente. Comportement lors d'un versement ultérieur en espèces pour une vente à crédit : Non déterminé. Prise en charge par le client ou par le vendeur : Non déterminé. Présentation sur le document (ligne séparée ou incluse dans le total) : Non déterminé à partir du seul moteur de calcul (le modèle d'impression prévoit un champ timbre : crates/domain/src/printing/receipt_model.rs:54).</p>
+<p>Cette règle est celle actuellement programmée ; elle n'a pas été validée par un professionnel.</p>
+<pre class="code">pub const TIMBRE_MIN_CENTIMES: i64 = 500;
+pub const TIMBRE_MAX_CENTIMES: i64 = 250_000;
+
+pub fn compute_timbre(
+    doc_type: DocumentType,
+    cash_tendered_centimes: i64,
+    base_for_timbre_centimes: i64,
+) -&gt; i64 {
+    let applicable = matches!(doc_type, DocumentType::Ticket | DocumentType::Facture)
+        &amp;&amp; cash_tendered_centimes &gt; 0;
+    if !applicable {
+        return 0;
+    }
+    // ceil(base * 0.01 / 100) * 100, all-integer: ((base + 9999) / 10000) * 100.
+    let stepped = (base_for_timbre_centimes.saturating_add(9_999) / 10_000).saturating_mul(100);
+    stepped.clamp(TIMBRE_MIN_CENTIMES, TIMBRE_MAX_CENTIMES)
+}</pre>
+<p class="lbl">Règle confirmée / à corriger :</p><div class="abox"></div>
+</div>
+
+<h2>Annexe B — Informations d'identité actuellement prévues dans le logiciel</h2>
+<div class="annex">
+<ul class="fields">
+<li>Champ prévu : nom du magasin (storeName, 80 caractères) — src/stores/store-identity-store.ts:41 ; crates/domain/src/printing/receipt_model.rs:72.</li>
+<li>Champ prévu : adresse du magasin (storeAddress, 120 caractères) — src/stores/store-identity-store.ts:42 ; crates/domain/src/printing/receipt_model.rs:74.</li>
+<li>Champ prévu : téléphone du magasin (storePhone, 40 caractères) — src/stores/store-identity-store.ts:43 ; crates/domain/src/printing/receipt_model.rs:76.</li>
+<li>Champ prévu : NIF (nif, 20 caractères) — src/stores/store-identity-store.ts:44 ; crates/domain/src/printing/receipt_model.rs:78.</li>
+<li>Champ prévu : NIS (nis, 20 caractères) — src/stores/store-identity-store.ts:45 ; crates/domain/src/printing/receipt_model.rs:80.</li>
+<li>Champ prévu : RC (rc, 20 caractères) — src/stores/store-identity-store.ts:46 ; crates/domain/src/printing/receipt_model.rs:82.</li>
+<li>Champ prévu : article d'imposition (ai, 20 caractères) — src/stores/store-identity-store.ts:47 ; crates/domain/src/printing/receipt_model.rs:84.</li>
+<li>Champ prévu : message de pied de ticket (ticketFooterMessage, 160 caractères, 3 lignes) — src/stores/store-identity-store.ts:48 ; crates/domain/src/printing/receipt_model.rs:86.</li>
+<li>Stockage : table settings (clé/valeur) — crates/infrastructure/migrations/0001_baseline_schema.sql:14-18 ; adaptateur crates/infrastructure/src/adapters/sqlite_printer_settings.rs. Aucune table d'identité dédiée dans les migrations 0001 à 0013 (recherche en lecture seule).</li>
+<li>Logo du magasin : Aucun champ trouvé.</li>
+</ul>
+</div>
+
+</body>
+</html>

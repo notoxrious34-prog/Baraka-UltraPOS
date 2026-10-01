@@ -25,6 +25,13 @@ fn window_number(window: &Value, key: &str) -> u64 {
         .unwrap_or_else(|| panic!("main window {key} must be a JSON integer"))
 }
 
+fn window_bool_absent_or_true(window: &Value, key: &str) {
+    match window.get(key) {
+        None | Some(Value::Bool(true)) => {}
+        other => panic!("main window {key} must be absent or true, found {other:?}"),
+    }
+}
+
 #[test]
 fn main_window_geometry_matches_adr066() {
     let windows = windows_array(include_str!("../tauri.conf.json"));
@@ -61,4 +68,25 @@ fn main_window_geometry_matches_adr066() {
         Some(&Value::Bool(false)),
         "main window must keep create=false (built in setup)"
     );
+}
+
+#[test]
+fn main_window_maximized_policy_brk060() {
+    let windows = windows_array(include_str!("../tauri.conf.json"));
+    let main = &windows[0];
+
+    assert_eq!(
+        main.get("maximized"),
+        Some(&Value::Bool(true)),
+        "main window must open maximized (BRK-060)"
+    );
+    assert_eq!(
+        main.get("center"),
+        Some(&Value::Bool(true)),
+        "main window must keep center=true"
+    );
+    // Resize/maximize/restore depend on these; tao defaults are true.
+    window_bool_absent_or_true(main, "resizable");
+    window_bool_absent_or_true(main, "maximizable");
+    window_bool_absent_or_true(main, "decorations");
 }

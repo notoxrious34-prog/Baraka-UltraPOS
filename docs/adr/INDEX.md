@@ -58,7 +58,7 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-064 | In-transaction idempotency claim: duplicate check is the first step inside the transaction, claim insert (with payload) is the last; request_hash comparison distinguishes conflict, replay, resume. | Implemented (per previous package). |
 | ADR-065 | Printing diagnostics and capture: test print is a synchronous settings-scoped diagnostic (not an outbox job, no accounting effect); capture sink; preview from the shared layout lines; structural stream inspector; the single source of truth for the device is the printer.serial_* settings. Includes Amendment 1. | Implemented (per previous package). Output profiles extended by ADR-070. |
 
-## 4. ADR-066..074 - SESSION-ARC-001 (Architect, Charter v2.0)
+## 4. ADR-066..076 - SESSION-ARC-001 (Architect, Charter v2.0)
 
 | ID | Title | Status |
 |---|---|---|
@@ -71,5 +71,7 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-072 | Catalog migration from Dolisoft export | ACCEPTED (format pending profiling) |
 | ADR-073 | Canonical repository location | ACCEPTED |
 | ADR-074 | Destructive-action confirmation pattern | ACCEPTED |
+| ADR-075 | Catalog import scope: products only | ACCEPTED |
+| ADR-076 | Isolated data directory override (BARAKA_DATA_DIR) | ACCEPTED |
 
-Next free id: ADR-075.
+Next free id: ADR-077.

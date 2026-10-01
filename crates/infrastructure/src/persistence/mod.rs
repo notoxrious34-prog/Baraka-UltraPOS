@@ -1,6 +1,7 @@
 //! SQLite persistence: connections, transactions, embedded migrations.
 
 pub mod connection;
+pub mod data_dir;
 pub mod migration;
 pub mod sha256;
 pub mod terminal_context;

@@ -25,6 +25,9 @@ use baraka_infrastructure::adapters::{
 use baraka_infrastructure::persistence::connection::{
     ensure_database_dir, open_connection, resolve_database_path,
 };
+use baraka_infrastructure::persistence::data_dir::{
+    prepare_data_dir, resolve_data_dir, DataDirError, DATA_DIR_ENV,
+};
 use baraka_infrastructure::persistence::migration::run_migrations;
 use baraka_infrastructure::persistence::terminal_context::resolve_device_id;
 use baraka_infrastructure::printing::capture::CaptureDevice;
@@ -43,6 +46,19 @@ const SHUTDOWN_JOIN_TIMEOUT: Duration = Duration::from_secs(10);
 /// error-type family, no `unwrap`/`expect` on startup I/O).
 fn startup_error(context: &str, detail: impl std::fmt::Display) -> std::io::Error {
     let message = format!("Baraka UltraPOS startup failed at {context}: {detail}");
+    eprintln!("{message}");
+    std::io::Error::other(message)
+}
+
+/// Map an invalid `BARAKA_DATA_DIR` override to the exact developer diagnostic.
+///
+/// There is no fallback: the caller aborts startup, the default (live)
+/// directory is never used, and the database is never opened.
+fn data_dir_invalid(error: DataDirError) -> std::io::Error {
+    let message = format!(
+        "Baraka UltraPOS cannot start: {DATA_DIR_ENV} is invalid ({}).",
+        error.code()
+    );
     eprintln!("{message}");
     std::io::Error::other(message)
 }
@@ -69,9 +85,18 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .map_err(|error| startup_error("app data directory resolution", error))?;
-            ensure_database_dir(&app_data_dir)
+            // BRK-058: opt-in isolated data directory (developer/test facility).
+            // Unset or blank keeps the default paths byte-for-byte; an invalid
+            // value aborts here, before any database is opened, with no fallback.
+            let data_dir_override_value = std::env::var_os(DATA_DIR_ENV);
+            let resolved = resolve_data_dir(&app_data_dir, data_dir_override_value.as_deref())
+                .map_err(data_dir_invalid)?;
+            prepare_data_dir(&resolved, &app_data_dir).map_err(data_dir_invalid)?;
+            let data_dir = resolved.path.clone();
+            let data_dir_override = resolved.is_override;
+            ensure_database_dir(&data_dir)
                 .map_err(|error| startup_error("application data directory creation", error))?;
-            let db_path = resolve_database_path(&app_data_dir);
+            let db_path = resolve_database_path(&data_dir);
             let mut conn =
                 open_connection(&db_path).map_err(|error| startup_error("database open", error))?;
             run_migrations(&mut conn)
@@ -113,7 +138,7 @@ pub fn run() {
                 reports: Arc::new(SqliteReportingRepository::new(Arc::clone(&db))),
                 returns: Arc::new(SqliteReturnRepository::new(Arc::clone(&db))),
                 backups: Arc::new(SqliteBackupManager::new(Arc::clone(&db), db_path.clone())),
-                backup_dir: app_data_dir.join("backups"),
+                backup_dir: data_dir.join("backups"),
                 terminal_id,
             };
             app.manage(state);
@@ -130,6 +155,37 @@ pub fn run() {
             );
             if let Ok(mut cell) = handle_cell.lock() {
                 *cell = Some(worker_handle);
+            }
+            // BRK-058: the main window is created here (config `create: false`)
+            // so override mode can redirect the WebView2 profile directory and
+            // mark the title. Default mode rebuilds the same configured window.
+            let window_config = app
+                .handle()
+                .config()
+                .app
+                .windows
+                .iter()
+                .find(|window| window.label == "main")
+                .ok_or_else(|| {
+                    startup_error("main window configuration", "missing label \"main\"")
+                })?
+                .clone();
+            let handle = app.handle().clone();
+            let mut builder = tauri::WebviewWindowBuilder::from_config(&handle, &window_config)
+                .map_err(|error| startup_error("main window creation", error))?;
+            if data_dir_override {
+                let webview_dir = data_dir.join("webview2");
+                std::fs::create_dir_all(&webview_dir)
+                    .map_err(|error| startup_error("override webview directory creation", error))?;
+                builder = builder.data_directory(webview_dir);
+            }
+            let window = builder
+                .build()
+                .map_err(|error| startup_error("main window creation", error))?;
+            if data_dir_override {
+                window
+                    .set_title("Baraka UltraPOS [BARAKA_DATA_DIR]")
+                    .map_err(|error| startup_error("override window title", error))?;
             }
             Ok(())
         })

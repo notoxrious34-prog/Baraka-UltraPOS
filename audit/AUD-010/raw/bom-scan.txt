@@ -1,0 +1,15 @@
+== audit/AUD-007 == files:1 BOM:0 strictParseFail:0
+== audit/AUD-008 == files:11 BOM:6 strictParseFail:6
+  BOM  audit\AUD-008\raw\run1-launch.json
+  BOM  audit\AUD-008\raw\run1-watch.json
+  BOM  audit\AUD-008\raw\run2-launch.json
+  BOM  audit\AUD-008\raw\run2-watch.json
+  BOM  audit\AUD-008\raw\run3-launch.json
+  BOM  audit\AUD-008\raw\run3-watch.json
+  FAIL audit\AUD-008\raw\run1-launch.json
+  FAIL audit\AUD-008\raw\run1-watch.json
+  FAIL audit\AUD-008\raw\run2-launch.json
+  FAIL audit\AUD-008\raw\run2-watch.json
+  FAIL audit\AUD-008\raw\run3-launch.json
+  FAIL audit\AUD-008\raw\run3-watch.json
+== audit/AUD-009 == files:13 BOM:0 strictParseFail:0

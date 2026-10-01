@@ -1,0 +1,16 @@
+{"head":"8abe3c66e2d94765e1ac058f6fc8e67f3faea2df","aud009bundledAt":"43e895b6","aud009bomfixAt":"8abe3c6","exe":{"size":14873088,"sha256":"94480efd5b9e81b7952a05ec7a77a4fc5529ac149baf7051c35f19a7671ea71e","mtime":"2026-10-01T16:31:06Z"},"build":{"noRebuild":true},"host":{"dpi":144,"monitorPhys":"1920x1080","workPhys":[0,0,1920,1034],"webview2":"154.0.4258.37"},"csp":null,"frontendDist":"../dist","dist":{"files":3,"bytes":513338,"largestJS":"index-o949h9zE.js","largestJSBytes":486063},"languageDecision":{"defaultLocale":"ar-DZ","src":"src/stores/pos-ui-store.ts:28","map":"src/App.tsx:103-105","docIndexHtml":"index.html:2 lang=fr","observed":"docElement lang=fr dir=, content dir=rtl lang=ar","adr069FrenchDefault":"NOT reflected"},"boot":{"ipcBeforeFirstRender":["check_first_run_status"],"firstRunSetupMountIPC":false,"webfonts":0,"externalRefs":0,"externalOrigins":0,"resourcesAllAppOrigin":true},"segments":{
+  "run1-cold":{"A_NavStartMs":1019,"B_NavToFCPMs":384,"C_FCPToFormUpperMs":1980,"formUpperMs":3383,"fcpMsT0":1403,"lcpMsT0":1535,"loadMsT0":1353,"cpuAAllMs":748,"cpuBMs":594,"cpuBUtilPct":155,"exeTotalMs":31},
+  "run2-warm":{"A_NavStartMs":779,"B_NavToFCPMs":304,"C_FCPToFormUpperMs":4064,"formUpperMs":5147,"fcpMsT0":1083,"lcpMsT0":1119,"loadMsT0":994,"cpuBMs":1154,"cpuBUtilPct":380,"loafMs":251,"exeTotalMs":15},
+  "run3-warm":{"A_NavStartMs":737,"B_NavToFCPMs":392,"C_FCPToFormUpperMs":2261,"formUpperMs":3390,"fcpMsT0":1129,"lcpMsT0":1129,"loadMsT0":951,"cpuBMs":1251,"cpuBUtilPct":319,"loafMs":344},
+  "run4-warm":{"A_NavStartMs":684,"B_NavToFCPMs":332,"C_FCPToFormUpperMs":2077,"formUpperMs":3093,"fcpMsT0":1016,"lcpMsT0":1016,"loadMsT0":898,"cpuBMs":1030,"cpuBUtilPct":310,"loafMs":294}},
+"cpuByRoleB_NavToFCP":{
+  "run2":{"browser":375,"gpu":328,"utility":233,"renderer":203,"exe":15},
+  "run3":{"browser":485,"gpu":375,"utility":187,"renderer":156,"exe":32},
+  "run4":{"browser":422,"gpu":281,"utility":171,"renderer":140,"exe":16}},
+"cpuByRoleTotals0toForm":{"run1":{"exe":31,"browser":781,"gpu":546,"renderer":218,"utility":171}},
+"resources":{"count":4,"decodedBytes":513338,"jsBundleBytes":486063,"jsTransferDMs":14,"ipcCheckFirstRunMs":3,"startedAfterFCP":0},
+"warmFormSpreadUpper":{"min":3093,"median":3390,"max":5147},
+"bottleneck":{"uncodedSplit486KB":"yes","loafOfJsBundleMs":[251,344,294],"phaseBUtilPct":[380,319,310],"exeIdle":"yes","browserProcessDominant":"yes"},
+"floor":{"ran":true,"result":"UNKNOWN","error":"standalone msedgewebview2 exposed no page target on 9223 (data: and file://); retry limit reached"},
+"isolation":{"fpAppdata":"f487a65b08bb140e4a0186aee61102692afd11cf5d95492df5141e9cd2d098f1","appdataEntries":10,"fpAppdataEqual":true,"fpLocal":"9566ede057b84a9d470eb4d086a616b1569d301b4f6ae6d2d077f82c26bffda3","localEntries":1599,"fpLocalEqual":true},
+"portsAfter":{"9222":"free","9223":"free"}}

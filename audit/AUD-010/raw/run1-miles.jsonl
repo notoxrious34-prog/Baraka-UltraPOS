@@ -1,0 +1,8 @@
+{"k":"start","t0EpochMs":1790873980374,"nowEpoch":1790873983631,"wallMs":3257}
+{"k":"pageTarget","ms":3357,"url":"http://tauri.localhost/","targetId":"16C2E71DE95642B683506CA3D68DC000","wallMs":3357}
+{"k":"wsOpen","ms":3367,"wallMs":3367}
+{"k":"firstEval","ms":3380,"timeOrigin":1790873981393.1,"wallMs":3380}
+{"k":"formFound","ms":3383,"pageClockMs":null,"note":"poll-upper-bound","wallMs":3383}
+{"k":"gathered","ms":3388,"wallMs":3388}
+{"k":"metricsGot","ms":3389,"wallMs":3389}
+{"k":"done","ms":3390,"wallMs":3390}

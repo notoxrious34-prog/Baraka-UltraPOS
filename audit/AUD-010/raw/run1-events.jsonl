@@ -1,0 +1,21 @@
+{"t":382,"ev":"win-created","hwnd":2098484,"title":"Baraka UltraPOS","vis":true,"zoom":true,"rect":[-7,-7,1288,697]}
+{"t":382,"ev":"win-created","hwnd":4588638,"title":"","vis":true,"zoom":false,"rect":[0,0,15,15]}
+{"t":382,"ev":"win-created","hwnd":3802446,"title":"MSCTFIME UI","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":382,"ev":"win-created","hwnd":1705118,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":382,"ev":"proc-seen","pid":6140,"name":"汵牴灡獯攮數攀爀攮數⸀硥e"}
+{"t":820,"ev":"win-created","hwnd":1836544,"title":"","vis":false,"zoom":false,"rect":[152,152,1112,649]}
+{"t":820,"ev":"win-created","hwnd":2753672,"title":"","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":820,"ev":"win-created","hwnd":2950350,"title":"","vis":false,"zoom":false,"rect":[0,0,136,39]}
+{"t":820,"ev":"win-created","hwnd":1443308,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":820,"ev":"win-created","hwnd":2622754,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":820,"ev":"proc-seen","pid":13364,"name":"獭摥敧敷癢敩㉷攮數攀⸀硥e"}
+{"t":820,"ev":"proc-seen","pid":14668,"name":"獭摥敧敷癢敩㉷攮數攀⸀硥e"}
+{"t":910,"ev":"proc-seen","pid":13592,"name":"獭摥敧敷癢敩㉷攮數攀⸀硥e"}
+{"t":910,"ev":"proc-seen","pid":13092,"name":"獭摥敧敷癢敩㉷攮數攀⸀硥e"}
+{"t":910,"ev":"proc-seen","pid":5872,"name":"獭摥敧敷癢敩㉷攮數攀⸀硥e"}
+{"t":910,"ev":"proc-seen","pid":5300,"name":"獭摥敧敷癢敩㉷攮數攀⸀硥e"}
+{"t":1169,"ev":"win-changed","hwnd":2098484,"title":"Baraka UltraPOS [BARAKA_DATA_DIR]","vis":true,"zoom":true,"rect":[-7,-7,1288,697]}
+{"t":1169,"ev":"win-created","hwnd":5965184,"title":"MSCTFIME UI","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":1169,"ev":"tcp-open"}
+{"t":1254,"ev":"win-created","hwnd":852816,"title":"","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":1254,"ev":"win-created","hwnd":2753954,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}

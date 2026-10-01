@@ -333,6 +333,16 @@ Basis HEAD when written: a8cf35d698641379d072249312df7d313edf1c43 (AUD-011). The
 This document is in English. Owner-facing reports are in Modern Standard Arabic only.
 The new session is SESSION-ARC-003. Reply numbering restarts at 1. The header of each reply is: "الرد رقم N — SESSION-ARC-003". Reply 10 of SESSION-ARC-003 must be the next CTP (CTP-SESSION-ARC-004).
 
+## 0. Executive summary (charter 15.2 executive summary item)
+
+- Product: Baraka UltraPOS, a Tauri v2 desktop point-of-sale for a hardware store in Algeria (one owner, one PC, one employee now). Engine: Rust + SQLite, 13 migrations, 72 IPC commands, trusted and frozen as release candidate BRK-057. Test baselines at HEAD 97d84aae and later: cargo 365 passed / 0 failed / 4 ignored; vitest 183 passed; fmt, clippy, lint, typecheck and build green.
+- Goal: deliver the final product per Charter v2.0: a rebuilt presentation layer (one shell, a design system, screens for all ten constitutional modules) on the existing engine, with FTS search, management of users/categories/products/customers/credit/stock/documents, 58 mm and 80 mm thermal plus A4 printing, import/export, and a release.
+- Where we are: governance and audits are done (charter, ADR-066..077, AUD-005..011, window policy BRK-058..060, French default DSN-001). AUD-011 shows the current UI has some screen or modal for nine of ten modules; Utilisateurs has none. Six fixed-position elements in PosShell are probably floating action buttons (ADR-067 violation, unverified). There is no toast host and no command palette; barcode-scanner behavior is unknown; the language is not persisted. No new screen has been built yet and no visual acceptance has been given.
+- Owner decisions fixed: IFU flat-rate tax; French default plus Arabic with Latin digits; thermal 58/80 mm plus A4; French product name with one optional Arabic alias; duplicate names rejected (also manual entry); light theme default; always maximized; no Dolisoft data transfer; generic professional import/export.
+- Open gates: real printer verification at 58 and 80 mm; professional tax/legal validation (the accountant questionnaire awaits the owner's print-preview result and must not be sent yet); database-encryption decision. Unmeasured: shop-PC specification and small-screen behavior.
+- Immediate next steps: review the report of TASK-REL-011-C1; TASK-AUD-011-C1 (reachability matrix, full IPC list, the elided inventory parts); questionnaire revision; then docs/design foundations, static prototypes, engine and presentation phases, release.
+- Status words: nothing is production ready. The v1.0.0 tag does not exist and must not be created before charter 9.2 holds.
+
 ## 1. Role, binding documents, first actions of the successor
 
 - You are the Master Principal Architect and Design Lead of Baraka UltraPOS, bound by Charter v2.0 (docs/architecture/CHARTER-v2.0.md, 52866 B, SHA-256 prefix 0b1bb13c).
@@ -533,4 +543,117 @@ Then:
 ## 19. Instruction for the first reply of SESSION-ARC-003
 
 Start with the REL-011 review (item 1 of section 16) if its report is available; otherwise issue TASK-REL-011 again only if the executor reports it was not completed. Header: "الرد رقم 1 — SESSION-ARC-003". Tell the owner plainly which items remain pending: the print-preview result for the questionnaire, the three open owner gates, and the unmeasured small-screen behavior.
+
+## 20. File map (generated from git ls-files at HEAD e430f35762741001cb57afb2b0ec3cdae59a96a2)
+
+Total tracked files: 599.
+
+Top-level entries:
+- .eslintrc.cjs — 1 files
+- .gitattributes — 1 files
+- .gitignore — 1 files
+- .opencode/ — 9 files
+- AGENTS.md — 1 files
+- Cargo.lock — 1 files
+- Cargo.toml — 1 files
+- assets/ — 5 files
+- audit/ — 202 files
+- crates/ — 151 files
+- docs/ — 45 files
+- index.html — 1 files
+- opencode.json — 1 files
+- package-lock.json — 1 files
+- package.json — 1 files
+- pnpm-lock.yaml — 1 files
+- pnpm-workspace.yaml — 1 files
+- postcss.config.js — 1 files
+- rust-toolchain.toml — 1 files
+- src-tauri/ — 59 files
+- src/ — 110 files
+- tailwind.config.js — 1 files
+- tsconfig.json — 1 files
+- tsconfig.node.json — 1 files
+- vite.config.ts — 1 files
+
+Directory file counts (depth 2) for src, crates, src-tauri, audit:
+- audit/AUD-004/ — 9 files
+- audit/AUD-007/ — 8 files
+- audit/AUD-008/ — 25 files
+- audit/AUD-009/ — 29 files
+- audit/AUD-010/ — 35 files
+- audit/AUD-011/ — 1 files
+- audit/measurements/ — 39 files
+- audit/screenshots/ — 53 files
+- crates/application/ — 22 files
+- crates/commands/ — 4 files
+- crates/domain/ — 34 files
+- crates/infrastructure/ — 91 files
+- src-tauri/capabilities/ — 1 files
+- src-tauri/icons/ — 52 files
+- src-tauri/src/ — 2 files
+- src-tauri/tests/ — 1 files
+- src/components/ — 40 files
+- src/features/ — 25 files
+- src/hooks/ — 3 files
+- src/lib/ — 15 files
+- src/stores/ — 18 files
+- src/types/ — 5 files
+
+All tracked files under docs/ (path, bytes):
+- docs/DEV_RUN_PROTOCOL.md — 10845 B
+- docs/adr/ADR-066-viewport-baseline-and-window-policy.md — 2151 B
+- docs/adr/ADR-067-single-top-bar-no-floating-buttons.md — 1113 B
+- docs/adr/ADR-068-tax-regime-ifu.md — 1419 B
+- docs/adr/ADR-069-locales-fr-ar-latin-digits.md — 970 B
+- docs/adr/ADR-070-output-formats-58-80-a4.md — 1106 B
+- docs/adr/ADR-071-deployment-topology-single-device.md — 816 B
+- docs/adr/ADR-072-catalog-migration-from-dolisoft.md — 1563 B
+- docs/adr/ADR-073-canonical-repository-location.md — 642 B
+- docs/adr/ADR-074-destructive-action-confirmation.md — 933 B
+- docs/adr/ADR-075-catalog-import-scope-products-only.md — 1256 B
+- docs/adr/ADR-076-isolated-data-directory-override.md — 1285 B
+- docs/adr/ADR-077-product-entry-and-generic-import-export.md — 7107 B
+- docs/adr/INDEX.md — 6673 B
+- docs/adr/README.md — 1042 B
+- docs/architecture/BOOT-SESSION-ARC-002.md — 73385 B
+- docs/architecture/BOOT-SESSION-ARC-003.md — 86967 B
+- docs/architecture/CHARTER-v2.0.md — 52866 B
+- docs/architecture/CTP-COVERAGE-ARC001-vs-ARC002.md — 5578 B
+- docs/architecture/CTP-SESSION-ARC-001.md — 81498 B
+- docs/architecture/CTP-SESSION-ARC-002.md — 19621 B
+- docs/architecture/CTP-SESSION-ARC-003.md — 33203 B
+- docs/architecture/EXECUTOR-CONSTITUTION-v2.md — 12153 B
+- docs/architecture/MASTER-ARCHITECTURE-ERRATA.md — 2863 B
+- docs/architecture/MASTER-ARCHITECTURE-v1.0.0.md — 39086 B
+- docs/architecture/README.md — 1897 B
+- docs/architecture/archive/AGENTS.v1.md — 3363 B
+- docs/architecture/archive/CONSTITUTION_OF_EXECUTOR.v1.0.0.md — 13720 B
+- docs/architecture/tools/build-boot-package.mjs — 3713 B
+- docs/audits/FIRST_LIVE_SALE_TICK_2026_000002_FORENSIC_AUDIT.md — 12207 B
+- docs/audits/LOGIN_PIPELINE_TRACE_AUDIT.md — 23094 B
+- docs/audits/PRODUCT_CATALOG_PIPELINE_AUDIT.md — 8896 B
+- docs/audits/TASK-BRK-039-payment-overpayment-investigation.md — 8987 B
+- docs/audits/TASK-BRK-040-document-conversion-contracts-investigation.md — 16088 B
+- docs/audits/TASK-BRK-041-document-query-audit.md — 4973 B
+- docs/audits/TASK-BRK-044-returns-and-avoir-architecture-investigation.md — 9614 B
+- docs/audits/TASK-BRK-048-catalog-stock-warehouse-audit.md — 9345 B
+- docs/audits/TASK-BRK-049-catalog-and-warehouses-audit.md — 9855 B
+- docs/audits/TASK-BRK-050-suppliers-purchases-reports-audit.md — 7656 B
+- docs/audits/WAREHOUSE_LIFECYCLE_AUDIT.md — 7633 B
+- docs/legal/QUESTIONNAIRE-COMPTABLE-FR.html — 18630 B
+- docs/operations/release-benchmarks-v1.0.0.md — 3987 B
+- docs/operations/release-notes-v1.0.0.md — 5299 B
+- docs/operations/release-procedure.md — 4697 B
+- docs/operations/thermal-printer-drill.md — 5502 B
+
+Generated mechanically; files added after that HEAD are not listed.
+
+## 21. Addenda written in reply 21 of SESSION-ARC-002
+
+1. Section 15.2 sentence: the sentence in section 2 is the quoted Arabic span inside charter line 302. The whole line 302 is 376 bytes and starts with the English words "Deliver with this sentence (Arabic): "; the quoted span alone is 335 bytes and matches SHA-256 e533009ad8dc33faaf6b156eec4fce448f7998e1879ac7f6f8eeba1f7d946653. Wherever section 2 says the sentence was copied from line 302, it means this quoted span. Reply 20 did not carry the sentence in its owner report; reply 21 delivered it.
+2. Boot generator: docs/architecture/tools/build-boot-package.mjs derives the session tag from the --ctp file name (CTP-SESSION-ARC-NNN.md) and keeps the exact ARC-002 output. It supports only --charter, --ctp, --out and --check. Any other flag (for example --help) triggers a full build that rewrites the default output file. Never call it with other flags.
+3. docs/adr/INDEX.md section 4 header now reads "## 4. ADR-066..077 - SESSION-ARC-001 (Architect, Charter v2.0)". The suffix "SESSION-ARC-001" is stale because ADR-077 was written in SESSION-ARC-002; fix it in a later docs task together with the stale ADR-072 row.
+4. Evidence discipline: the REL-011 report did not print charter lines 291-305, the generator diff, the README diff or the INDEX diff inline, and it printed grep line numbers without heading text. TASK-REL-011-C1 requires them inline.
+5. Reply numbering: if the owner continues in the same chat, the architect keeps counting (reply 21, 22, ...) and the next CTP is due at reply 30 (CTP-SESSION-ARC-004). If the owner opens a new chat and pastes BOOT-SESSION-ARC-003.md as the first message, that session is SESSION-ARC-003, numbering restarts at 1, and its reply 10 is the next CTP. The owner's wording in the new chat may refer to replies of SESSION-ARC-002 beyond 21; in that case ask the executor for the latest commit log.
+6. Pending at the time of writing: the owner's print-preview result for the accountant questionnaire (do not hand the questionnaire to the accountant); TASK-REL-011-C1 report; TASK-AUD-011-C1 not yet issued; the three open owner gates; unmeasured small-screen behavior.
 =====END-PART-2-CTP-ARC-003=====

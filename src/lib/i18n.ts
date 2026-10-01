@@ -1,5 +1,5 @@
 /**
- * Minimal typed bilingual dictionary (ar-DZ default, fr-DZ).
+ * Minimal typed bilingual dictionary (fr-DZ default, ar-DZ).
  * Both locales share identical keys, enforced by the type system.
  */
 

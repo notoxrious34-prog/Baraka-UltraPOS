@@ -25,7 +25,7 @@ interface PosUiState {
 }
 
 export const usePosUiStore = create<PosUiState>()((set) => ({
-  locale: "ar-DZ",
+  locale: "fr-DZ",
   activeModal: "none",
   searchQuery: "",
   selectedLineIndex: 0,

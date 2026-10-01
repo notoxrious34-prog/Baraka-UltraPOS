@@ -1,0 +1,23 @@
+{"t":466,"ev":"win-created","hwnd":721732,"title":"Baraka UltraPOS","vis":true,"zoom":true,"rect":[-7,-7,1288,697]}
+{"t":466,"ev":"win-created","hwnd":2360404,"title":"","vis":true,"zoom":false,"rect":[0,0,15,15]}
+{"t":466,"ev":"win-created","hwnd":3998846,"title":"MSCTFIME UI","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":466,"ev":"win-created","hwnd":4654398,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":466,"ev":"proc-seen","pid":7512,"name":"汵牴灡獯攮數攀"}
+{"t":466,"ev":"proc-seen","pid":9560,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":466,"ev":"proc-seen","pid":1652,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":866,"ev":"win-created","hwnd":3802264,"title":"","vis":false,"zoom":false,"rect":[152,152,1112,649]}
+{"t":866,"ev":"win-created","hwnd":1050114,"title":"","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":866,"ev":"win-created","hwnd":1508864,"title":"","vis":false,"zoom":false,"rect":[0,0,136,39]}
+{"t":866,"ev":"win-changed","hwnd":721732,"title":"Baraka UltraPOS [BARAKA_DATA_DIR]","vis":true,"zoom":true,"rect":[-7,-7,1288,697]}
+{"t":866,"ev":"win-created","hwnd":2426146,"title":"MSCTFIME UI","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":866,"ev":"win-created","hwnd":2753742,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":866,"ev":"win-created","hwnd":2229386,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":866,"ev":"proc-seen","pid":8584,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":866,"ev":"proc-seen","pid":1836,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":866,"ev":"proc-seen","pid":14408,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":866,"ev":"proc-seen","pid":5264,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":866,"ev":"tcp-open"}
+{"t":1100,"ev":"win-created","hwnd":1246536,"title":"","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":1100,"ev":"win-created","hwnd":1443224,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":45018,"ev":"win-changed","hwnd":721732,"title":"Baraka UltraPOS [BARAKA_DATA_DIR]","vis":true,"zoom":false,"rect":[-7,9,1288,686]}
+{"t":46570,"ev":"win-changed","hwnd":721732,"title":"Baraka UltraPOS [BARAKA_DATA_DIR]","vis":true,"zoom":true,"rect":[-7,-7,1288,697]}

@@ -1,0 +1,25 @@
+
+> baraka-ultrapos@1.0.0 tauri
+> tauri build --no-bundle
+
+        Info `tauri-build` dependency has workspace inheritance enabled. The features array won't be automatically rewritten. Expected features: []
+        Info `tauri` dependency has workspace inheritance enabled. The features array won't be automatically rewritten. Expected features: []
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm run build`
+
+> baraka-ultrapos@1.0.0 build
+> tsc && vite build
+
+[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 113 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  0.51 kB[22m[1m[22m[2m │ gzip:   0.33 kB[22m
+[2mdist/[22m[35massets/index-DL6eCe9a.css  [39m[1m[2m 26.76 kB[22m[1m[22m[2m │ gzip:   5.33 kB[22m
+[2mdist/[22m[36massets/index-o949h9zE.js   [39m[1m[2m474.37 kB[22m[1m[22m[2m │ gzip: 119.78 kB[22m
+[32m✓ built in 3.44s[39m
+   Compiling ultrapos v1.0.0 (D:\Dev\Baraka UltraPOS\src-tauri)
+    Finished `release` profile [optimized] target(s) in 2m 24s
+       Built application at: D:\Dev\Baraka UltraPOS\target\release\ultrapos.exe
+BUILD_EXIT:0

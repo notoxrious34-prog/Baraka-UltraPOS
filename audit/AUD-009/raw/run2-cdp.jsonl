@@ -1,0 +1,10 @@
+{"milestone":"c-pageTarget","elapsedMs":4001,"url":"http://tauri.localhost/","pollCount":1}
+{"milestone":"wsOpen","elapsedMs":4021}
+{"milestone":"readyState-complete","elapsedMs":4027}
+{"milestone":"rootChildren","elapsedMs":4028,"count":1}
+{"milestone":"bodyText","elapsedMs":4028,"len":138,"head":"ب\nإنشاء حساب المدير\n\nالتشغيل الأول — أنشئ حساب مدير هذه الطرفية\n\nاسم المستخدم\nكلمة المرور\nتأكيد كلمة المرور\nإنشاء الحساب"}
+{"milestone":"loopGapMaxMs","value":0}
+{"milestone":"screenshot","elapsedMs":4134,"bytes":29863}
+{"milestone":"facts","elapsedMs":4136,"value":{"lang":"fr","dir":"","navLang":"en-GB"}}
+{"milestone":"metrics","elapsedMs":4138,"value":{"iw":1280,"ih":667,"ow":1280,"oh":668,"dpr":1.5,"availW":1280,"availH":690,"sw":1280,"cw":1280,"sh":667,"ch":667}}
+{"milestone":"harness-done","elapsedMs":4139}

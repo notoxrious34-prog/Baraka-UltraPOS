@@ -1,0 +1,364 @@
+﻿
+rel                                                                                                      Length  crtMs
+---                                                                                                      ------  -----
+webview2\EBWebView\Default\Site Characteristics Database\CURRENT                                             16    579
+webview2\EBWebView\Default\Site Characteristics Database\LOCK                                                 0    577
+webview2\EBWebView\Default\Site Characteristics Database\000003.log                                         256    579
+webview2\EBWebView\Default\shared_proto_db\metadata\LOG.old                                                 330    604
+webview2\EBWebView\Default\shared_proto_db\metadata\MANIFEST-000001                                          41    608
+webview2\EBWebView\Default\Site Characteristics Database\LOG                                                340 223284
+webview2\EBWebView\Default\Sync Data\LevelDB\000003.log                                                      65    604
+webview2\EBWebView\Default\Sync Data\LevelDB\CURRENT                                                         16    600
+webview2\EBWebView\Default\Sync Data\LevelDB                                                                       591
+webview2\EBWebView\Default\Site Characteristics Database\LOG.old                                            340    576
+webview2\EBWebView\Default\Site Characteristics Database\MANIFEST-000001                                     41    577
+webview2\EBWebView\Default\shared_proto_db\LOCK                                                               0    614
+webview2\EBWebView\Default\shared_proto_db\LOG                                                              312 223303
+webview2\EBWebView\Default\shared_proto_db\CURRENT                                                           16    616
+webview2\EBWebView\Default\shared_proto_db\metadata                                                                604
+webview2\EBWebView\Default\shared_proto_db\000003.log                                                      5548    618
+webview2\EBWebView\Default\shared_proto_db\LOG.old                                                          312    614
+webview2\EBWebView\Default\shared_proto_db\metadata\LOCK                                                      0    605
+webview2\EBWebView\Default\shared_proto_db\metadata\LOG                                                     330 223301
+webview2\EBWebView\Default\shared_proto_db\metadata\CURRENT                                                  16    610
+webview2\EBWebView\Default\shared_proto_db\MANIFEST-000001                                                   41    614
+webview2\EBWebView\Default\shared_proto_db\metadata\000003.log                                              886    613
+webview2\EBWebView\GrShaderCache\index                                                                   262512   1293
+webview2\EBWebView\hyphen-data\120.0.6050.0                                                                     209942
+webview2\EBWebView\GrShaderCache\data_3                                                                 4202496   1295
+webview2\EBWebView\GrShaderCache\data_1                                                                  270336   1294
+webview2\EBWebView\GrShaderCache\data_2                                                                    8192   1295
+webview2\EBWebView\hyphen-data\120.0.6050.0\_metadata                                                           210023
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-bg.hyb                                                    3467 209974
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-bn.hyb                                                     703 209974
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-be.hyb                                                    6098 209973
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-af.hyb                                                   72640 209971
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-as.hyb                                                     703 209972
+webview2\EBWebView\Default\Sync Data\LevelDB\MANIFEST-000001                                                 41    597
+webview2\EBWebView\extensions_crx_cache\metadata.json                                                        13  40605
+webview2\EBWebView\Default\Sync Data\LevelDB\LOG.old                                                        316    593
+webview2\EBWebView\Default\Sync Data\LevelDB\LOCK                                                             0    595
+webview2\EBWebView\Default\Sync Data\LevelDB\LOG                                                            316 223290
+webview2\EBWebView\GPUPersistentCache\DawnGraphiteCache                                                            535
+webview2\EBWebView\GPUPersistentCache\DawnGraphiteCache\TLVJWQT6NJWKNBUVMWJ4BCR6DK7MJALX\cache.journal        0    535
+webview2\EBWebView\GrShaderCache\data_0                                                                   45056   1294
+webview2\EBWebView\GPUPersistentCache\DawnGraphiteCache\TLVJWQT6NJWKNBUVMWJ4BCR6DK7MJALX\cache.db-wal         0    535
+webview2\EBWebView\GPUPersistentCache\DawnGraphiteCache\TLVJWQT6NJWKNBUVMWJ4BCR6DK7MJALX                           535
+webview2\EBWebView\GPUPersistentCache\DawnGraphiteCache\TLVJWQT6NJWKNBUVMWJ4BCR6DK7MJALX\cache.db             0    535
+webview2\EBWebView\Default\Shared Dictionary\cache\index-dir\the-real-index                                  48   1150
+webview2\EBWebView\Default\Network\Cookies-journal                                                            0   1176
+webview2\EBWebView\Default\Network\Device Bound Sessions                                                  20480   1134
+webview2\EBWebView\Default\Network\Cookies                                                                20480   1175
+webview2\EBWebView\Default\Local Storage\leveldb\LOG.old                                                    324    712
+webview2\EBWebView\Default\Local Storage\leveldb\MANIFEST-000001                                             41    715
+webview2\EBWebView\Default\Network\Device Bound Sessions-journal                                              0   1134
+webview2\EBWebView\Default\Network\Reporting and NEL-journal                                                  0   1173
+webview2\EBWebView\Default\Network\SCT Auditing Pending Reports                                               2   1498
+webview2\EBWebView\Default\Network\Reporting and NEL                                                      36864   1169
+webview2\EBWebView\Default\Network\Network Persistent State                                                 111  11501
+webview2\EBWebView\Default\Network\NetworkDataMigrated                                                        0    587
+webview2\EBWebView\Default\GPUCache\data_2                                                                 8192    674
+webview2\EBWebView\Default\GPUCache\data_3                                                                 8192    674
+webview2\EBWebView\Default\GPUCache\data_1                                                               270336    674
+webview2\EBWebView\Default\Feature Engagement Tracker\EventDB\LOG.old                                         0   3374
+webview2\EBWebView\Default\GPUCache\data_0                                                                 8192    673
+webview2\EBWebView\Default\GPUCache\index                                                                262512    672
+webview2\EBWebView\Default\Local Storage\leveldb\LOCK                                                         0    713
+webview2\EBWebView\Default\Local Storage\leveldb\LOG                                                        324 223432
+webview2\EBWebView\Default\Local Storage\leveldb\CURRENT                                                     16    718
+webview2\EBWebView\Default\Local Storage\leveldb                                                                   711
+webview2\EBWebView\Default\Local Storage\leveldb\000003.log                                                  87    726
+webview2\EBWebView\Default\Session Storage\LOCK                                                               0 223681
+webview2\EBWebView\Default\Session Storage\LOG                                                              271 223680
+webview2\EBWebView\Default\Session Storage\CURRENT                                                           16 223688
+webview2\EBWebView\Default\PersistentOriginTrials\LOG.old                                                     0    579
+webview2\EBWebView\Default\Session Storage\000003.log                                                        49 223694
+webview2\EBWebView\Default\Session Storage\MANIFEST-000001                                                   41 223682
+webview2\EBWebView\Default\Shared Dictionary\cache\index-dir                                                      1150
+webview2\EBWebView\Default\Shared Dictionary\cache\index                                                     24   1123
+webview2\EBWebView\Default\Shared Dictionary\db-journal                                                       0   1124
+webview2\EBWebView\Default\Shared Dictionary\cache                                                                1123
+webview2\EBWebView\Default\Shared Dictionary\db                                                           45056   1124
+webview2\EBWebView\Default\optimization_guide_hint_cache_store\LOCK                                           0   3368
+webview2\EBWebView\Default\optimization_guide_hint_cache_store\LOG                                            0 226022
+webview2\EBWebView\Default\Network\Trust Tokens-journal                                                       0   1124
+webview2\EBWebView\Default\Network\Sdch Dictionaries                                                         40  11128
+webview2\EBWebView\Default\Network\Trust Tokens                                                           36864   1124
+webview2\EBWebView\Default\optimization_guide_hint_cache_store\LOG.old                                        0   3368
+webview2\EBWebView\Default\PersistentOriginTrials\LOCK                                                        0    579
+webview2\EBWebView\Default\PersistentOriginTrials\LOG                                                         0 223291
+webview2\EBWebView\Default\parcel_tracking_db\LOG.old                                                         0    593
+webview2\EBWebView\Default\parcel_tracking_db\LOCK                                                            0    593
+webview2\EBWebView\Default\parcel_tracking_db\LOG                                                             0 223289
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-cs.hyb                                                   64245 209975
+webview2\EBWebView\ShaderCache\index                                                                     262512    540
+webview2\EBWebView\Speech Recognition\1.15.0.1                                                                  197575
+webview2\EBWebView\ShaderCache\data_3                                                                      8192    546
+webview2\EBWebView\ShaderCache\data_1                                                                    270336    542
+webview2\EBWebView\ShaderCache\data_2                                                                      8192    545
+webview2\EBWebView\Speech Recognition\1.15.0.1\manifest.json                                                 76 197605
+webview2\EBWebView\Subresource Filter\Indexed Rules\38                                                          292233
+webview2\EBWebView\Subresource Filter\Indexed Rules\38\10.34.0.84                                               292391
+webview2\EBWebView\Subresource Filter\Unindexed Rules                                                              592
+webview2\EBWebView\Speech Recognition\1.15.0.1\Microsoft.CognitiveServices.Speech.core.dll              2692424 197605
+webview2\EBWebView\Subresource Filter\Indexed Rules                                                             292233
+webview2\EBWebView\OriginTrials\0.0.1.7                                                                          65171
+webview2\EBWebView\OriginTrials\0.0.1.7\manifest.json                                                        43  65240
+webview2\EBWebView\hyphen-data\120.0.6050.0\_metadata\verified_contents.json                               7328 210024
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-und-ethi.hyb                                              3484 210022
+webview2\EBWebView\hyphen-data\120.0.6050.0\manifest.json                                                    82 210023
+webview2\EBWebView\PKIMetadata\46.0.0.0                                                                         189131
+webview2\EBWebView\PKIMetadata\46.0.0.0\manifest.json                                                       102 189200
+webview2\EBWebView\ShaderCache\data_0                                                                      8192    542
+webview2\EBWebView\PKIMetadata\46.0.0.0\kp_pinslist.pb                                                    10674 189198
+webview2\EBWebView\PKIMetadata\46.0.0.0\crs.pb                                                           239119 189195
+webview2\EBWebView\PKIMetadata\46.0.0.0\ct_config.pb                                                      16452 189197
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\Part-RU                                1211986 292220
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\Part-ZH                                 702705 292228
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\Part-NL                                  81784 292219
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\Part-FR                                 540971 292214
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\Part-IT                                 221404 292217
+webview2\EBWebView\TrustTokenKeyCommitments\2026.8.3.1                                                           85992
+webview2\EBWebView\TrustTokenKeyCommitments\2026.8.3.1\manifest.json                                         78  86021
+webview2\EBWebView\TrustTokenKeyCommitments\2026.8.3.1\_metadata\verified_contents.json                    1862  86022
+webview2\EBWebView\TrustTokenKeyCommitments\2026.8.3.1\LICENSE                                             1558  86020
+webview2\EBWebView\TrustTokenKeyCommitments\2026.8.3.1\_metadata                                                 86021
+webview2\EBWebView\TrustTokenKeyCommitments\2026.8.3.1\keys.json                                           8756  86019
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\adblock_snippet.js                        2323 292181
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\Filtering Rules                        2153681 292181
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84                                                292117
+webview2\EBWebView\Subresource Filter\Indexed Rules\38\10.34.0.84\LICENSE                                 24621 292406
+webview2\EBWebView\Subresource Filter\Indexed Rules\38\10.34.0.84\Ruleset Data                          3989624 292392
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\Filtering Rules-AA                     2395466 292193
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\Part-DE                                 312807 292210
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\Part-ES                                 140844 292213
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\manifest.json                              116 292209
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\Filtering Rules-CA                       11977 292207
+webview2\EBWebView\Subresource Filter\Unindexed Rules\10.34.0.84\LICENSE                                  24621 292208
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-uk.hyb                                                   19417 210021
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-gl.hyb                                                    9289 209991
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-gu.hyb                                                     655 209992
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-ga.hyb                                                   35824 209990
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-eu.hyb                                                     665 209989
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-fr.hyb                                                    8165 209989
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-hi.hyb                                                     687 209992
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-it.hyb                                                    2512 209997
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-ka.hyb                                                    9996 209997
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-hy.hyb                                                     605 209996
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-hr.hyb                                                    3031 209993
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-hu.hyb                                                  317251 209993
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-de-1901.hyb                                             121393 209978
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-de-1996.hyb                                             120412 209980
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-da.hyb                                                    6967 209978
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-cu.hyb                                                   52842 209976
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-cy.hyb                                                   35913 209977
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-de-ch-1901.hyb                                          120218 209982
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-es.hyb                                                   14995 209987
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-et.hyb                                                   21421 209988
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-en-us.hyb                                                59802 209986
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-el.hyb                                                    4219 209984
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-en-gb.hyb                                                46607 209985
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-ru.hyb                                                   19886 210013
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-sk.hyb                                                   64103 210014
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-pt.hyb                                                    1414 210013
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-or.hyb                                                     647 210011
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-pa.hyb                                                     607 210012
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-sl.hyb                                                    6631 210015
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-te.hyb                                                     703 210020
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-tk.hyb                                                    2712 210021
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-ta.hyb                                                     554 210019
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-sq.hyb                                                    2013 210016
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-sv.hyb                                                   72119 210017
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-lv.hyb                                                   38602 210001
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-ml.hyb                                                     776 210002
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-lt.hyb                                                    7774 210000
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-kn.hyb                                                     711 209998
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-la.hyb                                                    1839 209999
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-mn-cyrl.hyb                                               5142 210003
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-nl.hyb                                                   77080 210008
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-nn.hyb                                                  145263 210009
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-nb.hyb                                                  145263 210006
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-mr.hyb                                                     687 210005
+webview2\EBWebView\hyphen-data\120.0.6050.0\hyph-mul-ethi.hyb                                              3740 210005
+webview2\EBWebView\Default\Feature Engagement Tracker\EventDB\LOG                                             0 226032
+webview2\EBWebView\Default\DawnWebGPUCache                                                                         675
+webview2\EBWebView\Default\discounts_db                                                                            593
+webview2\EBWebView\Default\DawnGraphiteCache                                                                       677
+webview2\EBWebView\Default\Code Cache                                                                              579
+webview2\EBWebView\Default\commerce_subscription_db                                                                594
+webview2\EBWebView\Default\discount_infos_db                                                                       593
+webview2\EBWebView\Default\Extension State                                                                         684
+webview2\EBWebView\Default\Feature Engagement Tracker                                                             3373
+webview2\EBWebView\Default\Extension Scripts                                                                       605
+webview2\EBWebView\Default\EdgeSessions                                                                           3276
+webview2\EBWebView\Default\Extension Rules                                                                         586
+webview2\EBWebView\Crashpad\settings.dat                                                                    288    293
+webview2\EBWebView\Crashpad\throttle_store.dat                                                               20    293
+webview2\EBWebView\Crashpad\metadata                                                                          0    477
+webview2\EBWebView\Crashpad\attachments                                                                            292
+webview2\EBWebView\Crashpad\reports                                                                                292
+webview2\EBWebView\Default\AutofillAiModelCache                                                                   3368
+webview2\EBWebView\Default\Cache                                                                                   569
+webview2\EBWebView\Default\ClientCertificates                                                                      578
+webview2\EBWebView\Default\BudgetDatabase                                                                         3369
+webview2\EBWebView\Default\AutofillStrikeDatabase                                                                 3369
+webview2\EBWebView\Default\blob_storage                                                                           3248
+webview2\EBWebView\Default\declarative_performance_observer.db                                            32768    577
+webview2\EBWebView\Default\declarative_performance_observer.db-journal                                        0    578
+webview2\EBWebView\Default\BookmarkMergedSurfaceOrdering                                                      6   3366
+webview2\EBWebView\Default\Site Characteristics Database                                                           576
+webview2\EBWebView\Default\Sync Data                                                                               588
+webview2\EBWebView\Default\DIPS                                                                           36864   3315
+webview2\EBWebView\Default\Favicons-journal                                                                   0    591
+webview2\EBWebView\Default\favorites_diagnostic.log                                                        2886   3373
+webview2\EBWebView\Default\Favicons                                                                       20480    590
+webview2\EBWebView\Default\ExtensionActivityEdge                                                          32768   3265
+webview2\EBWebView\Default\ExtensionActivityEdge-journal                                                      0   3266
+webview2\EBWebView\Default\Network                                                                                 579
+webview2\EBWebView\Default\optimization_guide_hint_cache_store                                                    3368
+webview2\EBWebView\Default\Local Storage                                                                           711
+webview2\EBWebView\Default\GPUCache                                                                                671
+webview2\EBWebView\Default\JumpListIconsRecentWorkspacesV2                                                        3314
+webview2\EBWebView\Default\parcel_tracking_db                                                                      593
+webview2\EBWebView\Default\Shared Dictionary                                                                       577
+webview2\EBWebView\Default\shared_proto_db                                                                         596
+webview2\EBWebView\Default\Sessions                                                                                603
+webview2\EBWebView\Default\PersistentOriginTrials                                                                  579
+webview2\EBWebView\Default\Session Storage                                                                      223679
+webview2\EBWebView\component_crx_cache\metadata.json                                                        684  10536
+webview2\EBWebView\hyphen-data                                                                                     588
+webview2\EBWebView\MEIPreload                                                                                      591
+webview2\EBWebView\GrShaderCache                                                                                  1292
+webview2\EBWebView\extensions_crx_cache                                                                          30591
+webview2\EBWebView\GPUPersistentCache                                                                              535
+webview2\EBWebView\OriginTrials                                                                                    589
+webview2\EBWebView\Subresource Filter                                                                              592
+webview2\EBWebView\Trust Protection Lists                                                                          593
+webview2\EBWebView\Speech Recognition                                                                              591
+webview2\EBWebView\PKIMetadata                                                                                     592
+webview2\EBWebView\ShaderCache                                                                                     540
+baraka.db-wal                                                                                            729272    112
+webview2\EBWebView                                                                                                 290
+baraka.db-shm                                                                                             32768    112
+webview2                                                                                                           172
+baraka.db                                                                                                  4096    108
+webview2\EBWebView\AutoLaunchProtocolsComponent                                                                    587
+webview2\EBWebView\Crashpad                                                                                        292
+webview2\EBWebView\Default                                                                                         543
+webview2\EBWebView\component_crx_cache                                                                             532
+webview2\EBWebView\BrowserMetrics                                                                                  367
+webview2\EBWebView\CertificateRevocation                                                                           587
+webview2\EBWebView\CertificateRevocation\6498.2025.9.4\manifest.json                                        113 102604
+webview2\EBWebView\component_crx_cache\720517793663c90e0dbd77cb42709bac49af733f83f73320ba89859d9b0310e0 2393882       
+webview2\EBWebView\CertificateRevocation\6498.2025.9.4\crl-set                                            23123 102603
+webview2\EBWebView\BrowserMetrics\BrowserMetrics-6ABE8CFF-3008.pma                                      1310720 223049
+webview2\EBWebView\CertificateRevocation\6498.2025.9.4                                                          102538
+webview2\EBWebView\component_crx_cache\95fd9d48e4fc245a3f3a99a3a16ecd1355050ba3f4afc555f19a97c7f9b49677    1355       
+webview2\EBWebView\component_crx_cache\ef7bf9efb7c82e6847b572d7781e11fc7fd642a55ab79e42a3d3ba2f80d520f6    8417       
+webview2\EBWebView\component_crx_cache\fa29a6d5775ff340900a65b39b02fc8b4b77d403c048d8debf22f2f5d09c61a0   23359       
+webview2\EBWebView\component_crx_cache\cde4f808f038aaffece9680c0356ded00c81c4559e0a431acb45d1276425d9eb    1922       
+webview2\EBWebView\component_crx_cache\a81d1959892ae4180554347df1b97834abba2e1a5e6b9aeba000ecea26eabecc  975576       
+webview2\EBWebView\component_crx_cache\bec8ead1da3c9600fe66bbcc0e7a9bed9a184c1be821b4d23570c6b7af7f0410  186331       
+webview2\EBWebView\Local State                                                                            11135    539
+webview2\EBWebView\Variations                                                                                85    455
+webview2\EBWebView\Last Version                                                                              13    540
+webview2\EBWebView\TrustTokenKeyCommitments                                                                        592
+webview2\EBWebView\WidevineCdm                                                                                     593
+webview2\EBWebView\VariationsRuntimeSeedV2                                                                  431    458
+webview2\EBWebView\AutoLaunchProtocolsComponent\1.0.0.12\manifest.json                                      135  73539
+webview2\EBWebView\AutoLaunchProtocolsComponent\1.0.0.12\protocols.json                                    3672  73539
+webview2\EBWebView\AutoLaunchProtocolsComponent\1.0.0.12                                                         73511
+webview2\EBWebView\VariationsSafeSeedV2                                                                    1202    458
+webview2\EBWebView\VariationsSeedV2                                                                          76    458
+webview2\EBWebView\Default\History                                                                       212992    568
+webview2\EBWebView\Default\DawnWebGPUCache\index                                                         262512    675
+webview2\EBWebView\Default\discounts_db\LOCK                                                                  0    595
+webview2\EBWebView\Default\DawnWebGPUCache\data_3                                                          8192    677
+webview2\EBWebView\Default\DawnWebGPUCache\data_1                                                        270336    676
+webview2\EBWebView\Default\DawnWebGPUCache\data_2                                                          8192    677
+webview2\EBWebView\Default\discounts_db\LOG                                                                   0 223290
+webview2\EBWebView\Default\discount_infos_db\LOG.old                                                          0    594
+webview2\EBWebView\Default\EdgeSessions\SessionRestoreLog                                                   999   3368
+webview2\EBWebView\Default\discount_infos_db\LOG                                                              0 223289
+webview2\EBWebView\Default\discounts_db\LOG.old                                                               0    594
+webview2\EBWebView\Default\discount_infos_db\LOCK                                                             0    594
+webview2\EBWebView\Default\commerce_subscription_db\LOG                                                       0 223292
+webview2\EBWebView\Default\commerce_subscription_db\LOG.old                                                   0    595
+webview2\EBWebView\Default\commerce_subscription_db\LOCK                                                      0    595
+webview2\EBWebView\Default\Code Cache\wasm\index                                                             24    579
+webview2\EBWebView\Default\Code Cache\wasm\index-dir\the-real-index                                          48    592
+webview2\EBWebView\Default\DawnGraphiteCache\data_0                                                        8192    679
+webview2\EBWebView\Default\DawnGraphiteCache\index                                                       262512    678
+webview2\EBWebView\Default\DawnWebGPUCache\data_0                                                          8192    676
+webview2\EBWebView\Default\DawnGraphiteCache\data_3                                                        8192    680
+webview2\EBWebView\Default\DawnGraphiteCache\data_1                                                      270336    679
+webview2\EBWebView\Default\DawnGraphiteCache\data_2                                                        8192    679
+webview2\EBWebView\Default\Extension State\LOG.old                                                          312    684
+webview2\EBWebView\Default\Extension State\MANIFEST-000001                                                   41    684
+webview2\EBWebView\Default\Extension State\LOG                                                              312 223383
+webview2\EBWebView\Default\Extension State\CURRENT                                                           16    685
+webview2\EBWebView\Default\Extension State\LOCK                                                               0    684
+webview2\EBWebView\Default\Feature Engagement Tracker\AvailabilityDB                                              3374
+webview2\EBWebView\Default\Feature Engagement Tracker\AvailabilityDB\LOG.old                                  0   3374
+webview2\EBWebView\Default\Feature Engagement Tracker\EventDB\LOCK                                            0   3375
+webview2\EBWebView\Default\Feature Engagement Tracker\AvailabilityDB\LOG                                      0 226030
+webview2\EBWebView\Default\Feature Engagement Tracker\EventDB                                                     3374
+webview2\EBWebView\Default\Feature Engagement Tracker\AvailabilityDB\LOCK                                     0   3374
+webview2\EBWebView\Default\Extension Rules\LOG                                                              271    587
+webview2\EBWebView\Default\Extension Rules\MANIFEST-000001                                                   41    587
+webview2\EBWebView\Default\Extension Rules\LOCK                                                               0    587
+webview2\EBWebView\Default\Extension Rules\000003.log                                                        38    598
+webview2\EBWebView\Default\Extension Rules\CURRENT                                                           16    591
+webview2\EBWebView\Default\Extension Scripts\000003.log                                                      38    610
+webview2\EBWebView\Default\Extension Scripts\MANIFEST-000001                                                 41    606
+webview2\EBWebView\Default\Extension State\000003.log                                                       114    691
+webview2\EBWebView\Default\Extension Scripts\LOG                                                            275    605
+webview2\EBWebView\Default\Extension Scripts\CURRENT                                                         16    607
+webview2\EBWebView\Default\Extension Scripts\LOCK                                                             0    606
+webview2\EBWebView\Default\Code Cache\wasm\index-dir                                                               590
+webview2\EBWebView\Default\ServerCertificate-journal                                                          0    573
+webview2\EBWebView\Default\settings_diagnostic.log                                                        32530   3367
+webview2\EBWebView\Default\ServerCertificate                                                              20480    571
+webview2\EBWebView\Default\README                                                                           182    543
+webview2\EBWebView\Default\Secure Preferences                                                              9856  10568
+webview2\EBWebView\Default\Top Sites                                                                      20480   3249
+webview2\EBWebView\Default\Web Data                                                                      223232    566
+webview2\EBWebView\Default\Web Data-journal                                                                   0    567
+webview2\EBWebView\Default\Vpn Tokens-journal                                                                 0    573
+webview2\EBWebView\Default\Top Sites-journal                                                                  0   3249
+webview2\EBWebView\Default\Vpn Tokens                                                                     28672    569
+webview2\EBWebView\Default\LOG.old                                                                            0    605
+webview2\EBWebView\Default\Login Data                                                                     43008    579
+webview2\EBWebView\Default\LOG                                                                                0 223292
+webview2\EBWebView\Default\History-journal                                                                    0    571
+webview2\EBWebView\Default\LOCK                                                                               0    605
+webview2\EBWebView\Default\Login Data For Account                                                         43008    578
+webview2\EBWebView\Default\Network Action Predictor-journal                                                   0   3329
+webview2\EBWebView\Default\Preferences                                                                     9275  10571
+webview2\EBWebView\Default\Network Action Predictor                                                       53248   3328
+webview2\EBWebView\Default\Login Data For Account-journal                                                     0    579
+webview2\EBWebView\Default\Login Data-journal                                                                 0    585
+webview2\EBWebView\Default\ClientCertificates\LOG.old                                                         0    579
+webview2\EBWebView\Default\Code Cache\js                                                                           579
+webview2\EBWebView\Default\ClientCertificates\LOG                                                             0 223282
+webview2\EBWebView\Default\Cache\No_Vary_Search                                                                    576
+webview2\EBWebView\Default\ClientCertificates\LOCK                                                            0    579
+webview2\EBWebView\Default\Code Cache\wasm                                                                         579
+webview2\EBWebView\Default\Code Cache\js\index                                                               24    585
+webview2\EBWebView\Default\Code Cache\js\index-dir\the-real-index                                            96    595
+webview2\EBWebView\Default\Code Cache\js\7dd19d646d5cdaf9_0                                              302088 125202
+webview2\EBWebView\Default\Code Cache\js\index-dir                                                                 595
+webview2\EBWebView\Default\Code Cache\js\5586abbedd768042_0                                                 256   1297
+webview2\EBWebView\Default\AutofillStrikeDatabase\LOCK                                                        0   3369
+webview2\EBWebView\Default\AutofillStrikeDatabase\LOG                                                         0 226026
+webview2\EBWebView\Default\AutofillAiModelCache\LOG.old                                                       0   3368
+webview2\EBWebView\Default\AutofillAiModelCache\LOCK                                                          0   3368
+webview2\EBWebView\Default\AutofillAiModelCache\LOG                                                           0 226025
+webview2\EBWebView\Default\AutofillStrikeDatabase\LOG.old                                                     0   3369
+webview2\EBWebView\Default\BudgetDatabase\LOG.old                                                             0   3369
+webview2\EBWebView\Default\Cache\Cache_Data                                                                        569
+webview2\EBWebView\Default\BudgetDatabase\LOG                                                                 0 226027
+webview2\EBWebView\Default\blob_storage\d69a87c4-4e5d-4fd1-b6a9-fe6bb449d85f                                    225670
+webview2\EBWebView\Default\BudgetDatabase\LOCK                                                                0   3369
+
+

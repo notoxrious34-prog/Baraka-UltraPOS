@@ -1,0 +1,20 @@
+{"t":359,"ev":"win-created","hwnd":3605218,"title":"Baraka UltraPOS","vis":true,"zoom":true,"rect":[-7,-7,1288,697]}
+{"t":359,"ev":"win-created","hwnd":1639936,"title":"","vis":true,"zoom":false,"rect":[0,0,15,15]}
+{"t":359,"ev":"win-created","hwnd":2164266,"title":"MSCTFIME UI","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":359,"ev":"win-created","hwnd":2294922,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":359,"ev":"proc-seen","pid":14604,"name":"汵牴灡獯攮數攀"}
+{"t":359,"ev":"proc-seen","pid":12296,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":359,"ev":"proc-seen","pid":12212,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":817,"ev":"win-created","hwnd":2360456,"title":"","vis":false,"zoom":false,"rect":[51,51,1011,548]}
+{"t":817,"ev":"win-created","hwnd":1312236,"title":"","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":817,"ev":"win-created","hwnd":1246640,"title":"","vis":false,"zoom":false,"rect":[0,0,136,39]}
+{"t":817,"ev":"win-changed","hwnd":3605218,"title":"Baraka UltraPOS [BARAKA_DATA_DIR]","vis":true,"zoom":true,"rect":[-7,-7,1288,697]}
+{"t":817,"ev":"win-created","hwnd":2818796,"title":"MSCTFIME UI","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":817,"ev":"win-created","hwnd":3671374,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":817,"ev":"win-created","hwnd":2032984,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":817,"ev":"proc-seen","pid":6664,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":817,"ev":"proc-seen","pid":11792,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":817,"ev":"proc-seen","pid":6060,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":817,"ev":"proc-seen","pid":13880,"name":"獭摥敧敷癢敩㉷攮數"}
+{"t":1223,"ev":"win-created","hwnd":1245722,"title":"","vis":false,"zoom":false,"rect":[0,0,0,0]}
+{"t":1223,"ev":"win-created","hwnd":4064382,"title":"Default IME","vis":false,"zoom":false,"rect":[0,0,0,0]}

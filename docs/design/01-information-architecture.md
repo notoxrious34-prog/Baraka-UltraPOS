@@ -1,4 +1,4 @@
-# 01 - Information Architecture (v0.3, PROPOSED)
+# 01 - Information Architecture (v0.4, PROPOSED)
 
 Status: PROPOSED. Structure follows ADR-078. The visibility matrix (2.2), the key bindings (3.3, 7) and the frequencies (6) are provisional until the static prototypes are accepted by the owner. Nothing here is a compliance or hardware-verification claim.
 
@@ -148,7 +148,7 @@ The six buttons are deleted when the new shell lands. Modals that remain modals 
 |---|---|---|---|---|---|---|
 | J01 | Scan or type, add to cart, pay | Vendeur, Caissier, Gérant | 200 per day | critical | start on Vente; scan or F1 + type; Enter; F12 | EXISTS, search NEEDS-BRK |
 | J02 | Sell on credit | Caissier, Gérant | 30 per day | critical | F2 choose customer; F12; method Crédit | EXISTS |
-| J03 | Collect a debt payment | Gérant, Admin | 20 per day | critical | Ctrl+3; select customer; Encaisser; or customer chip in Vente > Encaisser | EXISTS |
+| J03 | Collect a debt payment | Roles: Gerant, Admin directly; Caissier only with manager approval in place (ADR-079 Amendment 2) | 20 per day | critical | Ctrl+3; select customer; Encaisser; or customer chip in Vente > Encaisser | EXISTS |
 | J04 | Park and resume a sale | all selling roles | 10 per day | high | F8 park; F6 list; Enter resume | NEEDS-BRK |
 | J05 | Reprint the last receipt | Caissier, Gérant | 5 per day | medium | Vente > Dernier ticket; or palette Réimprimer | NEEDS-BRK |
 | J06 | Return goods / Avoir | Caissier (with manager approval), Gérant, Admin | 3 per week | high | Ctrl+2; F1 find document; open; Retour / Avoir | EXISTS, list UI-ONLY |
@@ -172,6 +172,8 @@ The six buttons are deleted when the new shell lands. Modals that remain modals 
 - Esc: close the innermost modal, panel or palette; clear the focused search; never leaves the screen.
 - Inside Vente the F-key contract of the charter section 7.3 applies unchanged; outside Vente F2..F12 are inactive unless a screen specification defines them.
 - Ctrl+Digit conflicts with WebView2 or Windows are verified in the prototype before the keys are frozen.
+
+Implementation status of keys (AUD-011, AUD-013). Handled in code today: F1, F2, F3, F4, F5, F8, F10, F12, Delete/Backspace, ArrowUp/ArrowDown, Ctrl/Cmd+K (its action is not recorded). NOT implemented although specified in this document and the charter: F6, F7, F9, F11, Alt+1..8, and every Ctrl+digit. Conflicts of these keys inside the packaged webview are unmeasured.
 
 ## 8. Contextual links between modules
 - Vente customer chip > Clients & Crédit detail of that customer.
@@ -209,11 +211,11 @@ The six buttons are deleted when the new shell lands. Modals that remain modals 
 1. Rail default (collapsed vs expanded) at 1024 px wide for a non-technical user.
 2. CLOSED in v0.3: the Caissier may create a customer (name and phone) at the counter and sees only one word at a credit sale (12.1 items 4 and 5; ADR-079 Amendment 1).
 3. Whether Ctrl+Digit keys are free of conflicts in the packaged app.
-4. Which of the 19 named modals in AUD-011 is the nineteenth (UNKNOWN: AUD-011 enumerates 18).
+4. Which of the 19 named modals in AUD-011 is the nineteenth (UNKNOWN: AUD-011 enumerates 18). The 19th modal named in earlier audit prose is unidentified. Enumerated and verified: 18. Hypothesis only (unverified): ModalShell, the shared shell component that is not itself a dialog, was counted.
 5. Dialogs today have no focus trap and no focus restoration (AUD-011-C1 section G); the modal component must add both.
-6. Debt payment while no manager is present: by owner decision the Caissier cannot collect (12.1 item 2). Whether collection may be allowed under manager approval (the mechanism of 12.5) was asked of the owner on 2026-10-02; until he answers, it is not allowed.
+6. Debt collection: the Caissier records a debt payment only after the manager confirms in place with his PIN ('Autorisation du gerant'), same mechanism as returns (ADR-079 Amendment 2). Gerant and Admin collect directly. Customer statements are manager-only. PROPOSED: the collection form opens only after the PIN. OPEN: whether the cashier sees the debt amount inside the approved form (owner question Q-B); whether a printed proof is issued (Q-A); the cashier's entry point (Caisse & Cloture or Vente customer picker).
 
-## 12. Decisions and corrections in v0.2
+## 12. Decisions and corrections in v0.4
 
 ### 12.1 Owner answers (recorded in ADR-079)
 1. The employee receives money and opens and closes the cash session: the employee is a Caissier.
@@ -251,6 +253,14 @@ The six buttons are deleted when the new shell lands. Modals that remain modals 
 4. On success the return completes in the same step; the Avoir and the audit record show both the Caissier and the approving manager.
 5. The Caissier session is never switched and the UI never stores the PIN.
 6. The same mechanism is reserved for the other restricted actions of the F7 override (price, discount, negative stock, credit limit); they are not part of the first BRK task.
+
+### 12.6 AUD-013 consequences (added in v0.4)
+- Credit HUD: src/components/pos/CreditHud.tsx shows balance and limit amounts today. It must change to the one-word rule (allowed / not allowed, icon, no amount, no reason text) for the Caissier. "Allowed" depends on the credit part of the current cart; the prototype must define it. The engine has no eligibility-only command; customers_search and customers_list rows carry only id, name, phone, credit_policy, so a status-only command is a candidate BRK task.
+- Quick "Nouveau client" form (name and phone only): the engine requires name 2..100 characters after trimming; phone is optional in the engine, digits only, mobile 0[5-7] plus 8 digits (10 total) or landline 0[2-4] plus 7 digits (9 total), else INVALID_PHONE_FORMAT; the phone is UNIQUE, a duplicate gives CUSTOMER_PHONE_DUPLICATE, so on that error the UI offers "open the existing customer". Whether the UI makes the phone mandatory is undecided.
+- credit_record_payment facts: one transaction writes a customer_ledger row, the customers balance, and a cash_movements row; it needs an open cash session; it applies to the global balance only (no per-document allocation); it creates no receipt or document, writes no audit_log row, and has no reversal command.
+- Personal data: customers (name, phone, address), users, suppliers (nif, rc) have no delete/anonymize/purge command (customers only have is_active); backups are unencrypted (cipher_version NONE); A4 and other document layouts were NOT checked for customer data (UNKNOWN, a read-only audit is planned).
+- Statement access: ViewCustomers is held by all roles, so the manager-only statement rule needs a new read permission (see ADR-079 Amendment 2 item 3).
+- Open owner questions: Q-A (printed proof for a debt payment), Q-B (cashier sees the debt amount in the approved form).
 
 ## Appendix A - Role and permission facts (generated from code, verbatim)
 Single mapping: exactly one Role-to-permission table exists, `Role::permissions()` in crates/domain/src/role.rs (below); the frontend holds no permission mapping and compares role-name strings only.

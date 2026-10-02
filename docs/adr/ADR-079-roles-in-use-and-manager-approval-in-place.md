@@ -16,7 +16,7 @@ AUD-012 verified the permission required by each of the 72 IPC commands. The own
 
 ## Consequences
 - New BRK tasks: manager approval in place (first for ProcessReturn), permission split for credit statement and debt collection, tightening of catalog_define_kit after confirmation, PIN management in Utilisateurs.
-- The design document docs/design/01-information-architecture.md (v0.4) carries the visibility matrix and the approval flow.
+- The design document docs/design/01-information-architecture.md (v0.5) carries the visibility matrix and the approval flow.
 - Settled by Amendment 1: customer creation at the counter and the credit HUD word. The visual details of both are settled in the prototypes.
 
 ## Amendment 1 (2026-10-02, owner answers)
@@ -26,7 +26,7 @@ AUD-012 verified the permission required by each of the 72 IPC commands. The own
 
 ## Amendment 2 (SESSION-ARC-004, reply 1): debt collection by the Caissier requires manager approval in place
 
-Status: items 1-3 ACCEPTED (owner decision, SESSION-ARC-003 reply 10). Items 4-6 PROPOSED or OPEN until the owner answers.
+Status: items 1-3 ACCEPTED (owner decision, SESSION-ARC-003 reply 10). Items 4-6: item 4 and the Q-A and Q-B parts of items 5 and 6 are RESOLVED by Amendment 3; the cashier entry point of item 6 stays OPEN.
 
 1. Rule. The Caissier may record a customer debt payment (command credit_record_payment) ONLY inside a manager-approved context. The manager types his PIN in the dialog "Autorisation du gerant". The mechanism is the same as for returns: a single-use approval, bound to ONE permission (RecordCreditPayment) and ONE target (the customer id), valid for a short time, audited with BOTH user ids. The cashier session is never switched. The UI never stores the PIN. Attempt limits and approval lifetime are decided in the BRK task that implements the mechanism.
 
@@ -39,3 +39,15 @@ Status: items 1-3 ACCEPTED (owner decision, SESSION-ARC-003 reply 10). Items 4-6
 5. OPEN, owner question Q-B: whether the cashier may see the customer's debt amount inside that approved form while the manager is present. Proposal: yes, inside the form only, nowhere else.
 
 6. OPEN, owner question Q-A: whether a customer receives a printed proof when paying a debt (the engine prints nothing and creates no document for it today). OPEN, design question: the cashier's entry point for an approved collection (Caisse & Cloture or the customer picker in Vente), because the visibility matrix hides Clients & Credit from the Caissier.
+
+## Amendment 3 (SESSION-ARC-004, reply 2): owner answers on debt collection
+
+Status: items 1-3 ACCEPTED (owner answers, SESSION-ARC-004 reply 2). Item 4 OPEN.
+
+1. The approval-first ordering (Amendment 2 item 4) is CONFIRMED. The collection form opens only after the manager's PIN is accepted. Owner wording: the form appears after the manager enters his PIN, and the amount shows inside it only while the manager is present, and nowhere else for the employee.
+
+2. Q-B answered YES: the Caissier sees the customer's debt amount inside the approved collection form only. The amount is never shown to the Caissier in Vente, in the customer picker or in the credit HUD (the one-word rule of Amendment 1 stays). Engine consequence for the BRK task: today customers_get and customers_create return the balance to every role; the BRK task must define how the amount reaches the Caissier session only through the approved path (candidate: a read or a command bound to the single-use approval), and must not rely on UI hiding alone.
+
+3. Q-A answered YES: every debt payment prints a proof handed to the customer. Today credit_record_payment prints nothing and creates no document. Engine consequence for the BRK task: add a printable debt-payment proof through the existing print pipeline, with the print job created in the same transaction as the payment; a print failure never rolls back the payment (charter section 5); reprint is governed by ReprintDocument.
+
+4. OPEN, for the BRK or design task that builds the proof: whether the proof carries a gapless number and from which sequence (depends on accountant questions Q11 and Q13); whether it shows the remaining balance; whether stamp duty applies to the payment (accountant question Q11); the cashier's entry point (Caisse & Cloture or the customer picker in Vente). The proof is a business and printing item, not a compliance claim.

@@ -1,10 +1,13 @@
-# 01 - Information Architecture (v0.4, PROPOSED)
+# 01 - Information Architecture (v0.5, PROPOSED)
 
 Status: PROPOSED. Structure follows ADR-078. The visibility matrix (2.2), the key bindings (3.3, 7) and the frequencies (6) are provisional until the static prototypes are accepted by the owner. Nothing here is a compliance or hardware-verification claim.
 
 v0.2 (2026-10-02): the visibility matrix (2.2), the role descriptions (2.1), jobs J03 and J06, the engine register (10) and the open points (11) are corrected against audit/AUD-012/PERMISSIONS.md (commit 7ba73089ab14f13fb2881954b77fd15677a078c3) and the owner answers recorded in ADR-079; section 12 is new. Appendix A and Appendix B are generated evidence and are not edited.
 
 v0.3 (2026-10-02): records the owner answers on customer creation at the counter and on the credit HUD (ADR-079 Amendment 1); closes open point 2 of section 11 and adds open point 6; corrects the result words of the table in 12.2 (CONFIRMED means the claim is true, REFUTED means it is false). Appendix A and Appendix B remain unedited.
+v0.4 (2026-10-02): records the owner decision that the Caissier collects a customer debt only after manager approval in place (ADR-079 Amendment 2); updates job J03, the key-status paragraph of section 7, section 11 points 4 and 6, the heading of section 12, and adds 12.6 (AUD-013 consequences). Appendix A and Appendix B remain unedited. (Entry added retroactively in v0.5.)
+
+v0.5 (2026-10-02): records the owner answers Q-A (printed proof for every debt payment) and Q-B (debt amount visible to the Caissier only inside the approved form) and confirms the approval-first order (ADR-079 Amendment 3); updates section 11 point 6 and 12.6, adds 12.7, renames the heading of section 12. Appendix A and Appendix B remain unedited.
 
 Scope: navigation, roles, jobs-to-be-done, module map, relocation of the six floating functions, engine dependencies. Out of scope: tokens, components, screen layouts, copy (later documents in docs/design/).
 
@@ -213,9 +216,9 @@ Implementation status of keys (AUD-011, AUD-013). Handled in code today: F1, F2,
 3. Whether Ctrl+Digit keys are free of conflicts in the packaged app.
 4. Which of the 19 named modals in AUD-011 is the nineteenth (UNKNOWN: AUD-011 enumerates 18). The 19th modal named in earlier audit prose is unidentified. Enumerated and verified: 18. Hypothesis only (unverified): ModalShell, the shared shell component that is not itself a dialog, was counted.
 5. Dialogs today have no focus trap and no focus restoration (AUD-011-C1 section G); the modal component must add both.
-6. Debt collection: the Caissier records a debt payment only after the manager confirms in place with his PIN ('Autorisation du gerant'), same mechanism as returns (ADR-079 Amendment 2). Gerant and Admin collect directly. Customer statements are manager-only. PROPOSED: the collection form opens only after the PIN. OPEN: whether the cashier sees the debt amount inside the approved form (owner question Q-B); whether a printed proof is issued (Q-A); the cashier's entry point (Caisse & Cloture or Vente customer picker).
+6. Debt collection (ADR-079 Amendments 2 and 3): the Caissier records a debt payment only after the manager confirms in place with his PIN ('Autorisation du gerant'), same mechanism as returns. Gerant and Admin collect directly. Customer statements are manager-only. CONFIRMED by the owner (reply 2 of SESSION-ARC-004): the collection form opens only after the PIN is accepted, and the Caissier sees the debt amount only inside that form, nowhere else; CONFIRMED: every debt payment prints a proof for the customer. OPEN: numbering of the proof, remaining balance on the proof, stamp duty on the proof (accountant questions), and the cashier's entry point (Caisse & Cloture or the Vente customer picker).
 
-## 12. Decisions and corrections in v0.4
+## 12. Decisions and corrections (v0.2 to v0.5)
 
 ### 12.1 Owner answers (recorded in ADR-079)
 1. The employee receives money and opens and closes the cash session: the employee is a Caissier.
@@ -260,7 +263,14 @@ Implementation status of keys (AUD-011, AUD-013). Handled in code today: F1, F2,
 - credit_record_payment facts: one transaction writes a customer_ledger row, the customers balance, and a cash_movements row; it needs an open cash session; it applies to the global balance only (no per-document allocation); it creates no receipt or document, writes no audit_log row, and has no reversal command.
 - Personal data: customers (name, phone, address), users, suppliers (nif, rc) have no delete/anonymize/purge command (customers only have is_active); backups are unencrypted (cipher_version NONE); A4 and other document layouts were NOT checked for customer data (UNKNOWN, a read-only audit is planned).
 - Statement access: ViewCustomers is held by all roles, so the manager-only statement rule needs a new read permission (see ADR-079 Amendment 2 item 3).
-- Open owner questions: Q-A (printed proof for a debt payment), Q-B (cashier sees the debt amount in the approved form).
+- Owner questions Q-A and Q-B: ANSWERED YES in SESSION-ARC-004 reply 2 (a printed proof for every debt payment; the debt amount visible to the Caissier only inside the approved form). See ADR-079 Amendment 3 and 12.7.
+
+### 12.7 Manager-approved debt collection: flow and owner answers (added in v0.5)
+- Flow for the Caissier (job J03, to be prototyped): (1) the Caissier selects the customer at the entry point (undecided, see section 11 point 6); (2) the dialog "Autorisation du gerant" asks for the manager PIN; (3) after the PIN is accepted the collection form opens and shows the debt amount and an amount field; (4) the Caissier confirms and the payment is recorded; (5) the proof prints for the customer; (6) the form closes, the cashier session is unchanged and the amount is no longer visible.
+- Failure branches the prototype must show: wrong PIN (attempt counter, lock after the limit set by the BRK task); approval expired before confirmation (start again); no open cash session (payment refused, the message tells the user to open the session); printer offline or out of paper (the payment is kept and the proof stays reprintable); overpayment (needs ManageCustomerCredit, which the Caissier does not hold; PROPOSED: the approval is bound to RecordCreditPayment only, so an overpayment is refused to the Caissier and the manager records it in his own session; the owner has not yet confirmed this).
+- Proof of payment, candidate content (undecided): store identity, date and time, customer name, amount paid, method cash (the engine records a cash movement), cashier name, a number from a gapless sequence if the accountant requires it, and optionally the remaining balance. The proof is a business document and makes no compliance claim. The thermal 58 and 80 mm layouts are specified in a later design task.
+- Statement: the Caissier never sees the customer statement, even inside the approved context.
+- Engine consequences are listed in ADR-079 Amendment 3 items 2 and 3.
 
 ## Appendix A - Role and permission facts (generated from code, verbatim)
 Single mapping: exactly one Role-to-permission table exists, `Role::permissions()` in crates/domain/src/role.rs (below); the frontend holds no permission mapping and compares role-name strings only.

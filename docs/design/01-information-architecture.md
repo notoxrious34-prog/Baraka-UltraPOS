@@ -1,6 +1,8 @@
-# 01 - Information Architecture (v0.1, PROPOSED)
+# 01 - Information Architecture (v0.2, PROPOSED)
 
 Status: PROPOSED. Structure follows ADR-078. The visibility matrix (2.2), the key bindings (3.3, 7) and the frequencies (6) are provisional until the static prototypes are accepted by the owner. Nothing here is a compliance or hardware-verification claim.
+
+v0.2 (2026-10-02): the visibility matrix (2.2), the role descriptions (2.1), jobs J03 and J06, the engine register (10) and the open points (11) are corrected against audit/AUD-012/PERMISSIONS.md (commit 7ba73089ab14f13fb2881954b77fd15677a078c3) and the owner answers recorded in ADR-079; section 12 is new. Appendix A and Appendix B are generated evidence and are not edited.
 
 Scope: navigation, roles, jobs-to-be-done, module map, relocation of the six floating functions, engine dependencies. Out of scope: tokens, components, screen layouts, copy (later documents in docs/design/).
 
@@ -18,13 +20,13 @@ Scope: navigation, roles, jobs-to-be-done, module map, relocation of the six flo
 ## 2. Roles and visibility
 
 ### 2.1 Roles
-The code has four roles: Vendeur, Caissier, Gerant, Admin (Appendix A has the code facts). Today the shop has one owner and one employee on one PC (ADR-071).
+The code has four roles: Vendeur, Caissier, Gerant, Admin (Appendix A has the code facts). Today the shop has one owner and one employee on one PC (ADR-071). The employee uses the Caissier role; the Vendeur role stays in the engine and in the matrix but is not assigned today (ADR-079).
 
 | Role | Typical person | Main jobs |
 |---|---|---|
 | Admin | the owner | everything, including users, backups, store identity |
-| Gérant | a trusted manager | operations: catalog, stock, suppliers, reports, overrides |
-| Caissier | the employee at the counter | selling, collecting payments, cash session, reprints |
+| Gérant | a trusted manager | operations: catalog, stock, suppliers, reports, overrides, debt collection, customer statements |
+| Caissier | the employee at the counter | selling, opening and closing the cash session, expenses, reprints; returns only with manager approval (ADR-079) |
 | Vendeur | a seller without cash handling | selling, quotes, product and customer lookup |
 
 ### 2.2 Visibility (PROPOSED)
@@ -33,9 +35,9 @@ Legend: Y = full, R = read-only, P = partial (see note), N = hidden.
 | Module | Admin | Gérant | Caissier | Vendeur |
 |---|---|---|---|---|
 | Vente | Y | Y | Y | Y |
-| Documents | Y | Y | Y | R |
-| Clients & Crédit | Y | Y | Y | R |
-| Produits & Codes-barres | Y | Y | R | R |
+| Documents | Y | Y | P | R |
+| Clients & Crédit | Y | Y | N | N |
+| Produits & Codes-barres | Y | Y | N | N |
 | Stock | Y | Y | R | R |
 | Fournisseurs & Achats | Y | Y | N | N |
 | Caisse & Clôture | Y | Y | Y | N |
@@ -43,7 +45,7 @@ Legend: Y = full, R = read-only, P = partial (see note), N = hidden.
 | Utilisateurs | Y | N | N | N |
 | Paramètres & Sauvegarde | Y | P | P | P |
 
-Notes: Documents R for Vendeur = search, view, reprint only. Clients R for Vendeur = search and select a customer only (no ledger, no payments). Paramètres P for Gérant = Impression and Langue & affichage; P for Caissier and Vendeur = Langue & affichage only. Return/Avoir and document conversion for Caissier are subject to the engine permission found in Appendix A; if the engine requires a manager permission, the screen shows the action disabled with the reason, never hidden without explanation.
+Notes (v0.2): Documents R for Vendeur = search and view only (ReprintDocument is held by Caissier, Gérant and Admin). Documents P for Caissier = search, view, reprint and convert; Retour / Avoir is shown enabled and opens the manager-approval step (ADR-079). Clients & Crédit N for Caissier and Vendeur = no module; the customer is chosen from the picker inside Vente (customers_search needs ViewCustomers, held by all roles); the customer statement and debt collection are manager functions by owner decision. Produits N for Caissier and Vendeur = no module; lookup happens in the Vente search (catalog_search needs PosSell); the product editor needs StockAdjustment or SystemSettingsManage (Gérant, Admin). Stock R = view quantities only; adjustments and transfers need AdjustStock and TransferStock (Gérant, Admin); warehouse creation needs ManageWarehouses (Admin). Rapports N for Caissier = the Z report stays inside Caisse & Clôture (CashReportView). Paramètres P for Gérant, Caissier and Vendeur = Langue & affichage only; Impression and Identité du magasin need ManagePrinterSettings and SystemSettingsManage (Admin); Sauvegardes are Admin in the UI. Actions a role cannot perform are shown disabled with the reason, except where an approval step applies. Where the engine is more permissive than this matrix, the matrix is a UI decision and section 12.3 lists the gaps.
 
 ## 3. Navigation model
 
@@ -144,10 +146,10 @@ The six buttons are deleted when the new shell lands. Modals that remain modals 
 |---|---|---|---|---|---|---|
 | J01 | Scan or type, add to cart, pay | Vendeur, Caissier, Gérant | 200 per day | critical | start on Vente; scan or F1 + type; Enter; F12 | EXISTS, search NEEDS-BRK |
 | J02 | Sell on credit | Caissier, Gérant | 30 per day | critical | F2 choose customer; F12; method Crédit | EXISTS |
-| J03 | Collect a debt payment | Caissier, Gérant | 20 per day | critical | Ctrl+3; select customer; Encaisser; or customer chip in Vente > Encaisser | EXISTS |
+| J03 | Collect a debt payment | Gérant, Admin | 20 per day | critical | Ctrl+3; select customer; Encaisser; or customer chip in Vente > Encaisser | EXISTS |
 | J04 | Park and resume a sale | all selling roles | 10 per day | high | F8 park; F6 list; Enter resume | NEEDS-BRK |
 | J05 | Reprint the last receipt | Caissier, Gérant | 5 per day | medium | Vente > Dernier ticket; or palette Réimprimer | NEEDS-BRK |
-| J06 | Return goods / Avoir | Caissier (override), Gérant | 3 per week | high | Ctrl+2; F1 find document; open; Retour / Avoir | EXISTS, list UI-ONLY |
+| J06 | Return goods / Avoir | Caissier (with manager approval), Gérant, Admin | 3 per week | high | Ctrl+2; F1 find document; open; Retour / Avoir | EXISTS, list UI-ONLY |
 | J07 | Quote to BL to Facture | Gérant, Caissier | 10 per week | medium | Ctrl+2; filter Devis; open; Convertir | EXISTS, list UI-ONLY |
 | J08 | Open and close the cash session | Caissier, Gérant | 2 per day | critical | F11 in Vente; or Ctrl+7 | EXISTS |
 | J09 | Enter a new product (fast loop) | Gérant, Admin | hundreds at start | high | Ctrl+4; Ctrl+N; fill; save-and-new key decided in prototype | NEEDS-BRK |
@@ -198,13 +200,52 @@ The six buttons are deleted when the new shell lands. Modals that remain modals 
 | Product import/export (ADR-077) and barcode labels | Produits | NEEDS-BRK |
 | Language, theme and rail-state persistence; tax.regime key | shell, Paramètres | NEEDS-BRK |
 | Document list screen, customer edit screen, kit UI, product detail | Documents, Clients, Produits | UI-ONLY |
+| Manager approval in place for restricted actions, starting with ProcessReturn (ADR-079); PIN set and reset in Utilisateurs | Documents, Vente, Utilisateurs | NEEDS-BRK |
+| Permission split: credit statement view and debt collection restricted to Gérant and Admin; catalog_define_kit tightened (today PosSell per AUD-012 B2 row 10, to be confirmed by the BRK task) | Clients & Crédit, Produits | NEEDS-BRK |
 
 ## 11. Open points (to settle through the prototypes and the owner)
 1. Rail default (collapsed vs expanded) at 1024 px wide for a non-technical user.
-2. Exact Caissier vs Vendeur permissions (compare with Appendix A before freezing 2.2).
+2. Whether the Caissier may create a new customer at the counter (the engine allows it: CreateCustomer) and whether the credit HUD shows amounts or only a status text to the Caissier (section 12.4).
 3. Whether Ctrl+Digit keys are free of conflicts in the packaged app.
 4. Which of the 19 named modals in AUD-011 is the nineteenth (UNKNOWN: AUD-011 enumerates 18).
 5. Dialogs today have no focus trap and no focus restoration (AUD-011-C1 section G); the modal component must add both.
+
+## 12. Decisions and corrections in v0.2
+
+### 12.1 Owner answers (recorded in ADR-079)
+1. The employee receives money and opens and closes the cash session: the employee is a Caissier.
+2. The employee only chooses the customer when selling; he does not view debts and does not collect them.
+3. Returns are approved by the owner in place, without switching the user (approval in place).
+
+### 12.2 Suspicions checked against code (AUD-012, commit 7ba73089ab14f13fb2881954b77fd15677a078c3)
+| Suspicion | Result | Evidence |
+|---|---|---|
+| Vendeur can reprint | Contradiction CONFIRMED: reprint is held by Caissier, Gérant, Admin | role.rs:62-63, role.rs:121, printing.rs:43 |
+| Gérant can change Impression settings | Contradiction CONFIRMED: Admin only (ManagePrinterSettings, SystemSettingsManage) | ipc.rs:2378, role.rs:64-65 |
+| Warehouse creation Admin-only, transfers Gérant and Admin | REFUTED (the document matched the code) | inventory.rs:103, inventory.rs:273 |
+
+### 12.3 Engine facts that shape the design (evidence: audit/AUD-012/PERMISSIONS.md sections A3, B2, B3, B4)
+- ProcessReturn (returns_process, documents_process_return) is held by Gérant and Admin only. No in-place approval exists in the engine: no command argument carries approver credentials (grep NONE FOUND).
+- A fast-switch PIN check exists in the application layer (VerifyPinUseCase, crates/application/src/use_cases/mod.rs:199) but no registered IPC command exposes it.
+- sales_checkout needs CreateSale (all roles) and an open cash session for any role (error NO_OPEN_CASH_SESSION_FOR_TERMINAL); the Vendeur holds no CashSessionOpen, so he can only sell into a session opened by someone else.
+- credit_get_statement needs ViewCustomers (all roles); credit_record_payment needs RecordCreditPayment (Caissier, Gérant, Admin); customers_create and customers_update need CreateCustomer (Caissier, Gérant, Admin). The owner decision of 12.1 item 2 is therefore stricter than the engine.
+- catalog_search needs PosSell (all roles); catalog_get_product, catalog_create_product and catalog_update_product need StockAdjustment or SystemSettingsManage (Gérant, Admin); catalog_define_kit needs only PosSell per the AUD-012 B2 table, which is too permissive for a catalog-structure change (to be confirmed and tightened by a BRK task).
+- backups_create, backups_list and backups_verify need only a valid session; the restore commands need SystemSettingsManage. The UI limits backups to Admin; the engine does not.
+- documents_search needs CreateSale or ReportsView (all roles); documents_reprint needs ReprintDocument; convert_devis_to_bl and convert_bl_to_facture need CreateSale (all roles).
+
+### 12.4 Consequences for the screens (PROPOSED, to validate in the prototypes)
+- Caissier rail: Vente, Documents (partial), Stock (read), Caisse & Clôture, Paramètres (Langue & affichage). Vendeur rail: Vente, Documents (read), Stock (read), Paramètres (Langue & affichage).
+- The customer is chosen from a picker inside Vente. The Caissier sees no customer ledger and no Encaisser button.
+- Credit HUD for the Caissier (proposal): a status text with icon (credit allowed / limit reached / blocked), without balance amounts. This is a UI convenience because the engine returns balances to every role. Pending owner confirmation; the owner may decide to show amounts.
+- Retour / Avoir for the Caissier: the action is enabled, the return form is filled as usual, and confirming opens the approval step of 12.5.
+
+### 12.5 Approval in place: user flow (PROPOSED; engine parameters belong to the BRK task)
+1. The Caissier opens a document in Documents and chooses Retour / Avoir; the return form is completed as usual.
+2. On confirmation a dialog "Autorisation du gérant" asks for the manager PIN (password-type field, Enter confirms, Esc cancels, focus trapped and restored).
+3. A wrong PIN gives a plain message, clears the field and reveals nothing about which accounts exist; repeated failures pause approvals for a short period (limits fixed in the BRK task).
+4. On success the return completes in the same step; the Avoir and the audit record show both the Caissier and the approving manager.
+5. The Caissier session is never switched and the UI never stores the PIN.
+6. The same mechanism is reserved for the other restricted actions of the F7 override (price, discount, negative stock, credit limit); they are not part of the first BRK task.
 
 ## Appendix A - Role and permission facts (generated from code, verbatim)
 Single mapping: exactly one Role-to-permission table exists, `Role::permissions()` in crates/domain/src/role.rs (below); the frontend holds no permission mapping and compares role-name strings only.

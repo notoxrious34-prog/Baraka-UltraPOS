@@ -1,8 +1,10 @@
-# 01 - Information Architecture (v0.2, PROPOSED)
+# 01 - Information Architecture (v0.3, PROPOSED)
 
 Status: PROPOSED. Structure follows ADR-078. The visibility matrix (2.2), the key bindings (3.3, 7) and the frequencies (6) are provisional until the static prototypes are accepted by the owner. Nothing here is a compliance or hardware-verification claim.
 
 v0.2 (2026-10-02): the visibility matrix (2.2), the role descriptions (2.1), jobs J03 and J06, the engine register (10) and the open points (11) are corrected against audit/AUD-012/PERMISSIONS.md (commit 7ba73089ab14f13fb2881954b77fd15677a078c3) and the owner answers recorded in ADR-079; section 12 is new. Appendix A and Appendix B are generated evidence and are not edited.
+
+v0.3 (2026-10-02): records the owner answers on customer creation at the counter and on the credit HUD (ADR-079 Amendment 1); closes open point 2 of section 11 and adds open point 6; corrects the result words of the table in 12.2 (CONFIRMED means the claim is true, REFUTED means it is false). Appendix A and Appendix B remain unedited.
 
 Scope: navigation, roles, jobs-to-be-done, module map, relocation of the six floating functions, engine dependencies. Out of scope: tokens, components, screen layouts, copy (later documents in docs/design/).
 
@@ -45,7 +47,7 @@ Legend: Y = full, R = read-only, P = partial (see note), N = hidden.
 | Utilisateurs | Y | N | N | N |
 | Paramètres & Sauvegarde | Y | P | P | P |
 
-Notes (v0.2): Documents R for Vendeur = search and view only (ReprintDocument is held by Caissier, Gérant and Admin). Documents P for Caissier = search, view, reprint and convert; Retour / Avoir is shown enabled and opens the manager-approval step (ADR-079). Clients & Crédit N for Caissier and Vendeur = no module; the customer is chosen from the picker inside Vente (customers_search needs ViewCustomers, held by all roles); the customer statement and debt collection are manager functions by owner decision. Produits N for Caissier and Vendeur = no module; lookup happens in the Vente search (catalog_search needs PosSell); the product editor needs StockAdjustment or SystemSettingsManage (Gérant, Admin). Stock R = view quantities only; adjustments and transfers need AdjustStock and TransferStock (Gérant, Admin); warehouse creation needs ManageWarehouses (Admin). Rapports N for Caissier = the Z report stays inside Caisse & Clôture (CashReportView). Paramètres P for Gérant, Caissier and Vendeur = Langue & affichage only; Impression and Identité du magasin need ManagePrinterSettings and SystemSettingsManage (Admin); Sauvegardes are Admin in the UI. Actions a role cannot perform are shown disabled with the reason, except where an approval step applies. Where the engine is more permissive than this matrix, the matrix is a UI decision and section 12.3 lists the gaps.
+Notes (v0.2): Documents R for Vendeur = search and view only (ReprintDocument is held by Caissier, Gérant and Admin). Documents P for Caissier = search, view, reprint and convert; Retour / Avoir is shown enabled and opens the manager-approval step (ADR-079). Clients & Crédit N for Caissier and Vendeur = no module; the customer is chosen from the picker inside Vente (customers_search needs ViewCustomers, held by all roles) and a new customer (name and phone only) can be created from that picker (customers_create needs CreateCustomer, held by Caissier, Gérant, Admin); the customer statement and debt collection are manager functions by owner decision. Produits N for Caissier and Vendeur = no module; lookup happens in the Vente search (catalog_search needs PosSell); the product editor needs StockAdjustment or SystemSettingsManage (Gérant, Admin). Stock R = view quantities only; adjustments and transfers need AdjustStock and TransferStock (Gérant, Admin); warehouse creation needs ManageWarehouses (Admin). Rapports N for Caissier = the Z report stays inside Caisse & Clôture (CashReportView). Paramètres P for Gérant, Caissier and Vendeur = Langue & affichage only; Impression and Identité du magasin need ManagePrinterSettings and SystemSettingsManage (Admin); Sauvegardes are Admin in the UI. Actions a role cannot perform are shown disabled with the reason, except where an approval step applies. Where the engine is more permissive than this matrix, the matrix is a UI decision and section 12.3 lists the gaps.
 
 ## 3. Navigation model
 
@@ -205,10 +207,11 @@ The six buttons are deleted when the new shell lands. Modals that remain modals 
 
 ## 11. Open points (to settle through the prototypes and the owner)
 1. Rail default (collapsed vs expanded) at 1024 px wide for a non-technical user.
-2. Whether the Caissier may create a new customer at the counter (the engine allows it: CreateCustomer) and whether the credit HUD shows amounts or only a status text to the Caissier (section 12.4).
+2. CLOSED in v0.3: the Caissier may create a customer (name and phone) at the counter and sees only one word at a credit sale (12.1 items 4 and 5; ADR-079 Amendment 1).
 3. Whether Ctrl+Digit keys are free of conflicts in the packaged app.
 4. Which of the 19 named modals in AUD-011 is the nineteenth (UNKNOWN: AUD-011 enumerates 18).
 5. Dialogs today have no focus trap and no focus restoration (AUD-011-C1 section G); the modal component must add both.
+6. Debt payment while no manager is present: by owner decision the Caissier cannot collect (12.1 item 2). Whether collection may be allowed under manager approval (the mechanism of 12.5) was asked of the owner on 2026-10-02; until he answers, it is not allowed.
 
 ## 12. Decisions and corrections in v0.2
 
@@ -216,13 +219,15 @@ The six buttons are deleted when the new shell lands. Modals that remain modals 
 1. The employee receives money and opens and closes the cash session: the employee is a Caissier.
 2. The employee only chooses the customer when selling; he does not view debts and does not collect them.
 3. Returns are approved by the owner in place, without switching the user (approval in place).
+4. The employee may create a new customer (name and phone only) at the counter, from the customer picker in Vente.
+5. At a credit sale the employee sees one word only (allowed / not allowed) and never a debt amount.
 
 ### 12.2 Suspicions checked against code (AUD-012, commit 7ba73089ab14f13fb2881954b77fd15677a078c3)
-| Suspicion | Result | Evidence |
+| Claim checked (v0.1) | Result (CONFIRMED = claim true, REFUTED = claim false) | Evidence |
 |---|---|---|
-| Vendeur can reprint | Contradiction CONFIRMED: reprint is held by Caissier, Gérant, Admin | role.rs:62-63, role.rs:121, printing.rs:43 |
-| Gérant can change Impression settings | Contradiction CONFIRMED: Admin only (ManagePrinterSettings, SystemSettingsManage) | ipc.rs:2378, role.rs:64-65 |
-| Warehouse creation Admin-only, transfers Gérant and Admin | REFUTED (the document matched the code) | inventory.rs:103, inventory.rs:273 |
+| Vendeur can reprint | REFUTED (the v0.1 claim was wrong): reprint is held by Caissier, Gérant, Admin | role.rs:62-63, role.rs:121, printing.rs:43 |
+| Gérant can change Impression settings | REFUTED (the v0.1 claim was wrong): Admin only (ManagePrinterSettings, SystemSettingsManage) | ipc.rs:2378, role.rs:64-65 |
+| Warehouse creation Admin-only, transfers Gérant and Admin | CONFIRMED (the v0.1 text matched the code) | inventory.rs:103, inventory.rs:273 |
 
 ### 12.3 Engine facts that shape the design (evidence: audit/AUD-012/PERMISSIONS.md sections A3, B2, B3, B4)
 - ProcessReturn (returns_process, documents_process_return) is held by Gérant and Admin only. No in-place approval exists in the engine: no command argument carries approver credentials (grep NONE FOUND).
@@ -235,8 +240,8 @@ The six buttons are deleted when the new shell lands. Modals that remain modals 
 
 ### 12.4 Consequences for the screens (PROPOSED, to validate in the prototypes)
 - Caissier rail: Vente, Documents (partial), Stock (read), Caisse & Clôture, Paramètres (Langue & affichage). Vendeur rail: Vente, Documents (read), Stock (read), Paramètres (Langue & affichage).
-- The customer is chosen from a picker inside Vente. The Caissier sees no customer ledger and no Encaisser button.
-- Credit HUD for the Caissier (proposal): a status text with icon (credit allowed / limit reached / blocked), without balance amounts. This is a UI convenience because the engine returns balances to every role. Pending owner confirmation; the owner may decide to show amounts.
+- The customer is chosen from a picker inside Vente. The Caissier sees no customer ledger and no Encaisser button. The picker offers a quick form "Nouveau client" (name and phone only; the handling of a duplicate phone number is decided in the prototype).
+- Credit HUD for the Caissier (DECIDED, 12.1 item 5): one word with an icon, in two states, allowed / not allowed; no amount and no reason text. This is a UI rule because the engine returns balances to every role; a later BRK task may add a status-only command so that the amount never reaches the Caissier session.
 - Retour / Avoir for the Caissier: the action is enabled, the return form is filled as usual, and confirming opens the approval step of 12.5.
 
 ### 12.5 Approval in place: user flow (PROPOSED; engine parameters belong to the BRK task)

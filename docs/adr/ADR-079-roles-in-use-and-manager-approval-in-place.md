@@ -17,4 +17,9 @@ AUD-012 verified the permission required by each of the 72 IPC commands. The own
 ## Consequences
 - New BRK tasks: manager approval in place (first for ProcessReturn), permission split for credit statement and debt collection, tightening of catalog_define_kit after confirmation, PIN management in Utilisateurs.
 - The design document docs/design/01-information-architecture.md (v0.2) carries the visibility matrix and the approval flow.
-- The credit HUD content for the Caissier (status text versus amounts) and customer creation at the counter remain open owner questions, settled in the prototypes.
+- Settled by Amendment 1: customer creation at the counter and the credit HUD word. The visual details of both are settled in the prototypes.
+
+## Amendment 1 (2026-10-02, owner answers)
+1. The Caissier may create a new customer (name and phone only) at the counter, from the customer picker in Vente. CreateCustomer is already held by the Caissier, so no engine change is needed for creation. Editing customers stays in Clients & Crédit (Gérant, Admin) at UI level; the engine also lets the Caissier update a customer through customers_update (same permission), and whether to split it is left to the permission-split BRK task.
+2. At a credit sale the Caissier sees one word only (allowed / not allowed) and no debt amount. The engine returns balances to every role, so this is a UI rule; the permission-split BRK task may add a status-only command so that the amount never reaches the Caissier session.
+3. Open: debt payment while no manager is present. Until the owner answers, the Caissier cannot collect (Decision 2). The approval mechanism of Decision 3 could later cover it.

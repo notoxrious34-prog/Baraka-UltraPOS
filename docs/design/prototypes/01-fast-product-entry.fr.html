@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baraka UltraPOS - Prototype FR - Nouveau produit</title>
+<!-- Status: v0.1 PROPOSED. Date: 2026-10-04. Baseline: e8c65d44805150fd2b37d3a3d6922eab225f38e7. Flow: FL-12. Static prototype, no script, no dependency. -->
+<style>
+:root {
+  --color-bg: #F7F7F5;
+  --color-surface: #FFFFFF;
+  --color-border: #D9D9D6;
+  --color-text-primary: #1A1A18;
+  --color-text-secondary: #5B5B57;
+  --color-accent: #2F6F4F;
+  --color-accent-contrast: #FFFFFF;
+  --color-focus-ring: #2A5B8C;
+  --color-danger: #A3312B;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --font-family-base: Inter, system-ui, sans-serif;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --line-height-base: 1.4;
+  --density-control-height: 40px;
+  --density-padding-inline: var(--space-3);
+  --density-padding-block: var(--space-2);
+}
+* {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-base);
+}
+.app-shell {
+  display: flex;
+  min-block-size: 100vh;
+}
+.rail {
+  inline-size: 220px;
+  flex: none;
+  background: var(--color-surface);
+  border-inline-end: 1px solid var(--color-border);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-3);
+}
+.rail h2 {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rail ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.rail li a {
+  display: block;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+.rail li a.active {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+main {
+  flex: 1;
+  padding: var(--space-6);
+  max-inline-size: 760px;
+}
+h1 {
+  font-size: var(--font-size-lg);
+  margin-block: 0 var(--space-5);
+}
+form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.field label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.field .required {
+  color: var(--color-danger);
+}
+.field input,
+.field select {
+  block-size: var(--density-control-height);
+  padding-inline: var(--density-padding-inline);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+}
+.field input:focus,
+.field select:focus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.field-row {
+  display: flex;
+  gap: var(--space-4);
+}
+.field-row .field {
+  flex: 1;
+}
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-block-start: var(--space-5);
+}
+button {
+  block-size: var(--density-control-height);
+  padding-inline: var(--space-5);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font: inherit;
+  cursor: pointer;
+}
+button.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+button.secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+.note {
+  margin-block-start: var(--space-6);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+<nav class="rail" aria-label="Navigation">
+<h2>Baraka UltraPOS</h2>
+<ul>
+<li><a href="#">Vente</a></li>
+<li><a href="#">Documents</a></li>
+<li><a href="#">Clients &amp; Crédit</a></li>
+<li><a href="#" class="active" aria-current="page">Produits &amp; Codes-barres</a></li>
+<li><a href="#">Stock</a></li>
+<li><a href="#">Fournisseurs &amp; Achats</a></li>
+<li><a href="#">Caisse &amp; Clôture</a></li>
+<li><a href="#">Rapports</a></li>
+<li><a href="#">Utilisateurs</a></li>
+<li><a href="#">Paramètres &amp; Sauvegarde</a></li>
+</ul>
+</nav>
+<main>
+<h1>Nouveau produit</h1>
+<form>
+<div class="field">
+<label for="barcode">Code-barres</label>
+<input type="text" id="barcode" name="barcode" autofocus>
+</div>
+<div class="field">
+<label for="name-fr">Nom en français <span class="required">*</span></label>
+<input type="text" id="name-fr" name="name-fr" required>
+</div>
+<div class="field">
+<label for="name-ar">Nom en arabe (alias)</label>
+<input type="text" id="name-ar" name="name-ar" dir="rtl" lang="ar">
+</div>
+<div class="field-row">
+<div class="field">
+<label for="price-sell">Prix de vente</label>
+<input type="text" inputmode="decimal" id="price-sell" name="price-sell">
+</div>
+<div class="field">
+<label for="price-buy">Prix d'achat</label>
+<input type="text" inputmode="decimal" id="price-buy" name="price-buy">
+</div>
+</div>
+<div class="field-row">
+<div class="field">
+<label for="category">Catégorie</label>
+<select id="category" name="category">
+<option value="">-</option>
+</select>
+</div>
+<div class="field">
+<label for="unit">Unité</label>
+<select id="unit" name="unit">
+<option value="unite">Unité</option>
+</select>
+</div>
+</div>
+<div class="field">
+<label for="stock-min">Stock minimum</label>
+<input type="text" inputmode="numeric" id="stock-min" name="stock-min">
+</div>
+<div class="actions">
+<button type="submit" class="primary">Enregistrer</button>
+<button type="button" class="secondary">Annuler</button>
+</div>
+</form>
+<p class="note">Prototype statique v0.1 PROPOSED (DSN-011). Flux FL-12. Aucune logique n'est reliee a ce formulaire. Les valeurs de police, couleur et espacement suivent docs/design/04-design-tokens.md. Le champ Nom en arabe (alias) est facultatif; le nom en francais est obligatoire (decision du proprietaire). En cas de doublon normalise, l'application proposera "ouvrir l'existant" ou "changer le nom" (non simule ici).</p>
+</main>
+</div>
+</body>
+</html>

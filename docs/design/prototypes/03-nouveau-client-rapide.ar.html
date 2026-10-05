@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baraka UltraPOS - Prototype AR (RTL) - Nouveau client rapide</title>
+<!-- Statut : v0.1 PROPOSE. Date: 2026-10-05. Baseline FR: 06dcd0ae62619dcce1faa244cdcafddddae76aee8361d40f0de94d2f453a3ae0. Jumeau arabe de 03-nouveau-client-rapide.fr.html (TASK-DSN-018). Cinq états. Termes du glossaire docs/design/glossary-ar-fr.md. Chiffres latins uniquement (ADR-069). -->
+<style>
+:root {
+  --color-bg: #F7F7F5;
+  --color-surface: #FFFFFF;
+  --color-border: #D9D9D6;
+  --color-text-primary: #1A1A18;
+  --color-text-secondary: #5B5B57;
+  --color-accent: #2F6F4F;
+  --color-accent-contrast: #FFFFFF;
+  --color-focus-ring: #2A5B8C;
+  --color-danger: #A3312B;
+  --color-success: #2F6F4F;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --font-family-base: Inter, system-ui, sans-serif;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --line-height-base: 1.4;
+  --density-control-height: 40px;
+  --density-padding-inline: var(--space-3);
+  --density-padding-block: var(--space-2);
+}
+* {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: Cairo, "Noto Naskh Arabic", sans-serif;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-base);
+}
+.page {
+  max-inline-size: 720px;
+  margin-inline: auto;
+  padding-block: var(--space-5);
+  padding-inline: var(--space-4);
+}
+.page-head h1 {
+  font-size: var(--font-size-lg);
+  margin-block: 0 var(--space-2);
+}
+.page-head p {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-5);
+}
+.example {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-4);
+  margin-block-end: var(--space-4);
+}
+.example-caption {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-3);
+}
+.form-card {
+  max-inline-size: 360px;
+  inline-size: 100%;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-4);
+}
+.form-card h2 {
+  font-size: var(--font-size-md);
+  margin-block: 0 var(--space-3);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-block-end: var(--space-3);
+}
+.field label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.field label .req {
+  color: var(--color-danger);
+}
+.field input {
+  min-block-size: var(--density-control-height);
+  padding-block: var(--space-2);
+  padding-inline: var(--density-padding-inline);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+}
+.field input:focus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.field input.input-simfocus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.field input.input-error {
+  border-color: var(--color-danger);
+  outline: 2px solid var(--color-danger);
+  outline-offset: 1px;
+}
+.hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0;
+}
+.field-error-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  margin-block: 0;
+}
+.button-row {
+  display: flex;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+}
+.btn {
+  flex: 1;
+  min-block-size: 44px;
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+.btn-primary[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+.open-existing {
+  margin-block-start: var(--space-2);
+  align-self: flex-start;
+}
+.success-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-inline-size: 360px;
+  inline-size: 100%;
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-3);
+  font-weight: 700;
+}
+.success-icon {
+  inline-size: 18px;
+  block-size: 18px;
+  flex: none;
+}
+.doc-note {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-3);
+  margin-block: 0 var(--space-5);
+}
+.doc-note + .doc-note {
+  margin-block-start: var(--space-3);
+}
+.doc-note-tail {
+  margin-block-start: var(--space-5);
+}
+sup.mark {
+  font-size: 0.75em;
+}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="page-head">
+<h1>زبون جديد — إنشاء سريع على الصندوق<sup class="mark">†</sup></h1>
+<p>الاسم والهاتف فقط. الشاشة الكاملة مخصصة لدور المسؤول والمسيّر.<sup class="mark">†</sup></p>
+</div>
+<section class="example" aria-labelledby="cap-un">
+<p class="example-caption" id="cap-un">الحالة الأولى: نموذج فارغ (حالة التركيز محاكاة للعرض)<sup class="mark">†</sup></p>
+<div class="form-card">
+<h2>زبون جديد</h2>
+<div class="field">
+<label for="nom-1">الاسم <span class="req" aria-hidden="true">*</span></label>
+<input type="text" id="nom-1" name="nom" class="input-simfocus" autocomplete="off">
+</div>
+<div class="field">
+<label for="tel-1">الهاتف (اختياري)<sup class="mark">†</sup></label>
+<input type="text" id="tel-1" name="telephone" inputmode="tel" dir="ltr" autocomplete="off">
+<p class="hint">مثال: <bdi>0555 12 34 56</bdi></p>
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary">إنشاء<sup class="mark">†</sup></button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+</section>
+<section class="example" aria-labelledby="cap-deux">
+<p class="example-caption" id="cap-deux">الحالة الثانية: نموذج معبأ صالح<sup class="mark">†</sup></p>
+<div class="form-card">
+<h2>زبون جديد</h2>
+<div class="field">
+<label for="nom-2">الاسم <span class="req" aria-hidden="true">*</span></label>
+<input type="text" id="nom-2" name="nom" value="ياسين ت." autocomplete="off">
+</div>
+<div class="field">
+<label for="tel-2">الهاتف (اختياري)<sup class="mark">†</sup></label>
+<input type="text" id="tel-2" name="telephone" inputmode="tel" dir="ltr" value="0555 12 34 56" autocomplete="off">
+<p class="hint">مثال: <bdi>0555 12 34 56</bdi></p>
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary">إنشاء<sup class="mark">†</sup></button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+</section>
+<section class="example" aria-labelledby="cap-trois">
+<p class="example-caption" id="cap-trois">الحالة الثالثة: خطأ في التحقق من الاسم<sup class="mark">†</sup></p>
+<div class="form-card">
+<h2>زبون جديد</h2>
+<div class="field">
+<label for="nom-3">الاسم <span class="req" aria-hidden="true">*</span></label>
+<input type="text" id="nom-3" name="nom" class="input-error" autocomplete="off">
+<p class="field-error-text">الاسم مطلوب. أدخل حرفين على الأقل.<sup class="mark">†</sup></p>
+</div>
+<div class="field">
+<label for="tel-3">الهاتف (اختياري)<sup class="mark">†</sup></label>
+<input type="text" id="tel-3" name="telephone" inputmode="tel" dir="ltr" value="0555 12 34 56" autocomplete="off">
+<p class="hint">مثال: <bdi>0555 12 34 56</bdi></p>
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary">إنشاء<sup class="mark">†</sup></button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+</section>
+<section class="example" aria-labelledby="cap-quatre">
+<p class="example-caption" id="cap-quatre">الحالة الرابعة: رقم الهاتف مستعمل بالفعل<sup class="mark">†</sup></p>
+<div class="form-card">
+<h2>زبون جديد</h2>
+<div class="field">
+<label for="nom-4">الاسم <span class="req" aria-hidden="true">*</span></label>
+<input type="text" id="nom-4" name="nom" value="كريم ب." autocomplete="off">
+</div>
+<div class="field">
+<label for="tel-4">الهاتف (اختياري)<sup class="mark">†</sup></label>
+<input type="text" id="tel-4" name="telephone" inputmode="tel" dir="ltr" class="input-error" value="0555 12 34 56" autocomplete="off">
+<p class="field-error-text">هذا الرقم مرتبط بالفعل بالزبون ياسين ت. افتح بطاقته بدل إنشاء نسخة مكررة.<sup class="mark">†</sup></p>
+<button type="button" class="btn btn-secondary open-existing">افتح بطاقة ياسين ت.<sup class="mark">†</sup></button>
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary" disabled>إنشاء<sup class="mark">†</sup></button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+</section>
+<section class="example" aria-labelledby="cap-cinq">
+<p class="example-caption" id="cap-cinq">الحالة الخامسة: تم إنشاء الزبون<sup class="mark">†</sup></p>
+<div class="form-card">
+<h2>زبون جديد</h2>
+<div class="field">
+<label for="nom-5">الاسم <span class="req" aria-hidden="true">*</span></label>
+<input type="text" id="nom-5" name="nom" value="ياسين ت." autocomplete="off">
+</div>
+<div class="field">
+<label for="tel-5">الهاتف (اختياري)<sup class="mark">†</sup></label>
+<input type="text" id="tel-5" name="telephone" inputmode="tel" dir="ltr" value="0555 12 34 56" autocomplete="off">
+<p class="hint">مثال: <bdi>0555 12 34 56</bdi></p>
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary">إنشاء<sup class="mark">†</sup></button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+<p class="success-banner"><svg class="success-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg><span>تم إنشاء الزبون: ياسين ت.<sup class="mark">†</sup></span></p>
+</section>
+<p class="doc-note">Prototype statique DSN-018, jumeau arabe de DSN-013. Cinq états, données fictives uniquement. Bouton principal actif à vide (S-R3), bloqué en cas de doublon.</p>
+<p class="doc-note">Termes nouveaux, hors glossaire (†) : le titre, le sous-titre, les cinq légendes d’état, « الهاتف (اختياري) », « إنشاء », les messages d’erreur, le lien « افتح بطاقة ياسين ت. », le bandeau de succès et les noms d’exemple translittérés (« ياسين ت. » pour Yacine T., « كريم ب. » pour Karim B.) — aucune de ces chaînes n’a d’entrée exacte dans le glossaire.</p>
+<p class="doc-note">Termes du glossaire signalés pour révision (‡) : aucun — aucune des lignes signalées 3, 19, 24, 35, 57, 58 n’est utilisée sur cet écran.</p>
+</div>
+</body>
+</html>

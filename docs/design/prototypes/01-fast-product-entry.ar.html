@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baraka UltraPOS - Prototype AR (RTL) - Nouveau produit</title>
+<!-- Status: v0.1 PROPOSED. Date: 2026-10-05. Baseline: 75130706cf63e90e2ba38d374f11c6bddfdf6cb835ea25ea673b52dd505aff55. Flow: FL-12. Static prototype, no script, no dependency. Arabic twin of 01-fast-product-entry.fr.html (TASK-DSN-016). Terms from docs/design/glossary-ar-fr.md. -->
+<style>
+:root {
+  --color-bg: #F7F7F5;
+  --color-surface: #FFFFFF;
+  --color-border: #D9D9D6;
+  --color-text-primary: #1A1A18;
+  --color-text-secondary: #5B5B57;
+  --color-accent: #2F6F4F;
+  --color-accent-contrast: #FFFFFF;
+  --color-focus-ring: #2A5B8C;
+  --color-danger: #A3312B;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --font-family-base: Inter, system-ui, sans-serif;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --line-height-base: 1.4;
+  --density-control-height: 40px;
+  --density-padding-inline: var(--space-3);
+  --density-padding-block: var(--space-2);
+}
+* {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: Cairo, "Noto Naskh Arabic", sans-serif;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-base);
+}
+.latin {
+  font-family: Inter, system-ui, sans-serif;
+}
+.app-shell {
+  display: flex;
+  min-block-size: 100vh;
+}
+.rail {
+  inline-size: 220px;
+  flex: none;
+  background: var(--color-surface);
+  border-inline-end: 1px solid var(--color-border);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-3);
+}
+.rail h2 {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rail ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.rail li a {
+  display: block;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+.rail li a.active {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+main {
+  flex: 1;
+  padding: var(--space-6);
+  max-inline-size: 760px;
+}
+h1 {
+  font-size: var(--font-size-lg);
+  margin-block: 0 var(--space-5);
+}
+form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.field label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.field .required {
+  color: var(--color-danger);
+}
+.field input,
+.field select {
+  block-size: var(--density-control-height);
+  padding-inline: var(--density-padding-inline);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+}
+.field input:focus,
+.field select:focus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.field-row {
+  display: flex;
+  gap: var(--space-4);
+}
+.field-row .field {
+  flex: 1;
+  min-inline-size: 0;
+}
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-block-start: var(--space-5);
+}
+button {
+  block-size: var(--density-control-height);
+  padding-inline: var(--space-5);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font: inherit;
+  cursor: pointer;
+}
+button.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+button.secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+.note {
+  margin-block-start: var(--space-6);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+sup.mark {
+  font-size: 0.75em;
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+<nav class="rail" aria-label="تنقل">
+<h2><bdi class="latin">Baraka UltraPOS</bdi></h2>
+<ul>
+<li><a href="#">البيع</a></li>
+<li><a href="#">الوثائق</a></li>
+<li><a href="#">الزبائن والدين<sup class="mark">‡</sup></a></li>
+<li><a href="#" class="active" aria-current="page">المنتجات والرموز الشريطية</a></li>
+<li><a href="#">المخزون</a></li>
+<li><a href="#">الموردون والمشتريات</a></li>
+<li><a href="#">الصندوق والإقفال</a></li>
+<li><a href="#">التقارير</a></li>
+<li><a href="#">المستخدمون</a></li>
+<li><a href="#">الإعدادات والنسخ الاحتياطي</a></li>
+</ul>
+</nav>
+<main>
+<h1>منتج جديد<sup class="mark">†</sup></h1>
+<form>
+<div class="field">
+<label for="barcode">رمز شريطي</label>
+<input type="text" id="barcode" name="barcode" dir="ltr" autofocus>
+</div>
+<div class="field">
+<label for="name-fr">الاسم بالفرنسية <span class="required">*</span></label>
+<input type="text" id="name-fr" name="name-fr" dir="ltr" lang="fr" required>
+</div>
+<div class="field">
+<label for="name-ar">الاسم بالعربية</label>
+<input type="text" id="name-ar" name="name-ar">
+</div>
+<div class="field-row">
+<div class="field">
+<label for="price-sell">سعر البيع</label>
+<input type="text" inputmode="decimal" id="price-sell" name="price-sell" dir="ltr">
+</div>
+<div class="field">
+<label for="price-buy">سعر الشراء</label>
+<input type="text" inputmode="decimal" id="price-buy" name="price-buy" dir="ltr">
+</div>
+</div>
+<div class="field-row">
+<div class="field">
+<label for="category">فئة</label>
+<select id="category" name="category">
+<option value="">-</option>
+</select>
+</div>
+<div class="field">
+<label for="unit">الوحدة</label>
+<select id="unit" name="unit">
+<option value="unite">الوحدة</option>
+</select>
+</div>
+</div>
+<div class="field">
+<label for="stock-min">الحد الأدنى للمخزون</label>
+<input type="text" inputmode="numeric" id="stock-min" name="stock-min" dir="ltr">
+</div>
+<div class="actions">
+<button type="submit" class="primary">حفظ</button>
+<button type="button" class="secondary">إلغاء</button>
+</div>
+</form>
+<p class="note">Prototype statique v0.1 PROPOSED (DSN-016, jumeau arabe de DSN-011). Flux FL-12. Aucune logique n’est reliée à ce formulaire. Les valeurs de police, couleur et espacement suivent docs/design/04-design-tokens.md ; la police arabe appliquée est Cairo, « Noto Naskh Arabic », sans-serif (repli documenté, voir rapport). Le champ الاسم بالعربية est facultatif ; le nom français est obligatoire (décision du propriétaire). En cas de doublon normalisé, l’application proposera « ouvrir l’existant » ou « changer le nom » (non simulé ici).</p>
+<p class="note">Termes nouveaux, hors glossaire (†) : 1) « منتج جديد » (Nouveau produit) — composé à partir de « زبون جديد » (rang 46) et « منتج » (rang 61) ; 2) « تنقل » (Navigation, attribut aria non visible) — traduction proposée.</p>
+<p class="note">Termes du glossaire signalés pour révision (‡) : « الزبائن والدين » (Clients et Crédit, rang 3 du glossaire) — employé dans la barre de navigation.</p>
+</main>
+</div>
+</body>
+</html>

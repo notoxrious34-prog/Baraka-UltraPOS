@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baraka UltraPOS - Prototype AR (RTL) - Autorisation du gérant</title>
+<!-- Statut : v0.1 PROPOSE. Date: 2026-10-05. Baseline FR: c985b143f8e5b61462391c6044df9d6c5d977175bc96d7a142c0e57fb66bf2cd. Jumeau arabe de 04-autorisation-gerant.fr.html (TASK-DSN-019). Quatre états. Termes du glossaire docs/design/glossary-ar-fr.md. PIN masqué par pastilles uniquement. -->
+<style>
+:root {
+  --color-bg: #F7F7F5;
+  --color-surface: #FFFFFF;
+  --color-border: #D9D9D6;
+  --color-text-primary: #1A1A18;
+  --color-text-secondary: #5B5B57;
+  --color-accent: #2F6F4F;
+  --color-accent-contrast: #FFFFFF;
+  --color-focus-ring: #2A5B8C;
+  --color-danger: #A3312B;
+  --color-success: #2F6F4F;
+  --color-overlay-scrim: rgba(20,20,18,0.45);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --font-family-base: Inter, system-ui, sans-serif;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --line-height-base: 1.4;
+  --density-control-height: 40px;
+  --density-padding-inline: var(--space-3);
+  --density-padding-block: var(--space-2);
+}
+* {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: Cairo, "Noto Naskh Arabic", sans-serif;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-base);
+}
+.page {
+  max-inline-size: 720px;
+  margin-inline: auto;
+  padding-block: var(--space-5);
+  padding-inline: var(--space-4);
+}
+.page-head h1 {
+  font-size: var(--font-size-lg);
+  margin-block: 0 var(--space-2);
+}
+.page-head p {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-5);
+}
+.example {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-4);
+  margin-block-end: var(--space-4);
+}
+.example-caption {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-3);
+}
+.reuse-note {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-5);
+}
+.stage {
+  position: relative;
+  min-block-size: 600px;
+  overflow: hidden;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.backdrop {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  background: var(--color-overlay-scrim);
+}
+.dialog {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  transform: translate(50%, -50%);
+  inline-size: 360px;
+  max-inline-size: calc(100% - 48px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-4);
+}
+.dialog h2 {
+  font-size: var(--font-size-md);
+  margin-block: 0 var(--space-1);
+}
+.context-line {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-3);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-block-end: var(--space-3);
+}
+.field label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.field input {
+  min-block-size: var(--density-control-height);
+  padding-block: var(--space-2);
+  padding-inline: var(--density-padding-inline);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  letter-spacing: 0.35em;
+}
+.field input:focus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.field input.input-simfocus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.field input.input-error {
+  border-color: var(--color-danger);
+  outline: 2px solid var(--color-danger);
+  outline-offset: 1px;
+}
+.field input[disabled] {
+  opacity: 0.6;
+  background: var(--color-bg);
+  cursor: not-allowed;
+}
+.field-message {
+  font-size: var(--font-size-sm);
+  margin-block: 0;
+}
+.field-message-error {
+  color: var(--color-danger);
+}
+.field-message-muted {
+  color: var(--color-text-secondary);
+}
+.button-row {
+  display: flex;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+}
+.btn {
+  flex: 1;
+  min-block-size: 44px;
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+.btn-primary[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+.success-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-success);
+  font-weight: 700;
+  font-size: var(--font-size-md);
+  margin-block: var(--space-3) 0;
+}
+.success-icon {
+  inline-size: 18px;
+  block-size: 18px;
+  flex: none;
+}
+.doc-note {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-3);
+  margin-block: 0 var(--space-5);
+}
+.doc-note-tail {
+  margin-block-start: var(--space-5);
+  margin-block-end: 0;
+}
+sup.mark {
+  font-size: 0.75em;
+}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="page-head">
+<h1>ترخيص المسيّر — اعتماد على الصندوق<sup class="mark">†‡</sup></h1>
+<p>المسيّر يدخل رمزه السري في هذا الحوار. جلسة أمين الصندوق لا تتغير أبدا.<sup class="mark">†</sup></p>
+</div>
+<p class="doc-note">Note de relecture : dans l’application réelle, ce dialogue recouvrira tout l’écran grâce à un positionnement fixe (exception ADR-067 pour les fenêtres modales) ; dans ce fichier statique, chaque exemple utilise un positionnement absolu limité à sa propre section, uniquement pour permettre la relecture des quatre états sur une seule page. Le code PIN n’est ni stocké ni journalisé par l’interface.</p>
+<p class="reuse-note">يُعاد استعمال هذا الحوار نفسه لباقي الإجراءات الخاضعة للترخيص (مثل تسديد دين) بتغيير نص سطر السياق فقط ؛ ووفق ADR-079 لا يعرض هذا السطر أبدا مبلغا ولا سبب رفض الائتمان، بل اسم الإجراء ومرجع الوثيقة عند الاقتضاء.<sup class="mark">†</sup></p>
+<section class="example" aria-labelledby="cap-un">
+<p class="example-caption" id="cap-un">الحالة الأولى: حوار أولي، رمز فارغ (حالة التركيز محاكاة للعرض). مفتاح الخروج يلغي الحوار ويغلقه دون اعتماد.<sup class="mark">†</sup></p>
+<div class="stage">
+<div class="backdrop"></div>
+<div class="dialog">
+<h2>ترخيص المسيّر<sup class="mark">‡</sup></h2>
+<p class="context-line">إرجاع بضاعة — وصل رقم <bdi>000123</bdi><sup class="mark">†</sup></p>
+<div class="field">
+<label for="pin-1">الرمز السري للمسيّر</label>
+<input type="text" id="pin-1" name="pin" class="input-simfocus" inputmode="numeric" autocomplete="off">
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary">اعتماد</button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+</div>
+</section>
+<section class="example" aria-labelledby="cap-deux">
+<p class="example-caption" id="cap-deux">الحالة الثانية: رمز غير صحيح، محاولة جديدة ممكنة<sup class="mark">†</sup></p>
+<div class="stage">
+<div class="backdrop"></div>
+<div class="dialog">
+<h2>ترخيص المسيّر<sup class="mark">‡</sup></h2>
+<p class="context-line">إرجاع بضاعة — وصل رقم <bdi>000123</bdi><sup class="mark">†</sup></p>
+<div class="field">
+<label for="pin-2">الرمز السري للمسيّر</label>
+<input type="text" id="pin-2" name="pin" class="input-error" inputmode="numeric" value="••••" autocomplete="off">
+<p class="field-message field-message-error">الرمز السري غير صحيح. حاول مجددا.<sup class="mark">†</sup></p>
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary">اعتماد</button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+</div>
+</section>
+<section class="example" aria-labelledby="cap-trois">
+<p class="example-caption" id="cap-trois">الحالة الثالثة: قفل مؤقت بعد محاولات كثيرة<sup class="mark">†</sup></p>
+<div class="stage">
+<div class="backdrop"></div>
+<div class="dialog">
+<h2>ترخيص المسيّر<sup class="mark">‡</sup></h2>
+<p class="context-line">إرجاع بضاعة — وصل رقم <bdi>000123</bdi><sup class="mark">†</sup></p>
+<div class="field">
+<label for="pin-3">الرمز السري للمسيّر</label>
+<input type="text" id="pin-3" name="pin" inputmode="numeric" disabled autocomplete="off">
+<p class="field-message field-message-muted">محاولات خاطئة كثيرة. حاول لاحقا أو اتصل بمسؤول آخر.<sup class="mark">†</sup></p>
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary" disabled>اعتماد</button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+</div>
+</section>
+<section class="example" aria-labelledby="cap-quatre">
+<p class="example-caption" id="cap-quatre">الحالة الرابعة: تم الترخيص<sup class="mark">†</sup></p>
+<div class="stage">
+<div class="backdrop"></div>
+<div class="dialog">
+<h2>ترخيص المسيّر<sup class="mark">‡</sup></h2>
+<p class="context-line">إرجاع بضاعة — وصل رقم <bdi>000123</bdi><sup class="mark">†</sup></p>
+<p class="success-line"><svg class="success-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg><span>مسموح</span></p>
+</div>
+</div>
+</section>
+<p class="doc-note doc-note-tail">Prototype statique DSN-019, jumeau arabe de DSN-014. États D05. Données fictives uniquement.</p>
+<p class="doc-note">Termes nouveaux, hors glossaire (†) : le titre de page, le sous-titre, la note de réemploi, les quatre légendes d’état, la ligne de contexte (« إرجاع بضاعة — وصل رقم 000123 ») et les deux messages d’état — aucune de ces chaînes n’a d’entrée exacte dans le glossaire.</p>
+<p class="doc-note">Termes du glossaire signalés pour révision (‡) : « ترخيص المسيّر » (Autorisation du gérant, rang 58 du glossaire) — employé comme titre des quatre dialogues.</p>
+</div>
+</body>
+</html>

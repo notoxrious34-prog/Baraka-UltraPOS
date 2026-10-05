@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baraka UltraPOS - Prototype AR (RTL) - Encaissement de dette</title>
+<!-- Statut : v0.1 PROPOSE. Date: 2026-10-05. Baseline FR: 84fea228b5a47fce41041f0282162c287d8b8c09ef93ce042ca437c3535c2f73. Jumeau arabe de 05-encaissement-dette.fr.html (TASK-DSN-020). Quatre états. Termes du glossaire docs/design/glossary-ar-fr.md. Chiffres latins uniquement (ADR-069). -->
+<style>
+:root {
+  --color-bg: #F7F7F5;
+  --color-surface: #FFFFFF;
+  --color-border: #D9D9D6;
+  --color-text-primary: #1A1A18;
+  --color-text-secondary: #5B5B57;
+  --color-accent: #2F6F4F;
+  --color-accent-contrast: #FFFFFF;
+  --color-focus-ring: #2A5B8C;
+  --color-danger: #A3312B;
+  --color-success: #2F6F4F;
+  --color-overlay-scrim: rgba(20,20,18,0.45);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --font-family-base: Inter, system-ui, sans-serif;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --line-height-base: 1.4;
+  --density-control-height: 40px;
+  --density-padding-inline: var(--space-3);
+  --density-padding-block: var(--space-2);
+}
+* {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: Cairo, "Noto Naskh Arabic", sans-serif;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-base);
+}
+.page {
+  max-inline-size: 720px;
+  margin-inline: auto;
+  padding-block: var(--space-5);
+  padding-inline: var(--space-4);
+}
+.page-head h1 {
+  font-size: var(--font-size-lg);
+  margin-block: 0 var(--space-2);
+}
+.page-head p {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-5);
+}
+.example {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-4);
+  margin-block-end: var(--space-4);
+}
+.example-caption {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-3);
+}
+.caption-note {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: 0 var(--space-3);
+}
+.form-card {
+  max-inline-size: 360px;
+  inline-size: 100%;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-4);
+}
+.form-card h2 {
+  font-size: var(--font-size-md);
+  margin-block: 0 var(--space-3);
+}
+.customer-line {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  margin-block: 0 var(--space-1);
+}
+.balance-line {
+  font-size: var(--font-size-md);
+  margin-block: 0 var(--space-3);
+}
+.money {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-block-end: var(--space-3);
+}
+.field label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+.field input {
+  min-block-size: var(--density-control-height);
+  padding-block: var(--space-2);
+  padding-inline: var(--density-padding-inline);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.field input:focus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.field input.input-simfocus {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.field input.input-error {
+  border-color: var(--color-danger);
+  outline: 2px solid var(--color-danger);
+  outline-offset: 1px;
+}
+.field-error-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  margin-block: 0;
+}
+.button-row {
+  display: flex;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+}
+.btn {
+  flex: 1;
+  min-block-size: 44px;
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+.btn-primary[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+.success-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-success);
+  font-weight: 700;
+  font-size: var(--font-size-md);
+  margin-block: 0 var(--space-3);
+}
+.success-icon {
+  inline-size: 18px;
+  block-size: 18px;
+  flex: none;
+}
+.receipt {
+  max-inline-size: 320px;
+  inline-size: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-3);
+}
+.receipt h3 {
+  font-size: var(--font-size-md);
+  text-align: center;
+  margin-block: 0 var(--space-3);
+}
+.receipt p {
+  font-size: var(--font-size-sm);
+  margin-block: 0 var(--space-1);
+}
+.print-note {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-block: var(--space-3) 0;
+}
+.doc-note {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-3);
+  margin-block: 0 var(--space-5);
+}
+.doc-note-tail {
+  margin-block-start: var(--space-5);
+  margin-block-end: 0;
+}
+sup.mark {
+  font-size: 0.75em;
+}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="page-head">
+<h1>تسديد دين — تحصيل بعد ترخيص المسيّر<sup class="mark">†</sup></h1>
+<p>أمين الصندوق لا يرى مبلغ الدين إلا في هذا النموذج المرخّص. كل دفعة تطبع وصلا.<sup class="mark">†</sup></p>
+</div>
+<p class="doc-note">Note de relecture : ce formulaire n’est accessible qu’immédiatement après un état « Autorisé » de l’approbation du gérant (prototype 04-autorisation-gerant). Le blocage du dépassement du solde dans l’état trois est PROPOSÉ et en attente de confirmation du propriétaire. La numérotation des pièces justificatives est en attente d’une future tâche moteur.</p>
+<section class="example" aria-labelledby="cap-un">
+<p class="example-caption" id="cap-un">الحالة الأولى: نموذج أولي، الرصيد معروض (حالة التركيز محاكاة للعرض)<sup class="mark">†</sup></p>
+<p class="caption-note">هذا المبلغ لا يظهر إلا بعد خطوة ترخيص المسيّر، وفق ADR-079.<sup class="mark">†</sup></p>
+<div class="form-card">
+<h2>تحصيل الزبون<sup class="mark">†</sup></h2>
+<p class="customer-line">ياسين ت.<sup class="mark">†</sup></p>
+<p class="balance-line">الرصيد المستحق: <bdi class="money">12 500,00 DZD</bdi><sup class="mark">†</sup></p>
+<div class="field">
+<label for="montant-1">المبلغ المحصّل<sup class="mark">†</sup></label>
+<input type="text" id="montant-1" name="montant" class="input-simfocus" inputmode="decimal" dir="ltr" autocomplete="off">
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary">تحصيل</button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+</section>
+<section class="example" aria-labelledby="cap-deux">
+<p class="example-caption" id="cap-deux">الحالة الثانية: مبلغ صحيح مدخل<sup class="mark">†</sup></p>
+<div class="form-card">
+<h2>تحصيل الزبون<sup class="mark">†</sup></h2>
+<p class="customer-line">ياسين ت.<sup class="mark">†</sup></p>
+<p class="balance-line">الرصيد المستحق: <bdi class="money">12 500,00 DZD</bdi><sup class="mark">†</sup></p>
+<div class="field">
+<label for="montant-2">المبلغ المحصّل<sup class="mark">†</sup></label>
+<input type="text" id="montant-2" name="montant" inputmode="decimal" dir="ltr" value="5 000,00 DZD" autocomplete="off">
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary">تحصيل</button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+</section>
+<section class="example" aria-labelledby="cap-trois">
+<p class="example-caption" id="cap-trois">الحالة الثالثة: المبلغ يفوق الرصيد<sup class="mark">†</sup></p>
+<p class="caption-note">v0.1 PROPOSÉ, en attente de confirmation du propriétaire : le dépassement du solde par le caissier n’est pas autorisé dans cette version.</p>
+<div class="form-card">
+<h2>تحصيل الزبون<sup class="mark">†</sup></h2>
+<p class="customer-line">ياسين ت.<sup class="mark">†</sup></p>
+<p class="balance-line">الرصيد المستحق: <bdi class="money">12 500,00 DZD</bdi><sup class="mark">†</sup></p>
+<div class="field">
+<label for="montant-3">المبلغ المحصّل<sup class="mark">†</sup></label>
+<input type="text" id="montant-3" name="montant" class="input-error" inputmode="decimal" dir="ltr" value="20 000,00 DZD" autocomplete="off">
+<p class="field-error-text">المبلغ يتجاوز الرصيد المستحق (<bdi>12 500,00 DZD</bdi>). أدخل مبلغا أصغر من الرصيد أو مساويا له.<sup class="mark">†</sup></p>
+</div>
+<div class="button-row">
+<button type="button" class="btn btn-primary" disabled>تحصيل</button>
+<button type="button" class="btn btn-secondary">إلغاء</button>
+</div>
+</div>
+</section>
+<section class="example" aria-labelledby="cap-quatre">
+<p class="example-caption" id="cap-quatre">الحالة الرابعة: تم تحصيل الدفعة، الوصل مطبوع<sup class="mark">†</sup></p>
+<div class="form-card">
+<h2>تحصيل الزبون<sup class="mark">†</sup></h2>
+<p class="success-line"><svg class="success-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg><span>تم تحصيل المبلغ<sup class="mark">†</sup></span></p>
+<div class="receipt">
+<h3>وصل الدفع<sup class="mark">†</sup></h3>
+<p>الزبون: ياسين ت.<sup class="mark">†</sup></p>
+<p>المبلغ المحصّل: <bdi class="money">5 000,00 DZD</bdi><sup class="mark">†</sup></p>
+<p>الرصيد الجديد: <bdi class="money">7 500,00 DZD</bdi><sup class="mark">†</sup></p>
+<p>Pièce justificative : (numérotation à définir)</p>
+</div>
+<p class="print-note">تم إطلاق طباعة هذا الوصل.<sup class="mark">†</sup></p>
+</div>
+</section>
+<p class="doc-note doc-note-tail">Prototype statique DSN-020, jumeau arabe de DSN-015. État D06. Données fictives uniquement.</p>
+<p class="doc-note">Termes nouveaux, hors glossaire (†) : le titre de page, le sous-titre, les quatre légendes d’état, « تحصيل الزبون », « المبلغ المحصّل », « الرصيد المستحق », « الرصيد الجديد », « وصل الدفع », « تم تحصيل المبلغ », le message d’erreur de dépassement, la note d’impression et le nom d’exemple translittéré « ياسين ت. » — aucune de ces chaînes n’a d’entrée exacte dans le glossaire.</p>
+<p class="doc-note">Termes du glossaire signalés pour révision (‡) : aucun — aucune des lignes signalées 3, 19, 24, 35, 57, 58 n’est utilisée sur cet écran.</p>
+</div>
+</body>
+</html>

@@ -1254,6 +1254,18 @@ pub trait ReceiptRendererPort: Send + Sync {
     ) -> Result<Vec<baraka_domain::printing::PreviewLine>, ApplicationError> {
         Ok(Vec::new())
     }
+
+    /// Render a debt-payment receipt (non-sale print job; no
+    /// corresponding row in `documents`). Default: not implemented
+    /// (test fakes that never exercise this path keep compiling).
+    fn render_debt_receipt(
+        &self,
+        _receipt: &baraka_domain::printing::DebtReceiptDocument,
+    ) -> Result<Vec<u8>, ApplicationError> {
+        Err(ApplicationError::Port(
+            "debt receipt rendering not implemented".to_string(),
+        ))
+    }
 }
 
 /// Cash session view (application-level projection of the domain aggregate).

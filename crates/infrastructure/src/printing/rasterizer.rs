@@ -7,7 +7,7 @@ use ab_glyph::{Font, FontRef, Glyph, GlyphId, Point, PxScale};
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::ReceiptRendererPort;
 use baraka_domain::errors::DomainError;
-use baraka_domain::printing::ReceiptDocument;
+use baraka_domain::printing::{DebtReceiptDocument, ReceiptDocument};
 use image::{GrayImage, Luma};
 
 use crate::printing::blocks::{
@@ -222,6 +222,90 @@ pub fn render_canvas(receipt: &ReceiptDocument) -> Result<GrayImage, DomainError
     render_lines(&lines)
 }
 
+/// Build the ordered logical lines of a debt-payment receipt.
+///
+/// Separate pipeline from [`build_lines`]: a credit payment is not a
+/// sale, so sales-specific totals rows (HT/TVA/Timbre) never appear
+/// here. Only display-ready strings from [`DebtReceiptDocument`] are
+/// transcribed; no financial computation happens in this function.
+fn build_debt_receipt_lines(receipt: &DebtReceiptDocument) -> Result<Vec<LayoutLine>, DomainError> {
+    let language = receipt.language;
+    let mut lines = Vec::new();
+    if receipt.store_identity.store_name.trim().is_empty() {
+        lines.push(layout_text(&receipt.shop_name, TITLE_PX, true)?);
+    } else {
+        lines.extend(build_identity_lines(&receipt.store_identity, language)?);
+    }
+    lines.push(layout_text(
+        &label(language, "وصل تسديد دَين", "Reçu de paiement"),
+        TITLE_PX,
+        true,
+    )?);
+    lines.push(layout_text(
+        &format!("{}  {}", receipt.receipt_number, receipt.created_at),
+        BODY_PX,
+        true,
+    )?);
+    lines.push(LayoutLine::Rule { height_px: 2.0 });
+    lines.push(layout_text(
+        &format!(
+            "{}: {}",
+            label(language, "الزبون", "Client"),
+            receipt.customer_name
+        ),
+        BODY_PX,
+        false,
+    )?);
+    lines.push(layout_text(
+        &format!(
+            "{}: {}",
+            label(language, "المبلغ المحصَّل", "Montant encaissé"),
+            receipt.amount_text
+        ),
+        BODY_PX,
+        false,
+    )?);
+    lines.push(layout_text(
+        &format!(
+            "{}: {}",
+            label(language, "الرصيد الجديد", "Nouveau solde"),
+            receipt.new_balance_text
+        ),
+        BODY_PX,
+        false,
+    )?);
+    if let Some(reference) = receipt.reference_text.as_deref() {
+        if !reference.trim().is_empty() {
+            lines.push(layout_text(
+                &format!("{}: {}", label(language, "المرجع", "Référence"), reference),
+                BODY_PX,
+                false,
+            )?);
+        }
+    }
+    lines.push(LayoutLine::Rule { height_px: 2.0 });
+    if receipt.footer_message.trim().is_empty() {
+        lines.push(layout_text(
+            &label(language, "شكرا لثقتكم", "Merci de votre confiance"),
+            BODY_PX,
+            true,
+        )?);
+    } else {
+        lines.extend(build_footer_lines(&receipt.footer_message, language)?);
+    }
+    lines.push(LayoutLine::Gap { height_px: 24.0 });
+    Ok(lines)
+}
+
+/// Compose the full monochrome canvas for a debt-payment receipt.
+///
+/// Shares the single pixel-drawing core [`render_lines`] with the sales
+/// path, so layout behavior cannot diverge between the two pipelines.
+pub fn render_debt_canvas(receipt: &DebtReceiptDocument) -> Result<GrayImage, DomainError> {
+    let lines = build_debt_receipt_lines(receipt)?;
+    render_lines(&lines)
+}
+
 /// Build the ordered logical lines of a receipt (shared with test print).
 pub fn receipt_lines(receipt: &ReceiptDocument) -> Result<Vec<LayoutLine>, DomainError> {
     build_lines(receipt)
@@ -268,6 +352,15 @@ pub struct EscPosRasterizer;
 impl ReceiptRendererPort for EscPosRasterizer {
     fn render(&self, receipt: &ReceiptDocument) -> Result<Vec<u8>, ApplicationError> {
         render_canvas(receipt)
+            .map(|canvas| encode_gs_v0(&canvas))
+            .map_err(|_| ApplicationError::Validation(DomainError::PrintRenderingFailed))
+    }
+
+    fn render_debt_receipt(
+        &self,
+        receipt: &baraka_domain::printing::DebtReceiptDocument,
+    ) -> Result<Vec<u8>, ApplicationError> {
+        render_debt_canvas(receipt)
             .map(|canvas| encode_gs_v0(&canvas))
             .map_err(|_| ApplicationError::Validation(DomainError::PrintRenderingFailed))
     }

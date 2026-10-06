@@ -183,6 +183,44 @@ pub struct ReceiptDocument {
     pub footer_message: String,
 }
 
+/// Debt-payment receipt content (separate from [`ReceiptDocument`]:
+/// a customer credit payment is not a row in `documents`, so it
+/// cannot carry a `document_id` or sales-specific totals). Built
+/// verbatim from already-persisted ledger data in TASK-BRK-061; this
+/// type carries only display-ready strings, never raw centimes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DebtReceiptDocument {
+    /// Layout language.
+    pub language: ReceiptLanguage,
+    /// Legacy single-line fallback header, used only when
+    /// `store_identity.store_name` is empty (mirrors
+    /// [`ReceiptDocument::shop_name`] fallback behavior exactly).
+    pub shop_name: String,
+    /// Human-readable receipt number (sourced from
+    /// `customer_ledger.sequence_no` in TASK-BRK-061 — this type has
+    /// no opinion on numbering scheme, it only displays the string
+    /// it is given).
+    pub receipt_number: String,
+    /// Capture instant display text.
+    pub created_at: String,
+    /// Customer display name.
+    pub customer_name: String,
+    /// Amount collected, pre-formatted display text (e.g. `"1500.00"`).
+    pub amount_text: String,
+    /// Customer's new remaining balance after this payment,
+    /// pre-formatted display text.
+    pub new_balance_text: String,
+    /// Optional free-text payment reference (e.g. a cheque number).
+    /// `None` or an empty/whitespace-only string both suppress the
+    /// reference line entirely.
+    pub reference_text: Option<String>,
+    /// Store identity block (same type as [`ReceiptDocument`] uses).
+    pub store_identity: StoreIdentity,
+    /// Free-text footer. Empty selects the legacy default line
+    /// (mirrors [`ReceiptDocument::footer_message`] fallback).
+    pub footer_message: String,
+}
+
 /// Format integer centimes as plain `"122.50"` display text.
 #[must_use]
 pub fn format_centimes_plain(value: i64) -> String {

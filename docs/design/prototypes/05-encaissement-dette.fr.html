@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Baraka UltraPOS - Prototype FR - Encaissement de dette</title>
-<!-- Statut : v0.1 PROPOSE. Tache DSN-015 (prototype 5 sur 5). Encaissement apres approbation gerant ; chaque paiement imprime un justificatif. Base visuelle : 04-autorisation-gerant.fr.html. References : ADR-079, etat D06, composant C10. Depassement du solde : PROPOSE, non confirme. -->
+<!-- Statut : v1.0 VALIDE. Tache DSN-015 (prototype 5 sur 5). Encaissement apres approbation gerant ; chaque paiement imprime un justificatif. Base visuelle : 04-autorisation-gerant.fr.html. References : ADR-079, etat D06, composant C10. Depassement du solde : VALIDE (interdit pour Caissier ; requiert Gerant/Admin). -->
 <style>
 :root {
   --color-bg: #F7F7F5;
@@ -231,7 +231,7 @@ html, body {
 <h1>Encaissement de dette - après approbation du gérant</h1>
 <p>Le caissier ne voit le montant de la dette que dans ce formulaire approuvé. Chaque paiement imprime un justificatif.</p>
 </div>
-<p class="doc-note">Note de relecture : ce formulaire n’est accessible qu’immédiatement après un état « Autorisé » de l’approbation du gérant (prototype 04-autorisation-gerant). Le blocage du dépassement du solde dans l’état trois est PROPOSÉ et en attente de confirmation du propriétaire. La numérotation des pièces justificatives est en attente d’une future tâche moteur.</p>
+<p class="doc-note">Note de relecture : ce formulaire n’est accessible qu’immédiatement après un état « Autorisé » de l’approbation du gérant (prototype 04-autorisation-gerant). Le blocage du dépassement du solde dans l’état trois est VALIDÉ (décision propriétaire SESSION-ARC-005) : tout dépassement requiert Gérant/Admin (ManageCustomerCredit). La numérotation des pièces justificatives est en attente d’une future tâche moteur.</p>
 <section class="example" aria-labelledby="cap-un">
 <p class="example-caption" id="cap-un">État un : formulaire initial, solde affiché (état focus simulé pour démonstration)</p>
 <p class="caption-note">Ce montant n’est visible qu’après l’étape d’approbation du gérant, conformément à ADR-079.</p>
@@ -267,7 +267,7 @@ html, body {
 </section>
 <section class="example" aria-labelledby="cap-trois">
 <p class="example-caption" id="cap-trois">État trois : montant supérieur au solde</p>
-<p class="caption-note">v0.1 PROPOSÉ, en attente de confirmation du propriétaire : le dépassement du solde par le caissier n’est pas autorisé dans cette version.</p>
+<p class="caption-note">v1.0 VALIDÉ (décision propriétaire SESSION-ARC-005) : le dépassement du solde par le caissier est strictement interdit ; tout encaissement excédentaire requiert Gérant/Admin (ManageCustomerCredit).</p>
 <div class="form-card">
 <h2>Encaissement du client</h2>
 <p class="customer-line">Yacine T.</p>

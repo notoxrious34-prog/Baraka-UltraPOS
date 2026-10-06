@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Baraka UltraPOS - Prototype AR (RTL) - Encaissement de dette</title>
-<!-- Statut : v0.1 PROPOSE. Date: 2026-10-05. Baseline FR: 84fea228b5a47fce41041f0282162c287d8b8c09ef93ce042ca437c3535c2f73. Jumeau arabe de 05-encaissement-dette.fr.html (TASK-DSN-020). Quatre états. Termes du glossaire docs/design/glossary-ar-fr.md. Chiffres latins uniquement (ADR-069). -->
+<!-- Statut : v1.0 VALIDE. Date: 2026-10-05. Baseline FR: 84fea228b5a47fce41041f0282162c287d8b8c09ef93ce042ca437c3535c2f73. Jumeau arabe de 05-encaissement-dette.fr.html (TASK-DSN-020). Quatre états. Termes du glossaire docs/design/glossary-ar-fr.md. Chiffres latins uniquement (ADR-069). -->
 <style>
 :root {
   --color-bg: #F7F7F5;
@@ -234,7 +234,7 @@ sup.mark {
 <h1>تسديد دين — تحصيل بعد ترخيص المسيّر<sup class="mark">†</sup></h1>
 <p>أمين الصندوق لا يرى مبلغ الدين إلا في هذا النموذج المرخّص. كل دفعة تطبع وصلا.<sup class="mark">†</sup></p>
 </div>
-<p class="doc-note">Note de relecture : ce formulaire n’est accessible qu’immédiatement après un état « Autorisé » de l’approbation du gérant (prototype 04-autorisation-gerant). Le blocage du dépassement du solde dans l’état trois est PROPOSÉ et en attente de confirmation du propriétaire. La numérotation des pièces justificatives est en attente d’une future tâche moteur.</p>
+<p class="doc-note">Note de relecture : ce formulaire n’est accessible qu’immédiatement après un état « Autorisé » de l’approbation du gérant (prototype 04-autorisation-gerant). Le blocage du dépassement du solde dans l’état trois est VALIDÉ (décision propriétaire SESSION-ARC-005) : tout dépassement requiert Gérant/Admin (ManageCustomerCredit). La numérotation des pièces justificatives est en attente d’une future tâche moteur.</p>
 <section class="example" aria-labelledby="cap-un">
 <p class="example-caption" id="cap-un">الحالة الأولى: نموذج أولي، الرصيد معروض (حالة التركيز محاكاة للعرض)<sup class="mark">†</sup></p>
 <p class="caption-note">هذا المبلغ لا يظهر إلا بعد خطوة ترخيص المسيّر، وفق ADR-079.<sup class="mark">†</sup></p>
@@ -270,7 +270,7 @@ sup.mark {
 </section>
 <section class="example" aria-labelledby="cap-trois">
 <p class="example-caption" id="cap-trois">الحالة الثالثة: المبلغ يفوق الرصيد<sup class="mark">†</sup></p>
-<p class="caption-note">v0.1 PROPOSÉ, en attente de confirmation du propriétaire : le dépassement du solde par le caissier n’est pas autorisé dans cette version.</p>
+<p class="caption-note">v1.0 VALIDÉ (décision propriétaire SESSION-ARC-005) : le dépassement du solde par le caissier est strictement interdit ; tout encaissement excédentaire requiert Gérant/Admin (ManageCustomerCredit).</p>
 <div class="form-card">
 <h2>تحصيل الزبون<sup class="mark">†</sup></h2>
 <p class="customer-line">ياسين ت.<sup class="mark">†</sup></p>

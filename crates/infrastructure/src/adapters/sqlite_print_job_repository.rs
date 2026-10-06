@@ -39,14 +39,15 @@ impl SqlitePrintJobRepository {
 impl PrintJobRepository for SqlitePrintJobRepository {
     fn enqueue_job(
         &self,
-        document_id: DocumentId,
+        document_id: Option<DocumentId>,
         job_type: &str,
         payload_json: &str,
     ) -> Result<String, ApplicationError> {
         let mut guard = self.lock()?;
         let stamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+        let id_text = document_id.map(|id| id.to_string());
         run_transaction(&mut guard, |tx| {
-            enqueue_in_tx(tx, &document_id.to_string(), job_type, payload_json, &stamp)
+            enqueue_in_tx(tx, id_text.as_deref(), job_type, payload_json, &stamp)
         })
         .map_err(|_| store_failure())
     }
@@ -56,7 +57,7 @@ impl PrintJobRepository for SqlitePrintJobRepository {
         let stamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
         run_transaction(&mut guard, |tx| {
             // Atomic claim: exactly one claimant wins the row.
-            let claimed: Option<(String, String, String, i64)> = tx
+            let claimed: Option<(String, Option<String>, String, i64)> = tx
                 .query_row(
                     "SELECT id, document_id, job_type, attempt_count FROM print_jobs
                      WHERE status = 'PENDING' ORDER BY rowid LIMIT 1",
@@ -80,13 +81,17 @@ impl PrintJobRepository for SqlitePrintJobRepository {
                     if changed != 1 {
                         return Ok(None);
                     }
+                    let document_id = document_id
+                        .map(|text| {
+                            Uuid::parse_str(&text).map_err(|_| {
+                                rusqlite::Error::InvalidColumnName("document id".to_string())
+                            })
+                        })
+                        .transpose()?
+                        .map(baraka_domain::sales::DocumentId::from);
                     Ok(Some(PrintJobRecord {
                         job_id,
-                        document_id: baraka_domain::sales::DocumentId::from(
-                            Uuid::parse_str(&document_id).map_err(|_| {
-                                rusqlite::Error::InvalidColumnName("document id".to_string())
-                            })?,
-                        ),
+                        document_id,
                         job_type,
                         attempt_count,
                     }))
@@ -187,8 +192,9 @@ impl PrintJobRepository for SqlitePrintJobRepository {
     fn enqueue_reprint(&self, document_id: DocumentId) -> Result<String, ApplicationError> {
         let mut guard = self.lock()?;
         let stamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+        let id_text = document_id.to_string();
         run_transaction(&mut guard, |tx| {
-            enqueue_in_tx(tx, &document_id.to_string(), "DUPLICATA", "{}", &stamp)
+            enqueue_in_tx(tx, Some(id_text.as_str()), "DUPLICATA", "{}", &stamp)
         })
         .map_err(|_| store_failure())
     }
@@ -251,9 +257,10 @@ impl SqlitePrintJobRepository {
 }
 
 /// Enqueue inside an explicit transaction handle (shared with checkout).
+/// `document_id` is `None` for non-sale jobs; rusqlite binds it as NULL.
 pub fn enqueue_in_tx(
     tx: &rusqlite::Transaction,
-    document_id: &str,
+    document_id: Option<&str>,
     job_type: &str,
     payload_json: &str,
     stamp: &str,

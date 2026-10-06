@@ -236,7 +236,9 @@ where
     T: PrinterTransportPort + ?Sized,
     R: ReceiptRendererPort + ?Sized,
 {
-    let document_id = claimed.document_id;
+    let document_id = claimed
+        .document_id
+        .ok_or(ApplicationError::Validation(DomainError::PrintJobNotFound))?;
     let document = documents
         .get_by_id(document_id)?
         .ok_or(ApplicationError::Validation(DomainError::PrintJobNotFound))?;

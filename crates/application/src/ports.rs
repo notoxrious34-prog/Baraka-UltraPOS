@@ -1083,9 +1083,11 @@ pub struct LedgerEntryRow {
 /// attempts per job; the worker enforces the terminal `FAILED` transition.
 pub trait PrintJobRepository: Send + Sync {
     /// Enqueue one PENDING job; returns its stored id.
+    /// `document_id` is `None` for non-sale jobs (debt receipts, Z-reports,
+    /// test prints) that reference no row in `documents`.
     fn enqueue_job(
         &self,
-        document_id: DocumentId,
+        document_id: Option<DocumentId>,
         job_type: &str,
         payload_json: &str,
     ) -> Result<String, ApplicationError>;
@@ -1144,8 +1146,8 @@ pub const PRINT_STALE_PENDING_SECS: u64 = 3600;
 pub struct PrintJobRecord {
     /// Stored row id.
     pub job_id: String,
-    /// Owning document id.
-    pub document_id: DocumentId,
+    /// Owning document id; `None` for non-sale jobs.
+    pub document_id: Option<DocumentId>,
     /// Job kind code (`RECEIPT`, `DUPLICATA`).
     pub job_type: String,
     /// Physical send attempts so far.

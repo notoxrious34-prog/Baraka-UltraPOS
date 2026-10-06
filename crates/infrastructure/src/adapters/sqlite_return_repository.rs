@@ -365,7 +365,7 @@ fn persist_return_atomic(
             "total_ttc_centimes": order.ttc_centimes,
         })
         .to_string();
-        enqueue_in_tx(tx, &avoir_id, "RECEIPT", &job_payload, &stamp)?;
+        enqueue_in_tx(tx, Some(avoir_id.as_str()), "RECEIPT", &job_payload, &stamp)?;
         // l. Idempotency completion with lost-race replay.
         let receipt = PersistReturnReceipt {
             return_document_id: avoir_id.clone(),

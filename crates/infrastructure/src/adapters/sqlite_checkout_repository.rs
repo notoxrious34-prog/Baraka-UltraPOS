@@ -478,7 +478,7 @@ impl CheckoutRepository for SqliteCheckoutRepository {
                 "total_ttc_centimes": command.totals.total_ttc,
             })
             .to_string();
-            let job_id = enqueue_in_tx(tx, &document_id, "RECEIPT", &payload, &stamp)?;
+            let job_id = enqueue_in_tx(tx, Some(document_id.as_str()), "RECEIPT", &payload, &stamp)?;
             // 9. Record the idempotency row atomically with the sale
             // (ADR-064: the claim check in step 1 and this INSERT are both
             // inside the sale transaction — there is no separately

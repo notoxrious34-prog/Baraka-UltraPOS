@@ -71,7 +71,7 @@ fn rerun_is_idempotent() {
             row.get(0)
         })
         .expect("count");
-    assert_eq!(rows, 13);
+    assert_eq!(rows, 14);
 }
 
 #[test]
@@ -154,7 +154,7 @@ fn migration_0002_adds_lockout_columns() {
             row.get(0)
         })
         .expect("count");
-    assert_eq!(versions, 13);
+    assert_eq!(versions, 14);
 }
 
 #[test]
@@ -354,4 +354,67 @@ fn migration_0013_widens_cash_movements_for_refund_out() {
         )
         .expect("v13 name");
     assert_eq!(name, "0013_add_refund_out_movement_type.sql");
+}
+
+#[test]
+fn migration_0014_makes_print_job_document_id_nullable() {
+    let db = common::migrated_file_db();
+    // v14 bookkeeping row present with the exact file name.
+    let name: String = db
+        .conn
+        .query_row(
+            "SELECT name FROM schema_migrations WHERE version = 14",
+            [],
+            |row| row.get(0),
+        )
+        .expect("v14 name");
+    assert_eq!(name, "0014_make_print_jobs_document_id_nullable.sql");
+    // document_id column is now nullable (notnull == 0).
+    let notnull: i64 = db
+        .conn
+        .query_row(
+            "SELECT \"notnull\" FROM pragma_table_info('print_jobs') WHERE name = 'document_id'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("pragma");
+    assert_eq!(notnull, 0);
+    // All 12 columns survive the rebuild, and the document index is back.
+    let columns: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('print_jobs')",
+            [],
+            |row| row.get(0),
+        )
+        .expect("columns");
+    assert_eq!(columns, 12);
+    let index: i64 = db
+        .conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_print_jobs_document'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("index");
+    assert_eq!(index, 1);
+    // A NULL-document row inserts cleanly under the rebuilt schema.
+    db.conn
+        .execute(
+            "INSERT INTO print_jobs
+             (id, document_id, status, payload_json, created_at, updated_at)
+             VALUES ('null-doc-job-1', NULL, 'PENDING', '{}',
+                     '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            [],
+        )
+        .expect("null insert");
+    let stored: Option<String> = db
+        .conn
+        .query_row(
+            "SELECT document_id FROM print_jobs WHERE id = 'null-doc-job-1'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("null read");
+    assert_eq!(stored, None);
 }

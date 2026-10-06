@@ -458,7 +458,7 @@ pub(crate) fn convert_devis_to_bl_atomic(
             "total_ttc_centimes": source.ttc,
         })
         .to_string();
-        enqueue_in_tx(tx, &bl_id, "RECEIPT", &job_payload, &stamp)?;
+        enqueue_in_tx(tx, Some(bl_id.as_str()), "RECEIPT", &job_payload, &stamp)?;
         // p. Idempotency completion with lost-race replay.
         let items_count = u32::try_from(source_lines.len())
             .map_err(|_| tx_failure(sentinel::OVERFLOW.to_string()))?;
@@ -751,7 +751,7 @@ pub(crate) fn convert_bl_to_facture_atomic(
             "total_ttc_centimes": source.ttc,
         })
         .to_string();
-        enqueue_in_tx(tx, &facture_id, "RECEIPT", &job_payload, &stamp)?;
+        enqueue_in_tx(tx, Some(facture_id.as_str()), "RECEIPT", &job_payload, &stamp)?;
         // r. Idempotency completion with lost-race replay.
         let items_count = u32::try_from(source_lines.len())
             .map_err(|_| tx_failure(sentinel::OVERFLOW.to_string()))?;

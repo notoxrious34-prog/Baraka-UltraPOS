@@ -910,3 +910,36 @@ fn test_unconfigured_printer_is_bounded_and_never_spins() {
         "last_error descriptive"
     );
 }
+
+#[test]
+fn null_document_id_job_enqueues_claims_and_completes() {
+    // Migration 0014: non-sale jobs (debt receipts, Z-reports, test prints)
+    // carry no sales document; the row, the claim, and the terminal
+    // transition must all round-trip `document_id == None`.
+    let harness = setup();
+    let job_id = harness
+        .jobs
+        .enqueue_job(None, "RECEIPT", "{}")
+        .expect("enqueue null");
+    let stored: Option<String> = harness
+        .db
+        .lock()
+        .expect("lock")
+        .query_row(
+            "SELECT document_id FROM print_jobs WHERE id = ?1",
+            [&job_id],
+            |row| row.get(0),
+        )
+        .expect("read");
+    assert_eq!(stored, None, "NULL must persist as NULL");
+    let claimed = harness
+        .jobs
+        .claim_next_pending()
+        .expect("claim")
+        .expect("pending job");
+    assert_eq!(claimed.job_id, job_id);
+    assert_eq!(claimed.document_id, None);
+    harness.jobs.mark_done(&job_id).expect("done");
+    let (status, _, _, _) = job_full(&harness, &job_id);
+    assert_eq!(status, "DONE");
+}

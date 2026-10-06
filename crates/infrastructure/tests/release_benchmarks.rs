@@ -405,7 +405,7 @@ fn bench_m3_print_job_insert() {
     let mut samples = Vec::with_capacity(MEASURED);
     for iteration in 0..(WARMUP + MEASURED) {
         let start = Instant::now();
-        jobs.enqueue_job(document_id, "TICKET", "{}")
+        jobs.enqueue_job(Some(document_id), "TICKET", "{}")
             .expect("enqueue");
         if iteration >= WARMUP {
             samples.push(start.elapsed().as_micros());

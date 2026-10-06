@@ -87,6 +87,11 @@ pub const MIGRATIONS: &[EmbeddedMigration] = &[
         name: "0013_add_refund_out_movement_type.sql",
         sql: include_str!("../../migrations/0013_add_refund_out_movement_type.sql"),
     },
+    EmbeddedMigration {
+        version: 14,
+        name: "0014_make_print_jobs_document_id_nullable.sql",
+        sql: include_str!("../../migrations/0014_make_print_jobs_document_id_nullable.sql"),
+    },
 ];
 
 /// SHA-256 hex digest of `input` (pure Rust, no extra dependency).

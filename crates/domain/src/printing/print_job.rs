@@ -79,8 +79,9 @@ impl PrintJobType {
 pub struct PrintJob {
     /// Stored row id (TEXT UUID).
     pub id: String,
-    /// Owning document id.
-    pub document_id: String,
+    /// Owning document id, when the job was enqueued for a sale document.
+    /// `None` for non-sale jobs (debt receipts, Z-reports, test prints).
+    pub document_id: Option<String>,
     /// Job kind.
     pub job_type: PrintJobType,
     /// Lifecycle state.

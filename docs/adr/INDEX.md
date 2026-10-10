@@ -77,4 +77,4 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-078 | Information architecture and navigation | ACCEPTED |
 | ADR-079 | Roles in use and manager approval in place | ACCEPTED |
 
-Next free id: ADR-080.
+Next free id: ADR-086.

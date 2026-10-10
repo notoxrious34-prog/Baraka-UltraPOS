@@ -153,6 +153,10 @@ impl DocumentRepository for FakeDocuments {
         panic!("out of scope for return tests");
     }
 
+    fn cancel_draft(&self, _id: DocumentId) -> Result<(), ApplicationError> {
+        Ok(())
+    }
+
     fn get_by_id(&self, _id: DocumentId) -> Result<Option<Document>, ApplicationError> {
         Ok(self.document.lock().expect("document").clone())
     }

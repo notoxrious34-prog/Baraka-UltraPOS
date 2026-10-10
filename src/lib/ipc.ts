@@ -486,6 +486,19 @@ export async function ipcCreateDraft(
   return wire.draft_id;
 }
 
+/** Discard a parked draft (DRAFT -> CANCELLED). */
+export async function ipcDiscardDraft(
+  sessionToken: string,
+  draftId: string,
+): Promise<void> {
+  return call("sales_discard_draft", {
+    request: {
+      session_token: sessionToken,
+      draft_id: draftId,
+    },
+  });
+}
+
 export interface NewCustomerWire {
   name: string;
   phone: string | null;

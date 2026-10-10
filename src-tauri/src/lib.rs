@@ -210,6 +210,7 @@ pub fn run() {
             baraka_commands::ipc::convert_devis_to_bl,
             baraka_commands::ipc::convert_bl_to_facture,
             baraka_commands::ipc::sales_create_draft,
+            baraka_commands::ipc::sales_discard_draft,
             baraka_commands::ipc::sales_get,
             baraka_commands::ipc::documents_search,
             baraka_commands::ipc::returns_get_source_summary,

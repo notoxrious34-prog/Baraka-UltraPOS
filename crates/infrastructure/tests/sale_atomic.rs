@@ -4,11 +4,13 @@ use std::sync::{Arc, Mutex};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    ProductRepository, SessionContext, SessionToken, StockRepository, WarehouseRepository,
+    DocumentSearchFilter, ProductRepository, SessionContext, SessionToken, StockRepository,
+    WarehouseRepository,
 };
 use baraka_application::use_cases::sales::{
-    CartLineInput, CheckoutInput, CheckoutSaleUseCase, CreateDraftSaleUseCase, DraftInput,
-    GetSaleUseCase, PaymentInput, PreviewSaleTotalsUseCase, PreviewTotalsInput,
+    CartLineInput, CheckoutInput, CheckoutSaleUseCase, CreateDraftSaleUseCase,
+    DiscardDraftSaleUseCase, DraftInput, GetSaleUseCase, PaymentInput, PreviewSaleTotalsUseCase,
+    PreviewTotalsInput, SearchDocumentsUseCase,
 };
 use baraka_domain::catalog::{Barcode, Product, ProductId, ProductUnit, Sku, UnitId};
 use baraka_domain::errors::DomainError;
@@ -951,6 +953,70 @@ fn arabic_checkout_persists_language_and_renders_rtl() {
         )
         .expect("legacy language");
     assert_eq!(legacy, "AR");
+}
+
+#[test]
+fn draft_lifecycle_create_search_and_discard() {
+    let harness = setup();
+    let warehouse = seed_warehouse(&harness, "MAIN");
+    let (product, unit) = seed_product(&harness, "PARK-1", 10_000, false);
+    let session = session_with(Role::Vendeur);
+    let clock = baraka_infrastructure::adapters::SystemClock;
+    let draft_id = CreateDraftSaleUseCase::new(
+        &harness.catalog,
+        &harness.documents,
+        &harness.warehouses,
+        &harness.customers,
+        &clock,
+    )
+    .execute(
+        &session,
+        DraftInput {
+            warehouse_id: warehouse,
+            customer_id: None,
+            language: DocumentLanguage::Fr,
+            lines: vec![CartLineInput {
+                product_id: product,
+                unit_id: unit,
+                quantity_micro: 20_000,
+                unit_price_override: None,
+                line_discount_centimes: 0,
+            }],
+            notes: None,
+        },
+        TEST_TERMINAL,
+    )
+    .expect("park draft");
+
+    let drafts = || {
+        SearchDocumentsUseCase::new(&harness.documents)
+            .execute(
+                &session,
+                DocumentSearchFilter {
+                    doc_type: None,
+                    status: Some("DRAFT".to_string()),
+                    query: None,
+                    limit: Some(20),
+                },
+            )
+            .expect("search drafts")
+    };
+    let listed = drafts();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, draft_id.to_string());
+
+    DiscardDraftSaleUseCase::new(&harness.documents)
+        .execute(&session, &draft_id.to_string())
+        .expect("discard draft");
+
+    assert!(drafts().is_empty());
+
+    let again =
+        DiscardDraftSaleUseCase::new(&harness.documents).execute(&session, &draft_id.to_string());
+    assert!(matches!(
+        again,
+        Err(ApplicationError::Conflict(_)) | Err(ApplicationError::NotFound(_))
+    ));
 }
 
 #[test]

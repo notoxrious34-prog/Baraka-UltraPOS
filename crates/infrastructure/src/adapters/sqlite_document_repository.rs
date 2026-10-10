@@ -266,6 +266,21 @@ impl DocumentRepository for SqliteDocumentRepository {
         .map_err(|_| store_failure())
     }
 
+    fn cancel_draft(&self, id: DocumentId) -> Result<(), ApplicationError> {
+        let guard = self.lock()?;
+        let rows = guard
+            .prepare("UPDATE documents SET status = 'CANCELLED' WHERE id = ?1 AND status = 'DRAFT'")
+            .map_err(|_| store_failure())?
+            .execute(rusqlite::params![id.to_string()])
+            .map_err(|_| store_failure())?;
+        if rows == 0 {
+            return Err(ApplicationError::Conflict(
+                "document is not a draft".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     fn get_by_id(&self, id: DocumentId) -> Result<Option<Document>, ApplicationError> {
         let guard = self.lock()?;
         guard

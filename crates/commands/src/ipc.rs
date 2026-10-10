@@ -58,8 +58,8 @@ use baraka_application::use_cases::returns::{
 use baraka_application::use_cases::sales::{
     CartLineInput, CheckoutInput, CheckoutSaleUseCase, ClosingInput, ClosingPaymentInput,
     ConvertBlToFactureUseCase, ConvertDevisToBlInput, ConvertDevisToBlUseCase,
-    CreateDraftSaleUseCase, DraftInput, GetSaleUseCase, PaymentInput, PreviewSaleTotalsUseCase,
-    PreviewTotalsInput, SearchDocumentsUseCase, StockShortageWarning,
+    CreateDraftSaleUseCase, DiscardDraftSaleUseCase, DraftInput, GetSaleUseCase, PaymentInput,
+    PreviewSaleTotalsUseCase, PreviewTotalsInput, SearchDocumentsUseCase, StockShortageWarning,
 };
 use baraka_application::use_cases::suppliers::{
     CreateSupplierUseCase, GetSupplierStatementUseCase, GetSupplierUseCase, SearchSuppliersUseCase,
@@ -2016,6 +2016,24 @@ pub fn sales_create_draft(
         draft_id: draft_id.to_string(),
         created_at: state.clock.now_rfc3339(),
     })
+}
+
+/// `sales_discard_draft` command (`sales.discard_draft`): discard a parked draft.
+#[derive(Debug, serde::Deserialize)]
+pub struct DiscardDraftRequestDto {
+    pub session_token: String,
+    pub draft_id: String,
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn sales_discard_draft(
+    state: tauri::State<'_, AppState>,
+    request: DiscardDraftRequestDto,
+) -> Result<(), String> {
+    let session = require_session(&state, &request.session_token)?;
+    DiscardDraftSaleUseCase::new(state.documents.as_ref())
+        .execute(&session, &request.draft_id)
+        .map_err(|error| error_code(&error))
 }
 
 /// `sales_get` command (`sales.get`): full sale view.

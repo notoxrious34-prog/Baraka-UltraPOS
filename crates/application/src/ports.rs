@@ -569,6 +569,9 @@ pub trait DocumentRepository: Send + Sync {
         origin_device_id: &str,
     ) -> Result<(), ApplicationError>;
 
+    /// Discard a parked draft (DRAFT -> CANCELLED; sealed states untouched).
+    fn cancel_draft(&self, id: DocumentId) -> Result<(), ApplicationError>;
+
     /// Fetch a document header by id.
     fn get_by_id(&self, id: DocumentId) -> Result<Option<Document>, ApplicationError>;
 

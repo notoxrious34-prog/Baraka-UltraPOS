@@ -1118,6 +1118,47 @@ fn canonical_closing_request(input: &ClosingInput, source: &Document, terminal_i
     parts.join(";")
 }
 
+/// Parked-draft discard use case (DRAFT -> CANCELLED, no stock touched).
+pub struct DiscardDraftSaleUseCase<'a, D>
+where
+    D: ?Sized,
+{
+    documents: &'a D,
+}
+
+impl<'a, D> DiscardDraftSaleUseCase<'a, D>
+where
+    D: DocumentRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(documents: &'a D) -> Self {
+        Self { documents }
+    }
+
+    /// Validate and discard a parked draft.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        draft_id: &str,
+    ) -> Result<(), ApplicationError> {
+        if !session.role.has_permission(Permission::CreateSale) {
+            return Err(ApplicationError::Unauthorized);
+        }
+        let id =
+            DocumentId(Uuid::parse_str(draft_id.trim()).map_err(|_| coded("INVALID_DOCUMENT_ID"))?);
+        let document = self
+            .documents
+            .get_by_id(id)?
+            .ok_or_else(|| ApplicationError::NotFound("draft".to_string()))?;
+        if document.status != DocumentStatus::Draft {
+            return Err(ApplicationError::Conflict(
+                "document is not a draft".to_string(),
+            ));
+        }
+        self.documents.cancel_draft(id)
+    }
+}
+
 /// Sale read use case (any authenticated session; enforced at the edge).
 pub struct GetSaleUseCase<'a, D>
 where

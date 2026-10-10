@@ -1128,3 +1128,44 @@ in CHARTER-v2.0 Section 0 and Section 3.4:
 2. POS Cockpit keyboard contract & parked sales UX (F8 park, F6 resume).
 3. Customer management & credit ledger surface (Phase 3).
 4. Topbar crowding monitor & consolidation.
+
+
+## 18. Session Wrap-Up & Handoff to SESSION-ARC-010 (Reply 15)
+
+Date: 2026-10-10
+Counter: Reply 15 of SESSION-ARC-009 (Session End Handoff)
+Preceding release commits in session:
+- `b064e16` (REL-031 / DSN-024): Typography & local OFL font bundling (Cairo, Inter, JetBrains Mono)
+- `86a8149` (REL-032 / BRK-062): Backend infix search & default discovery results
+- `f59ed59` (REL-033 / DSN-025): POS catalog discovery on blank query & teaching empty state
+- `b108142` (DOC-033): Checkpoint 1 (Reply 10) Section 17 append & boot package update
+- `94d7464` (REL-034 / BRK-063): Sales draft discard engine capability, use case, & IPC command
+- Subsequent commit: `feat(pos): add parked sales modal, cart rehydration, f6 shortcut, and hud badge (DSN-026)`
+
+### 18.1 Final Metric Ledger
+- Rust Workspace Tests: `cargo test --workspace -j 2` -> 380 passed / 0 failed / 4 ignored (+2 tests in session)
+- Rust Quality: `cargo clippy --all-targets --all-features -D warnings` clean, `cargo fmt --check` clean
+- Vitest Frontend Tests: `npx vitest run` -> 26 files, 222 passed, 0 failed (+25 tests in session)
+- Frontend Quality: ESLint clean (0 errors, 0 warnings), TypeScript clean (0 errors)
+- Production Build: `npm run build` succeeds offline (~3.8s)
+- Total Commits in Session: 5 feature/release commits + 2 architecture documentation commits
+- Database Migrations: 14 migrations (0001-0014, frozen). Next: 0015.
+- Registered IPC Commands: 73 commands (+1 `sales_discard_draft`).
+- Free ADR Pointer: ADR-086.
+
+### 18.2 Session Learnings & Operational Notes
+1. **Upstream Font Formats (DSN-024):** Google Fonts upstream repository no longer maintains a `static/`
+   directory for variable fonts like Cairo. Using verified OFL builds (e.g. Fontsource OFL releases)
+   for static weight TTFs ensures reliable, reproducible builds.
+2. **Domain/Application Error Alignment (BRK-063):** When mapping use-case validation or conflict
+   conditions, use established `ApplicationError::Conflict` or `Validation` domain patterns rather
+   than inventing ad-hoc enum variants.
+3. **Modal Architectural Integration (DSN-026):** Integrating new POS overlays into the global
+   `ActiveModal` union in `PosShell` ensures full keyboard contract compliance (preventing shortcut
+   passthrough behind the modal) compared to local `useState` mounting.
+4. **Owner Directives Ratified:** The owner's directive for aggressive task batching has been
+   ratified for implementation starting in SESSION-ARC-010 to accelerate final product delivery.
+
+### 18.3 Successor Hand-off
+SESSION-ARC-009 concludes with zero debt, clean working tree, and verified boot packages.
+Handoff is executed to SESSION-ARC-010 with seed package `docs/architecture/CTP-SESSION-ARC-010.md`.

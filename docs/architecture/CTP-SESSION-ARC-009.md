@@ -1060,3 +1060,71 @@ SESSION-ARC-009 architect:
 5. Remember: CTP persistence language is English (ADR-085) — do not
    re-open this without a fresh, explicit owner instruction.
 
+
+## 17. Checkpoint 1 — SESSION-ARC-009 (Reply 10)
+
+Date: 2026-10-10
+Counter: Reply 10 of SESSION-ARC-009
+Git commit at checkpoint: `f59ed59` (TASK-REL-033)
+Preceding release commits in session: `b064e16` (REL-031), `86a8149` (REL-032), `f59ed59` (REL-033)
+
+### 17.1 Executive Summary & Cumulative Session Achievements
+SESSION-ARC-009 was initiated under explicit owner directive for high-density,
+flawless production. In its first 10 replies, the session delivered three complete,
+fully-gated features and release commits, closing critical product gaps identified
+in CHARTER-v2.0 Section 0 and Section 3.4:
+
+1. Offline-First Typography & Font Bundling (DSN-024 / REL-031, commit `b064e16`):
+   - Eliminated the long-standing design debt of falling back to arbitrary Windows
+     system fonts (Segoe UI / Tahoma).
+   - Acquired and bundled 10 canonical OFL font files into `public/fonts/`:
+     - Cairo (Arabic UI): Regular (400), SemiBold (600), Bold (700)
+     - Inter (Latin UI): Regular (400), Medium (500), SemiBold (600), Bold (700) in woff2
+     - JetBrains Mono (Financial numerals & codes): Regular (400), Medium (500), Bold (700) in woff2
+   - Attached OFL licenses in `assets/fonts/` (`LICENSE-Cairo.txt`, `LICENSE-JetBrainsMono.txt`).
+   - Wired 10 `@font-face` rules in `src/index.css` with `font-display: swap` and `.tabular-nums`.
+   - Verified offline independence: `npm run build` bundles all 10 fonts into `dist/fonts/`.
+   - Added automated test suite `src/__tests__/typography.test.ts` (5 tests).
+
+2. Backend Catalog Search & Default Discovery (BRK-062 / REL-032, commit `86a8149`):
+   - Proven by regression law (demonstrated RED failure on prefix-only query before fix).
+   - Upgraded `SqliteCatalogRepository::search` to support infix substring matching
+     (`%{escaped}%`) on `name_fr`, `name_ar`, and `sku`, solving the "douchette missing
+     Pomme de douchette" commercial search failure.
+   - Preserved strict exact matching on barcodes (`u.barcode = ?2 OR p.barcode = ?2`).
+   - Enabled default discovery retrieval on empty/blank query (`SELECT DISTINCT p.id FROM products p ORDER BY p.sku LIMIT ?1`),
+     removing the application-layer short-circuit in `SearchCatalogUseCase`.
+   - Added 5-scenario integration test in `crates/infrastructure/tests/catalog.rs`.
+   - Workspace backend tests increased to 379 passed / 0 failed / 4 ignored.
+
+3. POS Catalog Discovery Surface & Teaching Empty State (DSN-025 / REL-033, commit `f59ed59`):
+   - Eliminated the dead/empty catalog panel on blank query: removed the early return
+     in `use-catalog-search.ts`, allowing default discovery items to load automatically
+     upon POS opening without typing.
+   - Added teaching empty state in `ProductDiscovery.tsx` with clear instructions when
+     database has no products, and discovery subtitle when items are loaded.
+   - Added symmetric i18n keys in `src/lib/i18n.ts` for both French and Arabic (`search.discoveryTitle`, `search.catalogEmpty`).
+   - Created comprehensive Vitest test file `src/__tests__/product-discovery.test.ts` (9 tests).
+   - Vitest suite increased to 211 passed across 25 files.
+
+### 17.2 Metric Ledger at Checkpoint 1
+- Backend Tests: `cargo test --workspace -j 2` -> 379 passed / 0 failed / 4 ignored
+- Rust Quality: `cargo clippy --all-targets --all-features -D warnings` clean, `cargo fmt --check` clean
+- Frontend Tests: `npx vitest run` -> 25 files, 211 passed, 0 failed
+- Frontend Quality: ESLint clean (0 errors, 0 warnings), TypeScript clean (0 errors)
+- Production Build: `npm run build` succeeds offline (~3.8s)
+- Total Release Commits in Session: 3 (`b064e16`, `86a8149`, `f59ed59`)
+- Working tree status: clean
+
+### 17.3 Architecture & Design State Ledger
+- Schema Migrations: 14 migrations (0001-0014, frozen). Next migration: 0015.
+- IPC Commands: 72 commands, unchanged.
+- Next Free ADR ID: ADR-086 (confirmed via `docs/adr/INDEX.md`).
+- Viewport & Window: Tauri window configuration currently default 1280x640, min 1024x600.
+  Target baseline reconciliation to 1024x600 per ADR-066 scheduled next.
+
+### 17.4 Immediate Roadmap for SESSION-ARC-009 (Replies 11+)
+1. Tauri window baseline reconciliation per ADR-066 (default 1024x600).
+2. POS Cockpit keyboard contract & parked sales UX (F8 park, F6 resume).
+3. Customer management & credit ledger surface (Phase 3).
+4. Topbar crowding monitor & consolidation.

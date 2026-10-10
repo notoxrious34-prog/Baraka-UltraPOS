@@ -36,15 +36,9 @@ export function useCatalogSearch(): CatalogSearch {
   const wedge = useRef<WedgeKey[]>([]);
   const flashTimer = useRef<number | null>(null);
 
-  // Debounced backend search.
+  // Debounced backend search (blank queries fetch default discovery rows).
   useEffect(() => {
     const query = searchQuery.trim();
-    if (query === "") {
-      setResults([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
     setLoading(true);
     const timer = window.setTimeout(() => {
       const session = useSessionStore.getState().session;

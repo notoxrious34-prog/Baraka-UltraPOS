@@ -73,6 +73,11 @@ export function ProductDiscovery(): ReactElement {
       </div>
 
       <div className="flex shrink-0 gap-1">
+        {searchQuery.trim() === "" && visible.length > 0 && (
+          <span className="self-center text-xs font-medium text-slate-500 dark:text-slate-400">
+            {t(locale, "search.discoveryTitle")}
+          </span>
+        )}
         {chips.map((chip) => (
           <button
             key={chip.id}
@@ -105,10 +110,14 @@ export function ProductDiscovery(): ReactElement {
         {warehouse !== null && !loading && error !== null && (
           <p className="p-4 text-center text-sm font-semibold text-red-600">{error}</p>
         )}
-        {warehouse !== null && !loading && error === null && searchQuery.trim() !== "" && visible.length === 0 && (
-          <p className="p-4 text-center text-sm font-semibold text-slate-500">
-            {t(locale, "search.noResults")}
-          </p>
+        {warehouse !== null && !loading && error === null && visible.length === 0 && (
+          <div className="flex flex-col items-center justify-center p-8 text-center text-sm text-slate-500">
+            <p className="font-medium">
+              {searchQuery.trim() === ""
+                ? t(locale, "search.catalogEmpty")
+                : t(locale, "search.noResults")}
+            </p>
+          </div>
         )}
         <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
           {visible.map((product) => {

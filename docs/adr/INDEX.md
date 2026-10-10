@@ -58,7 +58,7 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-064 | In-transaction idempotency claim: duplicate check is the first step inside the transaction, claim insert (with payload) is the last; request_hash comparison distinguishes conflict, replay, resume. | Implemented (per previous package). |
 | ADR-065 | Printing diagnostics and capture: test print is a synchronous settings-scoped diagnostic (not an outbox job, no accounting effect); capture sink; preview from the shared layout lines; structural stream inspector; the single source of truth for the device is the printer.serial_* settings. Includes Amendment 1. | Implemented (per previous package). Output profiles extended by ADR-070. |
 
-## 4. ADR-066..079 - Architect (Charter v2.0)
+## 4. ADR-066..085 - Architect (Charter v2.0)
 
 | ID | Title | Status |
 |---|---|---|
@@ -76,5 +76,9 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-077 | Product entry priority, French name with optional Arabic alias, generic import/export | ACCEPTED |
 | ADR-078 | Information architecture and navigation | ACCEPTED |
 | ADR-079 | Roles in use and manager approval in place | ACCEPTED |
+| ADR-082 | Debt-receipt numbering reuses customer_ledger sequence | ACCEPTED |
+| ADR-083 | Debt-receipt printing uses a fully separate rendering path | ACCEPTED |
+| ADR-084 | Persisted CTP files authored in Arabic, superseding ADR-080 | SUPERSEDED (by ADR-085) |
+| ADR-085 | English-language CTP persistence re-ratified by owner, superseding ADR-084 | ACCEPTED |
 
 Next free id: ADR-086.

@@ -18,7 +18,7 @@ Status: v0.1 PROPOSED. Date: 2026-10-02. Baseline: a374cf10c6b04d33605c1c293c2fb
 |---|---|---|---|
 | 1 | Vente | البيع | - |
 | 2 | Documents | الوثائق | - |
-| 3 | Clients & Crédit | الزبائن والدين | - |
+| 3 | Clients & Crédit | العملاء والائتمان | Decided (glossary-decisions-arc-007.md). Standard international/academic Arabic. |
 | 4 | Produits & Codes-barres | المنتجات والرموز الشريطية | - |
 | 5 | Stock | المخزون | - |
 | 6 | Fournisseurs & Achats | الموردون والمشتريات | - |
@@ -26,15 +26,15 @@ Status: v0.1 PROPOSED. Date: 2026-10-02. Baseline: a374cf10c6b04d33605c1c293c2fb
 | 8 | Rapports | التقارير | - |
 | 9 | Utilisateurs | المستخدمون | - |
 | 10 | Paramètres & Sauvegarde | الإعدادات والنسخ الاحتياطي | - |
-| 11 | Administrateur | المسؤول | - |
-| 12 | Gérant | المسيّر | Trusted manager. Approves returns and debt collection by PIN (ADR-079). |
+| 11 | Administrateur | مسؤول النظام | System administrator role (glossary-decisions-arc-007.md). |
+| 12 | Gérant | المدير / المسيّر | Shop manager (glossary-decisions-arc-007.md). Approves returns and debt collection by PIN (ADR-079). |
 | 13 | Caissier | أمين الصندوق | The employee role. |
 | 14 | Vendeur | البائع | - |
 | 15 | Ticket de caisse | وصل الصندوق | - |
 | 16 | Facture | فاتورة | - |
 | 17 | Bon de livraison | وصل التسليم | - |
 | 18 | Devis | عرض سعر | - |
-| 19 | Avoir | إشعار دائن | Alternative to review with the owner: وصل إرجاع. |
+| 19 | Avoir | إشعار دائن | Ratified (glossary-decisions-arc-007.md). Standard commercial credit memo. |
 | 20 | Bon de commande | طلب شراء | - |
 | 21 | Bon de réception | وصل الاستلام | - |
 | 22 | Facture fournisseur | فاتورة المورد | - |
@@ -50,7 +50,7 @@ Status: v0.1 PROPOSED. Date: 2026-10-02. Baseline: a374cf10c6b04d33605c1c293c2fb
 | 32 | Espèces | نقدًا | - |
 | 33 | Chèque | شيك | - |
 | 34 | Carte | بطاقة | - |
-| 35 | À crédit | بالآجل | Payment-method label. |
+| 35 | À crédit | بالأجل | Payment-method label (glossary-decisions-arc-007.md). Standard academic spelling with hamza. |
 | 36 | Montant reçu | المبلغ المقبوض | - |
 | 37 | Monnaie à rendre | الباقي | Change given back to the customer. |
 | 38 | Nouvelle vente | بيع جديد | - |
@@ -72,7 +72,7 @@ Status: v0.1 PROPOSED. Date: 2026-10-02. Baseline: a374cf10c6b04d33605c1c293c2fb
 | 54 | Refusé | مرفوض | Credit HUD word for the Caissier: one word plus an icon, no amount, no reason. |
 | 55 | Relevé de compte | كشف الحساب | - |
 | 56 | Encaissement de dette | تسديد دين | Collection form, opened only after manager approval. |
-| 57 | Preuve d'encaissement | وصل التسديد | Printed proof handed to the customer. Numbering is an open accountant question. |
+| 57 | Preuve d'encaissement | سند قبض | Printed proof handed to the customer (ADR-082, ADR-083, glossary-decisions-arc-007.md). |
 | 58 | Autorisation du gérant | ترخيص المسيّر | Title of the approval dialog. |
 | 59 | Code PIN du gérant | الرمز السري للمسيّر | - |
 | 60 | Valider | اعتماد | - |
@@ -131,6 +131,6 @@ Status: v0.1 PROPOSED. Date: 2026-10-02. Baseline: a374cf10c6b04d33605c1c293c2fb
 
 ## 3. Open points
 
-- O1 Avoir: keep إشعار دائن or use وصل إرجاع (owner decision).
+- O1 Avoir: CLOSED (Ratified as إشعار دائن per glossary-decisions-arc-007.md).
 - O2 Whether الباقي is the preferred word for change given back.
 - O3 The owner reviews the Arabic terms together with the first static prototypes.

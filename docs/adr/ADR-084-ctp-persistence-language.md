@@ -1,6 +1,6 @@
 # ADR-084: Persisted CTP Files Are Authored in Arabic, Superseding ADR-080
 
-Status: ACCEPTED (supersedes ADR-080)
+Status: SUPERSEDED by ADR-085 (see ADR-085-ctp-persistence-language-reratified.md)
 Date: 2026-10-06
 Session: SESSION-ARC-007, Reply 13
 

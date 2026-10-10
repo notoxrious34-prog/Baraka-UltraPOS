@@ -1566,4 +1566,32 @@ In accordance with the Owner's directive to accelerate high-density, professiona
   - `npx vitest run`: 22 test files, 187 passed, 0 failed.
   - `npm run lint`: clean (0 warnings).
   - `npm run typecheck`: clean (0 errors).
+
+## 18. SESSION-ARC-008 Session Final Wrap-Up (Reply 15 Handoff)
+
+Date: 2026-10-10
+Counter: Reply 15 of SESSION-ARC-008 (Session End)
+Final Head Commit: `04c46fc7e653556bde0c4ef1bf590521ad4f67eb` (`04c46fc`)
+Quality Gates at Handoff:
+- Backend: Rust 378/0/4 passed, Clippy clean, Fmt clean.
+- Frontend: 197/197 Vitest passed (23 files), ESLint clean (0 warnings), TSC clean (0 errors), Vite production build clean (114 modules in 3.06s).
+
+### 18.1 Final Summary of Accomplishments (Replies 11 to 15)
+1. **Commit `e7c3997` (TASK-REL-029)**:
+   - Committed the upgraded POS debt payment modal (`RecordPaymentModal.tsx`) with State 3 balance exceed protection and State 4 "سند قبض" receipt preview card.
+   - Committed CTP-008 Checkpoint 1 (Section 17) and regenerated `BOOT-SESSION-ARC-008.md` with byte-for-byte `CHECK: OK`.
+2. **Audit of POS Shell & Layout (TASK-AUD-026 / TASK-AUD-027)**:
+   - Audited the 6 floating buttons in `PosShell.tsx:78–169` and root `h-screen w-screen`.
+   - Audited `Topbar.tsx`, finding an optimal mount point in the right-side cluster (`ms-auto`).
+   - Audited repository fonts: confirmed Inter and NotoNaskhArabic exist in `assets/fonts/`; confirmed no `@font-face` is wired in `src/index.css`.
+3. **Floating Buttons Elimination & Operations Menu Integration (TASK-DSN-023 / TASK-REL-030, commit `04c46fc`)**:
+   - Completely deleted all 6 `position: fixed` floating action buttons from `PosShell.tsx`, permanently satisfying CHARTER-v2.0 INIT-4 and ADR-067.
+   - Replaced root `h-screen w-screen` in `PosShell.tsx:64` with `h-full w-full`, resolving window-level horizontal and vertical scrollbars.
+   - Created `src/components/pos/OperationsMenu.tsx`: an accessible, role-gated topbar dropdown consolidating document conversion, merchandise returns, warehouse transfers, stock adjustments, backups, and store identity.
+   - Mounted `<OperationsMenu />` in `src/components/pos/Topbar.tsx`.
+   - Added unit test suite `src/components/pos/operations-menu.test.tsx` (10 tests), raising frontend test count to 197 passed tests across 23 test files.
+   - Verified that Vite production build succeeds cleanly in ~3.06s.
+
+### 18.2 Final Handoff State
+SESSION-ARC-008 concludes with all objectives met, zero open regressions, clean quality gates, and an unburdened POS viewport. Handoff to SESSION-ARC-009 is complete.
 =====END-PART-2-CTP-ARC-008=====

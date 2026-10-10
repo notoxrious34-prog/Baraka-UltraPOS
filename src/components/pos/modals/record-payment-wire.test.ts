@@ -13,6 +13,7 @@ import {
   buildPaymentReference,
   buildRecordPaymentWire,
   canUseOverpayment,
+  isPaymentExceedingBalance,
   isVendeur,
   methodTag,
   validatePaymentAmount,
@@ -132,6 +133,30 @@ describe("buildRecordPaymentWire", () => {
         allowOverpayment: false,
       }),
     ).toThrowError("payment.invalidAmount");
+  });
+});
+
+describe("isPaymentExceedingBalance", () => {
+  it("flags amounts strictly above balance when overpayment is disallowed", () => {
+    expect(isPaymentExceedingBalance("12001", "12000", false)).toBe(true);
+    expect(isPaymentExceedingBalance("1", "0", false)).toBe(true);
+  });
+
+  it("accepts amounts equal to or below balance", () => {
+    expect(isPaymentExceedingBalance("12000", "12000", false)).toBe(false);
+    expect(isPaymentExceedingBalance("8000", "12000", false)).toBe(false);
+    expect(isPaymentExceedingBalance("0", "0", false)).toBe(false);
+  });
+
+  it("never flags when the role holds the overpayment grant", () => {
+    expect(isPaymentExceedingBalance("99999", "12000", true)).toBe(false);
+    expect(isPaymentExceedingBalance("1", "0", true)).toBe(false);
+  });
+
+  it("treats unparsable input as non-exceeding (validation owns the error)", () => {
+    expect(isPaymentExceedingBalance("abc", "12000", false)).toBe(false);
+    expect(isPaymentExceedingBalance("", "12000", false)).toBe(false);
+    expect(isPaymentExceedingBalance("8000", "nan", false)).toBe(false);
   });
 });
 

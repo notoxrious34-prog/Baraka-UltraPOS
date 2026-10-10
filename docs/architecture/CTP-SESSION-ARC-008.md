@@ -1189,3 +1189,52 @@ SESSION-ARC-008 architect:
    authority (Section 4's reconfirmed lesson).
 5. Remember: CTP persistence language is English (ADR-085) — do not
    re-open this without a fresh, explicit owner instruction.
+
+## 17. SESSION-ARC-008 Checkpoint 1 (Reply 10)
+
+Date: 2026-10-10
+Counter: Reply 10 of SESSION-ARC-008
+Active Head Commit: `61f6726aa3740c5a58699b56e626c8f812178039` (`61f6726`)
+Quality Gates: Rust 378/0/4 passed, Clippy clean, Fmt clean; Frontend 187/187 Vitest passed (22 files), ESLint clean, TSC clean.
+
+### 17.1 Executive Summary of Replies 1 to 10
+In accordance with the Owner's directive to accelerate high-density, professional production, SESSION-ARC-008 has achieved three major milestones:
+1. **Debt Receipt Engine Wiring (BRK-061 / REL-027, commit `e0b823a`)**:
+   - `PrintJobRecord` in `crates/application/src/ports.rs` and `claim_next_pending` in `crates/infrastructure/src/adapters/sqlite_print_job_repository.rs` were extended to load `payload_json`.
+   - `PrintWorkerService` was expanded with `process_debt_claimed` (deserializing `DebtReceiptDocument`, invoking `render_debt_receipt` with panic protection via `catch_unwind`, bounded retry budget), cleanly routing non-sale jobs while keeping the sales pipeline verbatim (ADR-083).
+   - `SqliteCustomerRepository::record_credit_payment` was wired to atomically enqueue a `DEBT_RECEIPT` print job within the same transaction as the ledger append, balance cache update, and cash movement. Receipt numbering reuses the ledger sequence (`REC-{sequence:06}`) per ADR-082.
+   - 4 comprehensive integration tests (`debt_receipt_wiring.rs`) proved atomic enqueue, sequence reuse, worker completion, invalid payload failure handling, and zero regression on sales prints. Rust test suite reached 378 passed (0 failed, 4 ignored).
+2. **Master Glossary, ADR Index, and Prototype 05 Alignment (DOC-030 / REL-028, commit `61f6726`)**:
+   - `docs/adr/INDEX.md` was updated to include ADR-082 through ADR-085, and the section heading was updated to `ADR-066..085`.
+   - `docs/design/glossary-ar-fr.md` merged the 5 ratified terms from `glossary-decisions-arc-007.md` (العملاء والائتمان, مسؤول النظام, المدير / المسيّر, إشعار دائن, بالأجل, سند قبض) and closed open point O1.
+   - `docs/design/prototypes/05-encaissement-dette.ar.html` was cleansed of colloquial "وصل" / "وصل الدفع" and aligned strictly with the ratified "سند قبض" terminology.
+3. **POS Debt-Payment Modal Upgrade (DSN-022, uncommitted in working tree)**:
+   - Upgraded `src/components/pos/modals/RecordPaymentModal.tsx` to match Prototype 05:
+     - Implemented State 3 UX guard: warns cashier and blocks submission when entered amount exceeds balance without manager overpayment privilege.
+     - Implemented State 4 Confirmation View: upon successful payment and atomic print job creation, displays a dedicated "سند قبض" confirmation card detailing customer, amount collected, new balance, and print execution confirmation before modal closure.
+     - Added unit tests for balance exceed logic in `record-payment-wire.test.ts`, raising frontend test suite from 183 to 187 passed tests across 22 test files.
+
+### 17.2 Reply-by-Reply Audit Trail (SESSION-ARC-008)
+- Reply 1: `TASK-BRK-061` authored (transactional wiring of debt receipt pipeline).
+- Reply 2: Owner echo of task text clarified; `TASK-BRK-061` re-issued.
+- Reply 3: `TASK-BRK-061` report received (tests passed, but diff summarized); `TASK-BRK-061-C1` issued to extract literal raw diff and test file.
+- Reply 4: Raw diff and test file verified; `TASK-REL-027` issued to commit.
+- Reply 5: `TASK-REL-027` committed (`e0b823a`); `TASK-AUD-024` issued (consolidated audit of ADR table, prototype 05, glossary, and frontend credit surface).
+- Reply 6: `TASK-AUD-024` findings received; `TASK-DOC-030` issued (assert-then-replace script reconciling glossary, ADR table, and prototype 05).
+- Reply 7: `TASK-DOC-030` diff verified; `TASK-REL-028` issued to commit.
+- Reply 8: `TASK-REL-028` committed (`61f6726`); `TASK-AUD-025` issued (frontend baseline audit and quality gates).
+- Reply 9: `TASK-AUD-025` findings received (183 Vitest tests green, lint clean); `TASK-DSN-022` authored (POS debt payment modal upgrade & سند قبض receipt view).
+- Reply 10: `TASK-DSN-022` implementation verified across all 187 Vitest tests, lint, typecheck, and 378 Rust tests; `TASK-DOC-031` authored for CTP Checkpoint 1 append and raw diff extraction.
+
+### 17.3 State of Repository at Checkpoint 1
+- Head Commit: `61f6726`
+- Working Tree: 3 modified frontend files (`RecordPaymentModal.tsx`, `record-payment-wire.test.ts`, `i18n.ts`) pending release commit in Reply 11.
+- Migrations: 14 migrations (0001–0014), frozen.
+- Commands: 72 IPC commands, stable.
+- Quality Gates:
+  - `cargo test --workspace -j 2`: 378 passed, 0 failed, 4 ignored.
+  - `cargo clippy`: clean.
+  - `cargo fmt --check`: clean.
+  - `npx vitest run`: 22 test files, 187 passed, 0 failed.
+  - `npm run lint`: clean (0 warnings).
+  - `npm run typecheck`: clean (0 errors).

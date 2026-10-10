@@ -10,7 +10,7 @@
  * the customer credit domain carries no method column.
  */
 
-import { useRef, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
 import { formatMoney, parseMoneyToCentimes } from "@/lib/money";
 import { ipcRecordCreditPayment } from "@/lib/ipc";
@@ -60,6 +60,27 @@ export function isVendeur(role: string): boolean {
 /** Overpayment (negative balance) needs ManageCustomerCredit: GERANT/ADMIN. */
 export function canUseOverpayment(role: string): boolean {
   return role === "GERANT" || role === "ADMIN";
+}
+
+/**
+ * State 3 UX guard predicate (Prototype 05, TASK-DSN-022): true when the
+ * entered canonical amount strictly exceeds the backend-sourced balance
+ * while the session role holds no overpayment grant. Pure BigInt
+ * comparison — never throws (unparsable input reads as non-exceeding).
+ */
+export function isPaymentExceedingBalance(
+  amountCentimes: string,
+  balanceCentimes: string,
+  allowOverpayment: boolean,
+): boolean {
+  if (allowOverpayment) {
+    return false;
+  }
+  try {
+    return BigInt(amountCentimes) > BigInt(balanceCentimes);
+  } catch {
+    return false;
+  }
 }
 
 /** Amount validation outcome (i18n key on failure, UX-only guard). */
@@ -144,9 +165,25 @@ export function RecordPaymentModal({
   const [allowOverpayment, setAllowOverpayment] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  // State 4 receipt view (Prototype 05, TASK-DSN-022): set once on
+  // successful submit; cleared on every fresh open (see reset below).
+  const [completedPayment, setCompletedPayment] = useState<{
+    readonly amountCentimes: string;
+    readonly newBalanceCentimes: string;
+  } | null>(null);
   // Synchronous in-flight lock (TASK-BRK-032 pattern): React state alone
   // cannot block same-tick double triggers, the ref is authoritative.
   const busyRef = useRef(false);
+
+  // Fresh-open reset: the modal stays mounted across payments, so every
+  // new opening clears the previous receipt view and draft input.
+  useEffect(() => {
+    if (isOpen) {
+      setCompletedPayment(null);
+      setAmountText("");
+      setErrorCode(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) {
     return null;
@@ -158,11 +195,27 @@ export function RecordPaymentModal({
   const overpaymentAllowed = canUseOverpayment(role);
 
   const validation = validatePaymentAmount(amountText, role);
+  // State 3 guard: a non-privileged role may never submit an amount that
+  // strictly exceeds the backend-sourced outstanding balance.
+  const isExceedingBalance =
+    validation.ok &&
+    isPaymentExceedingBalance(
+      validation.centimes,
+      currentBalanceCentimes,
+      overpaymentAllowed,
+    );
+  const exceedsWarning =
+    isExceedingBalance && validation.ok
+      ? t(locale, "payment.exceedsBalanceWarning")
+          .replace("{amount}", formatMoney(validation.centimes, locale))
+          .replace("{balance}", formatMoney(currentBalanceCentimes, locale))
+      : null;
   const canSubmit =
     token !== null &&
     !busy &&
     !vendeurBlocked &&
     validation.ok &&
+    !isExceedingBalance &&
     (overpaymentAllowed || !allowOverpayment);
 
   const submit = async (): Promise<void> => {
@@ -175,6 +228,17 @@ export function RecordPaymentModal({
     const checked = validatePaymentAmount(amountText, role);
     if (!checked.ok) {
       setErrorCode(checked.key);
+      return;
+    }
+    // Defense in depth: the submit button is disabled on exceed, but the
+    // guard holds here too — the backend remains the final authority.
+    if (
+      isPaymentExceedingBalance(
+        checked.centimes,
+        currentBalanceCentimes,
+        overpaymentAllowed,
+      )
+    ) {
       return;
     }
     busyRef.current = true;
@@ -194,8 +258,12 @@ export function RecordPaymentModal({
           formatMoney(result.new_balance_centimes, locale),
         ),
       );
-      onSuccess(result.new_balance_centimes);
-      onClose();
+      // State 4: show the سند قبض receipt view; the caller refresh
+      // (onSuccess) and close run from the Fermer/إغلاق button instead.
+      setCompletedPayment({
+        amountCentimes: checked.centimes,
+        newBalanceCentimes: result.new_balance_centimes,
+      });
     } catch (failure: unknown) {
       setErrorCode(typeof failure === "string" ? failure : "INTERNAL_ERROR");
     } finally {
@@ -203,6 +271,76 @@ export function RecordPaymentModal({
       setBusy(false);
     }
   };
+
+  // State 4 success receipt view (Prototype 05, TASK-DSN-022): flushes
+  // the caller refresh exactly once, whether the cashier presses the
+  // Fermer/إغلاق button or the shell close control.
+  if (completedPayment !== null) {
+    const closeCompleted = (): void => {
+      onSuccess(completedPayment.newBalanceCentimes);
+      onClose();
+    };
+    return (
+      <ModalShell title={t(locale, "payment.title")} onClose={closeCompleted}>
+        <div className="flex flex-col gap-3">
+          <p className="flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+            <svg
+              className="h-5 w-5 shrink-0"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              fill="none"
+              aria-hidden="true"
+            >
+              <path d="M5 12l5 5L20 7" />
+            </svg>
+            <span>{t(locale, "payment.successTitle")}</span>
+          </p>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/60">
+            <p className="text-sm font-black text-slate-800 dark:text-slate-100">
+              {t(locale, "payment.receiptHeading")}
+            </p>
+            <p className="mt-1 truncate text-xs font-bold text-slate-600 dark:text-slate-300">
+              {t(locale, "payment.customerLabel")} · {customerName}
+            </p>
+            <p className="mt-2 flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-300">
+              <span>{t(locale, "payment.amountCollectedLabel")}</span>
+              <bdi className="font-mono font-black tabular-nums">
+                {formatMoney(completedPayment.amountCentimes, locale)}
+              </bdi>
+            </p>
+            <p className="mt-1 flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-300">
+              <span>{t(locale, "payment.newBalanceLabel")}</span>
+              <bdi className="font-mono font-black tabular-nums">
+                {formatMoney(completedPayment.newBalanceCentimes, locale)}
+              </bdi>
+            </p>
+            <p className="mt-3 flex items-start gap-1.5 text-xs font-bold text-slate-500">
+              <svg
+                className="mt-0.5 h-4 w-4 shrink-0"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 11v5M12 8v.01" />
+              </svg>
+              <span>{t(locale, "payment.printNote")}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={closeCompleted}
+            className="h-11 w-full rounded-lg bg-accent-500 text-sm font-black text-slate-950 hover:bg-amber-400"
+          >
+            {t(locale, "payment.close")}
+          </button>
+        </div>
+      </ModalShell>
+    );
+  }
 
   return (
     <ModalShell title={t(locale, "payment.title")} onClose={onClose}>
@@ -306,6 +444,11 @@ export function RecordPaymentModal({
         {!validation.ok && !vendeurBlocked && amountText.trim() !== "" && (
           <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
             {t(locale, validation.key)}
+          </p>
+        )}
+        {exceedsWarning !== null && (
+          <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
+            {exceedsWarning}
           </p>
         )}
         {errorCode !== null && (

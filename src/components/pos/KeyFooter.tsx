@@ -30,6 +30,7 @@ export function KeyFooter(): ReactElement {
     { code: "F3", labelKey: "key.f3" },
     { code: "F4", labelKey: "key.f4" },
     { code: "F5", labelKey: "key.f5" },
+    { code: "F6", labelKey: "key.f6" },
     { code: "F8", labelKey: "key.f8" },
     { code: "F10", labelKey: "key.f10" },
     { code: "F12", labelKey: "key.f12", accent: true, dimmed: !checkoutReady },

@@ -67,6 +67,8 @@ interface CartState {
   setCustomer: (customer: ActiveCustomer) => void;
   setDocType: (doc: DocType) => void;
   clearCart: () => void;
+  /** Atomically replace cart lines (draft resume); resets discount, sets customer. */
+  loadLines: (lines: CartLine[], customer?: ActiveCustomer) => void;
 }
 
 export const useCartStore = create<CartState>()((set) => ({
@@ -143,6 +145,12 @@ export const useCartStore = create<CartState>()((set) => ({
       lines: [],
       globalDiscountCentimes: ZERO,
       customer: { kind: "guest" },
+    }),
+  loadLines: (lines, customer) =>
+    set({
+      lines,
+      globalDiscountCentimes: ZERO,
+      customer: customer ?? { kind: "guest" },
     }),
 }));
 

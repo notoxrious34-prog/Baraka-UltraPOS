@@ -157,6 +157,13 @@ export function usePosKeyboard(): void {
         }
         return;
       }
+      if (event.key === "F6") {
+        event.preventDefault();
+        if (!modalOpen) {
+          ui.openModal("parked");
+        }
+        return;
+      }
       if (event.key === "F8") {
         event.preventDefault();
         if (!modalOpen) {

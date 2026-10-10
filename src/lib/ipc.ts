@@ -134,6 +134,16 @@ export async function ipcBootstrapFirstAdmin(
   return { userId: wire.user_id, username: wire.username };
 }
 
+/** Fetch one full product view by UUID (draft resume rehydration). */
+export async function ipcGetProduct(
+  sessionToken: string,
+  productId: string,
+): Promise<CatalogProduct> {
+  return call<CatalogProduct>("catalog_get_product", {
+    request: { session_token: sessionToken, product_id: productId },
+  });
+}
+
 /** Prefix/multilingual catalog search (150ms debounce applied by caller). */
 export async function ipcSearchCatalog(
   sessionToken: string,

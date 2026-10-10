@@ -23,6 +23,7 @@ import { WarehouseTransferModal } from "@/components/pos/modals/WarehouseTransfe
 import { ReturnModal } from "@/components/pos/modals/ReturnModal";
 import { usePaymentModalStore } from "@/stores/payment-modal-store";
 import { StockAdjustModal } from "@/components/pos/modals/StockAdjustModal";
+import { ParkedSalesModal } from "@/components/pos/ParkedSalesModal";
 import { useCartStore } from "@/stores/cart-store";
 
 export function PosShell(): ReactElement {
@@ -96,6 +97,7 @@ export function PosShell(): ReactElement {
       {activeModal === "cash-open" && <OpenCashSessionModal />}
       {activeModal === "cash-close" && <CloseCashSessionModal />}
       {activeModal === "cash-expense" && <RecordExpenseModal />}
+      {activeModal === "parked" && <ParkedSalesModal />}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { PosShell } from "@/components/pos/PosShell";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { FirstRunSetupScreen } from "@/features/auth/FirstRunSetupScreen";
 import { SuppliersModule } from "@/features/suppliers/SupplierListScreen";
+import { CustomersModule } from "@/features/customers/CustomersModule";
 import { ReportsHomeScreen } from "@/features/reports/ReportsHomeScreen";
 import { CatalogModule } from "@/features/catalog/CatalogModule";
 import { ipcCheckFirstRunStatus } from "@/lib/ipc";
@@ -46,6 +47,7 @@ function NavRail({
   return (
     <nav className="flex h-10 shrink-0 items-center gap-2 bg-primary-900 px-3">
       {entry("pos", t(locale, "nav.pos"))}
+      {entry("customers", t(locale, "nav.customers"))}
       {entry("suppliers", t(locale, "nav.suppliers"))}
       {entry("reports", t(locale, "nav.reports"))}
       {entry("catalog", t(locale, "nav.catalog"))}
@@ -110,7 +112,9 @@ export default function App(): ReactElement {
         <div className="flex h-full flex-col">
           {manager && <NavRail view={view} onSelect={setView} />}
           <div className="min-h-0 flex-1">
-            {view === "suppliers" && manager ? (
+            {view === "customers" && manager ? (
+              <CustomersModule />
+            ) : view === "suppliers" && manager ? (
               <SuppliersModule />
             ) : view === "reports" && manager ? (
               <ReportsHomeScreen />

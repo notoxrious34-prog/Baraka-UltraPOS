@@ -517,6 +517,26 @@ export interface NewCustomerWire {
   credit_limit_centimes: string | null;
 }
 
+export interface UpdateCustomerWire {
+  customer_id: string;
+  name?: string;
+  phone?: string | null;
+  address?: string | null;
+  credit_policy?: "DISABLED" | "LIMITED" | "UNLIMITED";
+  credit_limit_centimes?: string | null;
+  is_active?: boolean;
+}
+
+/** Sparse customer update; resolves the refreshed full view. */
+export async function ipcUpdateCustomer(
+  sessionToken: string,
+  input: UpdateCustomerWire,
+): Promise<CustomerDetail> {
+  return call<CustomerDetail>("customers_update", {
+    request: { session_token: sessionToken, ...input },
+  });
+}
+
 /** Register a customer; resolves the stored id. */
 export async function ipcCreateCustomer(
   sessionToken: string,

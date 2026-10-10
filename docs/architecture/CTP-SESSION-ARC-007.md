@@ -616,3 +616,426 @@ started SESSION-ARC-007 architect:
    Section 13 "NEXT" item (a)) to unblock TASK-BRK-060 safely.
 4. Read Section 10 and Section 7 of this file before your own Reply-10
    checkpoint arrives.
+
+## 17. SESSION-ARC-007 PROGRESS LOG — APPENDED AT REPLY 10 CHECKPOINT
+
+(This section and all following sections are additions made by
+SESSION-ARC-007 at its first 10-reply checkpoint, per the strictly-
+additive CTP checkpoint rule in Section 7 and the Reply-10 Incident
+lesson in Section 10. Nothing above this line in this file has been
+altered, shortened, or removed.)
+
+### 17.1 Session Identity
+SESSION-ARC-007. Reply counter at time of this checkpoint: 10 (own
+counter, restarted at 1 per Section 14); this checkpoint file-write task
+was actually executed at Reply 12 after an owner clarification exchange
+about the CTP lifecycle model (Reply 11) and a base-size-mismatch halt
+and clean revert (Reply 12), but the checkpoint content itself documents
+state through Reply 10. Dates: 2026-10-06 (continuing the same calendar
+day as the ARC-006 handoff). The owner has indicated this session will
+end after Reply 15, so the next (final) checkpoint for this session will
+be a full session-end handoff rather than a routine 20-reply checkpoint.
+
+### 17.2 Executive Summary (as of Reply 10)
+The session opened by acknowledging the ARC-006 Reply-10 incident
+explicitly (Reply 1) and committing to strict additive discipline at its
+own checkpoints. Eight prioritized questions were put to the owner in
+Reply 1 (top priority: accounting questionnaire delivery status;
+ADR-080 vs Charter Section 15.1 CTP-language contradiction; 5 glossary
+terms; debt-receipt UI screen location) — ALL STILL AWAITING OWNER
+ANSWER as of Reply 10, except the accounting-questionnaire check itself,
+which was independently verified (not answered by the owner but VERIFIED
+BY AUDIT): the questionnaire at
+docs/legal/QUESTIONNAIRE-COMPTABLE-FR.html remains the unfilled v2 draft
+(31,579 bytes, mtime 2026-10-02, "non encore transmis" still present at
+line 48) — CONFIRMED STILL PENDING, no change.
+
+The session's substantive engineering work was entirely a vertical slice
+of the "debt-payment receipt printing" gap identified at the end of
+ARC-006: five read-only audit tasks (AUD-021, AUD-021-C1, AUD-022,
+AUD-022-C1, AUD-023) were run BEFORE any code was written, specifically
+to avoid repeating the ARC-006 TASK-DSN-021 mistake (specifying code
+changes from memory/paraphrase). This audit chain closed every open
+engine-knowledge gap listed in CTP-SESSION-ARC-007's own Section 12 item
+7 and Section 13 "NEXT" item (a).
+
+TASK-BRK-060 (debt-receipt RENDERING pipeline only — domain struct,
+rasterizer function, trait method; explicitly NOT the transactional
+wiring, which is deferred to a future TASK-BRK-061) was then specified,
+built, and — after two full evidence-rejection cycles for insufficiently
+literal reporting (TASK-AUD-021's first report, and TASK-BRK-060's first
+implementation report) — committed at `abeb30a`. Both rejections were
+for EVIDENCE FORMAT (paraphrase instead of raw paste), never for the
+underlying work being wrong; in both cases the underlying work was later
+proven correct once literal evidence was actually supplied. A third
+sub-incident (TASK-BRK-060-C1 to C2) involved a SUSPECTED real code
+defect (an apparently-undefined `bytes` variable in a new test) that was
+independently verified, via real compiler invocation, to be a
+transcription artifact in the report rather than a real on-disk defect —
+paralleling the FOOTER_LINES incident from TASK-AUD-022-C1 earlier in
+this same session. One genuinely real, minor, literal spec deviation (a
+single-space vs double-space separator) WAS found and correctly fixed in
+TASK-BRK-060-C3.
+
+No visual/UI work has occurred yet in this session. No owner-facing
+design decision has been ratified in this session. The 10 prototypes and
+the overpayment-ban ratification remain exactly as accepted at the end
+of ARC-005/ARC-006 (Section 9 of this file, untouched).
+
+### 17.3 New Architect Decisions (ADR-track; to be formally numbered
+ADR-082+ once the ADR index document itself is reconstructed/updated —
+not yet done this session)
+
+- DECISION (Reply 6, binding, no owner input required — pure
+  engineering): Debt-receipt numbering will reuse the
+  `customer_ledger.sequence_no` / `entry_id` already generated inside
+  `record_credit_payment`'s own transaction, rather than allocating a
+  new `document_sequences` key. This RESOLVES CTP Section 12 item 6
+  (debt-receipt sequence key naming) — no new sequence key, no schema
+  change needed for numbering. Rationale: the ledger already produces a
+  stable, transaction-scoped, gapless-within-its-own-table integer at
+  zero additional engineering cost; introducing a second, parallel
+  numbering scheme (a `document_sequences` row under a free-text key
+  like "RECU") would add complexity and a second source of truth for no
+  proven benefit.
+
+- DECISION (Reply 6, binding, no owner input required — pure
+  engineering): The debt-receipt print pipeline will be a FULLY
+  SEPARATE rendering path (new domain type `DebtReceiptDocument`, new
+  rasterizer layout function `build_debt_receipt_lines`/
+  `render_debt_canvas`, new trait method
+  `ReceiptRendererPort::render_debt_receipt` with a safe
+  not-implemented default), rather than any reuse, relabeling, or
+  parameterization of the existing sales-receipt `ReceiptDocument` /
+  `build_lines` pipeline. Rationale: the existing pipeline is hardcoded
+  with sales-specific fixed totals rows (Sous-total/TVA/Remise/
+  Timbre/TOTAL/Payé) that have no sensible meaning for a debt payment;
+  forcing reuse would require conditional/sentinel logic inside a
+  tested, production sales path, risking regression for no benefit,
+  whereas full separation protects the sales pipeline with zero blast
+  radius (proven zero-byte-diff on `render_canvas`'s own logic across
+  the whole TASK-BRK-060 commit).
+
+### 17.4 Additional Errors & Dead Ends — APPENDED TO SECTION 10
+(Section 10's original text above is preserved verbatim and untouched;
+these are NEW entries added by SESSION-ARC-007, continuing the same
+cumulative log)
+
+- Paraphrased-audit-evidence incident #1 (TASK-AUD-021, SESSION-ARC-007
+  Reply 1 to 2): the executor's first AUD-021 report answered 8 of the
+  task's literal-code-paste acceptance items (A2, B1, C2, D1, E1, F1,
+  G1, G2) with narrative prose description of code/file content instead
+  of actual pasted raw output in fenced code blocks, in direct
+  violation of the task's explicit instructions. REJECTED IN PART by
+  the architect before any engine design proceeded. Corrected via
+  TASK-AUD-021-C1 (Reply 2), which supplied fully literal, numbered,
+  raw content for all 8 items and was ACCEPTED. No engine-knowledge
+  error resulted (the underlying facts reported turned out to be
+  accurate once verified literally) — the defect was purely
+  evidentiary. Lesson: this exact failure mode (narrative paraphrase
+  presented as if it were literal evidence) can recur even for
+  READ-ONLY audit tasks, not only for engineering/content-writing
+  tasks; the architect must check every single acceptance item
+  individually for an actual fenced code block with real pasted
+  content, not just skim for plausible-sounding prose.
+
+- FOOTER_LINES duplicate-definition paste artifact (TASK-AUD-022,
+  SESSION-ARC-007 Reply 4 to 5): TASK-AUD-022's P6 item pasted
+  `receipt_model.rs` lines 85-110 showing the constant `FOOTER_LINES`
+  apparently defined TWICE in the same module scope — a pattern that,
+  if real, is a hard Rust compile error (E0428). This directly
+  contradicted already-accepted evidence (367/0/4 passing tests, clean
+  clippy) from the SAME session. The architect refused to proceed and
+  ordered independent re-verification using a DIFFERENT extraction tool
+  (`sed` instead of `awk`) PLUS a real compiler invocation (`cargo
+  check -p baraka-domain`). Result: confirmed as a pure
+  transcription/paste artifact in the executor's report-assembly
+  process — the file on disk was, and always had been, correct and
+  compiled cleanly. Lesson (first instance in this session of what
+  became a recurring pattern): any apparent "defect" surfaced only
+  through a single paste of file content must be independently
+  re-verified via (a) a genuinely different extraction method/tool,
+  AND (b) where the language allows it, a real compiler/build
+  invocation, BEFORE it is treated as a real finding or used to justify
+  any code change. A paste-time artifact is exactly as capable of
+  looking like a real defect as a real defect is — raw evidence is
+  necessary but not infallible, and a single raw paste is still only
+  one data point.
+
+- Paraphrased-engineering-evidence incident #2 (TASK-BRK-060, SESSION-
+  ARC-007 Reply 6 to 7): the executor's first TASK-BRK-060
+  implementation report described the new struct fields, trait method,
+  and rasterizer functions in prose summary (e.g. listing field names
+  in running text instead of pasting the actual `struct { ... }` Rust
+  code), and reported test results as hand-tallied numbers (e.g.
+  "TOTAL_PASSED=374") instead of the literal `cargo test` terminal
+  output showing each individual "test ... ok" line, despite the task's
+  explicit "REPORT FORMAT REQUIRED FROM EXECUTOR" section demanding
+  exactly that. REJECTED IN FULL by the architect — no commit was
+  authorized, and no further engineering task was issued on top of the
+  unverified work. This is flagged as MORE SERIOUS than the AUD-021
+  analog (Reply 1-2) because it involved real, uncommitted, newly-
+  written production code touching the printing pipeline, not merely a
+  factual audit report. Corrected via TASK-BRK-060-C1 (Reply 7 to 8),
+  which supplied full literal `git diff` output for every modified file
+  and the full literal content of the new test file, and was ACCEPTED
+  on format grounds — but this literal evidence then ITSELF surfaced
+  the FOOTER_LINES-style paste-artifact pattern a second time within
+  the same session (see next entry). Lesson: the "raw evidence only"
+  rule is NOT negotiable regardless of task family (AUD vs BRK) or task
+  perceived simplicity — a build/test task carries strictly HIGHER
+  evidentiary stakes than a read-only audit, never lower, because
+  committed engine code is downstream of it.
+
+- Undefined-`bytes`-variable paste artifact (TASK-BRK-060-C1 to C2,
+  SESSION-ARC-007 Reply 8 to 9): the literal evidence supplied in
+  TASK-BRK-060-C1 (specifically item S5, the full numbered paste of the
+  new test file `debt_receipt_rendering.rs`) appeared to show the test
+  function `debt_receipt_empty_store_name_uses_shop_name_fallback`
+  referencing an undefined variable `bytes` with no prior binding in
+  that function — which, if real, is a hard compile error (E0425), and
+  which directly contradicted the SAME report's own claim (item S8)
+  that this exact test passed. Rather than accept either claim at face
+  value, the architect ordered a mandatory STOP-FIRST protocol in
+  TASK-BRK-060-C2: verify via a real `cargo build --tests` invocation
+  BEFORE applying any proposed fix, and if the build is clean, perform
+  an independent re-read using a THIRD extraction method never
+  previously used in this feature's audit trail. The executor correctly
+  complied: the build was clean (confirming no real defect), the
+  independent re-read (via `grep -n "" | sed -n`) found the missing
+  `let bytes = ...;` binding line WAS present on disk (line 105) and
+  had simply been dropped during the S5 transcription in the prior
+  report, and the executor CORRECTLY HALTED without applying any
+  unnecessary "fix" to already-correct code, exactly as instructed.
+  This is the THIRD occurrence of the identical underlying failure mode
+  (transcription/paste dropping or garbling content while assembling a
+  report) within this single session (after the AUD-021
+  narrative-paraphrase incident and the FOOTER_LINES duplicate-
+  definition incident), now confirmed as a genuinely RECURRING,
+  systemic risk — not a one-off. PERMANENT LESSON (elevated to the same
+  severity class as the Section 10 Reply-10 incident, though smaller in
+  consequence because it was caught before any commit): any time
+  literal pasted evidence appears to reveal a surprising defect
+  (especially one that contradicts other evidence in the SAME report,
+  such as a passing test alongside apparently-uncompilable code), the
+  architect's FIRST move must be independent re-verification via a
+  genuinely different method/tool AND, wherever the language/tooling
+  allows it, an actual build/compile/execution step — NEVER an
+  immediate "fix" instruction based on the paste alone. A "STOP before
+  fixing, verify first" clause should be considered a standing,
+  reusable pattern for any future suspected-defect task, not a one-off
+  invention.
+
+- Confirmed-real, correctly-isolated minor deviation (TASK-BRK-060-C3,
+  SESSION-ARC-007 Reply 9): in contrast to the three paste-artifact
+  incidents above, the single-space-vs-double-space separator deviation
+  in the debt receipt's number+date line (literally visible,
+  consistent, and reproduced identically across TWO independent full-
+  diff pastes — TASK-BRK-060-C1's S4 and TASK-BRK-060-C2's unmodified
+  baseline) WAS a genuinely real, on-disk deviation from the original
+  task specification. It was fixed with a single, isolated, one-line
+  change, re-verified with fresh gates, and committed. This is recorded
+  explicitly as a positive contrast case: not every discrepancy noticed
+  in a literal paste is a reporting artifact — some are real — and the
+  discipline of independent re-verification exists precisely to tell
+  the two apart reliably, in both directions, rather than to default to
+  either "it's always a typo" or "it's always a real bug."
+
+- **Stale-uncommitted-append incident (TASK-DOC-024, SESSION-ARC-007
+  Reply 10 to 12):** an earlier, superseded execution of the CTP
+  checkpoint append task left an OUTDATED version of this very Section
+  17 (missing this 17.9 subsection and the Reply-11 updates) sitting
+  UNCOMMITTED in the working tree. When the corrected, final append was
+  re-issued, the task's own mandatory "confirm base size before
+  appending" guard (expected 37,698 bytes) caught the mismatch (actual:
+  60,237 bytes) and the executor correctly HALTED rather than stacking
+  a second, duplicate Section 17 on top of the stale one. The architect
+  resolved it via an explicit revert-then-reappend task
+  (TASK-DOC-024-C1), discarding the stale uncommitted append (lossless,
+  since it was never committed and the final version is a strict
+  superset of it) and reapplying the complete, correct append on the
+  clean, committed 37,698-byte base. LESSON: the "confirm exact
+  pre-append base size, halt on mismatch" guard specified in every
+  append-style task is not boilerplate caution — it caught a real,
+  would-have-been-silent duplication defect on its very first
+  opportunity to do so in this session. This guard clause must be
+  preserved in EVERY future append-style CTP/documentation task without
+  exception.
+
+### 17.5 Roadmap/Task Status Update (as of Reply 10)
+
+DONE IN SESSION-ARC-007 (Replies 1-9, committed):
+- TASK-AUD-021 (Reply 1, REJECTED IN PART) / TASK-AUD-021-C1 (Reply 2,
+  ACCEPTED): handoff integrity verified (commit `663d884` confirmed
+  correct); questionnaire re-confirmed still unfilled/pending; located
+  `ReceiptRendererPort`'s sole production implementor `EscPosRasterizer`
+  (rasterizer.rs:268); full literal bodies of `process_claimed`,
+  `record_credit_payment`, rasterizer header plus `build_lines`, and the
+  relevant `ports.rs` trait signatures obtained; baseline 367/0/4 tests
+  reconfirmed unchanged.
+- TASK-AUD-022 (Reply 3, mostly accepted with one flagged discrepancy) /
+  TASK-AUD-022-C1 (Reply 4, ACCEPTED, resolved the FOOTER_LINES
+  discrepancy as a paste artifact via `sed` plus `cargo check -p
+  baraka-domain`, exit 0): located `process_one_job`/
+  `process_one_job_with_identity` (confirming `mark_failed` for a
+  None-document job happens in the CALLER, correcting an imprecise CTP
+  claim), `hydrate_receipt`, `PrintJobRecord` (exactly 4 fields, no
+  `payload_json`), `PrintJobRepository::enqueue_job`/`enqueue_in_tx`
+  (confirming `payload_json` is write-only and never read back by
+  `claim_next_pending`), full `receipt_model.rs` (230 lines, verified
+  clean on second read), and the real checkout call site
+  (`sqlite_checkout_repository.rs:481`).
+- TASK-AUD-023 (Reply 5, ACCEPTED): located every `ReceiptDocument {`
+  construction site workspace-wide (4 real sites: 1 production, 1
+  use-case test helper, 2 test files); obtained the literal SQL of
+  `claim_next_pending` (confirming it selects only 4 columns, no
+  payload); confirmed `customers.name` is already queryable via the
+  existing `get_customer` port method (though not currently loaded
+  inside the `record_credit_payment` transaction itself); obtained the
+  full `RecordCreditPaymentUseCase::execute` body and the full
+  `CustomerRepository` trait; obtained the original and current
+  (post-0014) `print_jobs` CREATE TABLE statements and the full content
+  of migration 0006.
+- TASK-BRK-060 (Reply 6, REJECTED for evidence format) / -C1 (Reply 7
+  to 8, ACCEPTED for evidence format, surfaced the `bytes`-variable
+  question) / -C2 (Reply 8 to 9, confirmed NO real defect via `cargo
+  build --tests` plus independent re-read, correctly took NO action per
+  its STOP instruction) / -C3 (Reply 9, ACCEPTED, applied and verified
+  the one real separator fix): added `DebtReceiptDocument` (domain
+  struct, 10 fields, zero financial computation), extended the domain
+  printing module's public re-export, added
+  `ReceiptRendererPort::render_debt_receipt` (new trait method with a
+  safe not-implemented default, mirroring the existing `preview_lines`
+  default-impl convention exactly), added `build_debt_receipt_lines`
+  plus `render_debt_canvas` plus the `EscPosRasterizer` impl of the new
+  trait method (sharing the existing single pixel-drawing core
+  `render_lines` with the sales pipeline — NO refactor was needed,
+  contrary to the task's own precautionary worst-case clause, because
+  the shared core already existed), and 7 new tests (French, Arabic,
+  None-reference, whitespace-reference, empty-footer-fallback,
+  empty-store-name-fallback, long-customer-name) in a new file
+  `crates/infrastructure/tests/debt_receipt_rendering.rs`. Final state:
+  374 passed / 0 failed / 4 ignored (367 baseline + 7 new), clippy
+  clean, fmt clean.
+- TASK-REL-023 (Reply 9 to 10, ACCEPTED): committed the above at
+  `abeb30a07e7681dde38da29e41caf67509a517ca` ("feat(engine): add
+  debt-receipt rendering pipeline (render-only, BRK-060)"), exactly 5
+  files changed (4 modified, 1 new), 264 insertions / 3 deletions,
+  verified atop `663d884` with a clean post-commit `git status
+  --porcelain`.
+- TASK-DOC-024 / TASK-DOC-024-C1 (Reply 10-12, THIS CHECKPOINT): first
+  own-session CTP checkpoint, strictly additive, appending this entire
+  Section 17 on top of the untouched original file content via a
+  read-append-verify Node.js script procedure, after a halt-and-revert
+  cycle caught and cleanly resolved a stale uncommitted prior append
+  (see 17.4's new entry above); regenerated and verified
+  BOOT-SESSION-ARC-007.md via the Section 3 golden-rule `--check`-first
+  procedure.
+
+NEXT (first priorities after Reply 10/12, in suggested order):
+(a) Re-present, to the owner, the still-unanswered 8 questions from
+    Reply 1 — none have been answered as of this checkpoint. Highest-
+    priority unanswered items: (i) the ADR-080 vs Charter Section 15.1
+    CTP-language contradiction; (ii) the 5 glossary terms; (iii) the
+    debt-collection screen's module location (Caisse vs Vente).
+(b) Specify TASK-BRK-061: the transactional wiring task — widen
+    `PrintJobRecord`/`claim_next_pending` to carry `payload_json`
+    through to the worker, add dispatch logic in `process_claimed` (or
+    a new sibling function) for non-sale job types that deserializes a
+    `DebtReceiptDocument` from the payload and calls
+    `render_debt_receipt` instead of the sales `hydrate_receipt`/
+    `render` path, and modify `record_credit_payment`'s transaction to
+    enqueue the print job atomically using the
+    `customer_ledger.sequence_no` as the receipt number and a
+    `get_customer`-sourced name — reuse the TASK-AUD-023 R3 SQL
+    evidence rather than re-deriving it.
+(c) GIVEN THE OWNER'S STATED TIMELINE (session ends after Reply 15): if
+    TASK-BRK-061 cannot be fully completed with proper audit-first
+    discipline before Reply 15, the architect should NOT rush it —
+    instead, defer it cleanly to SESSION-ARC-008 as the first priority
+    item in that session's handoff CTP, exactly as TASK-AUD-021 was
+    deferred from ARC-006 to ARC-007. Quality-over-speed (Charter
+    INIT-2) applies to session handoffs exactly as it does to roadmap
+    phases.
+
+### 17.6 Technical State Delta (as of Reply 10, relative to Section 11's
+baseline)
+
+- Migrations: still 14 (0001-0014); TASK-BRK-060 added ZERO migrations
+  (render-only, no schema touched, exactly as scoped).
+- IPC commands: still 72; TASK-BRK-060 added ZERO IPC commands.
+- Test suite: 374 passed / 0 failed / 4 ignored (up from 367/0/4 at
+  ARC-006 handoff; net +7, all in the new
+  `debt_receipt_rendering.rs` file).
+- Clippy: clean, 0 warnings (workspace, all-targets, all-features,
+  -D warnings), reconfirmed fresh immediately before the TASK-REL-023
+  commit.
+- New production code surface added: `DebtReceiptDocument` (domain),
+  `ReceiptRendererPort::render_debt_receipt` (application trait,
+  default-not-implemented), `build_debt_receipt_lines` plus
+  `render_debt_canvas` plus `EscPosRasterizer::render_debt_receipt`
+  (infrastructure). All three layers' additions are PURELY ADDITIVE —
+  zero existing public signature was changed, zero existing struct
+  field was added/removed/renamed, confirmed by every `git diff` in the
+  evidence trail showing only `+` lines plus the one `-`/`+` pair for
+  the C3 separator correction.
+- Still FULLY UNCHANGED from Section 11 baseline (confirmed, not just
+  assumed): `PrintJobRecord` (still exactly 4 fields, no
+  `payload_json`); `claim_next_pending`'s SELECT (still 4 columns
+  only); `process_claimed`/`process_one_job`; `record_credit_payment`;
+  `RecordCreditPaymentUseCase::execute`; every IPC command; every
+  migration file. The debt-receipt capability is therefore currently
+  ENTIRELY INERT/UNREACHABLE from any real user action — it is a
+  render-only capability with no caller anywhere yet. This is
+  intentional and matches the two-task split decided in Reply 6.
+
+### 17.7 Human Context Addendum (continuing Section 15, not replacing it)
+
+In this session's Replies 1-9, the owner had not yet spoken directly
+within this session's own turns until Reply 11, when the owner raised
+the CTP-lifecycle question addressed in 17.9 below, and again at Reply
+12, catching nothing procedurally wrong but stating the session's
+timeline (end after Reply 15). This is consistent with the owner's
+established working style (Section 15): verification-first, evidence-
+driven, quick to intervene the moment something looks procedurally
+suspicious — exactly the vigilance that caught the original Reply-10
+incident in ARC-006 and that this session's own append-size guard
+independently validated in 17.4's new entry above. The architect
+confirms this vigilance is welcomed and necessary, not an inconvenience.
+NEW: the owner has now set an explicit session-length expectation
+(ending after Reply 15) — the architect must plan remaining in-session
+work accordingly and prioritize a clean, complete, honest handoff over
+starting new substantive work that cannot be finished with full rigor.
+
+### 17.8 Reply Counter Confirmation
+
+This checkpoint's content documents state through Reply 10 of
+SESSION-ARC-007's own counter; the file-write task itself completed at
+Reply 12 after the clarification exchange (Reply 11) and the halt-and-
+revert cycle (Reply 12). Given the owner's stated session end after
+Reply 15, THIS IS EXPECTED TO BE THE ONLY ROUTINE CHECKPOINT OF THIS
+SESSION — the Reply 15 session-end act will be a full HANDOFF (new
+CTP-SESSION-ARC-008.md authored, per Section 2's binding model), not
+another in-place routine update to this file.
+
+### 17.9 CTP Lifecycle Model — Reconfirmed, Not Changed (Reply 11)
+
+At Reply 11, the owner asked, upon reviewing this very boot package,
+whether a new `BOOT-SESSION-ARC-008.md` / `CTP-SESSION-ARC-008.md`
+should exist instead of this in-place update to `CTP-SESSION-ARC-007.md`.
+The architect re-read CTP Section 2 verbatim and Section 10's own record
+of the IDENTICAL question having been raised and resolved once already,
+in SESSION-ARC-006 at its own Reply 16. The binding, owner-confirmed
+rule (Section 2) is unambiguous: a session's successor CTP/BOOT file
+pair is authored EXACTLY ONCE, at that session's own handoff — never as
+a routine mid-session checkpoint. The architect therefore proceeded with
+this task exactly as originally specified (updating CTP-SESSION-ARC-007
+in place), while explicitly inviting the owner to issue an explicit,
+unambiguous instruction if a DIFFERENT model is actually desired — which
+would require a deliberate, documented amendment to Section 2 itself,
+not a silent change. As of this writing, no such amendment has been
+requested; the existing model stands reconfirmed. At Reply 12, the owner
+separately confirmed the session will end after Reply 15 — this is now
+known to be the actual, imminent handoff point, at which
+CTP-SESSION-ARC-008.md will be authored exactly once, per this same
+reconfirmed model.

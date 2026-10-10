@@ -9,6 +9,7 @@ description = "Baraka UltraPOS application layer: use cases, ports and applicati
 [dependencies]
 baraka-domain = { path = "../domain" }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }

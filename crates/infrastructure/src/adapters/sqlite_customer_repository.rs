@@ -7,6 +7,9 @@ use baraka_application::ports::{
     CustomerRepository, CustomerSummary, CustomerUpdate, LedgerEntryRow, PaymentRecord,
 };
 use baraka_domain::errors::DomainError;
+use baraka_domain::printing::{
+    format_centimes_plain, DebtReceiptDocument, ReceiptLanguage, StoreIdentity,
+};
 use baraka_domain::sales::{CreditPolicy, CreditProfile, Customer, CustomerId};
 use baraka_domain::user::UserId;
 use chrono::{SecondsFormat, Utc};
@@ -18,6 +21,15 @@ use crate::persistence::transaction::run_transaction;
 /// Static, non-leaking mapping for unexpected storage failures.
 fn store_failure() -> ApplicationError {
     ApplicationError::Port("customer store failure".to_string())
+}
+
+/// Read one `settings` value inside a transaction; absent keys (or an
+/// uninitialized store identity) read as empty strings (graceful fallback).
+fn read_setting_in_tx(tx: &rusqlite::Transaction, key: &str) -> String {
+    tx.query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
+        row.get(0)
+    })
+    .unwrap_or_default()
 }
 
 /// Customer credit persistence over a shared SQLite connection.
@@ -425,18 +437,18 @@ impl CustomerRepository for SqliteCustomerRepository {
                     }
                     other => crate::persistence::InfrastructureError::Sqlite(other),
                 })?;
-            let current: Option<(i64, i64)> = tx
+            let current: Option<(i64, i64, String)> = tx
                 .query_row(
-                    "SELECT current_balance_centimes, revision FROM customers WHERE id = ?1",
+                    "SELECT current_balance_centimes, revision, name FROM customers WHERE id = ?1",
                     [customer_id.to_string()],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                 )
                 .map(Some)
                 .or_else(|error| match error {
                     rusqlite::Error::QueryReturnedNoRows => Ok(None),
                     other => Err(other),
                 })?;
-            let (balance, revision) = current.ok_or_else(|| {
+            let (balance, revision, customer_name) = current.ok_or_else(|| {
                 crate::persistence::InfrastructureError::Migration("CUSTOMER_MISSING".to_string())
             })?;
             if amount_centimes > balance && !allow_overpayment {
@@ -494,6 +506,46 @@ impl CustomerRepository for SqliteCustomerRepository {
                     stamp,
                     actor.to_string(),
                 ],
+            )?;
+            // TASK-BRK-061: enqueue the debt receipt print job in the SAME
+            // atomic transaction (ledger append, balance cache, cash
+            // movement, and outbox row commit or roll back together). The
+            // receipt number reuses the `customer_ledger` sequence (ADR-082).
+            let footer_message =
+                read_setting_in_tx(tx, "store.footer_message");
+            let store_identity = StoreIdentity {
+                store_name: read_setting_in_tx(tx, "store.name"),
+                store_address: read_setting_in_tx(tx, "store.address"),
+                store_phone: read_setting_in_tx(tx, "store.phone"),
+                nif: read_setting_in_tx(tx, "store.nif"),
+                nis: read_setting_in_tx(tx, "store.nis"),
+                rc: read_setting_in_tx(tx, "store.rc"),
+                ai: read_setting_in_tx(tx, "store.ai"),
+                ticket_footer_message: footer_message.clone(),
+            };
+            let debt_receipt = DebtReceiptDocument {
+                language: ReceiptLanguage::French,
+                shop_name: "BARAKA QUINCAILLERIE".to_string(),
+                receipt_number: format!("REC-{sequence:06}"),
+                created_at: stamp.clone(),
+                customer_name,
+                amount_text: format_centimes_plain(amount_centimes),
+                new_balance_text: format_centimes_plain(new_balance),
+                reference_text: reference.clone(),
+                store_identity,
+                footer_message,
+            };
+            let debt_payload = serde_json::to_string(&debt_receipt).map_err(|_| {
+                crate::persistence::InfrastructureError::Config(
+                    "DEBT_RECEIPT_SERIALIZE".to_string(),
+                )
+            })?;
+            super::sqlite_print_job_repository::enqueue_in_tx(
+                tx,
+                None,
+                "DEBT_RECEIPT",
+                &debt_payload,
+                &stamp,
             )?;
             Ok(PaymentRecord {
                 ledger_entry_id: entry_id,

@@ -57,12 +57,20 @@ impl PrintJobRepository for SqlitePrintJobRepository {
         let stamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
         run_transaction(&mut guard, |tx| {
             // Atomic claim: exactly one claimant wins the row.
-            let claimed: Option<(String, Option<String>, String, i64)> = tx
+            let claimed: Option<(String, Option<String>, String, i64, String)> = tx
                 .query_row(
-                    "SELECT id, document_id, job_type, attempt_count FROM print_jobs
+                    "SELECT id, document_id, job_type, attempt_count, payload_json FROM print_jobs
                      WHERE status = 'PENDING' ORDER BY rowid LIMIT 1",
                     [],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                    |row| {
+                        Ok((
+                            row.get(0)?,
+                            row.get(1)?,
+                            row.get(2)?,
+                            row.get(3)?,
+                            row.get(4)?,
+                        ))
+                    },
                 )
                 .map(Some)
                 .or_else(|error| match error {
@@ -71,7 +79,7 @@ impl PrintJobRepository for SqlitePrintJobRepository {
                 })?;
             match claimed {
                 None => Ok(None),
-                Some((job_id, document_id, job_type, attempt_count)) => {
+                Some((job_id, document_id, job_type, attempt_count, payload_json)) => {
                     let changed = tx.execute(
                         "UPDATE print_jobs
                          SET status = 'PROCESSING', claimed_at = ?1, updated_at = ?1
@@ -94,6 +102,7 @@ impl PrintJobRepository for SqlitePrintJobRepository {
                         document_id,
                         job_type,
                         attempt_count,
+                        payload_json,
                     }))
                 }
             }

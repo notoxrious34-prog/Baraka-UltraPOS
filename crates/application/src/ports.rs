@@ -1148,10 +1148,13 @@ pub struct PrintJobRecord {
     pub job_id: String,
     /// Owning document id; `None` for non-sale jobs.
     pub document_id: Option<DocumentId>,
-    /// Job kind code (`RECEIPT`, `DUPLICATA`).
+    /// Job kind code (`RECEIPT`, `DUPLICATA`, `DEBT_RECEIPT`).
     pub job_type: String,
     /// Physical send attempts so far.
     pub attempt_count: i64,
+    /// Stored `payload_json` column (debt receipt document JSON for
+    /// non-sale jobs; sales jobs carry their verbatim payload).
+    pub payload_json: String,
 }
 
 /// Latest job state view for one document.

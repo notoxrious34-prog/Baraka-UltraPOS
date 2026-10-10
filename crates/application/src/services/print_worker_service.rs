@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
-    format_centimes_plain, format_qty_plain, ReceiptDocument, ReceiptLanguage, ReceiptLine,
-    ReceiptTotals,
+    format_centimes_plain, format_qty_plain, DebtReceiptDocument, ReceiptDocument, ReceiptLanguage,
+    ReceiptLine, ReceiptTotals,
 };
 
 use crate::errors::ApplicationError;
@@ -218,6 +218,99 @@ where
     }
 }
 
+/// Consume a non-sale (`document_id == None`) outbox job through the
+/// independent debt receipt pipeline (ADR-083): deserialize the stored
+/// `payload_json` into a [`DebtReceiptDocument`], render it with
+/// [`ReceiptRendererPort::render_debt_receipt`], and transmit the bytes
+/// over the same transport edge (same bounded retry budget). Never
+/// touches the sales receipt pipeline or accounting state.
+fn process_debt_claimed<J, T, R>(
+    jobs: &J,
+    transport: &T,
+    renderer: &R,
+    claimed: &crate::ports::PrintJobRecord,
+) -> Result<JobOutcome, ApplicationError>
+where
+    J: PrintJobRepository + ?Sized,
+    T: PrinterTransportPort + ?Sized,
+    R: ReceiptRendererPort + ?Sized,
+{
+    let debt_receipt: DebtReceiptDocument =
+        serde_json::from_str(&claimed.payload_json).map_err(|_| {
+            ApplicationError::Validation(DomainError::InvalidCanonicalString(
+                "DEBT_PAYLOAD_INVALID".to_string(),
+            ))
+        })?;
+    // Defense in depth: a renderer panic must fell the job, never the thread.
+    let bytes = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        renderer.render_debt_receipt(&debt_receipt)
+    })) {
+        Ok(Ok(bytes)) => bytes,
+        Ok(Err(error)) => {
+            jobs.mark_failed(&claimed.job_id, "RENDER_FAILED")?;
+            return Ok(JobOutcome::Failed {
+                job_id: claimed.job_id.clone(),
+                reason: format!("{error}"),
+            });
+        }
+        Err(_) => {
+            jobs.mark_failed(&claimed.job_id, "RENDER_PANIC")?;
+            return Ok(JobOutcome::Failed {
+                job_id: claimed.job_id.clone(),
+                reason: "RENDER_PANIC".to_string(),
+            });
+        }
+    };
+    if !transport.is_available() {
+        let attempt = claimed.attempt_count + 1;
+        if attempt >= PRINT_MAX_ATTEMPTS {
+            let reason = "EXHAUSTED_MAX_RETRIES: NO_PRINTER_CONFIGURED".to_string();
+            jobs.mark_failed(&claimed.job_id, &reason)?;
+            return Ok(JobOutcome::Failed {
+                job_id: claimed.job_id.clone(),
+                reason,
+            });
+        }
+        jobs.release_for_retry(&claimed.job_id, "NO_PRINTER_CONFIGURED")?;
+        return Ok(JobOutcome::RetryAfter {
+            job_id: claimed.job_id.clone(),
+            delay: retry_delay(attempt),
+        });
+    }
+    match transport.send_raster(&bytes) {
+        Ok(()) => {
+            jobs.mark_done(&claimed.job_id)?;
+            Ok(JobOutcome::Done {
+                job_id: claimed.job_id.clone(),
+            })
+        }
+        Err(error) => {
+            let attempt = claimed.attempt_count + 1;
+            let reason = match &error {
+                ApplicationError::Validation(
+                    baraka_domain::errors::DomainError::PrinterTransportUnavailable,
+                ) => "PRINTER_OFFLINE".to_string(),
+                ApplicationError::Validation(domain) => format!("{domain}"),
+                _ => "TRANSPORT_ERROR".to_string(),
+            };
+            if attempt >= PRINT_MAX_ATTEMPTS {
+                let terminal = format!("EXHAUSTED_MAX_RETRIES: {reason}");
+                jobs.mark_failed(&claimed.job_id, &terminal)?;
+                Ok(JobOutcome::Failed {
+                    job_id: claimed.job_id.clone(),
+                    reason: terminal,
+                })
+            } else {
+                jobs.release_for_retry(&claimed.job_id, &reason)?;
+                Ok(JobOutcome::RetryAfter {
+                    job_id: claimed.job_id.clone(),
+                    delay: retry_delay(attempt),
+                })
+            }
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn process_claimed<D, J, P, T, R>(
     documents: &D,
@@ -236,9 +329,15 @@ where
     T: PrinterTransportPort + ?Sized,
     R: ReceiptRendererPort + ?Sized,
 {
-    let document_id = claimed
-        .document_id
-        .ok_or(ApplicationError::Validation(DomainError::PrintJobNotFound))?;
+    let document_id = match claimed.document_id {
+        Some(document_id) => document_id,
+        // Non-sale jobs (debt receipts, Z-reports, test prints) carry no
+        // row in `documents`: route them to the independent debt receipt
+        // pipeline (ADR-083). The sales flow below stays verbatim.
+        None => {
+            return process_debt_claimed(jobs, transport, renderer, claimed);
+        }
+    };
     let document = documents
         .get_by_id(document_id)?
         .ok_or(ApplicationError::Validation(DomainError::PrintJobNotFound))?;

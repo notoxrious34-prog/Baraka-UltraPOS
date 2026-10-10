@@ -556,12 +556,28 @@ impl ProductRepository for SqliteCatalogRepository {
         limit: usize,
     ) -> Result<Vec<(Product, Vec<ProductUnit>)>, ApplicationError> {
         let guard = self.lock()?;
+        let capped = (limit.clamp(1, 100)) as i64;
+        if query.trim().is_empty() {
+            let ids = guard
+                .prepare("SELECT DISTINCT p.id FROM products p ORDER BY p.sku LIMIT ?1")
+                .map_err(|_| store_failure())?
+                .query_map([capped], |row| row.get::<_, String>(0))
+                .map_err(|_| store_failure())?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| store_failure())?;
+            let mut out = Vec::with_capacity(ids.len());
+            for id in ids {
+                if let Some(found) = fetch_product(&guard, &id)? {
+                    out.push(found);
+                }
+            }
+            return Ok(out);
+        }
         let escaped = query
             .replace('\\', "\\\\")
             .replace('%', "\\%")
             .replace('_', "\\_");
-        let pattern = format!("{escaped}%");
-        let capped = (limit.clamp(1, 100)) as i64;
+        let pattern = format!("%{escaped}%");
         let mut statement = guard
             .prepare(
                 "SELECT DISTINCT p.id FROM products p

@@ -438,7 +438,7 @@ where
         Self { products }
     }
 
-    /// Search the catalog (blank queries return no rows).
+    /// Search the catalog (blank queries return default discovery rows).
     pub fn execute(
         &self,
         session: &SessionContext,
@@ -447,9 +447,6 @@ where
     ) -> Result<Vec<(Product, Vec<ProductUnit>)>, ApplicationError> {
         require(session, Permission::PosSell)?;
         let trimmed = query.trim();
-        if trimmed.is_empty() {
-            return Ok(Vec::new());
-        }
         self.products.search(trimmed, limit.clamp(1, 100))
     }
 }

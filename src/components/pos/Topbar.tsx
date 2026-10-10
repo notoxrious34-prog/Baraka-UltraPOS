@@ -8,6 +8,7 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { t } from "@/lib/i18n";
 import { CashSessionIndicator } from "@/components/pos/CashSessionIndicator";
+import { OperationsMenu } from "@/components/pos/OperationsMenu";
 
 function useClock(): string {
   const [now, setNow] = useState(() => new Date());
@@ -80,6 +81,8 @@ export function Topbar(): ReactElement {
               ))}
           </select>
         </label>
+
+        <OperationsMenu />
 
         <span className="hidden rounded-full bg-white/10 px-2 py-1 font-mono text-[11px] font-bold md:block">
           {session !== null ? session.username : "—"} · {session !== null ? session.role : "—"}

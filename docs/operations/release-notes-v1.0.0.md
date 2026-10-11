@@ -9,7 +9,7 @@
 ## 1. Installer l'application
 
 1. Récupérez le fichier d'installation auprès de votre technicien :
-   `Baraka UltraPOS_1.0.0_x64-setup.exe` (environ 140 Mo — il contient tout
+   `Baraka UltraPOS_1.0.0_x64-setup.exe` (environ 211 Mo — il contient tout
    le nécessaire, **aucune connexion internet n'est requise** pour l'installer).
 2. Double-cliquez sur le fichier et suivez l'assistant (français proposé
    en premier). L'installation est **par utilisateur** : installez-la depuis
@@ -74,7 +74,33 @@ Paramètres → « Identité & Impression » (compte ADMIN requis).
   dernière sauvegarde via la fonction Restauration (compte ADMIN), vérifiez
   une vente et le stock avant de reprendre le service.
 
-## 6. Ce que la v1 ne contient pas (en toute transparence)
+## 6. Ce que contient la v1.0.0 (périmètre livré)
+
+L'application couvre les 10 modules constitutionnels, tous utilisables
+hors-ligne :
+
+1. **Caisse / Vente** : panier, remises, encaissement espèces avec rendu,
+   touches rapides, brouillons de ventes en attente (**F8** mettre en attente,
+   **F6** reprendre).
+2. **Stock** : niveaux par magasin, mouvements d'entrée/sortie, alertes.
+3. **Clients & Crédit** : fiches clients, crédit, encaissements avec reçu
+   **سند قبض** (reçu de recouvrement) et prévention des trop-perçus.
+4. **Fournisseurs** : fiches fournisseurs et achats.
+5. **Produits** : catalogue, codes-barres, prix, recherche rapide.
+6. **Documents** : factures, tickets, avoirs, historique et réimpression.
+7. **Sessions Caisse** : ouverture/clôture, fond de caisse, écarts.
+8. **Rapports** : chiffres de ventes, stock, journal d'activité.
+9. **Utilisateurs** : comptes ADMIN / vendeur, verrouillage après échecs.
+10. **Paramètres** : identité du magasin (nom, adresse, téléphone),
+    identifiants fiscaux (**RC / NIF / NIS / AI**), configuration matérielle
+    de l'imprimante (port série, débit) et sauvegardes.
+
+- **Interface bilingue** : français et arabe avec prise en charge complète
+  de la droite-vers-gauche (RTL).
+- **Typographie embarquée** : polices Cairo, Inter et JetBrains Mono
+  fournies localement — aucun téléchargement à l'usage.
+
+## 7. Ce que la v1 ne contient pas (en toute transparence)
 
 - Pas de mise à jour automatique : les mises à jour se font en relançant un
   nouvel installeur par-dessus l'existant (vos données sont conservées).
@@ -85,7 +111,7 @@ Paramètres → « Identité & Impression » (compte ADMIN requis).
 
 ## ملخص بالعربية
 
-- **التثبيت**: شغّل `Baraka UltraPOS_1.0.0_x64-setup.exe` (يعمل دون إنترنت).
+- **التثبيت**: شغّل `Baraka UltraPOS_1.0.0_x64-setup.exe` (نحو 211 ميغا، يعمل دون إنترنت).
   عند ظهور تحذير SmartScreen الأزرق اضغط «Informations complémentaires» ثم
   «Exécuter quand même».
 - **أول تشغيل**: أنشئ حساب المدير (ADMIN) واحفظ كلمة المرور في مكان آمن.

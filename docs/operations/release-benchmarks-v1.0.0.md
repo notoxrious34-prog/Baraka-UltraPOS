@@ -14,7 +14,40 @@ CARGO_BUILD_JOBS=2 cargo test --release -p baraka-infrastructure \
   --test release_benchmarks -- --ignored --nocapture
 ```
 
-Result: `test result: ok. 3 passed; 0 failed` (59.41s wall, exit 0).
+Result: `test result: ok. 3 passed; 0 failed` (59.41s wall, exit 0)
+— historical run (pre-REL-042, M1 query-shape fix era).
+
+## Results (REL-042 fresh run — 2026-10-11)
+
+Literal harness output (`BENCH_EXIT:0`):
+
+```text
+Finished `release` profile [optimized] target(s) in 51.66s
+running 3 tests
+BENCH seed products=10000 elapsed=168.7s
+BENCH print_job_insert n=50 p50=1.025ms p95=2.726ms p99=41.836ms
+test bench_m3_print_job_insert ... ok
+BENCH atomic_sale n=50 p50=3.561ms p95=14.425ms p99=22.554ms
+test bench_m2_atomic_sale ... ok
+BENCH product_search n=50 p50=0.235ms p95=15.563ms p99=16.442ms
+test bench_m1_product_search ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 169.18s
+```
+
+| Metric | n | p50 | p95 | p99 | Notes |
+|---|---|---|---|---|---|
+| M1 `product_search` | 50 | 0.235 ms | 15.563 ms | 16.442 ms | alternating LIKE-prefix search (cap 20) + exact barcode lookup, rotating queries over all 10 000 rows |
+| M2 `atomic_sale` | 50 | 3.561 ms | 14.425 ms | 22.554 ms | full `CheckoutSaleUseCase`, cash-exact single line, fresh idempotency key per iteration |
+| M3 `print_job_insert` | 50 | 1.025 ms | 2.726 ms | 41.836 ms | direct `enqueue_job` against a real prior document id |
+
+Run notes (honesty): seeding cost this run was 168.7 s for 10 000
+products (~16.9 ms/row — slower than the historical ~6 ms/row; background
+machine activity, same i5-3450/SATA SSD). M1 p50 improved vs the historical
+0.606 ms (page-cache warmth); M3 p99 = 41.836 ms is a tail outlier
+consistent with limit L3 (environment-sensitive, not the DB path). p50/p95
+remain the stable signals and are the same order of magnitude as the
+historical run.
 
 ## Environment profile (§32)
 

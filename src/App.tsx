@@ -16,6 +16,7 @@ import { SuppliersModule } from "@/features/suppliers/SupplierListScreen";
 import { CustomersModule } from "@/features/customers/CustomersModule";
 import { DocumentsModule } from "@/features/documents/DocumentsModule";
 import { StockModule } from "@/features/stock/StockModule";
+import { UsersModule } from "@/features/users/UsersModule";
 import { ReportsHomeScreen } from "@/features/reports/ReportsHomeScreen";
 import { CatalogModule } from "@/features/catalog/CatalogModule";
 import { ipcCheckFirstRunStatus } from "@/lib/ipc";
@@ -33,6 +34,7 @@ function NavRail({
   onSelect: (view: AppView) => void;
 }): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
+  const role = useSessionStore((state) => state.session?.role);
   const entry = (target: AppView, label: string): ReactElement => (
     <button
       type="button"
@@ -55,6 +57,7 @@ function NavRail({
       {entry("suppliers", t(locale, "nav.suppliers"))}
       {entry("reports", t(locale, "nav.reports"))}
       {entry("catalog", t(locale, "nav.catalog"))}
+      {role === "ADMIN" && entry("users", t(locale, "nav.users"))}
     </nav>
   );
 }
@@ -103,6 +106,7 @@ export default function App(): ReactElement {
   const view = useAppViewStore((state) => state.view);
   const setView = useAppViewStore((state) => state.setView);
   const manager = session !== null && isManagerRole(session.role);
+  const isAdmin = session !== null && session.role === "ADMIN";
 
   return (
     <div
@@ -128,6 +132,16 @@ export default function App(): ReactElement {
               <ReportsHomeScreen />
             ) : view === "catalog" && manager ? (
               <CatalogModule />
+            ) : view === "users" ? (
+              isAdmin ? (
+                <UsersModule />
+              ) : (
+                <section className="flex h-full items-center justify-center p-8">
+                  <p className="rounded-md bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
+                    {t(locale, "users.unauthorized")}
+                  </p>
+                </section>
+              )
             ) : (
               <PosShell />
             )}

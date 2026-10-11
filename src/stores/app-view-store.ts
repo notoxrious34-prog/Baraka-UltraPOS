@@ -8,7 +8,7 @@
 
 import { create } from "zustand";
 
-export type AppView = "pos" | "customers" | "documents" | "suppliers" | "reports" | "catalog";
+export type AppView = "pos" | "stock" | "customers" | "documents" | "suppliers" | "reports" | "catalog";
 
 interface AppViewState {
   view: AppView;

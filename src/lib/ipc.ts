@@ -306,6 +306,33 @@ export async function ipcListWarehouses(): Promise<WarehouseInfo[]> {
   }));
 }
 
+/** Create a warehouse (ADMIN only); resolves the stored view. */
+export async function ipcCreateWarehouse(
+  sessionToken: string,
+  code: string,
+  name: string,
+): Promise<WarehouseInfo> {
+  interface WarehouseWire {
+    id: string;
+    code: string;
+    name: string;
+    is_active: boolean;
+  }
+  const wire = await call<WarehouseWire>("warehouses_create", {
+    request: {
+      session_token: sessionToken,
+      code: code.trim().toUpperCase(),
+      name: name.trim(),
+    },
+  });
+  return {
+    id: wire.id,
+    code: wire.code,
+    name: wire.name,
+    isActive: wire.is_active,
+  };
+}
+
 /** Read a stock level in base micros (`"0"` when absent). */
 export async function ipcGetStock(
   sessionToken: string,

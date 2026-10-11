@@ -1109,3 +1109,30 @@ SESSION-ARC-010 architect:
 5. Remember: CTP persistence language is English (ADR-085) — do not
    re-open this without a fresh, explicit owner instruction.
 
+## 18. SESSION-ARC-010 Checkpoint 1 (Reply 10)
+
+Date: 2026-10-10
+Counter: Reply 10 of SESSION-ARC-010
+Mode: Aggressive Batching (ratified by owner)
+
+### 18.1 Executive Summary of Accomplishments (Replies 1–10)
+Under the owner's directive to accelerate delivery through high-density batching, SESSION-ARC-010 completed four major capability milestones in 10 replies:
+1. **TASK-DSN-027 / TASK-REL-036 (commit `429dc24`)**: Complete Customer Management & Credit Ledger module (`CustomersModule`). Includes search, debtor filtering (`current_balance_centimes > 0`), financial HUD cards, full transaction statement ledger (`credit_get_statement`), customer create/edit modal (`CustomerFormModal`), `ipcUpdateCustomer` IPC binding, NavRail integration, and 11 Vitest tests.
+2. **TASK-DSN-028 / TASK-REL-037 (commit `a65e510`)**: Complete Documents & Billing module (`DocumentsModule`). Includes multi-criteria search, 5 document type filters (Tickets, BL, Factures, Devis, Avoirs), status filter (Finalized, Converted, Draft), dense tabular listing, detail inspect drawer, direct reprint trigger (`ipcReprint`), NavRail integration, and 12 Vitest tests.
+3. **TASK-DSN-029 / TASK-REL-038 (commit `ebd895f`)**: Complete Stock & Warehouses module (`StockModule`). Includes active warehouse selector, low-stock depletion alerts HUD and table (`reports_low_stock`), movement history audit ledger (`reports_stock_movement_history`), warehouse creation modal (`WarehouseCreateModal`), `ipcCreateWarehouse` binding, direct modal integration with `StockAdjustModal` and `WarehouseTransferModal`, and 14 Vitest tests.
+4. **TASK-BRK-064 / TASK-REL-039 (commit `d0846a6`)**: Complete Users Management engine capability in Rust. Implemented `UserRepository` extension, 4 use cases in `crates/application/src/use_cases/users.rs`, Argon2 password and PIN hashing, last active Admin protection invariant (`LAST_ADMIN_PROTECTED`), 4 IPC commands (`users_list`, `users_create`, `users_update`, `users_reset_credentials`), Tauri registration in `src-tauri/src/lib.rs`, TypeScript wrappers in `src/lib/ipc.ts`, and 8 Rust integration tests.
+
+### 18.2 Metrics & Verification Gate State
+- Rust Workspace Tests: **388 passed / 0 failed / 4 ignored** (380 baseline + 8 new user tests).
+- Rust Quality Gates: `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo fmt --check` clean.
+- Frontend Tests: **259 passed / 0 failed across 29 files** (222 baseline + 11 customers + 12 documents + 14 stock).
+- Frontend Quality Gates: `npm run lint` 0 warnings; `npm run typecheck` 0 errors; `npm run build` clean (~3.2s).
+- Total Registered Tauri Commands: **78 commands** (74 baseline + 4 user management).
+- Database Schema: 14 migrations (0001–0014, frozen). No schema changes required.
+
+### 18.3 Architecture Rules & Lessons Enforced
+- **Aggressive Batching**: Consolidation of full vertical slices into single BRK and DSN tasks proven successful; delivery velocity tripled with zero quality compromises.
+- **Mutex Guard Lifecycle in Repository**: During `TASK-BRK-064`, an initial deadlock occurred in `create_user`/`update_user` because the mutex guard was held across an internal call to `find_user_by_id`. Caught during test execution and resolved by explicitly dropping the guard before helper re-reads (`drop(guard)`). Standing pattern: always drop mutex lock before calling re-read helpers.
+- **Error Code Invariant**: Domain conflicts intended for client handling must use SCREAMING_SNAKE_CASE wire codes (`LAST_ADMIN_PROTECTED`, `USERNAME_TAKEN`, `INVALID_PIN`) passed through `stable_code_or`, preventing collapse into generic `INTERNAL_ERROR`.
+- **Money & Visual Hygiene**: Zero floats maintained across all modules; canonical string centimes on IPC; `<bdi dir="ltr">` and tabular figures applied to all numbers, codes, and currency amounts.
+

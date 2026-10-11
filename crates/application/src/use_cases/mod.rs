@@ -11,6 +11,7 @@ pub mod reports;
 pub mod returns;
 pub mod sales;
 pub mod suppliers;
+pub mod users;
 
 use baraka_domain::errors::DomainError;
 use baraka_domain::models::{HealthSnapshot, PaymentMode, SaleLine};
@@ -542,6 +543,126 @@ mod tests {
             };
             guard.insert(command.username.clone(), record);
             Ok(command.user_id)
+        }
+
+        fn list_all_users(&self) -> Result<Vec<crate::ports::UserRecord>, ApplicationError> {
+            let guard = self.by_name.lock().expect("users");
+            let mut names: Vec<&String> = guard.keys().collect();
+            names.sort();
+            Ok(names
+                .into_iter()
+                .map(|name| {
+                    let record = &guard[name];
+                    crate::ports::UserRecord {
+                        id: record.user.id,
+                        username: record.user.username.as_str().to_string(),
+                        role: record.user.role,
+                        is_active: record.user.is_active,
+                        has_pin: record.pin_hash.is_some(),
+                        created_at: "2026-01-01T00:00:00Z".to_string(),
+                        updated_at: "2026-01-01T00:00:00Z".to_string(),
+                    }
+                })
+                .collect())
+        }
+
+        fn find_user_by_id(
+            &self,
+            id: UserId,
+        ) -> Result<Option<crate::ports::UserRecord>, ApplicationError> {
+            let guard = self.by_name.lock().expect("users");
+            Ok(guard
+                .values()
+                .find(|record| record.user.id == id)
+                .map(|record| crate::ports::UserRecord {
+                    id: record.user.id,
+                    username: record.user.username.as_str().to_string(),
+                    role: record.user.role,
+                    is_active: record.user.is_active,
+                    has_pin: record.pin_hash.is_some(),
+                    created_at: "2026-01-01T00:00:00Z".to_string(),
+                    updated_at: "2026-01-01T00:00:00Z".to_string(),
+                }))
+        }
+
+        fn create_user(
+            &self,
+            input: &crate::ports::CreateUserInput,
+        ) -> Result<crate::ports::UserRecord, ApplicationError> {
+            let mut guard = self.by_name.lock().expect("users");
+            if guard.contains_key(&input.username) {
+                return Err(ApplicationError::Conflict("USERNAME_TAKEN".to_string()));
+            }
+            guard.insert(
+                input.username.clone(),
+                UserRecord {
+                    user: User {
+                        id: input.user_id,
+                        username: Username::new(&input.username).expect("valid"),
+                        role: input.role,
+                        is_active: true,
+                        failed_login_attempts: 0,
+                        locked_until: None,
+                    },
+                    password_hash: input.password_hash.clone(),
+                    pin_hash: input.pin_hash.clone(),
+                },
+            );
+            drop(guard);
+            self.find_user_by_id(input.user_id)?
+                .ok_or_else(|| ApplicationError::Port("created user unreadable".to_string()))
+        }
+
+        fn update_user(
+            &self,
+            input: &crate::ports::UpdateUserInput,
+        ) -> Result<crate::ports::UserRecord, ApplicationError> {
+            {
+                let mut guard = self.by_name.lock().expect("users");
+                let record = guard
+                    .values_mut()
+                    .find(|record| record.user.id == input.user_id)
+                    .ok_or_else(|| ApplicationError::NotFound("user".to_string()))?;
+                if let Some(role) = input.role {
+                    record.user.role = role;
+                }
+                if let Some(is_active) = input.is_active {
+                    record.user.is_active = is_active;
+                }
+            }
+            self.find_user_by_id(input.user_id)?
+                .ok_or_else(|| ApplicationError::Port("updated user unreadable".to_string()))
+        }
+
+        fn update_credentials(
+            &self,
+            user_id: UserId,
+            password_hash: Option<&str>,
+            pin_hash: Option<&str>,
+            _updated_at: &str,
+        ) -> Result<(), ApplicationError> {
+            let mut guard = self.by_name.lock().expect("users");
+            let record = guard
+                .values_mut()
+                .find(|record| record.user.id == user_id)
+                .ok_or_else(|| ApplicationError::NotFound("user".to_string()))?;
+            if let Some(hash) = password_hash {
+                record.password_hash = hash.to_string();
+            }
+            if let Some(hash) = pin_hash {
+                record.pin_hash = Some(hash.to_string());
+            }
+            Ok(())
+        }
+
+        fn count_active_admins(&self) -> Result<u64, ApplicationError> {
+            Ok(self
+                .by_name
+                .lock()
+                .expect("users")
+                .values()
+                .filter(|record| record.user.role == Role::Admin && record.user.is_active)
+                .count() as u64)
         }
     }
 

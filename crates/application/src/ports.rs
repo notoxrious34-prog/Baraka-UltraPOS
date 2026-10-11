@@ -82,6 +82,80 @@ pub trait UserRepository: Send + Sync {
         &self,
         command: &BootstrapFirstAdminCommand,
     ) -> Result<UserId, ApplicationError>;
+
+    /// Every managed operator ordered by username (RBAC enforced by callers).
+    fn list_all_users(&self) -> Result<Vec<UserRecord>, ApplicationError>;
+
+    /// Managed view of one operator by id.
+    fn find_user_by_id(&self, id: UserId) -> Result<Option<UserRecord>, ApplicationError>;
+
+    /// Insert a pre-validated, pre-hashed operator (username must be unique).
+    fn create_user(&self, input: &CreateUserInput) -> Result<UserRecord, ApplicationError>;
+
+    /// Patch role and/or active flag (plus `updated_at`); returns the fresh view.
+    fn update_user(&self, input: &UpdateUserInput) -> Result<UserRecord, ApplicationError>;
+
+    /// Replace password and/or PIN hashes (plus `updated_at`).
+    /// `None` leaves the slot untouched; both `None` is rejected by callers.
+    fn update_credentials(
+        &self,
+        user_id: UserId,
+        password_hash: Option<&str>,
+        pin_hash: Option<&str>,
+        updated_at: &str,
+    ) -> Result<(), ApplicationError>;
+
+    /// Active operators whose role is Admin (last-admin invariant input).
+    fn count_active_admins(&self) -> Result<u64, ApplicationError>;
+}
+
+/// Managed operator view (presentation-friendly; never carries hashes).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserRecord {
+    /// Stable identifier.
+    pub id: UserId,
+    /// Login name.
+    pub username: String,
+    /// Operator role.
+    pub role: Role,
+    /// Deactivated accounts can never authenticate.
+    pub is_active: bool,
+    /// True when a PIN hash slot is configured.
+    pub has_pin: bool,
+    /// Capture instant (RFC3339 millis).
+    pub created_at: String,
+    /// Last mutation instant (RFC3339 millis).
+    pub updated_at: String,
+}
+
+/// Pre-validated, pre-hashed operator creation command.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreateUserInput {
+    /// Fresh operator id allocated by the use case.
+    pub user_id: UserId,
+    /// Validated, trimmed login name (3..=30, alphanumeric + underscores).
+    pub username: String,
+    /// Argon2id PHC hash produced by the shared [`PasswordHasher`] port.
+    pub password_hash: String,
+    /// Optional Argon2id PHC hash of a 4..=6 digit PIN.
+    pub pin_hash: Option<String>,
+    /// Assigned role.
+    pub role: Role,
+    /// Capture instant (RFC3339 millis) for `created_at`/`updated_at`.
+    pub created_at: String,
+}
+
+/// Role/active-flag patch command (at least one field must be `Some`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateUserInput {
+    /// Target operator id.
+    pub user_id: UserId,
+    /// New role, or `None` to keep the current one.
+    pub role: Option<Role>,
+    /// New active flag, or `None` to keep the current one.
+    pub is_active: Option<bool>,
+    /// Mutation instant (RFC3339 millis) for `updated_at`.
+    pub updated_at: String,
 }
 
 /// Atomic first-admin creation command (pre-validated by the use case).

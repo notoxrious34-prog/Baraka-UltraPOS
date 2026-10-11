@@ -65,6 +65,9 @@ use baraka_application::use_cases::suppliers::{
     CreateSupplierUseCase, GetSupplierStatementUseCase, GetSupplierUseCase, SearchSuppliersUseCase,
     UpdateSupplierUseCase,
 };
+use baraka_application::use_cases::users::{
+    CreateUserUseCase, ListUsersUseCase, ResetUserCredentialsUseCase, UpdateUserUseCase,
+};
 use baraka_application::use_cases::{
     AuthenticateUserUseCase, BootstrapFirstAdminInput, BootstrapFirstAdminUseCase, LogoutUseCase,
 };
@@ -72,7 +75,7 @@ use baraka_domain::catalog::{Barcode, CategoryId, ProductId, UnitId};
 use baraka_domain::errors::DomainError;
 use baraka_domain::inventory::WarehouseId;
 use baraka_domain::primitives::QtyMicro;
-use baraka_domain::role::Permission;
+use baraka_domain::role::{Permission, Role};
 use baraka_domain::sales::{
     CreditPolicy, CustomerId, DocumentId, DocumentLanguage, DocumentType, PaymentMethod,
 };
@@ -88,34 +91,35 @@ use crate::dto::{
     CheckoutSaleResponse, CommandErrorDto, ConfirmClosingRequestDto, ConvertBlToFactureRequest,
     ConvertBlToFactureResponse, ConvertDevisToBlRequest, ConvertDevisToBlResponse,
     CreateBackupRequestDto, CreateDraftSaleRequest, CreateProductDto,
-    CreatePurchaseOrderRequestDto, CreateSupplierRequestDto, CreateWarehouseRequestDto,
-    CreditOutstandingRowDto, CustomerDetailDto, CustomerSummaryDto, DailySalesSummaryDto,
-    DecodeSummaryDto, DefineKitDto, DocumentDto, DocumentItemDto, DocumentSearchRequest,
-    DocumentSearchResponse, DocumentSummaryDto, DocumentsProcessReturnRequestDto,
-    DocumentsProcessReturnResponseDto, DraftSaleResponse, GetCustomerRequestDto, GetProductDto,
-    GetSaleResponse, GetSessionReportRequestDto, GetStatementRequest, GetStatementResponse,
-    GetStockLevelRequestDto, GetStockLevelResponseDto, GrossMarginRowDto, HealthDto, KitItemDto,
-    ListWarehousesResponseDto, LoginRequestDto, LoginResponseDto, LogoutRequestDto,
-    LowStockRequestDto, LowStockRowDto, NewCustomerRequest, NewProductUnitDto,
-    OpenCashSessionRequestDto, PaymentDto, PaymentLineDto, PreRestoreChecksDto,
+    CreatePurchaseOrderRequestDto, CreateSupplierRequestDto, CreateUserRequestDto,
+    CreateWarehouseRequestDto, CreditOutstandingRowDto, CustomerDetailDto, CustomerSummaryDto,
+    DailySalesSummaryDto, DecodeSummaryDto, DefineKitDto, DocumentDto, DocumentItemDto,
+    DocumentSearchRequest, DocumentSearchResponse, DocumentSummaryDto,
+    DocumentsProcessReturnRequestDto, DocumentsProcessReturnResponseDto, DraftSaleResponse,
+    GetCustomerRequestDto, GetProductDto, GetSaleResponse, GetSessionReportRequestDto,
+    GetStatementRequest, GetStatementResponse, GetStockLevelRequestDto, GetStockLevelResponseDto,
+    GrossMarginRowDto, HealthDto, KitItemDto, ListWarehousesResponseDto, LoginRequestDto,
+    LoginResponseDto, LogoutRequestDto, LowStockRequestDto, LowStockRowDto, NewCustomerRequest,
+    NewProductUnitDto, OpenCashSessionRequestDto, PaymentDto, PaymentLineDto, PreRestoreChecksDto,
     PreRestoreReportDto, PreRestoreRequestDto, PreviewLineDto, PreviewTotalsRequest,
     PreviewTotalsResponse, PrintStatusResponse, PrinterSettingsDto, ProcessReturnRequestDto,
     ProcessReturnResponseDto, ProductResponseDto, ProductUnitDto, PurchaseLineRequestDto,
     PurchaseOrderDto, PurchaseOrderLineDto, ReceiveGoodsRequestDto, RecordCreditPaymentRequest,
     RecordCreditPaymentResponse, RecordExpenseRequestDto, RecordSupplierInvoiceRequestDto,
     RecordSupplierPaymentRequestDto, RefundDestinationDto, ReportDateRangeRequestDto,
-    ReprintRequest, ReprintResponse, RestoreBackupRequestDto, RestoreIneligibleReasonDto,
-    RestoreOutcomeDto, RestoreWarningDto, ReturnContextResponseDto, ReturnableDocumentSummaryDto,
-    ReturnableItemDto, ReturnableLineDto, SalesByCategoryRowDto, SalesByProductRowDto,
-    SaveStoreIdentityRequest, SearchCustomersRequest, SearchCustomersResponse,
-    SearchSuppliersRequestDto, SearchSuppliersResponseDto, StatementEntryDto,
-    StockMovementHistoryRequestDto, StockMovementRowDto, StockShortageWarningDto, StoreIdentityDto,
-    StoreIdentityResponse, SupplierDto, SupplierIdRequestDto, SupplierLedgerEntryDto,
-    SupplierPaymentOutcomeDto, SupplierStatementDto, TestPrintRequest, TestPrintResponse,
-    TransferStockRequestDto, TransferStockResponseDto, UpdateCustomerRequest,
-    UpdatePrinterSettingsRequest, UpdateProductDto, UpdateProductUnitDto,
-    UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto, UserActivityRequestDto,
-    UserActivityRowDto, VerifyBackupRequestDto, VerifyBackupResponseDto, WarehouseDto,
+    ReprintRequest, ReprintResponse, ResetUserCredentialsRequestDto, RestoreBackupRequestDto,
+    RestoreIneligibleReasonDto, RestoreOutcomeDto, RestoreWarningDto, ReturnContextResponseDto,
+    ReturnableDocumentSummaryDto, ReturnableItemDto, ReturnableLineDto, SalesByCategoryRowDto,
+    SalesByProductRowDto, SaveStoreIdentityRequest, SearchCustomersRequest,
+    SearchCustomersResponse, SearchSuppliersRequestDto, SearchSuppliersResponseDto,
+    StatementEntryDto, StockMovementHistoryRequestDto, StockMovementRowDto,
+    StockShortageWarningDto, StoreIdentityDto, StoreIdentityResponse, SupplierDto,
+    SupplierIdRequestDto, SupplierLedgerEntryDto, SupplierPaymentOutcomeDto, SupplierStatementDto,
+    TestPrintRequest, TestPrintResponse, TransferStockRequestDto, TransferStockResponseDto,
+    UpdateCustomerRequest, UpdatePrinterSettingsRequest, UpdateProductDto, UpdateProductUnitDto,
+    UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto, UpdateUserRequestDto,
+    UserActivityRequestDto, UserActivityRowDto, UserSummaryDto, VerifyBackupRequestDto,
+    VerifyBackupResponseDto, WarehouseDto,
 };
 
 /// Shared backend handles for command handlers.
@@ -633,6 +637,105 @@ pub fn bootstrap_first_admin(
             username: output.username,
         }),
         Err(error) => Err(error_code(&error)),
+    }
+}
+
+/// `users_list` command: every managed operator (UserManage-gated).
+#[tauri::command(rename_all = "snake_case")]
+pub fn users_list(
+    state: tauri::State<'_, AppState>,
+    session_token: String,
+) -> Result<Vec<UserSummaryDto>, String> {
+    let session = require_session(&state, &session_token)?;
+    let records = ListUsersUseCase::new(state.users.as_ref())
+        .execute(&session)
+        .map_err(|error| error_code(&error))?;
+    Ok(records.iter().map(to_user_summary).collect())
+}
+
+/// `users_create` command: validated, hashed operator creation (UserManage-gated).
+#[tauri::command(rename_all = "snake_case")]
+pub fn users_create(
+    state: tauri::State<'_, AppState>,
+    request: CreateUserRequestDto,
+) -> Result<UserSummaryDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let role = Role::from_code(request.role.trim())
+        .map_err(|error| error_code(&ApplicationError::Validation(error)))?;
+    let record = CreateUserUseCase::new(
+        state.hasher.as_ref(),
+        state.users.as_ref(),
+        state.clock.as_ref(),
+    )
+    .execute(
+        &session,
+        &request.username,
+        &request.password,
+        request.pin.as_deref(),
+        role,
+    )
+    .map_err(|error| error_code(&error))?;
+    Ok(to_user_summary(&record))
+}
+
+/// `users_update` command: role/active-flag patch, last-admin protected.
+#[tauri::command(rename_all = "snake_case")]
+pub fn users_update(
+    state: tauri::State<'_, AppState>,
+    request: UpdateUserRequestDto,
+) -> Result<UserSummaryDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let user_id = parse_wire_id(&request.user_id, "user_id")
+        .map(baraka_domain::user::UserId::from)
+        .map_err(|error| error_code(&error))?;
+    let role = request
+        .role
+        .as_deref()
+        .map(|code| {
+            Role::from_code(code.trim())
+                .map_err(|error| error_code(&ApplicationError::Validation(error)))
+        })
+        .transpose()?;
+    let record = UpdateUserUseCase::new(state.users.as_ref(), state.clock.as_ref())
+        .execute(&session, user_id, role, request.is_active)
+        .map_err(|error| error_code(&error))?;
+    Ok(to_user_summary(&record))
+}
+
+/// `users_reset_credentials` command: password/PIN replacement (UserManage-gated).
+#[tauri::command(rename_all = "snake_case")]
+pub fn users_reset_credentials(
+    state: tauri::State<'_, AppState>,
+    request: ResetUserCredentialsRequestDto,
+) -> Result<(), String> {
+    let session = require_session(&state, &request.session_token)?;
+    let user_id = parse_wire_id(&request.user_id, "user_id")
+        .map(baraka_domain::user::UserId::from)
+        .map_err(|error| error_code(&error))?;
+    ResetUserCredentialsUseCase::new(
+        state.hasher.as_ref(),
+        state.users.as_ref(),
+        state.clock.as_ref(),
+    )
+    .execute(
+        &session,
+        user_id,
+        request.password.as_deref(),
+        request.pin.as_deref(),
+    )
+    .map_err(|error| error_code(&error))
+}
+
+/// Map an application user record onto its wire summary (hashes never cross).
+fn to_user_summary(record: &baraka_application::ports::UserRecord) -> UserSummaryDto {
+    UserSummaryDto {
+        id: record.id.to_string(),
+        username: record.username.clone(),
+        role: record.role.code().to_string(),
+        is_active: record.is_active,
+        has_pin: record.has_pin,
+        created_at: record.created_at.clone(),
+        updated_at: record.updated_at.clone(),
     }
 }
 

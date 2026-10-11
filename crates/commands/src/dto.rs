@@ -2245,3 +2245,63 @@ pub struct RestoreOutcomeDto {
     /// Always true: the operator must restart before resuming work.
     pub restart_required: bool,
 }
+
+/// Managed operator view (mirrors application `UserRecord`; never carries hashes).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserSummaryDto {
+    /// Operator id (UUID string).
+    pub id: String,
+    /// Login name.
+    pub username: String,
+    /// Role code (`VENDEUR`, `CAISSIER`, `GERANT`, `ADMIN`).
+    pub role: String,
+    /// Active flag.
+    pub is_active: bool,
+    /// True when a PIN hash slot is configured.
+    pub has_pin: bool,
+    /// Capture instant (RFC3339 millis).
+    pub created_at: String,
+    /// Last mutation instant (RFC3339 millis).
+    pub updated_at: String,
+}
+
+/// `users_create` request (plaintext secrets; hashed inside the use case).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CreateUserRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Login name (3..=30, alphanumeric + underscores).
+    pub username: String,
+    /// Plaintext password (min 6 chars).
+    pub password: String,
+    /// Optional plaintext PIN (4..=6 digits).
+    pub pin: Option<String>,
+    /// Role code.
+    pub role: String,
+}
+
+/// `users_update` request (role/active-flag patch).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateUserRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Target operator id (UUID string).
+    pub user_id: String,
+    /// New role code, or `None` to keep the current one.
+    pub role: Option<String>,
+    /// New active flag, or `None` to keep the current one.
+    pub is_active: Option<bool>,
+}
+
+/// `users_reset_credentials` request (plaintext replacements).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResetUserCredentialsRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Target operator id (UUID string).
+    pub user_id: String,
+    /// Replacement plaintext password, or `None` to keep the current one.
+    pub password: Option<String>,
+    /// Replacement plaintext PIN, or `None` to keep the current one.
+    pub pin: Option<String>,
+}

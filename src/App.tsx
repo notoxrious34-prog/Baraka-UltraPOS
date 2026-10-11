@@ -17,6 +17,7 @@ import { CustomersModule } from "@/features/customers/CustomersModule";
 import { DocumentsModule } from "@/features/documents/DocumentsModule";
 import { StockModule } from "@/features/stock/StockModule";
 import { UsersModule } from "@/features/users/UsersModule";
+import { SettingsModule } from "@/features/settings/SettingsModule";
 import { ReportsHomeScreen } from "@/features/reports/ReportsHomeScreen";
 import { CatalogModule } from "@/features/catalog/CatalogModule";
 import { ipcCheckFirstRunStatus } from "@/lib/ipc";
@@ -57,6 +58,7 @@ function NavRail({
       {entry("suppliers", t(locale, "nav.suppliers"))}
       {entry("reports", t(locale, "nav.reports"))}
       {entry("catalog", t(locale, "nav.catalog"))}
+      {entry("settings", t(locale, "nav.settings"))}
       {role === "ADMIN" && entry("users", t(locale, "nav.users"))}
     </nav>
   );
@@ -132,6 +134,8 @@ export default function App(): ReactElement {
               <ReportsHomeScreen />
             ) : view === "catalog" && manager ? (
               <CatalogModule />
+            ) : view === "settings" && manager ? (
+              <SettingsModule />
             ) : view === "users" ? (
               isAdmin ? (
                 <UsersModule />

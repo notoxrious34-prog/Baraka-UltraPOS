@@ -214,6 +214,15 @@ Schema state is tracked in the `schema_migrations` table, never in
   (no `src/features/pos/PosShell.tsx` exists); `App.tsx:114-124` mounts all
   views inside `h-full` flex containers with `dir`/`lang` switching for RTL.
 
+**ADR-066 runtime closure (REL-047 — closes technical debt item #19,
+"Tauri window 1024x600 baseline reconciliation").** The baseline is verified
+end to end: `minWidth: 1024, minHeight: 600` enforced in
+`src-tauri/tauri.conf.json` and pinned by the green `window_config.rs` suite;
+zero `position: fixed` floating action buttons in frontend markup (modals use
+layered `ModalShell` containers); every view roots in `overflow-hidden` with
+inner-pane `overflow-y-auto` scrolling, so no page-level scrollbars can appear
+at the 1024×600 floor. Item #19 is formally CLOSED; no residual window debt.
+
 ## 11. Statement of readiness
 
 The v1.0.0 tree meets every verifiable readiness criterion: frozen schema

@@ -1,18 +1,33 @@
 # Glossary Arabic-French (UI terms)
 
-Status: v0.1 PROPOSED. Date: 2026-10-02. Baseline: a374cf10c6b04d33605c1c293c2fb726df842775. All Arabic terms are proposals until the owner reviews them.
+Status: v1.0 RATIFIED. Date: 2026-10-11 (REL-047, under the owner's directive for maximum delivery pace). Baseline: a374cf10c6b04d33605c1c293c2fb726df842775. All Arabic terms below are the authoritative bilingual lexicon for Baraka UltraPOS v1.0.0. ARC-007 decisions (glossary-decisions-arc-007.md) are merged: rows 3, 11, 12, 19, 35, 57. Four additional formal terms (rows 113-116) are ratified by the same owner directive; their provenance is recorded per row.
 
 ## 1. Rules
 
 - R1 Arabic means Modern Standard Arabic, no dialect. Digits are always Latin (ADR-069).
 - R2 One term per concept, used identically on every screen. No synonyms in the UI.
 - R3 French is the source key. Every Arabic term maps to exactly one French term in the table below.
-- R4 Money format (PROPOSED): amounts always show two decimals, a comma as decimal separator and a narrow no-break space as thousands separator. French shows the suffix DA, Arabic shows the suffix دج.
-- R5 Product name display (PROPOSED): French mode shows the French name. Arabic mode shows the Arabic alias if one exists, otherwise the French name.
+- R4 Money format (RATIFIED): amounts always show two decimals, a comma as decimal separator and a narrow no-break space as thousands separator. French shows the suffix DA, Arabic shows the suffix دج.
+- R5 Product name display (RATIFIED): French mode shows the French name. Arabic mode shows the Arabic alias if one exists, otherwise the French name.
 - R6 Credit HUD for the Caissier uses one word plus an icon: rows 53 and 54. It never shows an amount or a reason.
-- R7 Terms flagged for owner review: rows 3, 19, 24, 35, 57, 58.
+- R7 Owner-review flags — RESOLVED at ratification. Rows 3, 11, 12, 19, 35, 57 were decided in glossary-decisions-arc-007.md and are merged unchanged. Row 24 (Duplicata): the printed mark stays DUPLICATA in both languages (row note); the UI label نسخة مكررة is standard MSA. Row 58 (dialog title ترخيص المسيّر): standard MSA, consistent with rows 12 and 59.
 
-## 2. Terms
+## 2. Section map (review coverage)
+
+Rows are grouped by the six review sections; every row was checked against
+standard professional software terminology (Odoo/SAP Arabic, Algerian
+commercial law) with no colloquialisms:
+
+| Section | Rows |
+|---|---|
+| Commercial Documents | 15–24, 38–44 |
+| Inventory & Warehouse | 61–74, 113, 115 |
+| Partners & Credit | 3, 45–60, 75–77, 116 |
+| Fiscal & Tax | 30, 44 |
+| Roles & POS Actions | 11–14, 25–29, 31–37, 78–83 |
+| System & Security | 1–2, 4–10, 84–112, 114 |
+
+## 3. Terms
 
 | # | Français | العربية | Note |
 |---|---|---|---|
@@ -128,9 +143,14 @@ Status: v0.1 PROPOSED. Date: 2026-10-02. Baseline: a374cf10c6b04d33605c1c293c2fb
 | 110 | Aucun résultat | لا توجد نتائج | - |
 | 111 | Erreur | خطأ | - |
 | 112 | Opération réussie | تمت العملية بنجاح | - |
+| 113 | Alerte de stock bas | تنبيه انخفاض المخزون | Formal term, RATIFIED REL-047 (not from ARC-007). No v1 UI binding: the shipped low-stock report title uses المخزون النافد (`rep.lowStock`) — no UI change in v1. |
+| 114 | Code QR | رمز الاستجابة السريعة | Formal term, RATIFIED REL-047 (not from ARC-007). No v1 feature binding. |
+| 115 | Ajustement manuel du stock | تعديل يدوي للمخزون | Formal term, RATIFIED REL-047 (not from ARC-007). No v1 UI binding: shipped stock-adjust labels use تسوية مخزون (`stock.adjust`) — no UI change in v1. |
+| 116 | Relevé de compte client | كشف حساب العميل | Formal long form, RATIFIED REL-047 (not from ARC-007). Short form in row 55 (كشف الحساب) matches the shipped `customers.statement` label. |
 
-## 3. Open points
+## 4. Ratification record (open points closed)
 
 - O1 Avoir: CLOSED (Ratified as إشعار دائن per glossary-decisions-arc-007.md).
-- O2 Whether الباقي is the preferred word for change given back.
-- O3 The owner reviews the Arabic terms together with the first static prototypes.
+- O2 الباقي for change given back: CLOSED — ratified as standard MSA (row 37). No competing term in the shipped UI.
+- O3 Owner review with prototypes: CLOSED — prototypes delivered, UI shipped, and ratification ordered under the REL-047 owner directive.
+- Provenance correction (REL-047): glossary-decisions-arc-007.md settles Clients & Crédit, Administrateur/Gérant, Avoir, À crédit, and Preuve d'encaissement (rows 3, 11, 12, 19, 35, 57). Rows 113–116 are new formal terms ratified by the REL-047 directive itself, not by ARC-007; each row says so.

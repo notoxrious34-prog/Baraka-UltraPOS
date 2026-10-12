@@ -996,3 +996,62 @@ SESSION-ARC-012 architect:
    touch the owner's reserved authority (Section 4's reconfirmed lesson).
 5. Remember: CTP persistence language is English (ADR-085) — do not
    re-open this without a fresh, explicit owner instruction.
+
+## 17. SESSION-ARC-012 Final Status (session end, Reply 10 — appended at handoff, never summarize above, only this)
+
+SESSION-ARC-012 ran the full mandated 10 replies and ends with zero
+unfinished engineering work. Field-testing track (owner-driven) plus
+baseline verification, committed as three feature commits on top of the
+v1.0.0-rc.3 baseline (`71bcfef`):
+
+- Reply 1–2, TASK-AUD-034 (baseline / delivery / boot audit): working
+  tree clean at `71bcfef`; tags v1.0.0-rc.1/rc.2/rc.3 present; boot
+  `--check` OK; cargo 388/0/4; vitest 304/31; tsc/eslint clean.
+  CONTRADICTION recorded: task-named `rc.3` artifact filenames do not
+  exist on disk — the authoritative binaries are
+  `Baraka UltraPOS_1.0.0_x64-setup.exe` (221,552,107 bytes,
+  `C608C32A…`) and `Baraka-UltraPOS-v1.0.0-rc.2-Delivery.zip`
+  (221,605,801 bytes, `16E96A32…`), hashes matching SHA256SUMS.txt.
+  Never rename committed release artifacts.
+- Reply 3, TASK-AUD-035 (POS keyboard standby audit): sovereign dispatch
+  lives in `src/hooks/use-pos-keyboard.ts` (F1/F2/F3/F4/F5/F6/F8/F10/F12,
+  Esc, Delete/Backspace, arrows, Ctrl/⌘+K); F7/F9/F11 and Alt+1..8 are
+  unbound; modals use capture-phase guards; CartTable carries no local
+  listener. Zero changes.
+- Reply 4–5, TASK-AUD-036/037 (catalog + stock-adjust audits): product
+  and unit `name_ar` enforced at three layers (frontend validation,
+  `Product::validate_names` / `build_unit`, SQLite NOT NULL); the
+  `StockAdjustModal` picker is a `max-h-40` button stack (not a
+  `<select>`), shared by POS and Stock & Dépôts via
+  `StockModule.tsx:261`. Resolution designed: blank-Ar falls back to Fr
+  (no schema change).
+- Reply 6, TASK-DSN-038 (committed `d0377c2`): optional Arabic name with
+  `name_ar = trim() || nameFr` fallback; PCS/SERIE/CTN/Autre unit presets
+  (PCS default); scanner Enter-guard on barcode inputs; stock picker
+  card overhaul with selected-product emerald banner; 10 i18n keys FR/AR.
+- Reply 7–8, TASK-AUD-038 + TASK-DSN-039 (committed `76cb84e`):
+  zero-dependency Code 128 Subset-B SVG engine (`src/lib/barcode-128.ts`,
+  table verified against ISO/IEC 15417 vectors after a 4-pattern
+  transcription catch); `ProductLabelModal` (50×30/40×25/100×50mm,
+  iframe `@page` dispatch for the XP-410B); picker flexbox overhaul
+  (`shrink-0`, `min-h`, `resolvePickerPane` mutual exclusion).
+- Reply 9, TASK-DSN-040 (committed `35565ef`): hands-free HENEX wedge —
+  printable keystrokes outside inputs/modals redirect into
+  `#pos-search-input`; search-input Enter resolves exact
+  barcode/SKU/unit-barcode or sole result via `resolveScanToCart`,
+  adds with matched unit index, clears, keeps focus, flashes
+  `✓ + pos.itemScannedSuccess`; legacy burst path deferred when focus is
+  in the input (no double-add).
+- Reply 10, TASK-AUD-039 (encoding + IPC audit): `UNIT_PRESET_NAMES`
+  Arabic bytes verified exact on disk (`قطعة` = `D9 82 D8 B7 D8 B9 D8 A9`,
+  no BOM); screenshot mojibake `(äعbة)` is client-side font fallback,
+  not disk corruption. Sequential provisioning validated:
+  `catalog_create_product` returns full `CatalogProduct`
+  (product_id + unit_ids) → `adjustStock(INCREASE)` needs no new backend.
+- Reply 10, TASK-DOC-041 (this handoff): this section, CTP-013 seed,
+  BOOT-013 assembly.
+- Final gates: Rust 388/0/4 (49 suites); Vitest 336/336 (35 files, up
+  from 304/31); TSC 0; ESLint 0; Vite build clean.
+- Owner ratification carried to ARC-013: Master Catalog Hub table +
+  ProductCreateModal (initial stock provisioning + label preview) as
+  Phase 6 Sprint 1, first task TASK-DSN-041. Gates 1 + 2 remain open.

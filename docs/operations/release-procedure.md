@@ -128,3 +128,24 @@ whole `release-v1.0.0/` directory to a USB stick (the `.exe` travels on disk;
 only the three metadata files live in git). The annotated tag `v1.0.0-rc.1`
 marks the exact source state. Operator docs: `docs/operations/HANDOVER-GUIDE.md`
 (source) and `release-v1.0.0/GUIDE-UTILISATION.html` (offline rendering).
+
+### Delivery archive verification (REL-049)
+
+The portable zip was extraction-tested into transient
+`target/delivery_verify/` (deleted afterward): all 4 files unpacked with
+exact sizes (exe 221 552 107, HTML 11 231, readme 2 036, manifest 102
+bytes), HTML opens `<!DOCTYPE html>` → closes `</html>`, and the extracted
+`.exe` re-hashed to the canonical
+`C608C32A8C96B089CB51E187DE473AD0FCCD3E728E8B1C07D0311C1E65D75934`.
+
+Shop-owner integrity check (run next to the downloaded zip):
+
+```powershell
+Get-FileHash -Algorithm SHA256 .\Baraka-UltraPOS-v1.0.0-rc.2-Delivery.zip
+```
+
+Must print:
+
+```text
+16E96A325EF946BF497029B003149110AC62C8B26EA31D86E980BC1D0BF5FA27
+```

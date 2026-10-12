@@ -18,8 +18,15 @@ import { join } from "node:path";
 import {
   baseUnitOf,
   CatalogHubView,
+  computeKpis,
   computeMargin,
+  filterProducts,
   formatMarginPct,
+  marginOfBigint,
+  nextSort,
+  sortProducts,
+  stockOfBigint,
+  type CatalogKpis,
 } from "@/features/catalog/CatalogModule";
 import {
   buildModalWire,
@@ -323,6 +330,9 @@ describe("createProductWithProvisioning", () => {
 describe("CatalogHubView markup", () => {
   const noop = (): void => undefined;
   const noopEdit = (): void => undefined;
+  const noopFilter = (): void => undefined;
+  const noopSort = (): void => undefined;
+  const testKpis: CatalogKpis = { total: 2, inStock: 1, outOfStock: 0, inactive: 1 };
   const rows = [
     product({}),
     product({
@@ -353,6 +363,12 @@ describe("CatalogHubView markup", () => {
         onEdit={noopEdit}
         onToggleActive={noopEdit}
         togglingId={null}
+        filter="all"
+        kpis={testKpis}
+        sort={null}
+        onFilter={noopFilter}
+        onSort={noopSort}
+        onExport={noop}
       />,
     );
     expect(html).toContain("VIS-8X40");
@@ -388,6 +404,12 @@ describe("CatalogHubView markup", () => {
         onEdit={noopEdit}
         onToggleActive={noopEdit}
         togglingId={null}
+        filter="all"
+        kpis={testKpis}
+        sort={null}
+        onFilter={noopFilter}
+        onSort={noopSort}
+        onExport={noop}
       />,
     );
     expect(html).toContain("لا توجد منتجات");
@@ -408,6 +430,12 @@ describe("CatalogHubView markup", () => {
         onEdit={noopEdit}
         onToggleActive={noopEdit}
         togglingId={null}
+        filter="all"
+        kpis={testKpis}
+        sort={null}
+        onFilter={noopFilter}
+        onSort={noopSort}
+        onExport={noop}
       />,
     );
     expect(pending).toContain("…");
@@ -432,6 +460,12 @@ describe("CatalogHubView markup", () => {
         onEdit={noopEdit}
         onToggleActive={noopEdit}
         togglingId={null}
+        filter="all"
+        kpis={testKpis}
+        sort={null}
+        onFilter={noopFilter}
+        onSort={noopSort}
+        onExport={noop}
       />,
     );
     expect(html).toContain("—");
@@ -495,5 +529,180 @@ describe("container wiring (source pins)", () => {
     expect(modalSrc).toContain('role="dialog"');
     expect(modalSrc).toContain('aria-modal="true"');
     expect(modalSrc).toContain('"Escape"');
+  });
+});
+
+describe("computeKpis / filterProducts", () => {
+  const stocked = product({});
+  const ruptured = product({
+    product_id: "p-2",
+    sku: "RUPT",
+    units: [
+      {
+        unit_id: "u-2",
+        product_id: "p-2",
+        unit_name_ar: "قطعة",
+        unit_name_fr: "PCS",
+        factor_micro: "10000",
+        barcode: null,
+        sale_price_centimes: "5000",
+        purchase_price_centimes: "4000",
+        is_base_unit: true,
+        is_default_selling: true,
+      },
+    ],
+  });
+  const dormant = product({ product_id: "p-3", sku: "OLD", is_active: false });
+  const rows = [stocked, ruptured, dormant];
+  const levels = { "p-1": "150000", "p-2": "0" };
+
+  it("tallies total, in-stock, rupture and inactive rows", () => {
+    expect(computeKpis(rows, levels)).toEqual({ total: 3, inStock: 1, outOfStock: 1, inactive: 1 });
+    expect(computeKpis([], {})).toEqual({ total: 0, inStock: 0, outOfStock: 0, inactive: 0 });
+  });
+
+  it("treats missing stock as rupture and malformed micros as zero", () => {
+    expect(computeKpis([stocked], {})).toEqual({ total: 1, inStock: 0, outOfStock: 1, inactive: 0 });
+    expect(stockOfBigint(stocked, { "p-1": "nope" })).toBe(0n);
+  });
+
+  it("filters rows per KPI tab", () => {
+    expect(filterProducts(rows, levels, "all").map((row) => row.sku)).toEqual([
+      "VIS-8X40",
+      "RUPT",
+      "OLD",
+    ]);
+    expect(filterProducts(rows, levels, "in_stock").map((row) => row.sku)).toEqual(["VIS-8X40"]);
+    expect(filterProducts(rows, levels, "out_of_stock").map((row) => row.sku)).toEqual(["RUPT"]);
+    expect(filterProducts(rows, levels, "inactive").map((row) => row.sku)).toEqual(["OLD"]);
+  });
+});
+
+describe("sortProducts / nextSort", () => {
+  const cheap = product({ product_id: "a", sku: "B-SKU", name_fr: "Banane" });
+  const pricey = product({
+    product_id: "b",
+    sku: "A-SKU",
+    name_fr: "Abricot",
+    units: [
+      {
+        unit_id: "ub",
+        product_id: "b",
+        unit_name_ar: "قطعة",
+        unit_name_fr: "PCS",
+        factor_micro: "10000",
+        barcode: null,
+        sale_price_centimes: "99900",
+        purchase_price_centimes: "1000",
+        is_base_unit: true,
+        is_default_selling: true,
+      },
+    ],
+  });
+  const rows = [cheap, pricey];
+  const levels = { a: "10000", b: "50000" };
+
+  it("keeps load order without a sort and never mutates the input", () => {
+    const frozen = [...rows];
+    expect(sortProducts(rows, levels, null).map((row) => row.product_id)).toEqual(["a", "b"]);
+    expect(rows).toEqual(frozen);
+  });
+
+  it("orders SKUs and names alphabetically both ways", () => {
+    expect(sortProducts(rows, levels, { field: "sku", direction: "asc" }).map((r) => r.sku)).toEqual([
+      "A-SKU",
+      "B-SKU",
+    ]);
+    expect(sortProducts(rows, levels, { field: "name", direction: "desc" }).map((r) => r.name_fr)).toEqual([
+      "Banane",
+      "Abricot",
+    ]);
+  });
+
+  it("orders prices, margins and stock with BigInt math", () => {
+    expect(
+      sortProducts(rows, levels, { field: "price", direction: "asc" }).map((r) => r.product_id),
+    ).toEqual(["a", "b"]);
+    expect(
+      sortProducts(rows, levels, { field: "margin", direction: "desc" }).map((r) => r.product_id),
+    ).toEqual(["b", "a"]);
+    expect(
+      sortProducts(rows, levels, { field: "stock", direction: "desc" }).map((r) => r.product_id),
+    ).toEqual(["b", "a"]);
+    expect(marginOfBigint(pricey)).toBe(98900n);
+  });
+
+  it("toggles direction on the active column and resets on a new one", () => {
+    expect(nextSort(null, "sku")).toEqual({ field: "sku", direction: "asc" });
+    expect(nextSort({ field: "sku", direction: "asc" }, "sku")).toEqual({
+      field: "sku",
+      direction: "desc",
+    });
+    expect(nextSort({ field: "sku", direction: "desc" }, "price")).toEqual({
+      field: "price",
+      direction: "asc",
+    });
+  });
+});
+
+describe("KPI strip and export markup", () => {
+  const noop = (): void => undefined;
+  const view = (
+    extra: Partial<{
+      filter: "all" | "in_stock" | "out_of_stock" | "inactive";
+      sort: { field: "sku" | "name" | "price" | "margin" | "stock"; direction: "asc" | "desc" } | null;
+    }> = {},
+  ) =>
+    renderToStaticMarkup(
+      <CatalogHubView
+        locale="fr-DZ"
+        products={[product({})]}
+        stockLevels={{ "p-1": "150000" }}
+        loading={false}
+        error={null}
+        query=""
+        togglingId={null}
+        filter={extra.filter ?? "all"}
+        kpis={{ total: 3, inStock: 1, outOfStock: 1, inactive: 1 }}
+        sort={extra.sort ?? null}
+        onQuery={noop}
+        onClear={noop}
+        onRefresh={noop}
+        onNew={noop}
+        onPrintLabel={noop}
+        onEdit={noop}
+        onToggleActive={noop}
+        onFilter={noop}
+        onSort={noop}
+        onExport={noop}
+      />,
+    );
+
+  it("renders KPI titles with counts and the export action", () => {
+    const html = view();
+    expect(html).toContain("Tous les produits");
+    expect(html).toContain("En stock");
+    expect(html).toContain("En rupture");
+    expect(html).toContain("Inactifs");
+    expect(html).toContain("Exporter CSV");
+    expect(html).toContain("⬇️");
+  });
+
+  it("marks the active filter and idle sort columns", () => {
+    const html = view({ filter: "in_stock" });
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain("↕");
+  });
+
+  it("shows the active sort direction", () => {
+    expect(view({ sort: { field: "price", direction: "asc" } })).toContain("▲");
+    expect(view({ sort: { field: "price", direction: "desc" } })).toContain("▼");
+  });
+
+  it("declares the hub strings in both locales", () => {
+    expect(t("fr-DZ", "cat.kpiInStock")).toBe("En stock");
+    expect(t("ar-DZ", "cat.kpiInStock")).toBe("متوفر في المخزون");
+    expect(t("fr-DZ", "cat.exportCsv")).toBe("Exporter CSV");
+    expect(t("ar-DZ", "cat.exportCsv")).toBe("تصدير CSV");
   });
 });

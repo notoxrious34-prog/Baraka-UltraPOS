@@ -21,6 +21,10 @@ import {
   ProductCreateModal,
 } from "@/features/catalog/ProductCreateModal";
 import {
+  buildCatalogCsvContent,
+  triggerCsvDownload,
+} from "@/features/catalog/catalog-export";
+import {
   formFromProduct,
   ProductEditModal,
   submitEditProduct,
@@ -59,6 +63,152 @@ export function baseUnitOf(product: CatalogProduct): CatalogProduct["units"][num
   return product.units.find((unit) => unit.is_base_unit) ?? product.units[0] ?? null;
 }
 
+/** Quick-filter tab for the KPI strip. */
+export type CatalogFilter = "all" | "in_stock" | "out_of_stock" | "inactive";
+
+/** Sortable hub column. */
+export type SortField = "sku" | "name" | "price" | "margin" | "stock";
+
+export type SortDirection = "asc" | "desc";
+
+export interface CatalogSort {
+  field: SortField;
+  direction: SortDirection;
+}
+
+export interface CatalogKpis {
+  total: number;
+  inStock: number;
+  outOfStock: number;
+  inactive: number;
+}
+
+/** Stock micros as BigInt (`0n` when absent or malformed). Pure. */
+export function stockOfBigint(
+  product: CatalogProduct,
+  stockLevels: Record<string, string>,
+): bigint {
+  try {
+    return BigInt(stockLevels[product.product_id] ?? "0");
+  } catch {
+    return 0n;
+  }
+}
+
+function bigintOrZero(raw: string): bigint {
+  try {
+    return BigInt(raw === "" ? "0" : raw);
+  } catch {
+    return 0n;
+  }
+}
+
+/** KPI tallies over the loaded products (BigInt comparisons only). Pure. */
+export function computeKpis(
+  products: CatalogProduct[],
+  stockLevels: Record<string, string>,
+): CatalogKpis {
+  let inStock = 0;
+  let outOfStock = 0;
+  let inactive = 0;
+  for (const product of products) {
+    if (!product.is_active) {
+      inactive += 1;
+      continue;
+    }
+    if (stockOfBigint(product, stockLevels) > 0n) {
+      inStock += 1;
+    } else {
+      outOfStock += 1;
+    }
+  }
+  return { total: products.length, inStock, outOfStock, inactive };
+}
+
+/** Row predicate for the active KPI filter. Pure. */
+export function filterProducts(
+  products: CatalogProduct[],
+  stockLevels: Record<string, string>,
+  filter: CatalogFilter,
+): CatalogProduct[] {
+  switch (filter) {
+    case "in_stock":
+      return products.filter(
+        (row) => row.is_active && stockOfBigint(row, stockLevels) > 0n,
+      );
+    case "out_of_stock":
+      return products.filter(
+        (row) => row.is_active && stockOfBigint(row, stockLevels) <= 0n,
+      );
+    case "inactive":
+      return products.filter((row) => !row.is_active);
+    case "all":
+    default:
+      return [...products];
+  }
+}
+
+/** Signed margin amount in centimes as BigInt (`0n` when unit-less). Pure. */
+export function marginOfBigint(product: CatalogProduct): bigint {
+  const base = baseUnitOf(product);
+  if (base === null) {
+    return 0n;
+  }
+  return bigintOrZero(base.sale_price_centimes) - bigintOrZero(base.purchase_price_centimes);
+}
+
+function compareField(
+  field: SortField,
+  a: CatalogProduct,
+  b: CatalogProduct,
+  stockLevels: Record<string, string>,
+): number {
+  switch (field) {
+    case "sku":
+      return a.sku.localeCompare(b.sku);
+    case "name":
+      return a.name_fr.localeCompare(b.name_fr);
+    case "price": {
+      const pa = bigintOrZero(baseUnitOf(a)?.sale_price_centimes ?? "0");
+      const pb = bigintOrZero(baseUnitOf(b)?.sale_price_centimes ?? "0");
+      return pa < pb ? -1 : pa > pb ? 1 : 0;
+    }
+    case "margin": {
+      const ma = marginOfBigint(a);
+      const mb = marginOfBigint(b);
+      return ma < mb ? -1 : ma > mb ? 1 : 0;
+    }
+    case "stock": {
+      const sa = stockOfBigint(a, stockLevels);
+      const sb = stockOfBigint(b, stockLevels);
+      return sa < sb ? -1 : sa > sb ? 1 : 0;
+    }
+  }
+}
+
+/** Sorted copy of the rows (`null` sort keeps load order). Pure. */
+export function sortProducts(
+  products: CatalogProduct[],
+  stockLevels: Record<string, string>,
+  sort: CatalogSort | null,
+): CatalogProduct[] {
+  const rows = [...products];
+  if (sort === null) {
+    return rows;
+  }
+  const sign = sort.direction === "asc" ? 1 : -1;
+  rows.sort((a, b) => sign * compareField(sort.field, a, b, stockLevels));
+  return rows;
+}
+
+/** Next sort state for a header click (toggle or fresh asc). Pure. */
+export function nextSort(current: CatalogSort | null, field: SortField): CatalogSort {
+  if (current !== null && current.field === field) {
+    return { field, direction: current.direction === "asc" ? "desc" : "asc" };
+  }
+  return { field, direction: "asc" };
+}
+
 /** Same manager rule as App.tsx isManagerRole (ADMIN or GERANT). */
 function isManagerRole(role: string): boolean {
   return role === "GERANT" || role === "ADMIN";
@@ -75,6 +225,9 @@ export interface CatalogHubViewProps {
   error: string | null;
   query: string;
   togglingId: string | null;
+  filter: CatalogFilter;
+  kpis: CatalogKpis;
+  sort: CatalogSort | null;
   onQuery: (value: string) => void;
   onClear: () => void;
   onRefresh: () => void;
@@ -82,6 +235,9 @@ export interface CatalogHubViewProps {
   onPrintLabel: (product: CatalogProduct) => void;
   onEdit: (product: CatalogProduct) => void;
   onToggleActive: (product: CatalogProduct) => void;
+  onFilter: (filter: CatalogFilter) => void;
+  onSort: (field: SortField) => void;
+  onExport: () => void;
 }
 
 function marginBadgeClass(pct: number): string {
@@ -128,7 +284,71 @@ function stockCell(
 
 /** Pure presentational hub (SSR-safe for tests; the container owns IPC). */
 export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
-  const { locale, products, stockLevels, loading, error, query } = props;
+  const { locale, products, stockLevels, loading, error, query, filter, kpis, sort } = props;
+
+  const sortMark = (field: SortField): string => {
+    if (sort === null || sort.field !== field) {
+      return "↕";
+    }
+    return sort.direction === "asc" ? "▲" : "▼";
+  };
+
+  const sortButton = (
+    label: string,
+    field: SortField,
+    alignEnd: boolean,
+  ): ReactElement => (
+    <button
+      type="button"
+      onClick={() => {
+        props.onSort(field);
+      }}
+      aria-label={`${label} (${sort !== null && sort.field === field ? sort.direction : "unsorted"})`}
+      className={`inline-flex items-center gap-1 font-black hover:text-primary-600 ${alignEnd ? "w-full justify-end" : ""}`}
+    >
+      <span>{label}</span>
+      <span aria-hidden="true" className="text-[10px] opacity-60">
+        {sortMark(field)}
+      </span>
+    </button>
+  );
+
+  const kpiCards: Array<{
+    key: CatalogFilter;
+    title: string;
+    count: number;
+    dot: string;
+    ring: string;
+  }> = [
+    {
+      key: "all",
+      title: t(locale, "cat.kpiAll"),
+      count: kpis.total,
+      dot: "bg-slate-400",
+      ring: "ring-slate-500",
+    },
+    {
+      key: "in_stock",
+      title: t(locale, "cat.kpiInStock"),
+      count: kpis.inStock,
+      dot: "bg-emerald-500",
+      ring: "ring-emerald-500",
+    },
+    {
+      key: "out_of_stock",
+      title: t(locale, "cat.kpiOutOfStock"),
+      count: kpis.outOfStock,
+      dot: "bg-red-500",
+      ring: "ring-red-500",
+    },
+    {
+      key: "inactive",
+      title: t(locale, "cat.kpiInactive"),
+      count: kpis.inactive,
+      dot: "bg-amber-500",
+      ring: "ring-amber-500",
+    },
+  ];
   return (
     <section className="flex h-full flex-col gap-3 p-4">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -169,12 +389,47 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
         </button>
         <button
           type="button"
+          onClick={props.onExport}
+          className="h-10 rounded-lg bg-slate-200 px-4 text-sm font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+        >
+          {"⬇️ "}
+          {t(locale, "cat.exportCsv")}
+        </button>
+        <button
+          type="button"
           onClick={props.onNew}
           className="h-10 rounded-lg bg-accent-500 px-4 text-sm font-black text-slate-950 hover:bg-amber-400"
         >
           {"➕ "}
           {t(locale, "cat.newProduct")}
         </button>
+      </div>
+
+      <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
+        {kpiCards.map((card) => {
+          const selected = filter === card.key;
+          return (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => {
+                props.onFilter(card.key);
+              }}
+              aria-pressed={selected}
+              className={`flex items-center gap-2 rounded-lg border bg-white p-3 text-start transition-all hover:shadow dark:bg-slate-900 ${
+                selected
+                  ? `border-transparent ring-2 ${card.ring}`
+                  : "border-slate-200 dark:border-slate-700"
+              }`}
+            >
+              <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${card.dot}`} />
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-xs font-bold opacity-70">{card.title}</span>
+                <span className="text-xl font-black leading-none">{card.count}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {loading && <p className="shrink-0 text-xs font-bold">{t(locale, "cash.loading")}</p>}
@@ -189,13 +444,13 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
           <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800">
             <tr>
               <th scope="col" className="px-3 py-2 text-start font-black">
-                {t(locale, "cat.colSku")}
+                {sortButton(t(locale, "cat.colSku"), "sku", false)}
               </th>
               <th scope="col" className="px-3 py-2 text-start font-black">
                 {t(locale, "cat.colBarcode")}
               </th>
               <th scope="col" className="px-3 py-2 text-start font-black">
-                {t(locale, "cat.colName")}
+                {sortButton(t(locale, "cat.colName"), "name", false)}
               </th>
               <th scope="col" className="px-3 py-2 text-start font-black">
                 {t(locale, "cat.colBaseUnit")}
@@ -204,13 +459,13 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                 {t(locale, "cat.colPurchasePrice")}
               </th>
               <th scope="col" className="px-3 py-2 text-end font-black">
-                {t(locale, "cat.colSalePrice")}
+                {sortButton(t(locale, "cat.colSalePrice"), "price", true)}
               </th>
               <th scope="col" className="px-3 py-2 text-end font-black">
-                {t(locale, "cat.colMargin")}
+                {sortButton(t(locale, "cat.colMargin"), "margin", true)}
               </th>
               <th scope="col" className="px-3 py-2 text-end font-black">
-                {t(locale, "cat.colStock")}
+                {sortButton(t(locale, "cat.colStock"), "stock", true)}
               </th>
               <th scope="col" className="px-3 py-2 text-start font-black">
                 {t(locale, "cat.colStatus")}
@@ -350,6 +605,8 @@ export function CatalogModule(): ReactElement {
   const [labelProduct, setLabelProduct] = useState<CatalogProduct | null>(null);
   const [editProduct, setEditProduct] = useState<CatalogProduct | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<CatalogFilter>("all");
+  const [sort, setSort] = useState<CatalogSort | null>(null);
   const depotRef = useRef<string | null | undefined>(undefined);
   const skipFirstDebounce = useRef(true);
   const authed = session !== null && isManagerRole(session.role);
@@ -483,6 +740,25 @@ export function CatalogModule(): ReactElement {
     void loadCatalog(activeToken, query.trim(), () => !cancelled);
   };
 
+  const kpis = computeKpis(products, stockLevels);
+  const visible = sortProducts(filterProducts(products, stockLevels, filter), stockLevels, sort);
+
+  const handleFilter = (next: CatalogFilter): void => {
+    setFilter((current) => (current === next ? "all" : next));
+  };
+
+  const handleSort = (field: SortField): void => {
+    setSort((current) => nextSort(current, field));
+  };
+
+  const handleExport = (): void => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    triggerCsvDownload(
+      buildCatalogCsvContent(visible, stockLevels, locale),
+      `${t(locale, "cat.csvExportFilename")}-${stamp}.csv`,
+    );
+  };
+
   const handleUpdated = (updated: CatalogProduct): void => {
     setProducts((prev) =>
       prev.map((row) => (row.product_id === updated.product_id ? updated : row)),
@@ -516,12 +792,15 @@ export function CatalogModule(): ReactElement {
     <>
       <CatalogHubView
         locale={locale}
-        products={products}
+        products={visible}
         stockLevels={stockLevels}
         loading={loading}
         error={error}
         query={query}
         togglingId={togglingId}
+        filter={filter}
+        kpis={kpis}
+        sort={sort}
         onQuery={setQuery}
         onClear={() => {
           setQuery("");
@@ -533,6 +812,9 @@ export function CatalogModule(): ReactElement {
         onPrintLabel={setLabelProduct}
         onEdit={setEditProduct}
         onToggleActive={toggleActive}
+        onFilter={handleFilter}
+        onSort={handleSort}
+        onExport={handleExport}
       />
       <ProductCreateModal
         isOpen={isCreateOpen}

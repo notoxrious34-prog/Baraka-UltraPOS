@@ -1113,3 +1113,57 @@ SESSION-ARC-011 architect:
    touch the owner's reserved authority (Section 4's reconfirmed lesson).
 5. Remember: CTP persistence language is English (ADR-085) — do not
    re-open this without a fresh, explicit owner instruction.
+
+## 17. SESSION-ARC-011 Final Wrap-up & Handoff (Reply 10)
+
+SESSION-ARC-011 executed Phase 5 (Production Readiness & Delivery Packaging)
+across Replies 1–10 under the owner's maximum-pace directive. All work below
+is measured on-disk evidence; Planned order AUD-033, REL-042…REL-049.
+
+- AUD-033 (read-only baseline): working tree clean at DOC-036 tip; all 7
+  gates green (388 Rust / 304 Vitest); window sizing per ADR-066 and the
+  pre-redesign NSIS bundle recorded.
+- REL-042 (commit 3bfb6cd): release benchmarks on the release profile
+  (M1 p50 0.235 ms, M2 p50 3.561 ms, M3 p50 1.025 ms); fresh NSIS installer
+  via `npx tauri build` — 221,552,107 bytes, SHA-256
+  `C608C32A8C96B089CB51E187DE473AD0FCCD3E728E8B1C07D0311C1E65D75934`;
+  §38 readiness audit authored. First build pass exceeded the tool window
+  after linking; the cached rerun completed (lesson §8).
+- REL-043 (commit cc65b58): all 4 `#[ignore]` tests identified (3 benchmarks
+  green; drill correctly gated on `BARAKA_DRILL_DB`); downgrade guard mapped
+  (restore path refuses newer backups, direct open trusts — residual risk
+  recorded); AppData preservation and ADR-066 viewport conformance audited.
+  Finding F2: drill pin stale at 13 vs 14 migrations (left open, correctly).
+- REL-044 (commit 8cbfe81): drill pin 13→14, drill green (`1 passed`) on a
+  scratch DB seeded via `run_migrations` (scaffold + scratch deleted,
+  NO_LEFTOVERS); ADR-086 recorded, INDEX pointer → ADR-087; bilingual
+  HANDOVER-GUIDE.md authored; F2 closed.
+- REL-045 (commit b11c5a5): `release-v1.0.0/` assembled (exe on disk,
+  gitignored); SHA256SUMS.txt, offline GUIDE-UTILISATION.html (0 network
+  refs), LISEZMOI-README.txt; tag `v1.0.0-rc.1`.
+- REL-046 (commit e9f1271): premise conflict recorded — the legal
+  questionnaire was a complete 38-question V2, not an empty draft; gap-filled
+  to 40 questions (mandated title + TVA section, questions-only stance);
+  drill gained debt-receipt/test-print steps with 3-row sign-off (audit +
+  handover synced); release-procedure §8 + stale-path fix.
+- REL-047 (commit 2a1756f): provenance conflict recorded — ARC-007 settles a
+  different five than tasked; glossary ratified v1.0 (116 terms, 0 PROPOSED,
+  rows 113–116 with honest provenance + no-UI-change notes); ADR-066 item #19
+  closed; tag `v1.0.0-rc.2`.
+- REL-048 (commit 76315ad): audit synced to rc.2; portable delivery zip
+  (221,605,801 bytes, SHA-256 `16E96A32…`) with in-zip manifest semantics
+  documented; `.gitignore` covers `*.exe` + `*.zip`.
+- REL-049 (commit 447b6a4): zip extraction-tested (4 files, exact sizes,
+  exe re-hash matches canonical); verification command recorded; tag
+  `v1.0.0-rc.3`.
+
+Gate summary (every reply): fmt 0, clippy 0, cargo test 388 passed / 0
+failed / 4 ignored (49 suites), lint 0, typecheck 0, vitest 304/304 (31
+files). Migrations 0001–0014 frozen throughout; `.gitattributes` untouched;
+no new dependencies; no live-data contact.
+
+Phase 5 status: engineering 100% complete. Two Owner Gates open (neither
+closeable by code): Gate 1 — physical thermal-printer drill sign-off (three
+rows: sale ticket, سند قبض, FR/AR test); Gate 2 — accountant sign-off on the
+40-question questionnaire. Accepted deviations stand: DB encryption out of
+v1 scope; newer-DB direct-open trusts (restore path guarded).

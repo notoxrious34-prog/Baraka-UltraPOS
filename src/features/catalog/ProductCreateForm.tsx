@@ -19,7 +19,26 @@ export const BASE_FACTOR_MICRO = "10000";
 
 const MAX_NAME_CHARS = 100;
 
+/** Standard hardware unit presets (TASK-DSN-038). CUSTOM = free manual entry. */
+export type UnitPreset = "PCS" | "SERIE" | "CTN" | "CUSTOM";
+
+const UNIT_PRESET_NAMES: Record<Exclude<UnitPreset, "CUSTOM">, { fr: string; ar: string }> = {
+  PCS: { fr: "PCS", ar: "قطعة" },
+  SERIE: { fr: "SERIE", ar: "سيريا" },
+  CTN: { fr: "CTN", ar: "كرتون" },
+};
+
+/** Apply a preset to a unit row (CUSTOM keeps existing manual values). */
+export function applyUnitPreset(unit: UnitFormData, preset: UnitPreset): UnitFormData {
+  if (preset === "CUSTOM") {
+    return { ...unit, preset };
+  }
+  const names = UNIT_PRESET_NAMES[preset];
+  return { ...unit, preset, nameFr: names.fr, nameAr: names.ar };
+}
+
 export interface UnitFormData {
+  preset: UnitPreset;
   nameAr: string;
   nameFr: string;
   /** Decimal factor string (extras only; base unit uses BASE_FACTOR_MICRO). */
@@ -41,7 +60,15 @@ export interface ProductFormData {
 }
 
 export function emptyUnit(): UnitFormData {
-  return { nameAr: "", nameFr: "", factor: "", salePrice: "", costPrice: "", barcode: "" };
+  return {
+    preset: "PCS",
+    nameAr: UNIT_PRESET_NAMES.PCS.ar,
+    nameFr: UNIT_PRESET_NAMES.PCS.fr,
+    factor: "",
+    salePrice: "",
+    costPrice: "",
+    barcode: "",
+  };
 }
 
 export function emptyProductForm(): ProductFormData {
@@ -80,16 +107,23 @@ export function validateProductForm(data: ProductFormData): Partial<Record<strin
   if (isBlank(data.sku)) {
     errors.sku = "cat.required";
   }
-  if (isBlank(data.nameAr) || isTooLong(data.nameAr)) {
+  // Arabic product name is optional (TASK-DSN-038): only length-guarded,
+  // blank falls back to the French name in the wire builder.
+  if (!isBlank(data.nameAr) && isTooLong(data.nameAr)) {
     errors.nameAr = "cat.required";
   }
   if (isBlank(data.nameFr) || isTooLong(data.nameFr)) {
     errors.nameFr = "cat.required";
   }
-  if (isBlank(data.base.nameAr) || isTooLong(data.base.nameAr)) {
+  // Preset units carry canonical names; CUSTOM rows require French only
+  // (Arabic falls back to French in the wire builder).
+  if (data.base.preset === "CUSTOM" && isBlank(data.base.nameFr)) {
+    errors["base.nameFr"] = "cat.required";
+  }
+  if (!isBlank(data.base.nameAr) && isTooLong(data.base.nameAr)) {
     errors["base.nameAr"] = "cat.required";
   }
-  if (isBlank(data.base.nameFr) || isTooLong(data.base.nameFr)) {
+  if (data.base.preset === "CUSTOM" && isTooLong(data.base.nameFr)) {
     errors["base.nameFr"] = "cat.required";
   }
   const baseSale = priceError(data.base.salePrice);
@@ -102,10 +136,13 @@ export function validateProductForm(data: ProductFormData): Partial<Record<strin
   }
   data.extras.forEach((extra, index) => {
     const prefix = `extras.${index}`;
-    if (isBlank(extra.nameAr) || isTooLong(extra.nameAr)) {
+    if (extra.preset === "CUSTOM" && isBlank(extra.nameFr)) {
+      errors[`${prefix}.nameFr`] = "cat.required";
+    }
+    if (!isBlank(extra.nameAr) && isTooLong(extra.nameAr)) {
       errors[`${prefix}.nameAr`] = "cat.required";
     }
-    if (isBlank(extra.nameFr) || isTooLong(extra.nameFr)) {
+    if (extra.preset === "CUSTOM" && isTooLong(extra.nameFr)) {
       errors[`${prefix}.nameFr`] = "cat.required";
     }
     if (isBlank(extra.factor)) {
@@ -134,9 +171,12 @@ export function validateProductForm(data: ProductFormData): Partial<Record<strin
 
 function toWireUnit(unit: UnitFormData, factorMicro: string, isBase: boolean): NewProductUnitWire {
   const barcode = unit.barcode.trim();
+  // Arabic falls back to French so backend NOT NULL / domain invariants hold.
+  const nameFr = unit.nameFr.trim();
+  const nameAr = unit.nameAr.trim() === "" ? nameFr : unit.nameAr.trim();
   return {
-    unit_name_ar: unit.nameAr.trim(),
-    unit_name_fr: unit.nameFr.trim(),
+    unit_name_ar: nameAr,
+    unit_name_fr: nameFr,
     factor_micro: factorMicro,
     barcode: barcode === "" ? null : barcode,
     sale_price_centimes:
@@ -160,11 +200,12 @@ export function buildCreateProductWire(data: ProductFormData): CreateProductWire
   }
   const sku = data.sku.trim();
   const barcode = data.barcode.trim();
+  const nameFr = data.nameFr.trim();
   return {
     sku,
     barcode: barcode === "" ? null : barcode,
-    name_ar: data.nameAr.trim(),
-    name_fr: data.nameFr.trim(),
+    name_ar: data.nameAr.trim() === "" ? nameFr : data.nameAr.trim(),
+    name_fr: nameFr,
     category_id: null,
     is_kit: false,
     units: [
@@ -218,6 +259,17 @@ export function ProductCreateForm({
     setData((prev) => ({
       ...prev,
       extras: prev.extras.map((extra, i) => (i === index ? { ...extra, [field]: value } : extra)),
+    }));
+  };
+
+  const patchBasePreset = (preset: UnitPreset): void => {
+    setData((prev) => ({ ...prev, base: applyUnitPreset(prev.base, preset) }));
+  };
+
+  const patchExtraPreset = (index: number, preset: UnitPreset): void => {
+    setData((prev) => ({
+      ...prev,
+      extras: prev.extras.map((extra, i) => (i === index ? applyUnitPreset(extra, preset) : extra)),
     }));
   };
 
@@ -282,7 +334,7 @@ export function ProductCreateForm({
           {fieldError(errors, "sku", locale)}
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold">{t(locale, "cat.nameAr")}</span>
+          <span className="text-xs font-bold">{t(locale, "cat.nameArOptional")}</span>
           <input
             value={data.nameAr}
             dir="auto"
@@ -299,26 +351,54 @@ export function ProductCreateForm({
       </div>
       <label className="flex flex-col gap-1">
         <span className="text-xs font-bold">{t(locale, "cat.barcode")}</span>
-        <input value={data.barcode} onChange={(e) => patch("barcode", e.target.value)} className={inputClass} />
+        <input
+          value={data.barcode}
+          onChange={(e) => patch("barcode", e.target.value)}
+          onKeyDown={swallowEnter}
+          className={inputClass}
+        />
       </label>
 
       <h4 className="text-xs font-black uppercase opacity-70">{t(locale, "cat.baseUnit")}</h4>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold">{t(locale, "cat.nameAr")}</span>
-          <input
-            value={data.base.nameAr}
-            dir="auto"
-            onChange={(e) => patchBase("nameAr", e.target.value)}
+          <span className="text-xs font-bold">{t(locale, "cat.unitPreset")}</span>
+          <select
+            value={data.base.preset}
+            onChange={(e) => {
+              patchBasePreset(e.target.value as UnitPreset);
+            }}
             className={inputClass}
-          />
-          {fieldError(errors, "base.nameAr", locale)}
+          >
+            <option value="PCS">{t(locale, "cat.unitPcs")}</option>
+            <option value="SERIE">{t(locale, "cat.unitSerie")}</option>
+            <option value="CTN">{t(locale, "cat.unitCtn")}</option>
+            <option value="CUSTOM">{t(locale, "cat.unitCustom")}</option>
+          </select>
         </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold">{t(locale, "cat.nameFr")}</span>
-          <input value={data.base.nameFr} onChange={(e) => patchBase("nameFr", e.target.value)} className={inputClass} />
-          {fieldError(errors, "base.nameFr", locale)}
-        </label>
+        {data.base.preset === "CUSTOM" && (
+          <>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold">{t(locale, "cat.nameArOptional")}</span>
+              <input
+                value={data.base.nameAr}
+                dir="auto"
+                onChange={(e) => patchBase("nameAr", e.target.value)}
+                className={inputClass}
+              />
+              {fieldError(errors, "base.nameAr", locale)}
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold">{t(locale, "cat.nameFr")}</span>
+              <input
+                value={data.base.nameFr}
+                onChange={(e) => patchBase("nameFr", e.target.value)}
+                className={inputClass}
+              />
+              {fieldError(errors, "base.nameFr", locale)}
+            </label>
+          </>
+        )}
         <label className="flex flex-col gap-1">
           <span className="text-xs font-bold">{t(locale, "cat.salePrice")}</span>
           <input
@@ -341,7 +421,12 @@ export function ProductCreateForm({
         </label>
         <label className="flex flex-col gap-1 md:col-span-2">
           <span className="text-xs font-bold">{t(locale, "cat.barcode")}</span>
-          <input value={data.base.barcode} onChange={(e) => patchBase("barcode", e.target.value)} className={inputClass} />
+          <input
+            value={data.base.barcode}
+            onChange={(e) => patchBase("barcode", e.target.value)}
+            onKeyDown={swallowEnter}
+            className={inputClass}
+          />
         </label>
       </div>
 
@@ -352,24 +437,43 @@ export function ProductCreateForm({
           className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 p-2 md:grid-cols-3 dark:border-slate-700"
         >
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold">{t(locale, "cat.nameAr")}</span>
-            <input
-              value={extra.nameAr}
-              dir="auto"
-              onChange={(e) => patchExtra(index, "nameAr", e.target.value)}
+            <span className="text-xs font-bold">{t(locale, "cat.unitPreset")}</span>
+            <select
+              value={extra.preset}
+              onChange={(e) => {
+                patchExtraPreset(index, e.target.value as UnitPreset);
+              }}
               className={inputClass}
-            />
-            {fieldError(errors, `extras.${index}.nameAr`, locale)}
+            >
+              <option value="PCS">{t(locale, "cat.unitPcs")}</option>
+              <option value="SERIE">{t(locale, "cat.unitSerie")}</option>
+              <option value="CTN">{t(locale, "cat.unitCtn")}</option>
+              <option value="CUSTOM">{t(locale, "cat.unitCustom")}</option>
+            </select>
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-bold">{t(locale, "cat.nameFr")}</span>
-            <input
-              value={extra.nameFr}
-              onChange={(e) => patchExtra(index, "nameFr", e.target.value)}
-              className={inputClass}
-            />
-            {fieldError(errors, `extras.${index}.nameFr`, locale)}
-          </label>
+          {extra.preset === "CUSTOM" && (
+            <>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-bold">{t(locale, "cat.nameArOptional")}</span>
+                <input
+                  value={extra.nameAr}
+                  dir="auto"
+                  onChange={(e) => patchExtra(index, "nameAr", e.target.value)}
+                  className={inputClass}
+                />
+                {fieldError(errors, `extras.${index}.nameAr`, locale)}
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-bold">{t(locale, "cat.nameFr")}</span>
+                <input
+                  value={extra.nameFr}
+                  onChange={(e) => patchExtra(index, "nameFr", e.target.value)}
+                  className={inputClass}
+                />
+                {fieldError(errors, `extras.${index}.nameFr`, locale)}
+              </label>
+            </>
+          )}
           <label className="flex flex-col gap-1">
             <span className="text-xs font-bold">{t(locale, "cat.factor")}</span>
             <input
@@ -405,6 +509,7 @@ export function ProductCreateForm({
             <input
               value={extra.barcode}
               onChange={(e) => patchExtra(index, "barcode", e.target.value)}
+              onKeyDown={swallowEnter}
               className={inputClass}
             />
           </label>

@@ -68,6 +68,9 @@ export function StockAdjustModal(): ReactElement {
   const [pickerQuery, setPickerQuery] = useState("");
   const [pickerResults, setPickerResults] = useState<CatalogProduct[]>([]);
   const [pickerBusy, setPickerBusy] = useState(false);
+  const [pickedMeta, setPickedMeta] = useState<{ sku: string; barcode: string | null } | null>(
+    null,
+  );
 
   const delta = parseMicro(s.computedDeltaMicro);
   const newStock = parseMicro(s.computedNewStockMicro);
@@ -114,6 +117,25 @@ export function StockAdjustModal(): ReactElement {
     closeModal();
   };
 
+  const changeProduct = (): void => {
+    if (s.isSubmitting) {
+      return;
+    }
+    useStockAdjustModalStore.setState({
+      productId: null,
+      productName: null,
+      unitId: null,
+      unitName: null,
+      currentStockMicro: "0",
+      computedDeltaMicro: "0",
+      computedNewStockMicro: "0",
+      errorMessage: null,
+      successResult: null,
+    });
+    setPickedMeta(null);
+    setPickerResults([]);
+  };
+
   const runPickerSearch = (): void => {
     if (pickerQuery.trim() === "" || session === null) {
       setPickerResults([]);
@@ -150,6 +172,7 @@ export function StockAdjustModal(): ReactElement {
       errorMessage: null,
       successResult: null,
     });
+    setPickedMeta({ sku: product.sku, barcode: product.barcode });
     if (token !== null && warehouseId !== null) {
       ipcGetStock(token, product.product_id, warehouseId)
         .then((level) => {
@@ -249,44 +272,68 @@ export function StockAdjustModal(): ReactElement {
               </button>
             </div>
             {pickerResults.length > 0 && (
-              <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
+              <div className="max-h-60 space-y-1.5 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-2 dark:border-slate-700 dark:bg-slate-900/50">
                 {pickerResults.map((product) => (
-                  <button
+                  <div
                     key={product.product_id}
-                    type="button"
-                    disabled={s.isSubmitting}
-                    onClick={() => {
-                      pickProduct(product);
-                    }}
-                    className="flex items-center justify-between gap-2 rounded-md bg-slate-100 px-2 py-1.5 text-start hover:bg-slate-200 disabled:opacity-50 dark:bg-slate-800 dark:hover:bg-slate-700"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800"
                   >
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-extrabold">
                         {locale === "ar-DZ" ? product.name_ar : product.name_fr}
                       </span>
-                      <span className="block font-mono text-[11px] opacity-60">
-                        {product.sku}
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs dark:bg-slate-700">
+                          {product.sku}
+                        </span>
+                        {product.barcode !== null && (
+                          <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs opacity-70 dark:bg-slate-700">
+                            <bdi dir="ltr">{product.barcode}</bdi>
+                          </span>
+                        )}
                       </span>
                     </span>
-                    <span aria-hidden="true" className="shrink-0 font-black">
-                      +
-                    </span>
-                  </button>
+                    <button
+                      type="button"
+                      disabled={s.isSubmitting}
+                      onClick={() => {
+                        pickProduct(product);
+                      }}
+                      className="h-8 shrink-0 rounded bg-primary-600 px-3 text-xs font-bold text-white hover:bg-primary-700 disabled:opacity-50"
+                    >
+                      {t(locale, "stockAdjust.selectProductAction")}
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
 
             {s.productId === null ? (
-              <p className="text-center text-xs font-bold text-slate-500">
-                {t(locale, "stockAdjust.noProduct")}
+              <p className="rounded-lg border border-slate-200 bg-slate-100/70 p-3 text-center text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400">
+                {t(locale, "stockAdjust.pleaseSelectGuidance")}
               </p>
             ) : (
-              <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm dark:bg-slate-800">
-                <p className="truncate font-extrabold">{s.productName}</p>
+              <div className="space-y-1 rounded-lg border-2 border-emerald-500 bg-emerald-50/50 p-3 dark:bg-emerald-950/20">
+                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                  {"✓ "}
+                  {t(locale, "stockAdjust.selectedProductBadge")}
+                </p>
+                <p className="truncate text-sm font-extrabold">{s.productName}</p>
+                <p className="font-mono text-xs opacity-70">
+                  {pickedMeta !== null ? pickedMeta.sku : ""}
+                </p>
                 <p className="font-mono text-xs opacity-70">
                   {t(locale, "stockAdjust.currentStock")}: {fmtQty(parseMicro(s.currentStockMicro))}{" "}
                   {s.unitName ?? ""}
                 </p>
+                <button
+                  type="button"
+                  onClick={changeProduct}
+                  disabled={s.isSubmitting}
+                  className="text-xs font-semibold text-slate-600 underline disabled:opacity-50 dark:text-slate-300"
+                >
+                  {t(locale, "stockAdjust.changeProduct")}
+                </button>
               </div>
             )}
 

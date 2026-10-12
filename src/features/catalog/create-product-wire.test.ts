@@ -7,9 +7,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  applyUnitPreset,
   BASE_FACTOR_MICRO,
   buildCreateProductWire,
   emptyProductForm,
+  emptyUnit,
   validateProductForm,
   type ProductFormData,
 } from "@/features/catalog/ProductCreateForm";
@@ -21,6 +23,7 @@ function validForm(): ProductFormData {
     nameFr: "Vis",
     barcode: "",
     base: {
+      preset: "CUSTOM",
       nameAr: "قطعة",
       nameFr: "Pièce",
       factor: "1",
@@ -30,6 +33,7 @@ function validForm(): ProductFormData {
     },
     extras: [
       {
+        preset: "CUSTOM",
         nameAr: "علبة",
         nameFr: "Boîte",
         factor: "12",
@@ -84,6 +88,7 @@ describe("buildCreateProductWire", () => {
       ...validForm(),
       extras: [
         {
+          preset: "CUSTOM",
           nameAr: "علبة",
           nameFr: "Boîte",
           factor: "0",
@@ -105,5 +110,72 @@ describe("buildCreateProductWire", () => {
     });
     expect(errors.nameFr).toBe("cat.required");
     expect(errors["base.salePrice"]).toBe("cat.invalidPrice");
+  });
+
+  it("accepts a blank Arabic product name and falls back to French on the wire", () => {
+    const form: ProductFormData = { ...validForm(), nameAr: "   " };
+    expect(validateProductForm(form).nameAr).toBeUndefined();
+    const wire = buildCreateProductWire(form);
+    expect(wire.name_ar).toBe("Vis");
+    expect(wire.name_fr).toBe("Vis");
+  });
+
+  it("defaults new unit rows to the PCS preset with canonical names", () => {
+    const unit = emptyUnit();
+    expect(unit.preset).toBe("PCS");
+    expect(unit.nameFr).toBe("PCS");
+    expect(unit.nameAr).toBe("قطعة");
+    expect(Object.keys(validateProductForm(emptyProductForm())).length).toBeGreaterThan(0);
+    const form: ProductFormData = {
+      sku: "VIS-8X40",
+      nameAr: "",
+      nameFr: "Vis",
+      barcode: "",
+      base: { ...emptyUnit(), salePrice: "", costPrice: "", barcode: "" },
+      extras: [],
+    };
+    expect(Object.keys(validateProductForm(form)).length).toBe(0);
+    const wire = buildCreateProductWire(form);
+    expect(wire.units[0]?.unit_name_fr).toBe("PCS");
+    expect(wire.units[0]?.unit_name_ar).toBe("قطعة");
+  });
+
+  it("applyUnitPreset maps presets to bilingual names and keeps CUSTOM values", () => {
+    const base = emptyUnit();
+    expect(applyUnitPreset(base, "SERIE")).toMatchObject({
+      preset: "SERIE",
+      nameFr: "SERIE",
+      nameAr: "سيريا",
+    });
+    expect(applyUnitPreset(base, "CTN")).toMatchObject({
+      preset: "CTN",
+      nameFr: "CTN",
+      nameAr: "كرتون",
+    });
+    expect(applyUnitPreset(base, "PCS")).toMatchObject({
+      preset: "PCS",
+      nameFr: "PCS",
+      nameAr: "قطعة",
+    });
+    const custom = applyUnitPreset(base, "CUSTOM");
+    expect(custom.preset).toBe("CUSTOM");
+    expect(custom.nameFr).toBe("PCS");
+    const blankCustom = applyUnitPreset(
+      { ...emptyUnit(), preset: "CUSTOM", nameAr: "", nameFr: "" },
+      "CUSTOM",
+    );
+    expect(validateProductForm({ ...validForm(), base: blankCustom })["base.nameFr"]).toBe(
+      "cat.required",
+    );
+  });
+
+  it("falls back blank CUSTOM unit Arabic names to French on the wire", () => {
+    const form: ProductFormData = {
+      ...validForm(),
+      base: { ...validForm().base, nameAr: "" },
+    };
+    expect(validateProductForm(form)["base.nameAr"]).toBeUndefined();
+    const wire = buildCreateProductWire(form);
+    expect(wire.units[0]?.unit_name_ar).toBe("Pièce");
   });
 });

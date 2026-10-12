@@ -8,7 +8,7 @@
  */
 
 import type { ReactElement } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useCartStore } from "@/stores/cart-store";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
@@ -16,8 +16,39 @@ import { useProductEditStore } from "@/stores/product-edit-store";
 import { useCatalogSearch } from "@/hooks/use-catalog-search";
 import { t } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
+import type { CatalogProduct } from "@/types/pos";
 
 type TypeFilter = "all" | "kits" | "goods";
+
+/** Exact scan-to-cart resolution (TASK-DSN-040): barcode/SKU hit or sole result. */
+export function resolveScanToCart(
+  query: string,
+  results: CatalogProduct[],
+): { product: CatalogProduct; unitIndex: number } | null {
+  const trimmed = query.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  const lower = trimmed.toLowerCase();
+  const exact = results.find(
+    (product) =>
+      product.barcode?.toLowerCase() === lower ||
+      product.sku.toLowerCase() === lower ||
+      product.units.some((unit) => unit.barcode?.toLowerCase() === lower),
+  );
+  const target = exact ?? (results.length === 1 ? results[0] : null);
+  if (target === null || target === undefined) {
+    return null;
+  }
+  const matchedUnit =
+    target.units.find((unit) => unit.barcode?.toLowerCase() === lower) ??
+    target.units.find((unit) => unit.is_base_unit) ??
+    target.units[0];
+  if (matchedUnit === undefined) {
+    return null;
+  }
+  return { product: target, unitIndex: target.units.indexOf(matchedUnit) };
+}
 
 export function ProductDiscovery(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
@@ -29,7 +60,38 @@ export function ProductDiscovery(): ReactElement {
   const addProduct = useCartStore((state) => state.addProduct);
   const { results, loading, error, scanFlash } = useCatalogSearch();
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [lastScanned, setLastScanned] = useState<{
+    name: string;
+    sku: string;
+    timestamp: number;
+  } | null>(null);
+  const scanTimer = useRef<number | null>(null);
   const canEditCatalog = session !== null && (session.role === "GERANT" || session.role === "ADMIN");
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    const target = resolveScanToCart(searchQuery, results);
+    if (target === null) {
+      return;
+    }
+    addProduct(target.product, target.unitIndex);
+    setSearchQuery("");
+    event.currentTarget.focus();
+    setLastScanned({
+      name: locale === "ar-DZ" ? target.product.name_ar : target.product.name_fr,
+      sku: target.product.sku,
+      timestamp: Date.now(),
+    });
+    if (scanTimer.current !== null) {
+      window.clearTimeout(scanTimer.current);
+    }
+    scanTimer.current = window.setTimeout(() => {
+      setLastScanned(null);
+    }, 2000);
+  };
 
   const visible = results.filter((product) => {
     if (typeFilter === "kits") {
@@ -56,7 +118,8 @@ export function ProductDiscovery(): ReactElement {
           onChange={(event) => {
             setSearchQuery(event.target.value);
           }}
-          placeholder={t(locale, "search.placeholder")}
+          onKeyDown={handleSearchKeyDown}
+          placeholder={t(locale, "pos.scanPrompt")}
           autoComplete="off"
           className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-600/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         />
@@ -71,6 +134,14 @@ export function ProductDiscovery(): ReactElement {
           {scanFlash ? t(locale, "search.scanning") : t(locale, "search.barcodeHint")}
         </span>
       </div>
+      {lastScanned !== null && (
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 animate-in fade-in duration-150">
+          {"✓ "}
+          {lastScanned.name}
+          {" — "}
+          {t(locale, "pos.itemScannedSuccess")}
+        </div>
+      )}
 
       <div className="flex shrink-0 gap-1">
         {searchQuery.trim() === "" && visible.length > 0 && (

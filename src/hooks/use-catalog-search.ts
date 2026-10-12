@@ -74,13 +74,15 @@ export function useCatalogSearch(): CatalogSearch {
         return;
       }
       const target = event.target;
-      const inSearch =
-        target instanceof HTMLInputElement && target.id === "pos-search-input";
       const inBody = target === document.body || target instanceof HTMLDivElement;
       if (event.key === "Enter") {
         const burst = wedge.current;
         wedge.current = [];
-        if (burst.length < MIN_SCAN_LENGTH || (!inBody && !inSearch)) {
+        // When focus already sits in the search input (the steady state after
+        // the DSN-040 wedge redirect), the input's own Enter handler on
+        // #pos-search-input is the single resolver — resolving here too would
+        // double-add. The legacy burst path is kept for body-focus scans.
+        if (burst.length < MIN_SCAN_LENGTH || !inBody) {
           return;
         }
         const first = burst[0];

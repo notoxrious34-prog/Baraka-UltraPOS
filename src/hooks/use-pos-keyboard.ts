@@ -33,6 +33,16 @@ function isTextInput(target: EventTarget | null): boolean {
   );
 }
 
+/** True for a bare printable character keystroke (no modifier). */
+export function isPrintableKey(event: {
+  key: string;
+  ctrlKey: boolean;
+  altKey: boolean;
+  metaKey: boolean;
+}): boolean {
+  return event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey;
+}
+
 /** True when the active customer blocks checkout on credit grounds. */
 export function isCreditBlocked(): boolean {
   const { customer } = useCartStore.getState();
@@ -196,6 +206,27 @@ export function usePosKeyboard(): void {
       if (modalOpen) {
         return;
       }
+
+      // Scanner wedge (TASK-DSN-040): a bare printable keystroke outside any
+      // text input and outside a modal is redirected into the catalog search
+      // bar, so the HENEX HC-3206R (USB-HID wedge) scans hands-free regardless
+      // of focus. The first redirect moved focus into the input; subsequent
+      // characters arrive with the input focused and take the normal path.
+      if (isPrintableKey(event)) {
+        const targetInput = document.getElementById(
+          SEARCH_INPUT_ID,
+        ) as HTMLInputElement | null;
+        if (targetInput !== null && !targetInput.disabled) {
+          event.preventDefault();
+          targetInput.focus();
+          targetInput.value = targetInput.value + event.key;
+          targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+          const length = targetInput.value.length;
+          targetInput.setSelectionRange(length, length);
+          return;
+        }
+      }
+
       if (event.key === "Delete" || event.key === "Backspace") {
         const line = useCartStore.getState().lines[usePosUiStore.getState().selectedLineIndex];
         if (line !== undefined) {

@@ -53,6 +53,7 @@ src-tauri/gen/schemas/
 # disk in release-v1.0.0/ for the merchant; only its SHA256SUMS.txt, HTML
 # handbook, and readme are committed.
 release-v1.0.0/*.exe
+release-v1.0.0/*.zip
 
 # Audit scratch
 audit/tmp/

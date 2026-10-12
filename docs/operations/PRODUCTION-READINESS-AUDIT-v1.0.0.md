@@ -14,6 +14,13 @@
 | Branch | `master` |
 | Working tree at audit | clean (`git status --porcelain` empty, verified before and after gates) |
 | Prior baseline | TASK-AUD-033 (all 7 gates green) |
+| Release tag | `v1.0.0-rc.2` (annotated; `v1.0.0-rc.1` superseded as source marker) |
+| Ratified lexicon | `docs/design/glossary-ar-fr.md` v1.0 RATIFIED, 116 terms (REL-047) |
+| Legal instrument | `docs/legal/QUESTIONNAIRE-COMPTABLE-FR.html`, 40 questions, 0 external links (REL-046) |
+| Handover pack | `docs/operations/HANDOVER-GUIDE.md` + offline `release-v1.0.0/GUIDE-UTILISATION.html` + `LISEZMOI-README.txt` (REL-044/045) |
+| Portable delivery | `release-v1.0.0/Baraka-UltraPOS-v1.0.0-rc.2-Delivery.zip` (on-disk, gitignored; hashes in `SHA256SUMS.txt`) |
+| Drill pin F2 | RESOLVED — `EXPECTED_MIGRATION_VERSION = 14`, drill green on scratch DB (REL-044) |
+| ADR-066 item #19 | CLOSED — 1024×600 baseline reconciled end to end (REL-047) |
 
 ## 2. Architectural invariants compliance
 
@@ -90,8 +97,15 @@ shop-owner release notes (FR/AR) in `docs/operations/release-notes-v1.0.0.md`.
 | Gate | Status |
 |---|---|
 | Thermal-printer hardware drill (§38 "Real hardware printing verified") | **OPEN for shop testing** — procedure + three-row signature table (sale ticket, سند قبض debt receipt, FR/AR test print) ready (`thermal-printer-drill.md` §6); closes only with all three rows signed in-shop |
-| Accountant tax questionnaire | **OPEN, lowest priority** — no code impact |
+| Accountant tax questionnaire | **OPEN — Gate 2 (owner-facing)** — the 40-question instrument (`docs/legal/QUESTIONNAIRE-COMPTABLE-FR.html`, REL-046) awaits the expert-comptable's written sign-off; no code impact, lowest engineering priority |
 | Database encryption | **Accepted deviation** — at-rest encryption explicitly out of v1 scope; mitigated by per-user install, local-only storage, and backup/restore guidance |
+
+All technical engineering requirements under CHARTER-v2.0 Section 9 are
+satisfied (invariants §2, gates §3, benchmarks §3, packaging §5, drill
+pin F2 §7, viewport §10, glossary/questionnaire/handover above). The only
+remaining opens are the two owner-facing sign-offs: **Gate 1** (physical
+printer drill, three signed rows) and **Gate 2** (accounting questionnaire) —
+neither can be closed by any code change.
 
 ## 7. Ignored Tests Verification
 

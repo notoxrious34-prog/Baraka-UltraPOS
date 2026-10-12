@@ -143,14 +143,16 @@ Windows الذي سيستعمل الصندوق. إذا ظهر تحذير SmartSc
 - [ ] Test physique : papier identique à l'aperçu, point par point.
 - [ ] Tolérances : USB débranché / éteinte / sans papier → badge d'erreur
       propre, application utilisable.
-- [ ] **Ligne signée** (date, opérateur, marque/modèle, COMx, OK) — sans
-      elle, la mise en service n'est pas clôturée.
+- [ ] **Ligne signée** (date, opérateur, marque/modèle, COMx, OK) pour chacun
+  des trois documents — ticket, سند قبض, test FR/AR. Sans les trois lignes,
+  la mise en service n'est pas clôturée.
 
 **العربية.**
 المرجع الكامل: `thermal-printer-drill.md`. الورق محمّل والطابعة مشغلة
 والكبل موصول ومنفذ COM معروف ← اختبار التقاط فقط والمعاينة سليمة ← اختبار
-فيزيائي مطابق للمعاينة ← اختبارات التحمل (فصل/إطفاء/نزع الورق) بشارة نظيفة ←
-**سطر موقّع** في الجدول، وبدونه لا يُغلَق التشغيل.
+فيزيائي مطابق للمعاينة ← سند قبض (الترويسة + الزبون + الرصيد) ← اختبارا
+FR وAR ← اختبارات التحمل (فصل/إطفاء/نزع الورق) بشارة نظيفة ←
+**الأسطر الثلاثة موقّعة** في الجدول، وبدونها لا يُغلَق التشغيل.
 
 ---
 

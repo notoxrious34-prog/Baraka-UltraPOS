@@ -63,6 +63,28 @@ cette procédure.
 | Longueur d'avance | | |
 | Position de coupe | | |
 
+### Étape 2b — reçu de dette (سند قبض)
+
+1. Dans la Caisse, ouvrir le dossier d'un client à crédit et encaisser un
+   versement partiel via la modale `RecordPaymentModal` (validation gérant
+   requise), en mode **Impression physique + capture**.
+2. Vérifier sur le papier, point par point :
+   - en-tête d'identité du magasin + **nom du client** ;
+   - montant encaissé en dinars, **chiffres latins** ;
+   - **solde restant dû (الرصيد المتبقي)** isolé sur sa propre ligne ;
+   - numéro de reçu séquencé (suite du grand-livre client).
+3. Comparer avec le fichier `.escpos` capturé : les quatre points ci-dessus
+   doivent s'y retrouver à l'octet près.
+
+### Étape 2c — impression de test bilingue (Paramètres)
+
+1. Paramètres → « Identité & Impression », section test d'impression :
+   lancer le test **FR**, puis le test **AR** (diagnostic synchrone sans
+   effet comptable).
+2. Pour chaque langue : comparer le papier avec l'aperçu à l'écran
+   (libellés « Tél » en FR / « هاتف » en AR ; NIF/NIS/RC/AI toujours latins ;
+   avance papier, position de coupe).
+
 ### Étape 3 — contrôles de tolérance
 
 Pour chaque condition (câble USB débranché / imprimante éteinte /
@@ -95,12 +117,14 @@ diagnostic) — suite `print_worker.rs` :
 
 ## 6. Tableau de validation (signature)
 
-| Date | Opérateur | Marque & Modèle | Port (COMx) | Résultat (OK/Échec) | Observations |
-|---|---|---|---|---|---|
-| | | | | | |
-| | | | | | |
+| Date | Opérateur | Marque & Modèle | Port (COMx) | Document | Résultat (OK/Échec) | Observations |
+|---|---|---|---|---|---|---|
+| | | | | 1. Ticket de vente standard (80 mm) | | |
+| | | | | 2. Reçu de dette (سند قبض) | | |
+| | | | | 3. Impression de test FR + AR | | |
 
-**Au moins une ligne signée clôt l'élément §38.**
+**Au moins les trois lignes (vente, سند قبض, test) signées clôturent
+l'élément §38.**
 
 ## 7. ملخص بالعربية
 
@@ -114,7 +138,9 @@ diagnostic) — suite `print_worker.rs` :
   وإعدادات `printer.serial_*` مضبوطة.
 - الخطوات: (1) اختبار التقاط فقط ومقارنة المعاينة (الهوية، NIF/NIS/RC/AI
   باللاتينية، التذييل، التقديم، القطع)؛ (2) اختبار فيزيائي ومقارنة
-  الورق مع المعاينة؛ (3) اختبارات التحمل (فصل USB / إطفاء / نزع الورق)
-  وتسجيل الشارة الملاحظة.
-- عنصر §38 (« Real hardware printing verified ») لا يُغلق إلا بسطر
-  موقّع في جدول Validation (§6).
+  الورق مع المعاينة؛ (2ب) إيصال دين (سند قبض): الترويسة + اسم الزبون،
+  المبلغ بالأرقام اللاتينية، الرصيد المتبقي في سطر مستقل، ورقم الإيصال
+  المتسلسل؛ (2ج) اختبارا الطباعة FR وAR من الإعدادات؛ (3) اختبارات التحمل
+  (فصل USB / إطفاء / نزع الورق) وتسجيل الشارة الملاحظة.
+- عنصر §38 (« Real hardware printing verified ») لا يُغلق إلا بالأسطر
+  الثلاثة موقّعة في جدول Validation (§6): تذكرة بيع، سند قبض، واختبار.

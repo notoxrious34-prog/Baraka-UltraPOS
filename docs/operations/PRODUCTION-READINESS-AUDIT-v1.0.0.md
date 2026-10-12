@@ -89,7 +89,7 @@ shop-owner release notes (FR/AR) in `docs/operations/release-notes-v1.0.0.md`.
 
 | Gate | Status |
 |---|---|
-| Thermal-printer hardware drill (§38 "Real hardware printing verified") | **OPEN for shop testing** — procedure + signature table ready (`thermal-printer-drill.md` §6); closes only with a signed in-shop validation row |
+| Thermal-printer hardware drill (§38 "Real hardware printing verified") | **OPEN for shop testing** — procedure + three-row signature table (sale ticket, سند قبض debt receipt, FR/AR test print) ready (`thermal-printer-drill.md` §6); closes only with all three rows signed in-shop |
 | Accountant tax questionnaire | **OPEN, lowest priority** — no code impact |
 | Database encryption | **Accepted deviation** — at-rest encryption explicitly out of v1 scope; mitigated by per-user install, local-only storage, and backup/restore guidance |
 

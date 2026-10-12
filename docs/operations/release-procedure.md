@@ -45,8 +45,8 @@ npx vitest run                                                     # G7
 time npm run tauri build                                           # G8
 
 # 3. Artifact fingerprint (the owner's release record):
-sha256sum "src-tauri/target/release/bundle/nsis/Baraka UltraPOS_1.0.0_x64-setup.exe"
-ls -la src-tauri/target/release/bundle/nsis/
+Get-FileHash 'target/release/bundle/nsis/Baraka UltraPOS_1.0.0_x64-setup.exe' -Algorithm SHA256
+ls -la target/release/bundle/nsis/
 ```
 
 ## 4. Verification checklist
@@ -98,3 +98,33 @@ CARGO_BUILD_JOBS=2 cargo test --release -p baraka-infrastructure \
 Copy the `BENCH …` lines into `docs/operations/release-benchmarks-v1.0.0.md`
 with the machine profile table. UI metrics follow the manual protocol in
 that document (screen recording at declared fps + working-set sampling).
+
+## 8. Packaging and Production Delivery (v1.0.0-rc.1)
+
+The shop receives a self-contained directory, NOT the `target/` tree:
+
+```text
+release-v1.0.0/
+  Baraka UltraPOS_1.0.0_x64-setup.exe   # 221 552 107 bytes, on disk only (gitignored)
+  SHA256SUMS.txt                        # committed: hash record
+  GUIDE-UTILISATION.html                # committed: offline FR/AR handbook
+  LISEZMOI-README.txt                   # committed: quick start
+```
+
+Reference values (REL-042, re-verified REL-045):
+
+- Size: 221 552 107 bytes (~211 MiB — offline WebView2 bundled).
+- SHA-256: `C608C32A8C96B089CB51E187DE473AD0FCCD3E728E8B1C07D0311C1E65D75934`.
+
+Verify a copied bundle before handing it over (PowerShell or certutil):
+
+```powershell
+Get-FileHash 'release-v1.0.0\Baraka UltraPOS_1.0.0_x64-setup.exe' -Algorithm SHA256
+certutil -hashfile "release-v1.0.0\Baraka UltraPOS_1.0.0_x64-setup.exe" SHA256
+```
+
+Compare against `release-v1.0.0/SHA256SUMS.txt`. Field deployment: copy the
+whole `release-v1.0.0/` directory to a USB stick (the `.exe` travels on disk;
+only the three metadata files live in git). The annotated tag `v1.0.0-rc.1`
+marks the exact source state. Operator docs: `docs/operations/HANDOVER-GUIDE.md`
+(source) and `release-v1.0.0/GUIDE-UTILISATION.html` (offline rendering).

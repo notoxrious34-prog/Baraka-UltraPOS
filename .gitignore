@@ -48,4 +48,11 @@ coverage/
 # Release baseline additions (STEP 1.4)
 src-tauri/gen/schemas/
 *.escpos
+
+# Delivery bundle binaries (REL-045): the 211 MiB NSIS installer lives on
+# disk in release-v1.0.0/ for the merchant; only its SHA256SUMS.txt, HTML
+# handbook, and readme are committed.
+release-v1.0.0/*.exe
+
+# Audit scratch
 audit/tmp/

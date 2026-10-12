@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Baraka UltraPOS v1.0.0 - Guide d'utilisation / دليل الاستعمال (offline handbook)" />
+<title>Baraka UltraPOS v1.0.0 — Guide d'utilisation / دليل الاستعمال</title>
+<style>
+  :root {
+    --ink: #0f172a;
+    --muted: #475569;
+    --line: #e2e8f0;
+    --brand: #0f3d5c;
+    --accent: #f59e0b;
+    --paper: #ffffff;
+    --wash: #f1f5f9;
+    --ok: #15803d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Cairo", "Segoe UI Arabic", Tahoma, sans-serif;
+    background: var(--wash);
+    color: var(--ink);
+    line-height: 1.65;
+  }
+  header.hero {
+    background: var(--brand);
+    color: #fff;
+    padding: 2.2rem 1.2rem 1.6rem;
+    text-align: center;
+  }
+  header.hero h1 { margin: 0 0 .3rem; font-size: 1.7rem; }
+  header.hero p { margin: .2rem 0; opacity: .92; }
+  header.hero .ver {
+    display: inline-block; margin-top: .6rem;
+    background: var(--accent); color: #1c1005;
+    font-weight: 700; border-radius: 999px; padding: .15rem .9rem;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 1.2rem 1rem 3rem; }
+  section.card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+    margin: 1rem 0;
+  }
+  section.card h2 { margin: 0 0 .4rem; color: var(--brand); font-size: 1.25rem; }
+  section.card h3 { margin: 1rem 0 .25rem; font-size: 1.02rem; }
+  .fr { dir: ltr; }
+  .ar { direction: rtl; text-align: right; }
+  hr.sep { border: 0; border-top: 1px dashed var(--line); margin: .9rem 0; }
+  ul.check { list-style: none; padding-inline-start: 0; }
+  ul.check li { padding-inline-start: 1.7em; position: relative; margin: .3rem 0; }
+  ul.check li::before { content: "☐"; position: absolute; inset-inline-start: 0; color: var(--brand); font-weight: 700; }
+  kbd {
+    display: inline-block; min-width: 1.9em; text-align: center;
+    background: var(--ink); color: #fff; border-radius: 6px;
+    padding: .05em .5em; font-family: inherit; font-weight: 700; font-size: .9em;
+  }
+  code, .hash {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .86em; background: var(--wash);
+    border: 1px solid var(--line); border-radius: 6px; padding: .1em .4em;
+    word-break: break-all;
+  }
+  table { border-collapse: collapse; width: 100%; margin: .6rem 0; font-size: .95em; }
+  th, td { border: 1px solid var(--line); padding: .45rem .6rem; text-align: start; }
+  th { background: var(--wash); }
+  .note { border-inline-start: 4px solid var(--accent); background: #fffbeb; padding: .6rem .9rem; border-radius: 0 8px 8px 0; }
+  .ar .note { border-radius: 8px 0 0 8px; }
+  footer { text-align: center; color: var(--muted); font-size: .9em; padding: 1.5rem 1rem 2.5rem; }
+  nav.toc { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: .8rem 1.25rem; }
+  nav.toc ol { margin: .3rem 0; padding-inline-start: 1.3em; }
+  nav.toc a { color: var(--brand); }
+  @media print {
+    body { background: #fff; }
+    header.hero { background: #fff; color: #000; border-bottom: 2px solid #000; }
+    section.card, nav.toc { break-inside: avoid; box-shadow: none; }
+    nav.toc a { text-decoration: none; color: #000; }
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <h1>Baraka UltraPOS — Guide d'utilisation / دليل الاستعمال</h1>
+  <p>Merchant handover handbook · Keep next to the cash register · يُحفظ بجانب الصندوق</p>
+  <span class="ver">v1.0.0</span>
+</header>
+
+<main>
+<nav class="toc" aria-label="Sommaire">
+  <ol>
+    <li><a href="#p1">Artefact &amp; Installation / ملف التثبيت</a></li>
+    <li><a href="#p2">Premier démarrage / أول تشغيل</a></li>
+    <li><a href="#p3">Imprimante &amp; douchette / الطابعة وقارئ الباركود</a></li>
+    <li><a href="#p4">Cycle quotidien / العمل اليومي</a></li>
+    <li><a href="#p5">Données &amp; sauvegardes / سلامة البيانات</a></li>
+    <li><a href="#p6">Check-list drill / قائمة التجربة</a></li>
+  </ol>
+</nav>
+
+<section class="card" id="p1">
+  <h2>1 · Artefact &amp; Installation / ملف التثبيت</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <p>Fichier remis par le technicien : <code>Baraka UltraPOS_1.0.0_x64-setup.exe</code>
+    (~211&nbsp;Mo, 221&nbsp;552&nbsp;107 octets). Windows 10/11, <strong>aucune connexion
+    internet requise</strong>.</p>
+    <p>SHA-256 :<br /><span class="hash">C608C32A8C96B089CB51E187DE473AD0FCCD3E728E8B1C07D0311C1E65D75934</span></p>
+    <p>Double-cliquez (français proposé en premier), installez depuis le compte Windows de la
+    caisse. Écran bleu SmartScreen attendu : « Informations complémentaires » →
+    « Exécuter quand même ».</p>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <p>الملف: <code>Baraka UltraPOS_1.0.0_x64-setup.exe</code> (نحو 211 ميغا)، يعمل دون
+    إنترنت على Windows 10 أو 11. ثبّته من حساب الصندوق. تحذير SmartScreen الأزرق
+    متوقّع: «Informations complémentaires» ثم «Exécuter quand même».</p>
+  </div>
+</section>
+
+<section class="card" id="p2">
+  <h2>2 · Premier démarrage &amp; Configuration / أول تشغيل وضبط</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <ol>
+      <li>Créez le compte <strong>ADMIN</strong> (un seul) ; conservez le mot de passe en lieu sûr.</li>
+      <li>Paramètres → « Identité &amp; Impression » : nom, adresse, téléphone,
+        identifiants fiscaux <strong>RC / NIF / NIS / AI</strong> (en-tête des tickets).</li>
+      <li>Un magasin par défaut existe déjà ; ajoutez les autres depuis le module Stock.</li>
+      <li>Basculez la langue FR/AR en haut (arabe affiché de droite à gauche).</li>
+    </ol>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <ol>
+      <li>أنشئ حساب المدير (ADMIN) واحفظ كلمة المرور.</li>
+      <li>الإعدادات ← «الهوية والطباعة»: الاسم والعنوان والهاتف والمعرفات
+        الجبائية RC / NIF / NIS / AI (تظهر في التذاكر).</li>
+      <li>يوجد مخزن افتراضي جاهز. بدّل اللغة FR/AR من الأعلى.</li>
+    </ol>
+  </div>
+</section>
+
+<section class="card" id="p3">
+  <h2>3 · Imprimante &amp; douchette / الطابعة وقارئ الباركود</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <ul>
+      <li>Recommandée : thermique <strong>80&nbsp;mm ESC/POS</strong>, port série ou COM virtuel.
+        Notez le port (ex. COM3) dans le Gestionnaire de périphériques.</li>
+      <li>Renseignez port + débit, puis bouton <strong>d'impression de test</strong>
+        (diagnostic sans effet comptable : aperçu + capture <code>.escpos</code>).</li>
+      <li>Faites le drill avec le technicien avant la mise en service (voir §6).</li>
+      <li>Douchette USB « frappe clavier » : branchez, cliquez dans la recherche, scannez.</li>
+    </ul>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <ul>
+      <li>الموصى بها: حرارية 80 مم ESC/POS عبر منفذ تسلسلي أو COM افتراضي.</li>
+      <li>اضبط المنفذ والسرعة ثم جرّب زر اختبار الطباعة (تشخيص دون أثر محاسبي).</li>
+      <li>نفّذ تجربة الطباعة مع التقني قبل التشغيل. قارئ USB يعمل مباشرة.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="card" id="p4">
+  <h2>4 · Cycle quotidien / العمل اليومي</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <table>
+      <tr><th>Étape</th><th>Action</th></tr>
+      <tr><td>1</td><td>Ouvrir la session de caisse (fond de caisse compté).</td></tr>
+      <tr><td>2</td><td>Vendre : scan/recherche, quantités, remise, espèces (rendu calculé) ou crédit client.</td></tr>
+      <tr><td>3</td><td><kbd>F8</kbd> parque la vente, <kbd>F6</kbd> la reprend.</td></tr>
+      <tr><td>4</td><td>Dette : dossier client → encaissement, reçu <strong>سند قبض</strong> (trop-perçus bloqués).</td></tr>
+      <tr><td>5</td><td>Clôturer : compter le tiroir, écart enregistré (rapport Z quotidien).</td></tr>
+    </table>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <p>افتح الجلسة ← بِع (مسح/بحث، خصم، نقد أو دين) ← <kbd>F8</kbd> تعليق و<kbd>F6</kbd>
+    استئناف ← تحصيل الديون بإيصال <strong>سند قبض</strong> ← أغلق الجلسة مع عدّ
+    الدرج (تقرير Z).</p>
+  </div>
+</section>
+
+<section class="card" id="p5">
+  <h2>5 · Données &amp; sauvegardes / سلامة البيانات</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <div class="note"><strong>Vos données vivent sur votre PC :</strong>
+      <code>%APPDATA%\com.baraka.ultrapos\baraka.db</code> —
+      installation, réinstallation et désinstallation ne les effacent <strong>jamais</strong>.</div>
+    <p>Sauvegardez depuis Paramètres → Sauvegardes et copiez le fichier sur une
+    <strong>clé USB hors du magasin</strong>. Panne : réinstallez, restaurez (ADMIN),
+    vérifiez une vente et le stock avant de reprendre.</p>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <div class="note">بياناتك في <code>%APPDATA%\com.baraka.ultrapos\baraka.db</code> —
+      لا يحذفها التثبيت أو إلغاؤه أبدًا.</div>
+    <p>انسخ نسخة احتياطية دوريًا على USB خارج المحل. عند عطل: أعد التثبيت واستعد
+    آخر نسخة ثم تحقق قبل الاستئناف.</p>
+  </div>
+</section>
+
+<section class="card" id="p6">
+  <h2>6 · Check-list du drill imprimante / قائمة تجربة الطباعة</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <ul class="check">
+      <li>Papier 80 mm, imprimante allumée, câble branché, port COM noté.</li>
+      <li>Test « capture seule » : aperçu correct (identité, NIF/NIS/RC/AI, totaux, coupe).</li>
+      <li>Test physique : papier identique à l'aperçu.</li>
+      <li>Tolérances : USB débranché / éteinte / sans papier → badge propre.</li>
+      <li><strong>Ligne signée</strong> (date, opérateur, modèle, COMx, OK) — sans elle, mise en service non clôturée.</li>
+    </ul>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <ul class="check">
+      <li>الورق والطاقة والكبل ومنفذ COM جاهزة.</li>
+      <li>اختبار التقاط فقط بمعاينة سليمة، ثم اختبار فيزيائي مطابق.</li>
+      <li>اختبارات التحمل بشارة نظيفة، ثم <strong>سطر موقّع</strong> في الجدول.</li>
+    </ul>
+  </div>
+</section>
+</main>
+
+<footer>Baraka UltraPOS v1.0.0 · Guide de remise / دليل التسليم · 100% hors-ligne — aucun appel réseau.</footer>
+</body>
+</html>

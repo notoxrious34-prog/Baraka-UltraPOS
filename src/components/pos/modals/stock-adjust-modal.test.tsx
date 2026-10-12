@@ -14,6 +14,7 @@ import {
   useStockAdjustModalStore,
 } from "@/stores/stock-adjust-modal-store";
 import { translateBackendError } from "@/lib/i18n";
+import { resolvePickerPane } from "@/components/pos/modals/StockAdjustModal";
 import { useSessionStore } from "@/stores/session-store";
 import type { SessionInfo } from "@/types/pos";
 
@@ -184,5 +185,21 @@ describe("stock adjust store", () => {
       expect(translateBackendError(code, "fr-DZ")).not.toBe("Erreur interne du noyau");
       expect(translateBackendError(code, "ar-DZ")).not.toBe("خطأ داخلي في النواة");
     }
+  });
+});
+
+describe("resolvePickerPane", () => {
+  it("selects exactly one pane per state (selected handled by the caller)", () => {
+    expect(resolvePickerPane({ busy: true, resultCount: 3, hasQuery: true })).toBe("loading");
+    expect(resolvePickerPane({ busy: false, resultCount: 2, hasQuery: true })).toBe("results");
+    expect(resolvePickerPane({ busy: false, resultCount: 0, hasQuery: true })).toBe("empty");
+    expect(resolvePickerPane({ busy: false, resultCount: 0, hasQuery: false })).toBe("guidance");
+  });
+
+  it("never shows results and guidance together", () => {
+    const busy = resolvePickerPane({ busy: false, resultCount: 1, hasQuery: false });
+    expect(busy).not.toBe("guidance");
+    expect(busy).not.toBe("empty");
+    expect(busy).not.toBe("loading");
   });
 });

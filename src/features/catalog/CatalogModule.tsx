@@ -14,6 +14,7 @@ import { ipcSearchCatalog } from "@/lib/ipc";
 import { formatMoney } from "@/lib/money";
 import type { CatalogProduct } from "@/types/pos";
 import { ProductCreateForm } from "@/features/catalog/ProductCreateForm";
+import { ProductLabelModal } from "@/features/catalog/ProductLabelModal";
 
 /** Same manager rule as App.tsx isManagerRole (ADMIN or GERANT). */
 function isManagerRole(role: string): boolean {
@@ -32,6 +33,7 @@ export function CatalogModule(): ReactElement {
   const [rows, setRows] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
+  const [labelProduct, setLabelProduct] = useState<CatalogProduct | null>(null);
 
   // Defense in depth: the screen verifies the role itself, independent of
   // NavRail visibility (URL/state manipulation must never expose the form).
@@ -122,12 +124,33 @@ export function CatalogModule(): ReactElement {
                 <span>
                   {product.sku} — {locale === "ar-DZ" ? product.name_ar : product.name_fr}
                 </span>
-                <span>{price === null ? "—" : formatMoney(price, locale)}</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span>{price === null ? "—" : formatMoney(price, locale)}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLabelProduct(product);
+                    }}
+                    className="rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+                  >
+                    {"🏷️ "}
+                    {t(locale, "cat.printLabel")}
+                  </button>
+                </span>
               </li>
             );
           })}
         </ul>
       </div>
+      {labelProduct !== null && (
+        <ProductLabelModal
+          product={labelProduct}
+          isOpen
+          onClose={() => {
+            setLabelProduct(null);
+          }}
+        />
+      )}
     </section>
   );
 }

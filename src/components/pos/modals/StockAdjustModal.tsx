@@ -60,6 +60,26 @@ function reasonKey(reason: StockAdjustReason): Parameters<typeof t>[1] {
   }
 }
 
+/** Visible picker sub-pane when no product is selected (mutually exclusive). */
+export type PickerPane = "loading" | "results" | "empty" | "guidance";
+
+export function resolvePickerPane(args: {
+  busy: boolean;
+  resultCount: number;
+  hasQuery: boolean;
+}): PickerPane {
+  if (args.busy) {
+    return "loading";
+  }
+  if (args.resultCount > 0) {
+    return "results";
+  }
+  if (args.hasQuery) {
+    return "empty";
+  }
+  return "guidance";
+}
+
 export function StockAdjustModal(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const closeModal = usePosUiStore((state) => state.closeModal);
@@ -196,6 +216,12 @@ export function StockAdjustModal(): ReactElement {
     setPickerQuery("");
   };
 
+  const pane = resolvePickerPane({
+    busy: pickerBusy,
+    resultCount: pickerResults.length,
+    hasQuery: pickerQuery.trim() !== "",
+  });
+
   return (
     <ModalShell title={t(locale, "stockAdjust.title")} onClose={close}>
       <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto">
@@ -246,7 +272,8 @@ export function StockAdjustModal(): ReactElement {
               </select>
             </label>
 
-            <div className="flex gap-2">
+            {s.productId === null && (
+              <div className="flex gap-2">
               <input
                 value={pickerQuery}
                 onChange={(event) => {
@@ -270,24 +297,32 @@ export function StockAdjustModal(): ReactElement {
               >
                 {t(locale, "returns.search")}
               </button>
-            </div>
-            {pickerResults.length > 0 && (
-              <div className="max-h-60 space-y-1.5 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-2 dark:border-slate-700 dark:bg-slate-900/50">
+              </div>
+            )}
+            {pane === "loading" && s.productId === null && (
+              <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+                <p className="animate-pulse text-center text-xs font-bold text-slate-500 dark:text-slate-400">
+                  {t(locale, "cash.loading")}
+                </p>
+              </div>
+            )}
+            {pane === "results" && (
+              <div className="shrink-0 min-h-[140px] max-h-56 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/60">
                 {pickerResults.map((product) => (
                   <div
                     key={product.product_id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800"
+                    className="flex shrink-0 min-h-[52px] items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 shadow-sm hover:border-primary-400 dark:border-slate-700 dark:bg-slate-800"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-extrabold">
+                      <span className="block truncate text-sm font-bold text-slate-900 dark:text-slate-100">
                         {locale === "ar-DZ" ? product.name_ar : product.name_fr}
                       </span>
-                      <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs dark:bg-slate-700">
+                      <span className="mt-0.5 flex items-center gap-2">
+                        <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
                           {product.sku}
                         </span>
                         {product.barcode !== null && (
-                          <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs opacity-70 dark:bg-slate-700">
+                          <span className="font-mono text-xs text-slate-500 dark:text-slate-400">
                             <bdi dir="ltr">{product.barcode}</bdi>
                           </span>
                         )}
@@ -299,7 +334,7 @@ export function StockAdjustModal(): ReactElement {
                       onClick={() => {
                         pickProduct(product);
                       }}
-                      className="h-8 shrink-0 rounded bg-primary-600 px-3 text-xs font-bold text-white hover:bg-primary-700 disabled:opacity-50"
+                      className="flex h-9 shrink-0 items-center justify-center rounded-lg bg-primary-600 px-4 text-xs font-black text-white shadow-sm transition-colors hover:bg-primary-700 active:bg-primary-800 disabled:opacity-50"
                     >
                       {t(locale, "stockAdjust.selectProductAction")}
                     </button>
@@ -308,11 +343,17 @@ export function StockAdjustModal(): ReactElement {
               </div>
             )}
 
-            {s.productId === null ? (
+            {s.productId === null && pane === "guidance" && (
               <p className="rounded-lg border border-slate-200 bg-slate-100/70 p-3 text-center text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400">
                 {t(locale, "stockAdjust.pleaseSelectGuidance")}
               </p>
-            ) : (
+            )}
+            {s.productId === null && pane === "empty" && (
+              <p className="rounded-lg border border-dashed border-slate-300 bg-white p-3 text-center text-xs font-bold text-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400">
+                {t(locale, "stockAdjust.noProductsFound")}
+              </p>
+            )}
+            {s.productId !== null && (
               <div className="space-y-1 rounded-lg border-2 border-emerald-500 bg-emerald-50/50 p-3 dark:bg-emerald-950/20">
                 <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
                   {"✓ "}

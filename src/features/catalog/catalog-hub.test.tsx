@@ -322,6 +322,7 @@ describe("createProductWithProvisioning", () => {
 
 describe("CatalogHubView markup", () => {
   const noop = (): void => undefined;
+  const noopEdit = (): void => undefined;
   const rows = [
     product({}),
     product({
@@ -349,6 +350,9 @@ describe("CatalogHubView markup", () => {
         onRefresh={noop}
         onNew={noop}
         onPrintLabel={noop}
+        onEdit={noopEdit}
+        onToggleActive={noopEdit}
+        togglingId={null}
       />,
     );
     expect(html).toContain("VIS-8X40");
@@ -381,6 +385,9 @@ describe("CatalogHubView markup", () => {
         onRefresh={noop}
         onNew={noop}
         onPrintLabel={noop}
+        onEdit={noopEdit}
+        onToggleActive={noopEdit}
+        togglingId={null}
       />,
     );
     expect(html).toContain("لا توجد منتجات");
@@ -398,6 +405,9 @@ describe("CatalogHubView markup", () => {
         onRefresh={noop}
         onNew={noop}
         onPrintLabel={noop}
+        onEdit={noopEdit}
+        onToggleActive={noopEdit}
+        togglingId={null}
       />,
     );
     expect(pending).toContain("…");
@@ -419,6 +429,9 @@ describe("CatalogHubView markup", () => {
         onRefresh={noop}
         onNew={noop}
         onPrintLabel={noop}
+        onEdit={noopEdit}
+        onToggleActive={noopEdit}
+        togglingId={null}
       />,
     );
     expect(html).toContain("—");

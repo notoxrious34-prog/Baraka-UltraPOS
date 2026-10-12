@@ -20,6 +20,11 @@ import {
   pickDepotId,
   ProductCreateModal,
 } from "@/features/catalog/ProductCreateModal";
+import {
+  formFromProduct,
+  ProductEditModal,
+  submitEditProduct,
+} from "@/features/catalog/ProductEditModal";
 import { ProductLabelModal } from "@/features/catalog/ProductLabelModal";
 
 export interface MarginView {
@@ -69,11 +74,14 @@ export interface CatalogHubViewProps {
   loading: boolean;
   error: string | null;
   query: string;
+  togglingId: string | null;
   onQuery: (value: string) => void;
   onClear: () => void;
   onRefresh: () => void;
   onNew: () => void;
   onPrintLabel: (product: CatalogProduct) => void;
+  onEdit: (product: CatalogProduct) => void;
+  onToggleActive: (product: CatalogProduct) => void;
 }
 
 function marginBadgeClass(pct: number): string {
@@ -131,12 +139,14 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
         <div className="flex min-w-52 flex-1 items-center gap-1">
           <input
             value={query}
+            id="catalog-search-input"
             autoFocus
             onChange={(event) => {
               props.onQuery(event.target.value);
             }}
             placeholder={t(locale, "cat.searchPlaceholder")}
             aria-label={t(locale, "cat.search")}
+            title={t(locale, "cat.quickSearchHelp")}
             className="h-10 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold outline-none focus:border-primary-600 dark:border-slate-700 dark:bg-slate-800"
           />
           {query !== "" && (
@@ -260,27 +270,58 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                   </td>
                   <td className="px-3 py-1.5">
                     {product.is_active ? (
-                      <span className="rounded-md bg-green-100 px-2 py-0.5 font-black text-green-700 dark:bg-green-900/40 dark:text-green-200">
+                      <button
+                        type="button"
+                        disabled={props.togglingId === product.product_id}
+                        onClick={() => {
+                          props.onToggleActive(product);
+                        }}
+                        title={t(locale, "cat.productActiveLabel")}
+                        aria-label={t(locale, "cat.productActiveLabel")}
+                        className="rounded-md bg-green-100 px-2 py-0.5 font-black text-green-700 hover:bg-green-200 disabled:opacity-50 dark:bg-green-900/40 dark:text-green-200 dark:hover:bg-green-900/60"
+                      >
                         {t(locale, "cat.active")}
-                      </span>
+                      </button>
                     ) : (
-                      <span className="rounded-md bg-slate-200 px-2 py-0.5 font-black text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                      <button
+                        type="button"
+                        disabled={props.togglingId === product.product_id}
+                        onClick={() => {
+                          props.onToggleActive(product);
+                        }}
+                        title={t(locale, "cat.productActiveLabel")}
+                        aria-label={t(locale, "cat.productActiveLabel")}
+                        className="rounded-md bg-slate-200 px-2 py-0.5 font-black text-slate-500 hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                      >
                         {t(locale, "cat.inactive")}
-                      </span>
+                      </button>
                     )}
                   </td>
                   <td className="px-3 py-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        props.onPrintLabel(product);
-                      }}
-                      aria-label={t(locale, "cat.printLabel")}
-                      title={t(locale, "cat.printLabel")}
-                      className="rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
-                    >
-                      🏷️
-                    </button>
+                    <span className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          props.onPrintLabel(product);
+                        }}
+                        aria-label={t(locale, "cat.printLabel")}
+                        title={t(locale, "cat.printLabel")}
+                        className="rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+                      >
+                        🏷️
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          props.onEdit(product);
+                        }}
+                        aria-label={t(locale, "cat.editProduct")}
+                        title={t(locale, "cat.editProduct")}
+                        className="rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+                      >
+                        ✏️
+                      </button>
+                    </span>
                   </td>
                 </tr>
               );
@@ -307,6 +348,8 @@ export function CatalogModule(): ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [labelProduct, setLabelProduct] = useState<CatalogProduct | null>(null);
+  const [editProduct, setEditProduct] = useState<CatalogProduct | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const depotRef = useRef<string | null | undefined>(undefined);
   const skipFirstDebounce = useRef(true);
   const authed = session !== null && isManagerRole(session.role);
@@ -403,6 +446,25 @@ export function CatalogModule(): ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, token]);
 
+  // F1 focuses + selects the search input for hands-free wedge scanners.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== "F1") {
+        return;
+      }
+      event.preventDefault();
+      const input = document.getElementById("catalog-search-input");
+      if (input instanceof HTMLInputElement) {
+        input.focus();
+        input.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
   // Defense in depth: the screen verifies the role itself, independent of
   // NavRail visibility (URL/state manipulation must never expose the hub).
   if (!authed) {
@@ -421,6 +483,35 @@ export function CatalogModule(): ReactElement {
     void loadCatalog(activeToken, query.trim(), () => !cancelled);
   };
 
+  const handleUpdated = (updated: CatalogProduct): void => {
+    setProducts((prev) =>
+      prev.map((row) => (row.product_id === updated.product_id ? updated : row)),
+    );
+    setEditProduct(null);
+  };
+
+  // Quick status toggle: full-state update with the flag flipped, then the
+  // fresh row swapped in place (stock cache untouched).
+  const toggleActive = (target: CatalogProduct): void => {
+    if (togglingId !== null) {
+      return;
+    }
+    setTogglingId(target.product_id);
+    const data = { ...formFromProduct(target), isActive: !target.is_active };
+    submitEditProduct(activeToken, target, data)
+      .then((updated) => {
+        setProducts((prev) =>
+          prev.map((row) => (row.product_id === updated.product_id ? updated : row)),
+        );
+      })
+      .catch((failure: unknown) => {
+        setError(typeof failure === "string" ? failure : "INTERNAL_ERROR");
+      })
+      .finally(() => {
+        setTogglingId(null);
+      });
+  };
+
   return (
     <>
       <CatalogHubView
@@ -430,6 +521,7 @@ export function CatalogModule(): ReactElement {
         loading={loading}
         error={error}
         query={query}
+        togglingId={togglingId}
         onQuery={setQuery}
         onClear={() => {
           setQuery("");
@@ -439,6 +531,8 @@ export function CatalogModule(): ReactElement {
           setIsCreateOpen(true);
         }}
         onPrintLabel={setLabelProduct}
+        onEdit={setEditProduct}
+        onToggleActive={toggleActive}
       />
       <ProductCreateModal
         isOpen={isCreateOpen}
@@ -461,6 +555,15 @@ export function CatalogModule(): ReactElement {
           }}
         />
       )}
+      <ProductEditModal
+        isOpen={editProduct !== null}
+        product={editProduct}
+        token={activeToken}
+        onClose={() => {
+          setEditProduct(null);
+        }}
+        onUpdated={handleUpdated}
+      />
     </>
   );
 }

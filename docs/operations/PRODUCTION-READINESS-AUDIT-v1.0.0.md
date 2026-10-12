@@ -129,14 +129,19 @@ operator-supplied **copy** of the database, opened `SQLITE_OPEN_READ_ONLY`.
 This is the safe behavior — the drill can never touch live `%APPDATA%` data
 by accident, and it was correctly left unexecuted in this environment.
 
-Finding F2 (stale drill constant, open item for architect — NOT fixed
-here, code changes out of scope): `release_drill.rs:30` pins
-`EXPECTED_MIGRATION_VERSION = 13` and asserts exactly versions 1..=13,
-while the workspace ships 14 migrations. Even with `BARAKA_DRILL_DB` set
-against a current v14 copy, assertion (1) would fail on row count. The
-checksum loop (lines 65–77) already iterates all 14 embedded migrations.
-Recommended follow-up: bump the constant to 14 in a code task; no migration
-content is affected.
+Finding F2 (RESOLVED in REL-044): `release_drill.rs:30` pinned
+`EXPECTED_MIGRATION_VERSION = 13` while the workspace ships 14 migrations.
+Fixed by updating the constant (and the 1..=13 comments) to 14, then
+verified green: a scratch DB was seeded with migrations 0001..0014 via
+`run_migrations` into gitignored `target/scratch_drill/drill.db`, and
+`BARAKA_DRILL_DB=<abs path> cargo test -p baraka-infrastructure --test
+release_drill -- --ignored --nocapture` printed
+`DRILL schema_migrations count=14 max=14`, `DRILL checksums verified
+rows=14`, `DRILL foreign_key_check clean`, and
+`test drill_upgrade_preservation_contract ... ok`
+(`test result: ok. 1 passed; 0 failed`, exit 0). The scratch directory and
+the one-off seed scaffold were deleted afterward (NO_LEFTOVERS verified via
+`git status`). No migration content was touched.
 
 ## 8. Schema Downgrade & Version Guard
 

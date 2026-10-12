@@ -10,8 +10,8 @@
 //!
 //! The test opens the copied database READ-ONLY (no migration runs, no
 //! write of any kind) and asserts the preservation contract:
-//!   1. `schema_migrations` holds exactly versions 1..=13 (migration
-//!      version still 13 — no migration was applied by the release binary).
+//!   1. `schema_migrations` holds exactly versions 1..=14 (migration
+//!      version still 14 — no migration was applied by the release binary).
 //!   2. Every recorded checksum matches the checksum recomputed over the
 //!      embedded migration SQL (no tamper, no drift).
 //!   3. `PRAGMA foreign_key_check` is clean.
@@ -27,7 +27,7 @@ use rusqlite::{Connection, OpenFlags};
 
 use baraka_infrastructure::persistence::migration::{checksum_of, MIGRATIONS};
 
-const EXPECTED_MIGRATION_VERSION: i64 = 13;
+const EXPECTED_MIGRATION_VERSION: i64 = 14;
 
 fn drill_db_path() -> std::path::PathBuf {
     let raw = std::env::var("BARAKA_DRILL_DB")
@@ -45,7 +45,7 @@ fn drill_upgrade_preservation_contract() {
     let conn = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .expect("open drill copy read-only");
 
-    // (1) Exactly versions 1..=13 — migration version still 13.
+    // (1) Exactly versions 1..=14 — migration version still 14.
     let (count, max_version): (i64, i64) = conn
         .query_row(
             "SELECT COUNT(*), COALESCE(MAX(version), 0) FROM schema_migrations",

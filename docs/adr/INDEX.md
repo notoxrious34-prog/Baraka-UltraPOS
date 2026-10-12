@@ -80,5 +80,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-083 | Debt-receipt printing uses a fully separate rendering path | ACCEPTED |
 | ADR-084 | Persisted CTP files authored in Arabic, superseding ADR-080 | SUPERSEDED (by ADR-085) |
 | ADR-085 | English-language CTP persistence re-ratified by owner, superseding ADR-084 | ACCEPTED |
+| ADR-086 | Release Candidate v1.0.0 Packaging and Production Approval | ACCEPTED |
 
-Next free id: ADR-086.
+Next free id: ADR-087.

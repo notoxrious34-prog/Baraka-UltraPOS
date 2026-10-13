@@ -15,6 +15,7 @@ import { useSessionStore } from "@/stores/session-store";
 import type {
   ActiveCustomer,
   CatalogProduct,
+  Category,
   CustomerDetail,
   CustomerSummary,
   DocType,
@@ -218,6 +219,72 @@ export interface UpdateProductPayload {
 export async function updateProduct(payload: UpdateProductPayload): Promise<void> {
   await call<unknown>("catalog_update_product", {
     request: { ...payload },
+  });
+}
+
+/**
+ * Category taxonomy (mirrors CategoryResponseDto list). Inactive rows are
+ * hidden unless `includeInactive` is set. Rejects verbatim on bridge errors.
+ */
+export async function ipcListCategories(
+  sessionToken: string,
+  includeInactive?: boolean,
+): Promise<Category[]> {
+  return call<Category[]>("category_list", {
+    session_token: sessionToken,
+    include_inactive: includeInactive ?? false,
+  });
+}
+
+/** Category creation payload (mirrors CreateCategoryRequestDto). */
+export interface CreateCategoryPayload {
+  session_token: string;
+  code: string;
+  name_fr: string;
+  name_ar: string;
+  parent_id?: string | null;
+}
+
+/**
+ * Create a category (unique code, active by default). Resolves with the
+ * stored view; rejects with `CATEGORY_CODE_DUPLICATE` on code collision.
+ */
+export async function ipcCreateCategory(
+  sessionToken: string,
+  payload: Omit<CreateCategoryPayload, "session_token">,
+): Promise<Category> {
+  return call<Category>("category_create", {
+    request: { session_token: sessionToken, ...payload },
+  });
+}
+
+/** Category update payload (mirrors UpdateCategoryRequestDto; code immutable). */
+export interface UpdateCategoryPayload {
+  session_token: string;
+  category_id: string;
+  name_fr: string;
+  name_ar: string;
+  parent_id?: string | null;
+  is_active: boolean;
+}
+
+/** Update a category's names, parent, and active flag. */
+export async function ipcUpdateCategory(
+  sessionToken: string,
+  payload: Omit<UpdateCategoryPayload, "session_token">,
+): Promise<Category> {
+  return call<Category>("category_update", {
+    request: { session_token: sessionToken, ...payload },
+  });
+}
+
+/**
+ * Idempotently provision the Algerian hardware starter taxonomy. No-op
+ * returning existing rows when any category exists.
+ */
+export async function ipcSeedStarterCategories(sessionToken: string): Promise<Category[]> {
+  return call<Category[]>("category_seed_starter", {
+    session_token: sessionToken,
   });
 }
 

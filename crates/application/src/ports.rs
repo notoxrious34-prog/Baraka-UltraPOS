@@ -285,6 +285,9 @@ pub trait CategoryRepository: Send + Sync {
 
     /// List all categories.
     fn list_categories(&self) -> Result<Vec<Category>, ApplicationError>;
+
+    /// Replace a category's mutable fields (code is immutable).
+    fn update_category(&self, category: &Category) -> Result<(), ApplicationError>;
 }
 
 /// One direct BOM edge (header id carried by the call, not the row).

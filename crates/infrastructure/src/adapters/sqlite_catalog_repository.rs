@@ -660,4 +660,29 @@ impl CategoryRepository for SqliteCatalogRepository {
             .map_err(|_| store_failure())?;
         Ok(categories)
     }
+
+    fn update_category(&self, category: &Category) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
+        run_transaction(&mut guard, |tx| {
+            let changed = tx.execute(
+                "UPDATE categories
+                 SET name_ar = ?1, name_fr = ?2, parent_id = ?3, is_active = ?4
+                 WHERE id = ?5",
+                rusqlite::params![
+                    category.name_ar,
+                    category.name_fr,
+                    category.parent_id.map(|id| id.to_string()),
+                    bool_to_int(category.is_active),
+                    category.id.to_string(),
+                ],
+            )?;
+            if changed == 0 {
+                return Err(crate::persistence::InfrastructureError::Sqlite(
+                    rusqlite::Error::QueryReturnedNoRows,
+                ));
+            }
+            Ok(())
+        })
+        .map_err(|_| store_failure())
+    }
 }

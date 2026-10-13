@@ -348,6 +348,55 @@ pub struct CatalogSearchRequestDto {
     pub limit: Option<u32>,
 }
 
+/// Stored category view.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CategoryResponseDto {
+    /// Category id (UUID string).
+    pub id: String,
+    /// Unique business code, e.g. `CAT-PLOMB`.
+    pub code: String,
+    /// French display name.
+    pub name_fr: String,
+    /// Arabic display name.
+    pub name_ar: String,
+    /// Parent category id (UUID string), if nested.
+    pub parent_id: Option<String>,
+    /// Inactive categories accept no new products.
+    pub is_active: bool,
+}
+
+/// Category creation request (active by default; code unique).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CreateCategoryRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Unique business code, e.g. `CAT-PLOMB`.
+    pub code: String,
+    /// French display name.
+    pub name_fr: String,
+    /// Arabic display name.
+    pub name_ar: String,
+    /// Parent category id (UUID string), if nested.
+    pub parent_id: Option<String>,
+}
+
+/// Category update request (code stays immutable).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateCategoryRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Category id (UUID string).
+    pub category_id: String,
+    /// French display name.
+    pub name_fr: String,
+    /// Arabic display name.
+    pub name_ar: String,
+    /// Parent category id (UUID string), or `None` to detach it.
+    pub parent_id: Option<String>,
+    /// Active flag.
+    pub is_active: bool,
+}
+
 // Inventory wire types --------------------------------------------------
 // Quantities travel as integer-micro strings; ids are UUID strings.
 

@@ -26,9 +26,10 @@ use baraka_application::use_cases::cash::{
 };
 use baraka_application::use_cases::catalog::CreateProductUseCase;
 use baraka_application::use_cases::catalog::{
-    CreateProductInput, DefineKitUseCase, GetProductWithUnitsUseCase, NewKitItemInput,
-    NewUnitInput, ProductDetail, SearchCatalogUseCase, UnitUpsert, UpdateProductInput,
-    UpdateProductUseCase,
+    CreateCategoryInput, CreateCategoryUseCase, CreateProductInput, DefineKitUseCase,
+    GetProductWithUnitsUseCase, ListCategoriesUseCase, NewKitItemInput, NewUnitInput,
+    ProductDetail, SearchCatalogUseCase, SeedStarterCategoriesUseCase, UnitUpsert,
+    UpdateCategoryInput, UpdateCategoryUseCase, UpdateProductInput, UpdateProductUseCase,
 };
 use baraka_application::use_cases::customers::{
     CreateCustomerUseCase, GetCustomerStatementUseCase, GetCustomerUseCase, ListCustomersUseCase,
@@ -71,7 +72,7 @@ use baraka_application::use_cases::users::{
 use baraka_application::use_cases::{
     AuthenticateUserUseCase, BootstrapFirstAdminInput, BootstrapFirstAdminUseCase, LogoutUseCase,
 };
-use baraka_domain::catalog::{Barcode, CategoryId, ProductId, UnitId};
+use baraka_domain::catalog::{Barcode, Category, CategoryId, ProductId, UnitId};
 use baraka_domain::errors::DomainError;
 use baraka_domain::inventory::WarehouseId;
 use baraka_domain::primitives::QtyMicro;
@@ -87,10 +88,10 @@ use crate::dto::{
     BootstrapFirstAdminRequest, BootstrapFirstAdminResponse, CartLineItemDto,
     CashClosingCommandDto, CashMovementDto, CashMovementTotalDto, CashSessionDto,
     CashSessionHistoryRowDto, CashSessionReportDto, CashSessionsHistoryRequestDto,
-    CatalogSearchRequestDto, CheckFirstRunStatusResponse, CheckoutSaleRequest,
+    CatalogSearchRequestDto, CategoryResponseDto, CheckFirstRunStatusResponse, CheckoutSaleRequest,
     CheckoutSaleResponse, CommandErrorDto, ConfirmClosingRequestDto, ConvertBlToFactureRequest,
     ConvertBlToFactureResponse, ConvertDevisToBlRequest, ConvertDevisToBlResponse,
-    CreateBackupRequestDto, CreateDraftSaleRequest, CreateProductDto,
+    CreateBackupRequestDto, CreateCategoryRequestDto, CreateDraftSaleRequest, CreateProductDto,
     CreatePurchaseOrderRequestDto, CreateSupplierRequestDto, CreateUserRequestDto,
     CreateWarehouseRequestDto, CreditOutstandingRowDto, CustomerDetailDto, CustomerSummaryDto,
     DailySalesSummaryDto, DecodeSummaryDto, DefineKitDto, DocumentDto, DocumentItemDto,
@@ -116,10 +117,10 @@ use crate::dto::{
     StockShortageWarningDto, StoreIdentityDto, StoreIdentityResponse, SupplierDto,
     SupplierIdRequestDto, SupplierLedgerEntryDto, SupplierPaymentOutcomeDto, SupplierStatementDto,
     TestPrintRequest, TestPrintResponse, TransferStockRequestDto, TransferStockResponseDto,
-    UpdateCustomerRequest, UpdatePrinterSettingsRequest, UpdateProductDto, UpdateProductUnitDto,
-    UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto, UpdateUserRequestDto,
-    UserActivityRequestDto, UserActivityRowDto, UserSummaryDto, VerifyBackupRequestDto,
-    VerifyBackupResponseDto, WarehouseDto,
+    UpdateCategoryRequestDto, UpdateCustomerRequest, UpdatePrinterSettingsRequest,
+    UpdateProductDto, UpdateProductUnitDto, UpdatePurchaseOrderRequestDto,
+    UpdateSupplierRequestDto, UpdateUserRequestDto, UserActivityRequestDto, UserActivityRowDto,
+    UserSummaryDto, VerifyBackupRequestDto, VerifyBackupResponseDto, WarehouseDto,
 };
 
 /// Shared backend handles for command handlers.
@@ -890,6 +891,107 @@ pub fn catalog_define_kit(
     DefineKitUseCase::new(state.catalog.as_ref())
         .execute(&session, kit_id, items)
         .map_err(|error| error_code(&error))
+}
+
+/// Map a domain category to its wire view.
+fn to_category_dto(category: &Category) -> CategoryResponseDto {
+    CategoryResponseDto {
+        id: category.id.to_string(),
+        code: category.code.clone(),
+        name_fr: category.name_fr.clone(),
+        name_ar: category.name_ar.clone(),
+        parent_id: category.parent_id.map(|id| id.to_string()),
+        is_active: category.is_active,
+    }
+}
+
+/// Parse an optional UUID wire id (`None` stays detached).
+fn parse_optional_wire_id(
+    text: Option<&str>,
+    field: &'static str,
+) -> Result<Option<CategoryId>, ApplicationError> {
+    text.map(|value| parse_wire_id(value, field).map(CategoryId::from))
+        .transpose()
+}
+
+/// `category_list` command: category taxonomy (all roles; inactive hidden
+/// unless `include_inactive` is set).
+#[tauri::command(rename_all = "snake_case")]
+pub fn category_list(
+    state: tauri::State<'_, AppState>,
+    session_token: String,
+    include_inactive: Option<bool>,
+) -> Result<Vec<CategoryResponseDto>, String> {
+    let session = require_session(&state, &session_token)?;
+    let categories = ListCategoriesUseCase::new(state.categories.as_ref())
+        .execute(&session, include_inactive.unwrap_or(false))
+        .map_err(|error| error_code(&error))?;
+    Ok(categories.iter().map(to_category_dto).collect())
+}
+
+/// `category_create` command: unique-code category creation (Gerant/Admin).
+#[tauri::command(rename_all = "snake_case")]
+pub fn category_create(
+    state: tauri::State<'_, AppState>,
+    request: CreateCategoryRequestDto,
+) -> Result<CategoryResponseDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let parent_id = parse_optional_wire_id(request.parent_id.as_deref(), "parent_id")
+        .map_err(|error| error_code(&error))?;
+    let category = CreateCategoryUseCase::new(state.categories.as_ref())
+        .execute(
+            &session,
+            CreateCategoryInput {
+                code: request.code,
+                name_fr: request.name_fr,
+                name_ar: request.name_ar,
+                parent_id,
+            },
+        )
+        .map_err(|error| error_code(&error))?;
+    Ok(to_category_dto(&category))
+}
+
+/// `category_update` command: mutable-field category update (Gerant/Admin;
+/// code stays immutable).
+#[tauri::command(rename_all = "snake_case")]
+pub fn category_update(
+    state: tauri::State<'_, AppState>,
+    request: UpdateCategoryRequestDto,
+) -> Result<CategoryResponseDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let id = parse_wire_id(&request.category_id, "category_id")
+        .map(CategoryId::from)
+        .map_err(|error| error_code(&error))?;
+    let parent_id = parse_optional_wire_id(request.parent_id.as_deref(), "parent_id")
+        .map_err(|error| error_code(&error))?;
+    let category = UpdateCategoryUseCase::new(state.categories.as_ref())
+        .execute(
+            &session,
+            UpdateCategoryInput {
+                id,
+                name_fr: request.name_fr,
+                name_ar: request.name_ar,
+                parent_id,
+                is_active: request.is_active,
+            },
+        )
+        .map_err(|error| error_code(&error))?;
+    Ok(to_category_dto(&category))
+}
+
+/// `category_seed_starter` command: idempotent Algerian hardware starter
+/// taxonomy (Gerant/Admin; no-op returning existing rows when non-empty).
+#[tauri::command(rename_all = "snake_case")]
+pub fn category_seed_starter(
+    state: tauri::State<'_, AppState>,
+    session_token: String,
+) -> Result<Vec<CategoryResponseDto>, String> {
+    let session = require_session(&state, &session_token)?;
+    let categories = SeedStarterCategoriesUseCase::new(state.categories.as_ref())
+        .execute(&session)
+        .map_err(|error| error_code(&error))?;
+    Ok(categories.iter().map(to_category_dto).collect())
 }
 
 /// `warehouses_create` command (`warehouses.create`): ADMIN-only creation.

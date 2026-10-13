@@ -143,6 +143,16 @@ export interface CatalogProduct {
   }>;
 }
 
+/** Category view (mirrors CategoryResponseDto). */
+export interface Category {
+  id: string;
+  code: string;
+  name_fr: string;
+  name_ar: string;
+  parent_id: string | null;
+  is_active: boolean;
+}
+
 /** Catalog unit view (mirrors ProductUnitDto). */
 export interface CatalogUnit {
   unit_id: string;

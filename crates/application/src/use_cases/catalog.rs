@@ -4,8 +4,8 @@
 //! (Gerant/Admin). Reads require `PosSell` (all roles).
 
 use baraka_domain::catalog::{
-    validate_kit_edges, validate_unit_set, Barcode, CategoryId, KitItem, Product, ProductId,
-    ProductUnit, Sku, UnitId,
+    validate_kit_edges, validate_unit_set, Barcode, Category, CategoryId, KitItem, Product,
+    ProductId, ProductUnit, Sku, UnitId,
 };
 use baraka_domain::errors::DomainError;
 use baraka_domain::primitives::{FactorMicro, Money, QtyMicro};
@@ -451,6 +451,240 @@ where
     }
 }
 
+/// Category creation payload (active by default; code unique).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreateCategoryInput {
+    /// Unique business code, e.g. `CAT-PLOMB`.
+    pub code: String,
+    /// French display name.
+    pub name_fr: String,
+    /// Arabic display name.
+    pub name_ar: String,
+    /// Parent category, if nested.
+    pub parent_id: Option<CategoryId>,
+}
+
+/// Category update payload (code stays immutable).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateCategoryInput {
+    /// Category to update.
+    pub id: CategoryId,
+    /// French display name.
+    pub name_fr: String,
+    /// Arabic display name.
+    pub name_ar: String,
+    /// Parent category, if nested.
+    pub parent_id: Option<CategoryId>,
+    /// Active flag.
+    pub is_active: bool,
+}
+
+/// Deterministic Algerian hardware starter taxonomy: (code, name_fr, name_ar).
+pub const STARTER_CATEGORIES: [(&str, &str, &str); 7] = [
+    ("CAT-PLOMB", "Plomberie & Sanitaire", "الترصيص الصحي والغاز"),
+    ("CAT-ELEC", "Électricité & Éclairage", "الكهرباء والإنارة"),
+    (
+        "CAT-VISS",
+        "Visserie, Boulonnerie & Fixation",
+        "البراغي والتثبيت",
+    ),
+    ("CAT-OUTIL", "Outillage & Équipement", "الأدوات والمعدات"),
+    (
+        "CAT-PEINT",
+        "Peinture & Droguerie",
+        "الدهانات والمواد الكيميائية",
+    ),
+    (
+        "CAT-BATIM",
+        "Quincaillerie de Bâtiment",
+        "لوازم البناء والنجارة",
+    ),
+    ("CAT-JARDIN", "Jardinage & Arrosage", "لوازم الحدائق والري"),
+];
+
+/// Create a category with a unique code (Gerant/Admin).
+pub struct CreateCategoryUseCase<'a, C>
+where
+    C: ?Sized,
+{
+    categories: &'a C,
+}
+
+impl<'a, C> CreateCategoryUseCase<'a, C>
+where
+    C: CategoryRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(categories: &'a C) -> Self {
+        Self { categories }
+    }
+
+    /// Validate, reject duplicate codes, and persist the category.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        input: CreateCategoryInput,
+    ) -> Result<Category, ApplicationError> {
+        require_any(session, &MANAGE_PERMISSIONS)?;
+        let code = input.code.trim().to_string();
+        let name_fr = input.name_fr.trim().to_string();
+        let name_ar = input.name_ar.trim().to_string();
+        Category::validate(&code, &name_ar, &name_fr).map_err(ApplicationError::Validation)?;
+        if let Some(parent_id) = input.parent_id {
+            if self.categories.find_category_by_id(parent_id)?.is_none() {
+                return Err(ApplicationError::NotFound("category".to_string()));
+            }
+        }
+        let existing = self.categories.list_categories()?;
+        if existing.iter().any(|category| category.code == code) {
+            return Err(ApplicationError::Conflict(
+                "CATEGORY_CODE_DUPLICATE".to_string(),
+            ));
+        }
+        let category = Category {
+            id: CategoryId::new(),
+            code,
+            name_ar,
+            name_fr,
+            parent_id: input.parent_id,
+            is_active: true,
+        };
+        self.categories.create_category(&category)?;
+        Ok(category)
+    }
+}
+
+/// Update a category's mutable fields (Gerant/Admin; code immutable).
+pub struct UpdateCategoryUseCase<'a, C>
+where
+    C: ?Sized,
+{
+    categories: &'a C,
+}
+
+impl<'a, C> UpdateCategoryUseCase<'a, C>
+where
+    C: CategoryRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(categories: &'a C) -> Self {
+        Self { categories }
+    }
+
+    /// Apply name, parent, and activity changes atomically.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        input: UpdateCategoryInput,
+    ) -> Result<Category, ApplicationError> {
+        require_any(session, &MANAGE_PERMISSIONS)?;
+        let mut category = match self.categories.find_category_by_id(input.id)? {
+            Some(found) => found,
+            None => return Err(ApplicationError::NotFound("category".to_string())),
+        };
+        let name_fr = input.name_fr.trim().to_string();
+        let name_ar = input.name_ar.trim().to_string();
+        Category::validate(&category.code, &name_ar, &name_fr)
+            .map_err(ApplicationError::Validation)?;
+        if let Some(parent_id) = input.parent_id {
+            if parent_id == input.id {
+                return Err(ApplicationError::Validation(
+                    DomainError::InvalidCanonicalString(
+                        "category cannot parent itself".to_string(),
+                    ),
+                ));
+            }
+            if self.categories.find_category_by_id(parent_id)?.is_none() {
+                return Err(ApplicationError::NotFound("category".to_string()));
+            }
+        }
+        category.name_fr = name_fr;
+        category.name_ar = name_ar;
+        category.parent_id = input.parent_id;
+        category.is_active = input.is_active;
+        self.categories.update_category(&category)?;
+        Ok(category)
+    }
+}
+
+/// List categories (all roles; inactive hidden unless requested).
+pub struct ListCategoriesUseCase<'a, C>
+where
+    C: ?Sized,
+{
+    categories: &'a C,
+}
+
+impl<'a, C> ListCategoriesUseCase<'a, C>
+where
+    C: CategoryRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(categories: &'a C) -> Self {
+        Self { categories }
+    }
+
+    /// Return categories ordered by the repository (code order in SQLite).
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        include_inactive: bool,
+    ) -> Result<Vec<Category>, ApplicationError> {
+        require(session, Permission::PosSell)?;
+        let categories = self.categories.list_categories()?;
+        if include_inactive {
+            Ok(categories)
+        } else {
+            Ok(categories
+                .into_iter()
+                .filter(|category| category.is_active)
+                .collect())
+        }
+    }
+}
+
+/// Idempotently provision the hardware starter taxonomy (Gerant/Admin).
+pub struct SeedStarterCategoriesUseCase<'a, C>
+where
+    C: ?Sized,
+{
+    categories: &'a C,
+}
+
+impl<'a, C> SeedStarterCategoriesUseCase<'a, C>
+where
+    C: CategoryRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(categories: &'a C) -> Self {
+        Self { categories }
+    }
+
+    /// No-op success when any category exists; otherwise create the seven
+    /// starter departments in taxonomy order.
+    pub fn execute(&self, session: &SessionContext) -> Result<Vec<Category>, ApplicationError> {
+        require_any(session, &MANAGE_PERMISSIONS)?;
+        let existing = self.categories.list_categories()?;
+        if !existing.is_empty() {
+            return Ok(existing);
+        }
+        let mut created = Vec::with_capacity(STARTER_CATEGORIES.len());
+        for (code, name_fr, name_ar) in STARTER_CATEGORIES {
+            let category = Category {
+                id: CategoryId::new(),
+                code: code.to_string(),
+                name_ar: name_ar.to_string(),
+                name_fr: name_fr.to_string(),
+                parent_id: None,
+                is_active: true,
+            };
+            self.categories.create_category(&category)?;
+            created.push(category);
+        }
+        Ok(created)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -668,6 +902,17 @@ mod tests {
                 .values()
                 .cloned()
                 .collect())
+        }
+
+        fn update_category(&self, category: &Category) -> Result<(), ApplicationError> {
+            let mut categories = self.categories.lock().expect("categories");
+            match categories.get_mut(&category.id) {
+                Some(entry) => {
+                    *entry = category.clone();
+                    Ok(())
+                }
+                None => Err(ApplicationError::NotFound("category".to_string())),
+            }
         }
     }
 
@@ -930,5 +1175,194 @@ mod tests {
             .expect("lookup")
             .expect("row");
         assert!(stored.category_id.is_none());
+    }
+
+    fn category_input(code: &str, parent_id: Option<CategoryId>) -> CreateCategoryInput {
+        CreateCategoryInput {
+            code: code.to_string(),
+            name_fr: "Plomberie".to_string(),
+            name_ar: "الترصيص".to_string(),
+            parent_id,
+        }
+    }
+
+    #[test]
+    fn gerant_creates_category_and_duplicate_code_rejected() {
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let create = CreateCategoryUseCase::new(&catalog);
+        let created = create
+            .execute(&gerant, category_input("CAT-PLOMB", None))
+            .expect("create");
+        assert_eq!(created.code, "CAT-PLOMB");
+        assert!(created.is_active);
+        let dup = create.execute(&gerant, category_input("CAT-PLOMB", None));
+        assert!(matches!(
+            dup,
+            Err(ApplicationError::Conflict(message)) if message == "CATEGORY_CODE_DUPLICATE"
+        ));
+    }
+
+    #[test]
+    fn category_create_rejects_blank_fields_unknown_parent_and_vendeur() {
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let create = CreateCategoryUseCase::new(&catalog);
+        let blank = CreateCategoryInput {
+            code: "   ".to_string(),
+            name_fr: "x".to_string(),
+            name_ar: "y".to_string(),
+            parent_id: None,
+        };
+        assert!(matches!(
+            create.execute(&gerant, blank),
+            Err(ApplicationError::Validation(_))
+        ));
+        let orphan = category_input("CAT-X", Some(CategoryId::new()));
+        assert!(matches!(
+            create.execute(&gerant, orphan),
+            Err(ApplicationError::NotFound(_))
+        ));
+        let vendeur = session_with(Role::Vendeur);
+        assert!(matches!(
+            create.execute(&vendeur, category_input("CAT-Y", None)),
+            Err(ApplicationError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn gerant_updates_category_names_parent_and_active_flag() {
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let create = CreateCategoryUseCase::new(&catalog);
+        let parent = create
+            .execute(&gerant, category_input("CAT-PLOMB", None))
+            .expect("parent");
+        let child = create
+            .execute(&gerant, category_input("CAT-VISS", None))
+            .expect("child");
+        let update = UpdateCategoryUseCase::new(&catalog);
+        let updated = update
+            .execute(
+                &gerant,
+                UpdateCategoryInput {
+                    id: child.id,
+                    name_fr: "Visserie MAJ".to_string(),
+                    name_ar: "البراغي".to_string(),
+                    parent_id: Some(parent.id),
+                    is_active: false,
+                },
+            )
+            .expect("update");
+        assert_eq!(updated.code, "CAT-VISS");
+        assert_eq!(updated.name_fr, "Visserie MAJ");
+        assert_eq!(updated.parent_id, Some(parent.id));
+        assert!(!updated.is_active);
+        // Unknown id, self-parent, and unauthorized role rejected.
+        assert!(matches!(
+            update.execute(
+                &gerant,
+                UpdateCategoryInput {
+                    id: CategoryId::new(),
+                    name_fr: "x".to_string(),
+                    name_ar: "y".to_string(),
+                    parent_id: None,
+                    is_active: true,
+                }
+            ),
+            Err(ApplicationError::NotFound(_))
+        ));
+        assert!(matches!(
+            update.execute(
+                &gerant,
+                UpdateCategoryInput {
+                    id: child.id,
+                    name_fr: "x".to_string(),
+                    name_ar: "y".to_string(),
+                    parent_id: Some(child.id),
+                    is_active: true,
+                }
+            ),
+            Err(ApplicationError::Validation(_))
+        ));
+        let vendeur = session_with(Role::Vendeur);
+        assert!(matches!(
+            update.execute(
+                &vendeur,
+                UpdateCategoryInput {
+                    id: child.id,
+                    name_fr: "x".to_string(),
+                    name_ar: "y".to_string(),
+                    parent_id: None,
+                    is_active: true,
+                }
+            ),
+            Err(ApplicationError::Unauthorized)
+        ));
+    }
+
+    #[test]
+    fn category_list_filters_inactive_and_all_roles_may_read() {
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let create = CreateCategoryUseCase::new(&catalog);
+        let active = create
+            .execute(&gerant, category_input("CAT-A", None))
+            .expect("active");
+        let dormant = create
+            .execute(&gerant, category_input("CAT-B", None))
+            .expect("dormant");
+        UpdateCategoryUseCase::new(&catalog)
+            .execute(
+                &gerant,
+                UpdateCategoryInput {
+                    id: dormant.id,
+                    name_fr: dormant.name_fr.clone(),
+                    name_ar: dormant.name_ar.clone(),
+                    parent_id: None,
+                    is_active: false,
+                },
+            )
+            .expect("deactivate");
+        let vendeur = session_with(Role::Vendeur);
+        let list = ListCategoriesUseCase::new(&catalog);
+        let visible = list.execute(&vendeur, false).expect("list");
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].id, active.id);
+        let all = list.execute(&vendeur, true).expect("list all");
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn seed_starter_is_idempotent_and_lists_seven_departments() {
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let seed = SeedStarterCategoriesUseCase::new(&catalog);
+        let created = seed.execute(&gerant).expect("seed");
+        assert_eq!(created.len(), 7);
+        let codes: Vec<&str> = created.iter().map(|item| item.code.as_str()).collect();
+        assert_eq!(
+            codes,
+            vec![
+                "CAT-PLOMB",
+                "CAT-ELEC",
+                "CAT-VISS",
+                "CAT-OUTIL",
+                "CAT-PEINT",
+                "CAT-BATIM",
+                "CAT-JARDIN"
+            ]
+        );
+        assert!(created.iter().all(|item| item.is_active));
+        // Second run is a no-op returning the same rows.
+        let again = seed.execute(&gerant).expect("reseed");
+        assert_eq!(again.len(), 7);
+        assert_eq!(catalog.list_categories().expect("rows").len(), 7);
+        // Unauthorized role cannot seed.
+        let vendeur = session_with(Role::Vendeur);
+        assert!(matches!(
+            seed.execute(&vendeur),
+            Err(ApplicationError::Unauthorized)
+        ));
     }
 }

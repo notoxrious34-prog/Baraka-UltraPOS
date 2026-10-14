@@ -12,12 +12,13 @@
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { t, translateBackendError, type I18nKey } from "@/lib/i18n";
-import type { Locale } from "@/types/pos";
+import type { Category, Locale } from "@/types/pos";
 import type { CatalogProduct } from "@/types/pos";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import {
   adjustStock,
   ipcCreateProduct,
+  ipcListCategories,
   listWarehouses,
   type CreateProductWire,
   type NewProductUnitWire,
@@ -147,9 +148,10 @@ export function validateModalForm(data: ModalFormData): Partial<Record<string, I
 /**
  * Build the exact CreateProductDto wire object for the single base unit
  * (throws Error<messageKey> on invalid input). Unit preset names reuse the
- * DSN-038 preset logic from ProductCreateForm.
+ * DSN-038 preset logic from ProductCreateForm. The optional `categoryId`
+ * carries the selected rayon (`null`/blank stays unassigned).
  */
-export function buildModalWire(data: ModalFormData): CreateProductWire {
+export function buildModalWire(data: ModalFormData, categoryId?: string | null): CreateProductWire {
   const errors = validateModalForm(data);
   const first = Object.values(errors)[0];
   if (first !== undefined) {
@@ -185,7 +187,7 @@ export function buildModalWire(data: ModalFormData): CreateProductWire {
     barcode: barcode === "" ? null : barcode,
     name_ar: data.nameAr.trim() === "" ? nameFr : data.nameAr.trim(),
     name_fr: nameFr,
-    category_id: null,
+    category_id: categoryId !== undefined && categoryId !== null && categoryId !== "" ? categoryId : null,
     is_kit: false,
     units: [unit],
   };
@@ -316,6 +318,8 @@ export function ProductCreateModal({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [depotId, setDepotId] = useState<string | null>(null);
   const [created, setCreated] = useState<CatalogProduct | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryId, setCategoryId] = useState("");
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   // Reset per opening and resolve the principal depot id (UUID) once.
@@ -329,6 +333,8 @@ export function ProductCreateModal({
     setSubmitError(null);
     setCreated(null);
     setDepotId(null);
+    setCategories([]);
+    setCategoryId("");
     let cancelled = false;
     listWarehouses(token)
       .then((rows) => {
@@ -339,6 +345,17 @@ export function ProductCreateModal({
       .catch(() => {
         if (!cancelled) {
           setDepotId(null);
+        }
+      });
+    ipcListCategories(token, false)
+      .then((rows) => {
+        if (!cancelled) {
+          setCategories(rows.filter((row) => row.is_active));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCategories([]);
         }
       });
     return () => {
@@ -442,7 +459,7 @@ export function ProductCreateModal({
     let wire: CreateProductWire;
     let stockMicro: string;
     try {
-      wire = buildModalWire(form);
+      wire = buildModalWire(form, categoryId);
       stockMicro = parseInitialStockToMicro(form.initialStock);
     } catch (failure: unknown) {
       setSubmitError(failure instanceof Error ? failure.message : "INTERNAL_ERROR");
@@ -570,6 +587,24 @@ export function ProductCreateModal({
               {fieldError(errors, "nameAr", locale)}
             </label>
           </div>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold">{t(locale, "cat.categoryLabel")}</span>
+            <select
+              value={categoryId}
+              onChange={(event) => {
+                setCategoryId(event.target.value);
+              }}
+              className={inputClass}
+            >
+              <option value="">{t(locale, "cat.noCategoryOption")}</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {locale === "ar-DZ" ? category.name_ar : category.name_fr}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <div className="flex flex-col gap-1">
             <span className="text-xs font-bold">{t(locale, "cat.unitPreset")}</span>

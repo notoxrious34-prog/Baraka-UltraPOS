@@ -11,11 +11,12 @@
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { t, translateBackendError, type I18nKey } from "@/lib/i18n";
-import type { Locale } from "@/types/pos";
+import type { Category, Locale } from "@/types/pos";
 import type { CatalogProduct } from "@/types/pos";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import {
   ipcGetProduct,
+  ipcListCategories,
   updateProduct,
   type UpdateProductPayload,
   type UpdateProductUnitPayload,
@@ -42,6 +43,11 @@ export interface EditFormData {
   salePrice: string;
   costPrice: string;
   isActive: boolean;
+  /**
+   * Selected rayon id (`""` clears the assignment; `undefined` keeps the
+   * product's current `category_id` — existing callers omit it).
+   */
+  categoryId?: string | null;
 }
 
 /** Decimal DZD input from canonical centimes (`"15050"` -> `"150.5"`). Pure. */
@@ -158,7 +164,12 @@ export function buildUpdatePayload(
     product_id: product.product_id,
     name_ar: data.nameAr.trim() === "" ? nameFr : data.nameAr.trim(),
     name_fr: nameFr,
-    category_id: product.category_id,
+    category_id:
+      data.categoryId === undefined
+        ? product.category_id
+        : data.categoryId === "" || data.categoryId === null
+          ? null
+          : data.categoryId,
     is_active: data.isActive,
     units,
   };
@@ -212,6 +223,10 @@ export interface ProductEditModalViewProps {
   onPatch: (field: keyof EditFormData, value: string | boolean) => void;
   onClose: () => void;
   onSubmit: () => void;
+  /** Active taxonomy rows for the rayon selector (absent = selector hidden). */
+  categories?: Category[];
+  categoryId?: string;
+  onCategory?: (id: string) => void;
 }
 
 /** Presentational edition dialog (pure props; SSR-safe for tests). */
@@ -341,6 +356,25 @@ export function ProductEditModalView(props: ProductEditModalViewProps): ReactEle
               {fieldError(errors, "nameAr", locale)}
             </label>
           </div>
+          {props.categories !== undefined && props.onCategory !== undefined && (
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold">{t(locale, "cat.categoryLabel")}</span>
+              <select
+                value={props.categoryId ?? ""}
+                onChange={(event) => {
+                  props.onCategory?.(event.target.value);
+                }}
+                className={inputClass}
+              >
+                <option value="">{t(locale, "cat.noCategoryOption")}</option>
+                {props.categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {locale === "ar-DZ" ? category.name_ar : category.name_fr}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <h3 className="text-xs font-black uppercase opacity-70">
             {t(locale, "cat.pricingSection")}
@@ -436,6 +470,8 @@ export function ProductEditModal({
   const [attempted, setAttempted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryId, setCategoryId] = useState("");
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   // Re-seed the form every time a (new) product is opened.
@@ -447,7 +483,24 @@ export function ProductEditModal({
     setAttempted(false);
     setBusy(false);
     setSubmitError(null);
-  }, [isOpen, product]);
+    setCategoryId(product?.category_id ?? "");
+    setCategories([]);
+    let cancelled = false;
+    ipcListCategories(token, false)
+      .then((rows) => {
+        if (!cancelled) {
+          setCategories(rows.filter((row) => row.is_active));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCategories([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, product, token]);
 
   // Escape closes (when idle); Tab cycles inside the card (focus trap).
   useEffect(() => {
@@ -507,7 +560,7 @@ export function ProductEditModal({
     }
     setBusy(true);
     setSubmitError(null);
-    submitEditProduct(token, product, form)
+    submitEditProduct(token, product, { ...form, categoryId })
       .then((updated) => {
         onUpdated(updated);
       })
@@ -531,6 +584,9 @@ export function ProductEditModal({
       onPatch={patch}
       onClose={onClose}
       onSubmit={submit}
+      categories={categories}
+      categoryId={categoryId}
+      onCategory={setCategoryId}
     />
   );
 }

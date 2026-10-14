@@ -1,6 +1,6 @@
 # CONTEXT TRANSFER PACKAGE — SESSION ARC-014
 
-Status: SEED (authored by outgoing session ARC-013 at handoff, Reply 10)
+Status: CLOSED (Replies 1-10 complete, finalized 2026-10-14 via TASK-DOC-043)
 Date: 2026-10-12
 Authoring session: SESSION-ARC-013 (Reply 10, TASK-DOC-042)
 
@@ -455,6 +455,15 @@ dependencies without explicit per-task authorization.
 - Flexbox unconstrained shrinkage (SESSION-ARC-012, TASK-DSN-038/039): dynamic results containers in flex-col modals require `shrink-0` and `min-h`.
 - Barcode 128 pattern table verification (SESSION-ARC-012, TASK-DSN-039): verified against ISO/IEC 15417 reference vectors.
 
+### SESSION-ARC-014 additions (appended at close, TASK-DOC-043 — never summarize above, only this)
+- rusqlite scalar-function feature (SESSION-ARC-014, TASK-BRK-066): `baraka_search_norm` UDF required the `functions` Cargo feature on the pinned rusqlite 0.32; NULL inputs must map to `""` inside the UDF.
+- Search LIMIT parameter binding (SESSION-ARC-014, TASK-BRK-066): trailing `LIMIT ?` without a bound param surfaces as an opaque store failure; bind `rusqlite::types::Value::Integer(capped)` last.
+- stock_levels schema truth (SESSION-ARC-014, TASK-BRK-067): `stock_levels` has NO `id` column — `(warehouse_id, product_id, quantity_micro, quantity_base_micro, revision, updated_at)`; import upserts must match exactly.
+- CSV zero-dependency parser BigInt fidelity (SESSION-ARC-014, TASK-DSN-045): `sed -i` corrupted a `\\s` character class mid-task; money/quantity parsing uses pure string arithmetic to centimes/micros — never floats; `\\uFEFF` BOM handled explicitly.
+- formatMoney French grouping (SESSION-ARC-014, TASK-DSN-046): `formatMoney` renders French grouping (`12 050,00 DZD`, comma decimals) — test assertions must use that form, never US formatting.
+- Zustand v5 SSR view split, second confirmation (SESSION-ARC-014, TASK-DSN-046): hook-using components cannot be invoked as plain functions under `renderToStaticMarkup` (null dispatcher) — pure `*View` with explicit props plus JSX elements (extends the SESSION-ARC-008 pattern).
+- Boot-tool Golden Rule re-confirmed (SESSION-ARC-014, TASK-DOC-043): `--help` is an unrecognized flag and falls through to a default build — never probe the tool with arbitrary flags; only `--charter/--ctp/--out/--check`.
+
 ### SESSION-ARC-013 additions (appended at handoff, Reply 10 — never summarize above, only this)
 - Warehouse UUID resolution in initial provisioning (SESSION-ARC-013, TASK-DSN-041): Task literal specified `warehouse_id: "DEP-01"`, but backend `parse_wire_id` strictly requires a valid UUID. The executor correctly resolved code `DEP-01` to UUID via `listWarehouses` with active-depot fallback. STANDING PATTERN: frontend modals resolve warehouse codes to UUIDs dynamically.
 - Float ban preservation in micro quantity parsing (SESSION-ARC-013, TASK-DSN-041): Task spec suggested `Number()/Math.floor` for initial stock micro calculation; executor adhered to ADR-069 float ban using integer `parseQtyToMicro`.
@@ -475,6 +484,13 @@ dependencies without explicit per-task authorization.
   - `Baraka-UltraPOS-v1.0.0-rc.4-Delivery.zip` (221,627,920 bytes, SHA-256 `18A6E37B14A028751EB26035A5BB809DAFA3FABBF6ED05B5DE9788A3AEF4E098`).
   - Annotated tag `v1.0.0-rc.4` at commit `8c86b25`.
 - Category capabilities active: `category_list`, `category_create`, `category_update`, `category_seed_starter` (7-category Algerian hardware taxonomy).
+
+### SESSION-ARC-014 closing state (appended at close, TASK-DOC-043)
+- 14 migrations (0001-0014, frozen, byte-intact).
+- 82 registered IPC commands (`catalog_import_products` added by TASK-BRK-067).
+- Backend gates: `cargo test --workspace -j 2` → 414 passed / 0 failed; clippy `-D warnings` clean; fmt clean.
+- Frontend gates: 490 Vitest tests passing across 44 files; ESLint 0 warnings; TSC 0 errors; Vite production build clean (642.35 kB JS, gzip 160.62 kB).
+- Structured commits: `289b8ef` (DSN-044 category suite), `69689dd` (BRK-066 phonetic search), `9c8a24e` (BRK-067 batch import, cmd 82), `f06716f` (DSN-045 CSV import UI), `70343f1` (DSN-046 multi-unit cockpit).
 
 ## 10. Open Design Points / Unknowns
 
@@ -500,6 +516,21 @@ TODO for SESSION-ARC-014 (Phase 6 Sprint 2 — Aggressive High-Density Batching)
 2. Search & Alias Engine: Infix/phonetic French-in-Arabic alias search for unbarcoded hardware references.
 3. Multi-Unit Sales Cockpit (F3 unit switching with factor_micro conversions).
 4. Bulk CSV Import Wizard (dry-run validation, duplicate resolution, atomic commit).
+
+DONE in SESSION-ARC-014 (appended at close, TASK-DOC-043):
+- TASK-DSN-044: Category Suite — pill strip, management modal, starter pack, product dropdowns (`289b8ef`).
+- TASK-AUD-042: Read-only catalog audit (no writes).
+- TASK-BRK-066: Quincaillerie hybrid phonetic & multi-token search engine (`69689dd`).
+- TASK-BRK-067: Atomic batch import engine, DEP-01 provisioning, command 82 (`9c8a24e`).
+- TASK-DSN-045 / DSN-045-C1: CSV bulk import UI, zero-dep parser, gates (`f06716f`).
+- TASK-DSN-046: Multi-unit sales cockpit, F3 switcher, HUD, popover (`70343f1`).
+- TASK-AUD-043: Customer/pricing contract audit for Pillar 4 (read-only).
+- TASK-DOC-043: This commit session (commits, CTP-015 seed, BOOT-SESSION-ARC-015).
+
+TODO for SESSION-ARC-015 (Pillar 4 — Artisan & Wholesale Tier Pricing):
+1. TASK-BRK-068: Backend tiers — Migration 0015, `CustomerType`, wholesale price on `product_units`, `SalePricingService` margin guard.
+2. TASK-DSN-047: Frontend tier integration — F2 tier pill, automatic cart re-pricing, margin warnings.
+3. TASK-REL-052: v1.0.0-rc.5 packaging with full Phase 6 capabilities.
 
 ## 12. ADR Log Summary (ADR-066 through ADR-086; next free ADR-087)
 
@@ -540,12 +571,24 @@ Next free ADR id: **ADR-087**.
 - `crates/commands/src/ipc.rs`: Category Tauri commands (`category_list`, `category_create`, `category_update`, `category_seed_starter`).
 - `src/types/pos.ts` & `src/lib/ipc.ts`: TypeScript `Category` interface and IPC wrappers (`ipcListCategories`, etc.).
 
+### ARC-014 additions (appended at close, TASK-DOC-043)
+- `src/features/catalog/CategoryPillStrip.tsx` + `CategoryManageModal.tsx` + `__tests__/CategoryManageModal.test.tsx`: category UI (DSN-044).
+- `crates/domain/src/catalog/search_normalization.rs` + `crates/infrastructure/tests/catalog_search_engine.rs`: phonetic search (BRK-066).
+- `crates/infrastructure/tests/catalog_import_engine.rs`: batch import tests (BRK-067).
+- `src/features/catalog/catalog-import-parser.ts` + `ProductImportModal.tsx` + `__tests__/catalog-import-parser.test.ts` + `__tests__/ProductImportModal.test.tsx`: CSV import (DSN-045).
+- `src/features/pos/UnitSelectPopover.tsx` + `__tests__/multi-unit-cockpit.test.tsx` + `src/stores/__tests__/cart-store.test.ts`: multi-unit cockpit (DSN-046).
+- Modified ARC-014: `CatalogModule.tsx`, `ProductCreateModal.tsx`, `ProductEditModal.tsx`, `cart-store.ts`, `CartTable.tsx`, `use-pos-keyboard.ts`, `use-catalog-search.ts`, `ProductDiscovery.tsx`, `i18n.ts`, `ipc.ts`, `pos.ts`, `sqlite_catalog_repository.rs`, catalog use cases, `dto.rs`, commands `ipc.rs`, `src-tauri/lib.rs`, `infrastructure/Cargo.toml`, `pnpm-lock.yaml`.
+
 ## 14. Technical State
 
 - Rust: 1.98.x, Tauri v2, workspace clean.
 - Schema: 14 migrations (0001-0014, frozen).
 - IPC Commands: 81 registered commands.
 - Quality Gates: Rust 393 passed / 0 failed / 4 ignored (49 suites); Vitest 425 passed (39 files); lint 0; typecheck 0.
+
+### ARC-014 closing (appended at close, TASK-DOC-043)
+- Rust: 1.98.x, Tauri v2, workspace clean. Schema: 14 migrations (0001-0014, frozen).
+- IPC Commands: 82 registered. Gates: Rust 414/0; Vitest 490 (44 files); lint 0; typecheck 0; build clean.
 
 ## 15. Human Context & High-Density Directive
 

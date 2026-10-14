@@ -12,7 +12,7 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { ipcCreateDraft } from "@/lib/ipc";
 import { t, translateBackendError } from "@/lib/i18n";
-import { creditUsageBp } from "@/lib/money";
+import { creditUsageBp, formatMoney } from "@/lib/money";
 import type { DocType } from "@/types/pos";
 
 const SEARCH_INPUT_ID = "pos-search-input";
@@ -148,7 +148,15 @@ export function usePosKeyboard(): void {
         if (!modalOpen) {
           const line = cart.lines[ui.selectedLineIndex];
           if (line !== undefined) {
-            cart.cycleLineUnit(line.key);
+            const result = cart.cycleLineUnit(line.key);
+            if (result.cycled) {
+              const name = ui.locale === "ar-DZ" ? result.unitNameAr : result.unitNameFr;
+              ui.setBanner(
+                `${t(ui.locale, "pos.unitChanged")} ${name} (${formatMoney(result.salePriceCentimes, ui.locale)})`,
+              );
+            } else {
+              ui.setBanner(t(ui.locale, "pos.singleUnitNotice"));
+            }
           }
         }
         return;

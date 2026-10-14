@@ -215,6 +215,20 @@ export function ProductDiscovery(): ReactElement {
                         {t(locale, "search.kit")}
                       </span>
                     )}
+                    {product.units.length > 1 && (
+                      <span
+                        title={product.units
+                          .map((unit) =>
+                            locale === "ar-DZ" ? unit.unit_name_ar : unit.unit_name_fr,
+                          )
+                          .join(", ")}
+                        className="shrink-0 rounded bg-sky-600 px-1 text-[10px] font-black text-white"
+                      >
+                        {locale === "ar-DZ"
+                          ? `${product.units.length} وحدات`
+                          : `${product.units.length} unités`}
+                      </span>
+                    )}
                   </span>
                   <span className="font-mono text-[11px] text-slate-500">{product.sku}</span>
                   <span className="mt-auto font-mono text-sm font-black text-primary-600 dark:text-sky-300">

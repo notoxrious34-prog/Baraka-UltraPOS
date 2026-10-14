@@ -115,7 +115,12 @@ export function useCatalogSearch(): CatalogSearch {
             );
             const pick = exact ?? products[0];
             if (pick !== undefined) {
-              useCartStore.getState().addProduct(pick);
+              const matchedUnitIndex = pick.units.findIndex(
+                (unit) => unit.barcode === code,
+              );
+              useCartStore
+                .getState()
+                .addProduct(pick, matchedUnitIndex >= 0 ? matchedUnitIndex : undefined);
               usePosUiStore.getState().setSearchQuery("");
             }
           })

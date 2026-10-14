@@ -7,9 +7,10 @@ import { create } from "zustand";
 import type {
   ActiveCustomer,
   CartLine,
-  CatalogProduct,
   CartUnitSnapshot,
+  CatalogProduct,
   DocType,
+  Locale,
 } from "@/types/pos";
 import { addBig, maxZero, mulQtyPrice, subBig } from "@/lib/money";
 
@@ -61,7 +62,8 @@ interface CartState {
   addProduct: (product: CatalogProduct, unitIndex?: number) => void;
   removeLine: (key: string) => void;
   setLineQty: (key: string, qtyMicro: string) => void;
-  cycleLineUnit: (key: string) => void;
+  setLineUnit: (key: string, unitIndex: number) => void;
+  cycleLineUnit: (key: string) => CycleLineUnitResult;
   setLineDiscount: (key: string, discountCentimes: string) => void;
   setGlobalDiscount: (value: string) => void;
   setCustomer: (customer: ActiveCustomer) => void;
@@ -71,7 +73,27 @@ interface CartState {
   loadLines: (lines: CartLine[], customer?: ActiveCustomer) => void;
 }
 
-export const useCartStore = create<CartState>()((set) => ({
+/** Structured F3/unit-switch feedback for toasts and badges. */
+export interface CycleLineUnitResult {
+  cycled: boolean;
+  unitCount: number;
+  unitNameFr: string;
+  unitNameAr: string;
+  salePriceCentimes: string;
+}
+
+function singleUnitResult(line: CartLine | undefined): CycleLineUnitResult {
+  const unit = line?.units[line.unitIndex];
+  return {
+    cycled: false,
+    unitCount: line?.units.length ?? 0,
+    unitNameFr: unit?.nameFr ?? "",
+    unitNameAr: unit?.nameAr ?? "",
+    salePriceCentimes: unit?.salePriceCentimes ?? "0",
+  };
+}
+
+export const useCartStore = create<CartState>()((set, get) => ({
   lines: [],
   globalDiscountCentimes: ZERO,
   customer: { kind: "guest" },
@@ -122,14 +144,33 @@ export const useCartStore = create<CartState>()((set) => ({
         line.key === key ? { ...line, quantityMicro: qtyMicro } : line,
       ),
     })),
-  cycleLineUnit: (key) =>
+  cycleLineUnit: (key) => {
+    const line = get().lines.find((candidate) => candidate.key === key);
+    if (line === undefined || line.units.length < 2) {
+      return singleUnitResult(line);
+    }
+    const unitIndex = (line.unitIndex + 1) % line.units.length;
     set((state) => ({
-      lines: state.lines.map((line) => {
-        if (line.key !== key || line.units.length < 2) {
-          return line;
-        }
-        return { ...line, unitIndex: (line.unitIndex + 1) % line.units.length };
-      }),
+      lines: state.lines.map((candidate) =>
+        candidate.key === key ? { ...candidate, unitIndex } : candidate,
+      ),
+    }));
+    const unit = get().lines.find((candidate) => candidate.key === key)?.units[unitIndex];
+    return {
+      cycled: true,
+      unitCount: line.units.length,
+      unitNameFr: unit?.nameFr ?? "",
+      unitNameAr: unit?.nameAr ?? "",
+      salePriceCentimes: unit?.salePriceCentimes ?? "0",
+    };
+  },
+  setLineUnit: (key, unitIndex) =>
+    set((state) => ({
+      lines: state.lines.map((line) =>
+        line.key === key && unitIndex >= 0 && unitIndex < line.units.length
+          ? { ...line, unitIndex }
+          : line,
+      ),
     })),
   setLineDiscount: (key, discountCentimes) =>
     set((state) => ({
@@ -161,6 +202,36 @@ export function previewLineTotal(line: CartLine): string {
     return "0";
   }
   return maxZero(subBig(mulQtyPrice(line.quantityMicro, unit.salePriceCentimes), line.lineDiscountCentimes));
+}
+
+/**
+ * Base-unit equivalence of a line quantity (`3 Boîtes x100` -> `"(= 300 Pièces)"`).
+ * Pure BigInt micro arithmetic — zero floats. Returns `""` for the base unit
+ * itself (no equivalence needed) and for unparseable inputs.
+ */
+export function calculateBaseQuantityEquivalent(
+  quantityMicro: string,
+  factorMicro: string,
+  baseUnitNameFr: string,
+  baseUnitNameAr: string,
+  locale: Locale,
+): string {
+  if (factorMicro === "10000") {
+    return "";
+  }
+  let baseQtyMicros: bigint;
+  try {
+    baseQtyMicros = (BigInt(quantityMicro) * BigInt(factorMicro)) / 10000n;
+  } catch {
+    return "";
+  }
+  const negative = baseQtyMicros < 0n;
+  const abs = negative ? -baseQtyMicros : baseQtyMicros;
+  const whole = (abs / 10000n).toString();
+  const frac = (abs % 10000n).toString().padStart(4, "0").replace(/0+$/, "");
+  const amount = `${negative ? "-" : ""}${frac === "" ? whole : `${whole}.${frac}`}`;
+  const baseName = locale === "ar-DZ" ? baseUnitNameAr : baseUnitNameFr;
+  return `(= ${amount} ${baseName})`;
 }
 
 export interface PreviewTotals {

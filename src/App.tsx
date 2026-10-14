@@ -22,6 +22,7 @@ import { ReportsHomeScreen } from "@/features/reports/ReportsHomeScreen";
 import { CatalogModule } from "@/features/catalog/CatalogModule";
 import { ipcCheckFirstRunStatus } from "@/lib/ipc";
 import { t } from "@/lib/i18n";
+import barakaLogoIcon from "@/assets/logo/baraka-logo-icon.png";
 
 function isManagerRole(role: string): boolean {
   return role === "GERANT" || role === "ADMIN";
@@ -51,6 +52,16 @@ function NavRail({
   );
   return (
     <nav className="flex h-10 shrink-0 items-center gap-2 bg-primary-900 px-3">
+      <span className="flex items-center gap-1.5 pe-1">
+        <img
+          src={barakaLogoIcon}
+          alt="Baraka"
+          className="h-7 w-7 select-none object-contain drop-shadow-sm"
+        />
+        <span className="text-xs font-black">
+          <span className="text-amber-300">Baraka</span>
+        </span>
+      </span>
       {entry("pos", t(locale, "nav.pos"))}
       {entry("stock", t(locale, "nav.stock"))}
       {entry("customers", t(locale, "nav.customers"))}

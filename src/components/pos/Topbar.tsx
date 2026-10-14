@@ -8,6 +8,7 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useCartStore } from "@/stores/cart-store";
 import { t } from "@/lib/i18n";
+import barakaLogoIcon from "@/assets/logo/baraka-logo-icon.png";
 import { searchDocuments } from "@/lib/ipc";
 import { CashSessionIndicator } from "@/components/pos/CashSessionIndicator";
 import { OperationsMenu } from "@/components/pos/OperationsMenu";
@@ -83,11 +84,23 @@ export function Topbar(): ReactElement {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 bg-primary-900 px-3 text-white">
       <div className="flex items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-500 text-lg font-black text-slate-950">
-          ب
-        </span>
+        <img
+          src={barakaLogoIcon}
+          alt="Baraka"
+          className="h-9 w-9 select-none object-contain drop-shadow-sm"
+        />
         <div className="leading-tight">
-          <p className="text-sm font-extrabold">{t(locale, "app.title")}</p>
+          <p className="text-sm font-extrabold">
+            {(() => {
+              const [first, ...rest] = t(locale, "app.title").split(" ");
+              return (
+                <>
+                  <span className="text-amber-300">{first}</span>
+                  {rest.length > 0 && <span>{` ${rest.join(" ")}`}</span>}
+                </>
+              );
+            })()}
+          </p>
           <p className="text-[11px] text-white/70">{t(locale, "app.subtitle")}</p>
         </div>
       </div>

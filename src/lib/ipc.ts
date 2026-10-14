@@ -642,6 +642,8 @@ export interface PreviewTotalsRequestWire {
   lines: CheckoutLineWire[];
   global_discount_centimes: string;
   payments: CheckoutPaymentWire[];
+  /** Sale customer id for tier pricing (`null` = retail guest). */
+  customer_id: string | null;
 }
 
 /**

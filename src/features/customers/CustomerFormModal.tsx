@@ -9,7 +9,7 @@ import { t, translateBackendError } from "@/lib/i18n";
 import { ipcCreateCustomer, ipcGetCustomer, ipcUpdateCustomer } from "@/lib/ipc";
 import { parseMoneyToCentimes } from "@/lib/money";
 import { ModalShell } from "@/components/pos/modals/ModalShell";
-import type { CustomerDetail, Locale } from "@/types/pos";
+import type { CustomerDetail, CustomerTier, Locale } from "@/types/pos";
 import { isValidCustomerName } from "@/features/customers/customer-helpers";
 
 type CreditPolicy = "DISABLED" | "LIMITED" | "UNLIMITED";
@@ -42,6 +42,7 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
   const [phone, setPhone] = useState(editing?.phone ?? "");
   const [address, setAddress] = useState(editing?.address ?? "");
   const [policy, setPolicy] = useState<CreditPolicy>(editing?.credit_policy ?? "DISABLED");
+  const [tier, setTier] = useState<CustomerTier>(editing?.customer_tier ?? "retail");
   const [limitText, setLimitText] = useState(editing?.credit_limit_centimes ?? "");
   const [active, setActive] = useState(editing?.is_active ?? true);
   const [formError, setFormError] = useState<string | null>(null);
@@ -92,6 +93,7 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
         address: address.trim() === "" ? null : address.trim(),
         credit_policy: policy,
         credit_limit_centimes: limit,
+        customer_tier: tier,
         is_active: active,
       })
         .then(done)
@@ -103,6 +105,7 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
         address: address.trim() === "" ? null : address.trim(),
         credit_policy: policy,
         credit_limit_centimes: limit,
+        customer_tier: tier,
       })
         .then((id) => ipcGetCustomer(props.token, id).then(done).catch(failed))
         .catch(failed);
@@ -163,6 +166,33 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
             />
           </label>
         )}
+        <div className="flex flex-col gap-1">
+          <span className={labelClass}>{t(locale, "customers.formTier")}</span>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                { id: "retail", label: t(locale, "tier_retail") },
+                { id: "artisan", label: t(locale, "tier_artisan") },
+                { id: "wholesale", label: t(locale, "tier_wholesale") },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  setTier(option.id);
+                }}
+                className={`rounded-lg px-2 py-2 text-xs font-black ${
+                  tier === option.id
+                    ? "bg-amber-500 text-slate-950"
+                    : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
         {editing !== null && (
           <label className="flex items-center gap-2 text-sm font-bold">
             <input

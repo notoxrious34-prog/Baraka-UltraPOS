@@ -257,6 +257,7 @@ describe("category product payloads", () => {
         customFr: "",
         salePrice: "",
         costPrice: "",
+        wholesalePrice: "",
         initialStock: "",
         printAfter: true,
       },
@@ -276,6 +277,7 @@ describe("category product payloads", () => {
       customFr: "",
       salePrice: "",
       costPrice: "",
+      wholesalePrice: "",
       initialStock: "",
       printAfter: true,
     });

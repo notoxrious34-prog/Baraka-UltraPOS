@@ -12,8 +12,13 @@ import { formatMoney } from "@/lib/money";
 export function TotalsFooter(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const lines = useCartStore((state) => state.lines);
+  const customer = useCartStore((state) => state.customer);
   const globalDiscountCentimes = useCartStore((state) => state.globalDiscountCentimes);
-  const totals = previewTotals(lines, globalDiscountCentimes);
+  const totals = previewTotals(
+    lines,
+    globalDiscountCentimes,
+    customer.kind === "named" ? customer.tier : "retail",
+  );
 
   return (
     <div className="shrink-0 border-t border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">

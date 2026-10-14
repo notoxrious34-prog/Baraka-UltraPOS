@@ -6,6 +6,8 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import {
   calculateBaseQuantityEquivalent,
+  isLineTierPriced,
+  lineUnitPriceCentimes,
   previewLineTotal,
   useCartStore,
 } from "@/stores/cart-store";
@@ -14,14 +16,27 @@ import { t } from "@/lib/i18n";
 import { addBig, formatMoney, formatQty, subBig } from "@/lib/money";
 import { UnitSelectPopover, factorTag, isBaseUnit } from "@/features/pos/UnitSelectPopover";
 
-import type { CartLine, Locale } from "@/types/pos";
+import type { CartLine, CustomerTier, LineMargin, Locale } from "@/types/pos";
 
 const STEP_MICRO = "10000";
+
+/** Integer-exact basis-points to percent label (`1764` -> `+17.64%`). */
+function formatMarginPercent(basisPoints: number): string {
+  const sign = basisPoints < 0 ? "-" : "+";
+  const abs = Math.abs(Math.trunc(basisPoints));
+  const whole = Math.trunc(abs / 100);
+  const frac = (abs % 100).toString().padStart(2, "0").replace(/0+$/, "");
+  return `${sign}${frac === "" ? `${whole}` : `${whole}.${frac}`}%`;
+}
 
 export interface CartTableViewProps {
   lines: CartLine[];
   selectedLineIndex: number;
   locale: Locale;
+  /** Active customer tier (drives PRO/GROS pills + tier totals). */
+  customerTier: CustomerTier;
+  /** Last preview Margin Guard readout (indexed by cart line order). */
+  margins: LineMargin[];
   popoverKey: string | null;
   onSelectLine: (index: number) => void;
   onTogglePopover: (key: string) => void;
@@ -35,6 +50,8 @@ export function CartTableView({
   lines,
   selectedLineIndex,
   locale,
+  customerTier,
+  margins,
   popoverKey,
   onSelectLine,
   onTogglePopover,
@@ -77,6 +94,9 @@ export function CartTableView({
         {lines.map((line, index) => {
           const unit = line.units[line.unitIndex];
           const selected = index === selectedLineIndex;
+          const tierPriced = isLineTierPriced(line, customerTier);
+          const margin = margins.find((entry) => entry.line_index === index);
+          const belowCost = margin?.is_below_cost === true;
           return (
             <tr
               key={line.key}
@@ -96,6 +116,29 @@ export function CartTableView({
                   {locale === "ar-DZ" ? line.nameAr : line.nameFr}
                 </p>
                 <p className="font-mono text-[11px] text-slate-500">{line.sku}</p>
+                {(tierPriced || belowCost) && (
+                  <span className="mt-0.5 flex flex-wrap gap-1">
+                    {tierPriced && (
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                        {customerTier === "artisan"
+                          ? locale === "ar-DZ"
+                            ? "سعر مهني"
+                            : "PRO"
+                          : locale === "ar-DZ"
+                            ? "سعر جملة"
+                            : "GROS"}
+                      </span>
+                    )}
+                    {belowCost && margin !== undefined && (
+                      <span
+                        title={`${t(locale, "margin_label")}: ${formatMarginPercent(margin.margin_basis_points)}`}
+                        className="animate-pulse rounded border border-rose-300 bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:border-rose-700 dark:bg-rose-950/60 dark:text-rose-400"
+                      >
+                        ⚠️ {t(locale, "below_cost_warning")}
+                      </span>
+                    )}
+                  </span>
+                )}
               </td>
               <td className="relative px-1 py-2">
                 {unit !== undefined && line.units.length > 1 ? (
@@ -161,7 +204,7 @@ export function CartTableView({
                 />
               </td>
               <td className="px-1 py-2 text-end font-mono text-xs font-bold">
-                {unit !== undefined ? formatMoney(unit.salePriceCentimes, locale) : "—"}
+                {unit !== undefined ? formatMoney(lineUnitPriceCentimes(line, customerTier), locale) : "—"}
               </td>
               <td className="px-1 py-2">
                 <span className="flex items-center justify-center gap-1">
@@ -193,7 +236,7 @@ export function CartTableView({
                 </span>
               </td>
               <td className="px-1 py-2 text-end font-mono text-xs font-black">
-                {formatMoney(previewLineTotal(line), locale)}
+                {formatMoney(previewLineTotal(line, customerTier), locale)}
               </td>
               <td className="px-1 py-2 text-center">
                 <button
@@ -220,6 +263,8 @@ export function CartTableView({
 export function CartTable(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const lines = useCartStore((state) => state.lines);
+  const customer = useCartStore((state) => state.customer);
+  const previewMargins = useCartStore((state) => state.previewMargins);
   const selectedLineIndex = usePosUiStore((state) => state.selectedLineIndex);
   const setSelectedLineIndex = usePosUiStore((state) => state.setSelectedLineIndex);
   const removeLine = useCartStore((state) => state.removeLine);
@@ -249,6 +294,8 @@ export function CartTable(): ReactElement {
       lines={lines}
       selectedLineIndex={selectedLineIndex}
       locale={locale}
+      customerTier={customer.kind === "named" ? customer.tier : "retail"}
+      margins={previewMargins}
       popoverKey={popoverKey}
       onSelectLine={setSelectedLineIndex}
       onTogglePopover={(key) =>

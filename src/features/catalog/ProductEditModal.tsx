@@ -42,6 +42,8 @@ export interface EditFormData {
   /** Decimal DZD strings; blank means zero (creation-form semantics). */
   salePrice: string;
   costPrice: string;
+  /** Artisan/wholesale DZD price (blank clears it; falls back to sale price). */
+  wholesalePrice: string;
   isActive: boolean;
   /**
    * Selected rayon id (`""` clears the assignment; `undefined` keeps the
@@ -76,6 +78,10 @@ export function formFromProduct(product: CatalogProduct): EditFormData {
     barcode: base?.barcode ?? "",
     salePrice: base === null ? "0" : centimesToDecimalInput(base.sale_price_centimes),
     costPrice: base === null ? "0" : centimesToDecimalInput(base.purchase_price_centimes),
+    wholesalePrice:
+      base?.wholesale_price_centimes === null || base?.wholesale_price_centimes === undefined
+        ? ""
+        : centimesToDecimalInput(base.wholesale_price_centimes),
     isActive: product.is_active,
   };
 }
@@ -115,11 +121,19 @@ export function validateEditForm(data: EditFormData): Partial<Record<string, I18
   if (cost !== null) {
     errors.costPrice = cost;
   }
+  const wholesale = priceError(data.wholesalePrice);
+  if (wholesale !== null) {
+    errors.wholesalePrice = wholesale;
+  }
   return errors;
 }
 
 function blankToZero(value: string, parse: (raw: string) => string): string {
   return value.trim() === "" ? "0" : parse(value);
+}
+
+function blankToNull(value: string, parse: (raw: string) => string): string | null {
+  return value.trim() === "" ? null : parse(value);
 }
 
 /**
@@ -155,7 +169,9 @@ export function buildUpdatePayload(
       purchase_price_centimes: edited
         ? blankToZero(data.costPrice, parseMoneyToCentimes)
         : unit.purchase_price_centimes,
-      wholesale_price_centimes: unit.wholesale_price_centimes,
+      wholesale_price_centimes: edited
+        ? blankToNull(data.wholesalePrice, parseMoneyToCentimes)
+        : unit.wholesale_price_centimes,
       is_base_unit: unit.is_base_unit,
       is_default_selling: unit.is_default_selling,
     };
@@ -406,6 +422,21 @@ export function ProductEditModalView(props: ProductEditModalViewProps): ReactEle
                 className={`${inputClass} font-mono`}
               />
               {fieldError(errors, "salePrice", locale)}
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold">
+                {t(locale, "wholesale_price")} (DZD)
+              </span>
+              <input
+                value={form.wholesalePrice}
+                inputMode="decimal"
+                dir="ltr"
+                onChange={(event) => {
+                  props.onPatch("wholesalePrice", event.target.value);
+                }}
+                className={`${inputClass} font-mono`}
+              />
+              {fieldError(errors, "wholesalePrice", locale)}
             </label>
           </div>
           <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-3 py-2 dark:bg-slate-800">

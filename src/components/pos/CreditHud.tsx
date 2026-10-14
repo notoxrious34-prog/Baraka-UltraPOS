@@ -12,6 +12,7 @@ import { usePaymentModalStore } from "@/stores/payment-modal-store";
 import { t, translateBackendError } from "@/lib/i18n";
 import { creditUsageBp, formatMoney } from "@/lib/money";
 import { ipcGetCustomer } from "@/lib/ipc";
+import { CustomerTierBadge } from "@/components/pos/CustomerTierBadge";
 
 export function CreditHud(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
@@ -77,7 +78,10 @@ export function CreditHud(): ReactElement {
           onClick={open}
           className="flex w-full items-center justify-between rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white"
         >
-          <span className="truncate">{customer.name}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate">{customer.name}</span>
+            <CustomerTierBadge tier={customer.tier} locale={locale} />
+          </span>
           <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[11px]">
             {t(locale, "credit.unlimited")}
           </span>
@@ -99,7 +103,10 @@ export function CreditHud(): ReactElement {
         onClick={open}
         className="flex w-full flex-col gap-1 rounded-lg bg-amber-100 px-3 py-2 text-start text-sm font-bold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
       >
-        <span className="truncate">{customer.name}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="truncate">{customer.name}</span>
+          <CustomerTierBadge tier={customer.tier} locale={locale} />
+        </span>
         <span className="text-[11px] font-semibold opacity-80">{t(locale, "credit.pending")}</span>
       </button>
     );
@@ -119,7 +126,10 @@ export function CreditHud(): ReactElement {
           onClick={open}
           className="w-full rounded-lg bg-slate-200 px-3 py-2 text-start text-sm font-bold dark:bg-slate-800 dark:text-slate-200"
         >
-          {customer.name}
+          <span className="flex items-center gap-1.5">
+            <span className="truncate">{customer.name}</span>
+            <CustomerTierBadge tier={customer.tier} locale={locale} />
+          </span>
         </button>
         <VersementButton
           locale={locale}
@@ -142,7 +152,10 @@ export function CreditHud(): ReactElement {
     <div className="flex w-full flex-col gap-1">
       <div className={`flex w-full flex-col gap-1 rounded-lg px-3 py-2 ${shellTone}`}>
         <button type="button" onClick={open} className="flex items-center justify-between gap-2 text-start">
-          <span className="truncate text-sm font-extrabold">{customer.name}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-sm font-extrabold">{customer.name}</span>
+            <CustomerTierBadge tier={customer.tier} locale={locale} />
+          </span>
           <span className="shrink-0 font-mono text-[11px] font-bold">
             {formatMoney(customer.balanceCentimes, locale)} / {formatMoney(customer.limitCentimes, locale)}
           </span>

@@ -220,19 +220,24 @@ fn preview_equals_commit_tick_2026_000002_scenario() {
         },
     ];
     // 1. PREVIEW before any commit: must already carry the timbre.
-    let preview =
-        PreviewSaleTotalsUseCase::new(&harness.catalog, &harness.stock, &harness.warehouses)
-            .execute(
-                &session,
-                PreviewTotalsInput {
-                    warehouse_id: warehouse,
-                    doc_type: DocumentType::Ticket,
-                    lines: lines.clone(),
-                    global_discount_centimes: 0,
-                    payments: payments.clone(),
-                },
-            )
-            .expect("preview");
+    let preview = PreviewSaleTotalsUseCase::new(
+        &harness.catalog,
+        &harness.stock,
+        &harness.warehouses,
+        &harness.customers,
+    )
+    .execute(
+        &session,
+        PreviewTotalsInput {
+            warehouse_id: warehouse,
+            doc_type: DocumentType::Ticket,
+            lines: lines.clone(),
+            customer_id: None,
+            global_discount_centimes: 0,
+            payments: payments.clone(),
+        },
+    )
+    .expect("preview");
     assert_eq!(
         (
             preview.subtotal_ht,
@@ -325,19 +330,24 @@ fn preview_equals_commit_with_discounts_bl_no_timbre() {
     ];
     // 1. PREVIEW with no tender yet (modal just opened): BL never carries
     //    a timbre, and the global discount allocates proportionally.
-    let preview_untendered =
-        PreviewSaleTotalsUseCase::new(&harness.catalog, &harness.stock, &harness.warehouses)
-            .execute(
-                &session,
-                PreviewTotalsInput {
-                    warehouse_id: warehouse,
-                    doc_type: DocumentType::Bl,
-                    lines: lines.clone(),
-                    global_discount_centimes: 4_050,
-                    payments: vec![],
-                },
-            )
-            .expect("preview");
+    let preview_untendered = PreviewSaleTotalsUseCase::new(
+        &harness.catalog,
+        &harness.stock,
+        &harness.warehouses,
+        &harness.customers,
+    )
+    .execute(
+        &session,
+        PreviewTotalsInput {
+            warehouse_id: warehouse,
+            doc_type: DocumentType::Bl,
+            lines: lines.clone(),
+            customer_id: None,
+            global_discount_centimes: 4_050,
+            payments: vec![],
+        },
+    )
+    .expect("preview");
     assert_eq!(
         (
             preview_untendered.subtotal_ht,
@@ -359,19 +369,24 @@ fn preview_equals_commit_with_discounts_bl_no_timbre() {
     }];
     // 3. The modal re-previews on every tender change: same cart state,
     //    now with the actual tender aboard.
-    let preview =
-        PreviewSaleTotalsUseCase::new(&harness.catalog, &harness.stock, &harness.warehouses)
-            .execute(
-                &session,
-                PreviewTotalsInput {
-                    warehouse_id: warehouse,
-                    doc_type: DocumentType::Bl,
-                    lines: lines.clone(),
-                    global_discount_centimes: 4_050,
-                    payments: payments.clone(),
-                },
-            )
-            .expect("preview with tender");
+    let preview = PreviewSaleTotalsUseCase::new(
+        &harness.catalog,
+        &harness.stock,
+        &harness.warehouses,
+        &harness.customers,
+    )
+    .execute(
+        &session,
+        PreviewTotalsInput {
+            warehouse_id: warehouse,
+            doc_type: DocumentType::Bl,
+            lines: lines.clone(),
+            customer_id: None,
+            global_discount_centimes: 4_050,
+            payments: payments.clone(),
+        },
+    )
+    .expect("preview with tender");
     assert_eq!(
         (
             preview.subtotal_ht,
@@ -439,22 +454,27 @@ fn preview_is_read_only_and_rejects_empty_cart() {
     ensure_cash_session(&harness, warehouse);
     let session = session_with(Role::Vendeur);
     // Empty cart: the kernel rejects exactly as a commit would.
-    let rejected =
-        PreviewSaleTotalsUseCase::new(&harness.catalog, &harness.stock, &harness.warehouses)
-            .execute(
-                &session,
-                PreviewTotalsInput {
-                    warehouse_id: warehouse,
-                    doc_type: DocumentType::Ticket,
-                    lines: vec![],
-                    global_discount_centimes: 0,
-                    payments: vec![PaymentInput {
-                        method: PaymentMethod::Cash,
-                        amount_centimes: 10_000,
-                    }],
-                },
-            )
-            .expect_err("empty cart");
+    let rejected = PreviewSaleTotalsUseCase::new(
+        &harness.catalog,
+        &harness.stock,
+        &harness.warehouses,
+        &harness.customers,
+    )
+    .execute(
+        &session,
+        PreviewTotalsInput {
+            warehouse_id: warehouse,
+            doc_type: DocumentType::Ticket,
+            lines: vec![],
+            customer_id: None,
+            global_discount_centimes: 0,
+            payments: vec![PaymentInput {
+                method: PaymentMethod::Cash,
+                amount_centimes: 10_000,
+            }],
+        },
+    )
+    .expect_err("empty cart");
     assert!(
         matches!(
             rejected,
@@ -463,25 +483,30 @@ fn preview_is_read_only_and_rejects_empty_cart() {
         "unexpected: {rejected:?}"
     );
     // Unsupported document kinds are rejected exactly as a commit would.
-    let forbidden =
-        PreviewSaleTotalsUseCase::new(&harness.catalog, &harness.stock, &harness.warehouses)
-            .execute(
-                &session_with(Role::Vendeur),
-                PreviewTotalsInput {
-                    warehouse_id: warehouse,
-                    doc_type: DocumentType::Devis,
-                    lines: vec![CartLineInput {
-                        product_id: product,
-                        unit_id: unit,
-                        quantity_micro: 10_000,
-                        unit_price_override: None,
-                        line_discount_centimes: 0,
-                    }],
-                    global_discount_centimes: 0,
-                    payments: vec![],
-                },
-            )
-            .expect_err("unsupported doc type");
+    let forbidden = PreviewSaleTotalsUseCase::new(
+        &harness.catalog,
+        &harness.stock,
+        &harness.warehouses,
+        &harness.customers,
+    )
+    .execute(
+        &session_with(Role::Vendeur),
+        PreviewTotalsInput {
+            warehouse_id: warehouse,
+            doc_type: DocumentType::Devis,
+            lines: vec![CartLineInput {
+                product_id: product,
+                unit_id: unit,
+                quantity_micro: 10_000,
+                unit_price_override: None,
+                line_discount_centimes: 0,
+            }],
+            customer_id: None,
+            global_discount_centimes: 0,
+            payments: vec![],
+        },
+    )
+    .expect_err("unsupported doc type");
     assert!(
         matches!(
             forbidden,

@@ -25,6 +25,7 @@ const PIECE: CartUnitSnapshot = {
   factorMicro: "10000",
   barcode: "PCS-001",
   salePriceCentimes: "15020",
+  wholesalePriceCentimes: null,
   isBaseUnit: true,
   isDefaultSelling: true,
 };
@@ -37,6 +38,7 @@ const BOX: CartUnitSnapshot = {
   factorMicro: "1000000",
   barcode: "BOX-001",
   salePriceCentimes: "1205000",
+  wholesalePriceCentimes: null,
   isBaseUnit: false,
   isDefaultSelling: false,
 };
@@ -72,6 +74,8 @@ function viewProps(lines: CartLine[], popoverKey: string | null = null) {
     lines,
     selectedLineIndex: 0,
     locale: "fr-DZ" as const,
+    customerTier: "retail" as const,
+    margins: [],
     popoverKey,
     onSelectLine: noop,
     onTogglePopover: noop,

@@ -622,6 +622,9 @@ pub struct PreviewTotalsRequest {
     pub global_discount_centimes: String,
     /// Tender lines exactly as currently entered by the operator.
     pub payments: Vec<PaymentLineDto>,
+    /// Customer id for tier pricing, if any (absent/null = retail guest).
+    #[serde(default)]
+    pub customer_id: Option<String>,
 }
 
 /// One leaf-level stock shortage (TASK-BRK-033).

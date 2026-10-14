@@ -54,6 +54,7 @@ function toCartLine(
       factor_micro: string;
       barcode: string | null;
       sale_price_centimes: string;
+      wholesale_price_centimes: string | null;
       is_base_unit: boolean;
       is_default_selling: boolean;
     }>;
@@ -80,6 +81,7 @@ function toCartLine(
       factorMicro: unit.factor_micro,
       barcode: unit.barcode,
       salePriceCentimes: unit.sale_price_centimes,
+      wholesalePriceCentimes: unit.wholesale_price_centimes,
       isBaseUnit: unit.is_base_unit,
       isDefaultSelling: unit.is_default_selling,
     })),
@@ -180,6 +182,7 @@ export function ParkedSalesModal(): ReactElement {
             policy: detail.credit_policy,
             limitCentimes: detail.credit_limit_centimes,
             balanceCentimes: detail.current_balance_centimes,
+            tier: detail.customer_tier,
             source: "backend",
           };
         }

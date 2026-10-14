@@ -205,6 +205,7 @@ export function CheckoutModal(): ReactElement {
       lines: buildLineWires(lines),
       global_discount_centimes: globalDiscountCentimes,
       payments: buildPaymentWires(cash, credit, cheque, card),
+      customer_id: customer.kind === "named" ? customer.id : null,
     })
       .then((result) => {
         if (previewRequestIdRef.current !== requestId) {
@@ -212,6 +213,8 @@ export function CheckoutModal(): ReactElement {
         }
         setPreview(result);
         setPreviewError(null);
+        // Publish the Margin Guard readout for the cart table pills.
+        useCartStore.getState().setPreviewMargins(result.line_margins ?? []);
       })
       .catch((failure: unknown) => {
         if (previewRequestIdRef.current !== requestId) {
@@ -227,7 +230,7 @@ export function CheckoutModal(): ReactElement {
         }
         setPreviewPending(false);
       });
-  }, [session, warehouseId, lines, globalDiscountCentimes, docType, cash, credit, cheque, card]);
+  }, [session, warehouseId, lines, globalDiscountCentimes, docType, cash, credit, cheque, card, customer]);
 
   // Shortage-confirmation reset: every distinct shortage set requires its
   // own explicit gesture — a toggle given for one cart must never leak

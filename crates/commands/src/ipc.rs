@@ -1401,6 +1401,7 @@ pub fn sales_preview_totals(
         state.catalog.as_ref(),
         state.stock.as_ref(),
         state.warehouses.as_ref(),
+        state.customers.as_ref(),
     )
     .execute(
         &session,
@@ -1411,6 +1412,15 @@ pub fn sales_preview_totals(
             doc_type: DocumentType::from_code(&request.document_type)
                 .map_err(|error| error_code(&ApplicationError::Validation(error)))?,
             lines,
+            customer_id: request
+                .customer_id
+                .as_deref()
+                .map(|text| {
+                    parse_wire_id(text, "customer_id")
+                        .map(CustomerId::from)
+                        .map_err(|error| error_code(&error))
+                })
+                .transpose()?,
             global_discount_centimes: parse_wire_int(
                 &request.global_discount_centimes,
                 "global_discount_centimes",

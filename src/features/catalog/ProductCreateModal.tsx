@@ -60,6 +60,8 @@ export interface ModalFormData {
   customFr: string;
   salePrice: string;
   costPrice: string;
+  /** Artisan/wholesale DZD price (blank = none, falls back to sale price). */
+  wholesalePrice: string;
   initialStock: string;
   printAfter: boolean;
 }
@@ -75,6 +77,7 @@ export function emptyModalForm(): ModalFormData {
     customFr: "",
     salePrice: "",
     costPrice: "",
+    wholesalePrice: "",
     initialStock: "",
     printAfter: true,
   };
@@ -132,6 +135,10 @@ export function validateModalForm(data: ModalFormData): Partial<Record<string, I
   if (cost !== null) {
     errors.costPrice = cost;
   }
+  const wholesale = priceError(data.wholesalePrice);
+  if (wholesale !== null) {
+    errors.wholesalePrice = wholesale;
+  }
   if (!isBlank(data.initialStock)) {
     try {
       const micro = parseQtyToMicro(data.initialStock);
@@ -179,7 +186,8 @@ export function buildModalWire(data: ModalFormData, categoryId?: string | null):
       data.salePrice.trim() === "" ? "0" : parseMoneyToCentimes(data.salePrice),
     purchase_price_centimes:
       data.costPrice.trim() === "" ? "0" : parseMoneyToCentimes(data.costPrice),
-    wholesale_price_centimes: null,
+    wholesale_price_centimes:
+      data.wholesalePrice.trim() === "" ? null : parseMoneyToCentimes(data.wholesalePrice),
     is_base_unit: true,
     is_default_selling: true,
   };
@@ -683,6 +691,21 @@ export function ProductCreateModal({
                 className={`${inputClass} font-mono`}
               />
               {fieldError(errors, "salePrice", locale)}
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold">
+                {t(locale, "wholesale_price")} (DZD)
+              </span>
+              <input
+                value={form.wholesalePrice}
+                inputMode="decimal"
+                dir="ltr"
+                onChange={(event) => {
+                  patch("wholesalePrice", event.target.value);
+                }}
+                className={`${inputClass} font-mono`}
+              />
+              {fieldError(errors, "wholesalePrice", locale)}
             </label>
           </div>
           <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-3 py-2 dark:bg-slate-800">

@@ -11,8 +11,9 @@ import { t } from "@/lib/i18n";
 import { StoreIdentityTab } from "./StoreIdentityTab";
 import { PrinterSettingsTab } from "./PrinterSettingsTab";
 import { BackupSettingsTab } from "./BackupSettingsTab";
+import { AboutTab } from "./AboutTab";
 
-type SettingsTab = "identity" | "printer" | "backups";
+type SettingsTab = "identity" | "printer" | "backups" | "about";
 
 export function SettingsModule(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
@@ -24,6 +25,7 @@ export function SettingsModule(): ReactElement {
     { id: "identity", label: t(locale, "settings.tabIdentity") },
     { id: "printer", label: t(locale, "settings.tabPrinter") },
     { id: "backups", label: t(locale, "settings.tabBackups") },
+    { id: "about", label: t(locale, "settings.tabAbout") },
   ];
 
   return (
@@ -57,6 +59,7 @@ export function SettingsModule(): ReactElement {
         {tab === "backups" && session !== null && (
           <BackupSettingsTab locale={locale} sessionToken={session.token} isAdmin={isAdmin} />
         )}
+        {tab === "about" && <AboutTab locale={locale} />}
       </div>
     </section>
   );

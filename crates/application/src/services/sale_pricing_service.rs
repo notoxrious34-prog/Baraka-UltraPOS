@@ -8,6 +8,7 @@
 use baraka_domain::catalog::{convert_to_base_micros, ProductId, UnitId};
 use baraka_domain::errors::DomainError;
 use baraka_domain::sales::pricing::calculate_margin_basis_points;
+use baraka_domain::sales::CustomerTier;
 
 use crate::errors::ApplicationError;
 use crate::ports::ProductRepository;
@@ -40,13 +41,15 @@ pub struct VerifiedLine {
 /// Verify one cart line against the catalog.
 ///
 /// `override_price`: explicit operator price, accepted verbatim here (the
-/// caller gates it behind `PriceOverride`); `None` uses the catalog price.
+/// caller gates it behind `PriceOverride`); `None` uses the tier-resolved
+/// catalog price (`ProductUnit::price_for_tier`).
 pub fn verify_cart_line<P>(
     products: &P,
     product_id: ProductId,
     unit_id: UnitId,
     quantity_micro: i64,
     override_price: Option<i64>,
+    tier: CustomerTier,
 ) -> Result<VerifiedLine, ApplicationError>
 where
     P: ProductRepository + ?Sized,
@@ -70,7 +73,7 @@ where
                 "INVALID_UNIT".to_string(),
             ))
         })?;
-    let unit_price = override_price.unwrap_or_else(|| unit.sale_price.centimes());
+    let unit_price = override_price.unwrap_or_else(|| unit.price_for_tier(tier).centimes());
     let cost_price = unit.purchase_price.centimes();
     let quantity_base_micro = convert_to_base_micros(quantity_micro, unit.factor_micro)
         .map_err(ApplicationError::Validation)?;

@@ -10,9 +10,9 @@ use baraka_domain::errors::DomainError;
 use baraka_domain::inventory::WarehouseId;
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{
-    price_document, CreditPolicy, CustomerId, Document, DocumentId, DocumentItem, DocumentLanguage,
-    DocumentStatus, DocumentType, PaymentMethod, PaymentShare, PaymentStatus, PricedDocument,
-    PricedLineInput,
+    price_document, CreditPolicy, CustomerId, CustomerTier, Document, DocumentId, DocumentItem,
+    DocumentLanguage, DocumentStatus, DocumentType, PaymentMethod, PaymentShare, PaymentStatus,
+    PricedDocument, PricedLineInput,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -72,6 +72,7 @@ pub fn verify_and_price_cart<P>(
     global_discount_centimes: i64,
     doc_type: DocumentType,
     payments: &[PaymentInput],
+    tier: CustomerTier,
 ) -> Result<(Vec<VerifiedLine>, PricedDocument), ApplicationError>
 where
     P: ProductRepository + ?Sized,
@@ -90,6 +91,7 @@ where
             line.unit_id,
             line.quantity_micro,
             line.unit_price_override,
+            tier,
         )?);
     }
     // Pure pricing (TVA baseline rate is 0 pending the tax engine).
@@ -213,6 +215,17 @@ where
         }
         // Catalog verification + pricing — shared with the read-only
         // preview (single source of truth for sale totals, TASK-BRK-031).
+        // Tier pricing (Pillar 4): the sale customer sets the catalog price
+        // tier system-wide — never an operator override, so no PriceOverride
+        // permission is involved; guests pay retail.
+        let tier = match input.customer_id {
+            Some(customer_id) => self
+                .customers
+                .get_customer(customer_id)?
+                .map(|customer| customer.customer_tier)
+                .unwrap_or_default(),
+            None => CustomerTier::Retail,
+        };
         let (verified, priced) = verify_and_price_cart(
             self.products,
             session,
@@ -220,6 +233,7 @@ where
             input.global_discount_centimes,
             input.doc_type,
             &input.payments,
+            tier,
         )?;
         // Credit authorization (reads only).
         let mut credit_amount: i128 = 0;
@@ -366,6 +380,8 @@ pub struct PreviewTotalsInput {
     pub doc_type: DocumentType,
     /// Cart lines (non-empty, else `EmptyCart`).
     pub lines: Vec<CartLineInput>,
+    /// Customer for tier pricing, if any (guests pay retail).
+    pub customer_id: Option<CustomerId>,
     /// Global discount in centimes.
     pub global_discount_centimes: i64,
     /// Tender lines exactly as currently entered by the operator.
@@ -436,29 +452,33 @@ pub struct PreviewTotalsOutput {
 /// the requested warehouse so the modal can gate the sale before commit.
 /// Warnings are advisory (levels may move before commit); the atomic
 /// engine performs the authoritative, role-gated re-check.
-pub struct PreviewSaleTotalsUseCase<'a, P, S, W>
+pub struct PreviewSaleTotalsUseCase<'a, P, S, W, C>
 where
     P: ?Sized,
     S: ?Sized,
     W: ?Sized,
+    C: ?Sized,
 {
     products: &'a P,
     stock: &'a S,
     warehouses: &'a W,
+    customers: &'a C,
 }
 
-impl<'a, P, S, W> PreviewSaleTotalsUseCase<'a, P, S, W>
+impl<'a, P, S, W, C> PreviewSaleTotalsUseCase<'a, P, S, W, C>
 where
     P: ProductRepository + ?Sized,
     S: StockRepository + ?Sized,
     W: WarehouseRepository + ?Sized,
+    C: CustomerRepository + ?Sized,
 {
     /// Wire the use case to its ports.
-    pub fn new(products: &'a P, stock: &'a S, warehouses: &'a W) -> Self {
+    pub fn new(products: &'a P, stock: &'a S, warehouses: &'a W, customers: &'a C) -> Self {
         Self {
             products,
             stock,
             warehouses,
+            customers,
         }
     }
 
@@ -482,6 +502,16 @@ where
             Some(_) => return Err(coded("WAREHOUSE_INACTIVE")),
             None => return Err(ApplicationError::NotFound("warehouse".to_string())),
         }
+        // Tier pricing (Pillar 4): same customer-tier resolution as commit,
+        // so previewed totals can never diverge from committed ones.
+        let tier = match input.customer_id {
+            Some(customer_id) => self
+                .customers
+                .get_customer(customer_id)?
+                .map(|customer| customer.customer_tier)
+                .unwrap_or_default(),
+            None => CustomerTier::Retail,
+        };
         let (verified, priced) = verify_and_price_cart(
             self.products,
             session,
@@ -489,6 +519,7 @@ where
             input.global_discount_centimes,
             input.doc_type,
             &input.payments,
+            tier,
         )?;
         // Leaf-level shortage scan: expand kits exactly as the commit
         // does, aggregate requested base micros per leaf product, and
@@ -679,6 +710,16 @@ where
         }
         let mut priced_inputs = Vec::with_capacity(input.lines.len());
         let mut verified = Vec::with_capacity(input.lines.len());
+        // Tier pricing (Pillar 4): drafts persist the same tier-resolved
+        // prices the atomic commit would charge.
+        let tier = match input.customer_id {
+            Some(customer_id) => self
+                .customers
+                .get_customer(customer_id)?
+                .map(|customer| customer.customer_tier)
+                .unwrap_or_default(),
+            None => CustomerTier::Retail,
+        };
         for (index, line) in input.lines.iter().enumerate() {
             if line.unit_price_override.is_some()
                 && !session.role.has_permission(Permission::PriceOverride)
@@ -691,6 +732,7 @@ where
                 line.unit_id,
                 line.quantity_micro,
                 line.unit_price_override,
+                tier,
             )?;
             priced_inputs.push(PricedLineInput {
                 quantity_micro: checked.quantity_micro,

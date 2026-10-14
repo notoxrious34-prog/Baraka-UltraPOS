@@ -58,6 +58,7 @@ const forensicCart: PreviewTotalsRequestWire = {
     },
   ],
   global_discount_centimes: "0",
+  customer_id: null,
   payments: [
     { payment_method: "CASH", amount_centimes: "15000" },
     { payment_method: "CARD", amount_centimes: "15050" },
@@ -102,6 +103,7 @@ describe("ipcPreviewTotals", () => {
         document_type: "TICKET",
         lines: forensicCart.lines,
         global_discount_centimes: "0",
+        customer_id: null,
         payments: forensicCart.payments,
       },
       session_token: "tok-preview-1",

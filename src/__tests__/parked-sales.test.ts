@@ -130,7 +130,7 @@ describe("cart-store loadLines", async () => {
           lineDiscountCentimes: "0",
         },
       ],
-      { kind: "named", id: "c1", name: "Client", policy: "LIMITED", limitCentimes: null, balanceCentimes: "0", source: "backend" },
+      { kind: "named", id: "c1", name: "Client", policy: "LIMITED", limitCentimes: null, balanceCentimes: "0", tier: "retail", source: "backend" },
     );
     const state = useCartStore.getState();
     expect(state.lines).toHaveLength(1);
@@ -143,6 +143,7 @@ describe("cart-store loadLines", async () => {
       policy: "LIMITED",
       limitCentimes: null,
       balanceCentimes: "0",
+      tier: "retail",
       source: "backend",
     });
     store.clearCart();

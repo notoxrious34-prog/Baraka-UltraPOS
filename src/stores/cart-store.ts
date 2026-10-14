@@ -9,7 +9,9 @@ import type {
   CartLine,
   CartUnitSnapshot,
   CatalogProduct,
+  CustomerTier,
   DocType,
+  LineMargin,
   Locale,
 } from "@/types/pos";
 import { addBig, maxZero, mulQtyPrice, subBig } from "@/lib/money";
@@ -28,6 +30,7 @@ function toSnapshot(
     factor_micro: string;
     barcode: string | null;
     sale_price_centimes: string;
+    wholesale_price_centimes: string | null;
     is_base_unit: boolean;
     is_default_selling: boolean;
   },
@@ -40,6 +43,7 @@ function toSnapshot(
     factorMicro: unit.factor_micro,
     barcode: unit.barcode,
     salePriceCentimes: unit.sale_price_centimes,
+    wholesalePriceCentimes: unit.wholesale_price_centimes,
     isBaseUnit: unit.is_base_unit,
     isDefaultSelling: unit.is_default_selling,
   };
@@ -59,6 +63,8 @@ interface CartState {
   globalDiscountCentimes: string;
   customer: ActiveCustomer;
   docType: DocType;
+  /** Last preview's Margin Guard readout (cleared on any cart/customer change). */
+  previewMargins: LineMargin[];
   addProduct: (product: CatalogProduct, unitIndex?: number) => void;
   removeLine: (key: string) => void;
   setLineQty: (key: string, qtyMicro: string) => void;
@@ -66,6 +72,7 @@ interface CartState {
   cycleLineUnit: (key: string) => CycleLineUnitResult;
   setLineDiscount: (key: string, discountCentimes: string) => void;
   setGlobalDiscount: (value: string) => void;
+  setPreviewMargins: (margins: LineMargin[]) => void;
   setCustomer: (customer: ActiveCustomer) => void;
   setDocType: (doc: DocType) => void;
   clearCart: () => void;
@@ -98,6 +105,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
   globalDiscountCentimes: ZERO,
   customer: { kind: "guest" },
   docType: "TICKET",
+  previewMargins: [],
   addProduct: (product, unitIndex) =>
     set((state) => {
       const resolved =
@@ -115,6 +123,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
       );
       if (existing !== undefined) {
         return {
+          previewMargins: [],
           lines: state.lines.map((line) =>
             line.key === existing.key
               ? { ...line, quantityMicro: addBig(line.quantityMicro, DEFAULT_QTY_MICRO) }
@@ -134,12 +143,13 @@ export const useCartStore = create<CartState>()((set, get) => ({
         quantityMicro: DEFAULT_QTY_MICRO,
         lineDiscountCentimes: ZERO,
       };
-      return { lines: [...state.lines, line] };
+      return { previewMargins: [], lines: [...state.lines, line] };
     }),
   removeLine: (key) =>
-    set((state) => ({ lines: state.lines.filter((line) => line.key !== key) })),
+    set((state) => ({ previewMargins: [], lines: state.lines.filter((line) => line.key !== key) })),
   setLineQty: (key, qtyMicro) =>
     set((state) => ({
+      previewMargins: [],
       lines: state.lines.map((line) =>
         line.key === key ? { ...line, quantityMicro: qtyMicro } : line,
       ),
@@ -151,6 +161,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
     }
     const unitIndex = (line.unitIndex + 1) % line.units.length;
     set((state) => ({
+      previewMargins: [],
       lines: state.lines.map((candidate) =>
         candidate.key === key ? { ...candidate, unitIndex } : candidate,
       ),
@@ -166,6 +177,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
   },
   setLineUnit: (key, unitIndex) =>
     set((state) => ({
+      previewMargins: [],
       lines: state.lines.map((line) =>
         line.key === key && unitIndex >= 0 && unitIndex < line.units.length
           ? { ...line, unitIndex }
@@ -174,34 +186,70 @@ export const useCartStore = create<CartState>()((set, get) => ({
     })),
   setLineDiscount: (key, discountCentimes) =>
     set((state) => ({
+      previewMargins: [],
       lines: state.lines.map((line) =>
         line.key === key ? { ...line, lineDiscountCentimes: discountCentimes } : line,
       ),
     })),
-  setGlobalDiscount: (value) => set({ globalDiscountCentimes: value }),
-  setCustomer: (customer) => set({ customer }),
+  setGlobalDiscount: (value) => set({ globalDiscountCentimes: value, previewMargins: [] }),
+  setPreviewMargins: (margins) => set({ previewMargins: margins }),
+  // Tier re-pricing is derived (lineUnitPriceCentimes) and charged by the
+  // backend from the customer id — no stored price mutation, so a customer
+  // change only invalidates the last preview readout.
+  setCustomer: (customer) => set({ customer, previewMargins: [] }),
   setDocType: (doc) => set({ docType: doc }),
   clearCart: () =>
     set({
       lines: [],
       globalDiscountCentimes: ZERO,
       customer: { kind: "guest" },
+      previewMargins: [],
     }),
   loadLines: (lines, customer) =>
     set({
       lines,
       globalDiscountCentimes: ZERO,
       customer: customer ?? { kind: "guest" },
+      previewMargins: [],
     }),
 }));
 
-/** Preview total of one line: max(0, qty*price - discount). */
-export function previewLineTotal(line: CartLine): string {
+/** Preview total of one line at the customer's tier price. */
+export function lineUnitPriceCentimes(line: CartLine, tier: CustomerTier): string {
   const unit = line.units[line.unitIndex];
   if (unit === undefined) {
     return "0";
   }
-  return maxZero(subBig(mulQtyPrice(line.quantityMicro, unit.salePriceCentimes), line.lineDiscountCentimes));
+  if (tier !== "retail" && unit.wholesalePriceCentimes !== null) {
+    try {
+      if (BigInt(unit.wholesalePriceCentimes) > 0n) {
+        return unit.wholesalePriceCentimes;
+      }
+    } catch {
+      // Unparseable wholesale wire: fall through to the sale price.
+    }
+  }
+  return unit.salePriceCentimes;
+}
+
+/** True when the line prices at the artisan/wholesale tier (PRO/GROS pill). */
+export function isLineTierPriced(line: CartLine, tier: CustomerTier): boolean {
+  const unit = line.units[line.unitIndex];
+  if (unit === undefined || tier === "retail") {
+    return false;
+  }
+  return lineUnitPriceCentimes(line, tier) !== unit.salePriceCentimes;
+}
+
+/** Preview total of one line: max(0, qty*tierPrice - discount). */
+export function previewLineTotal(line: CartLine, tier: CustomerTier = "retail"): string {
+  const unit = line.units[line.unitIndex];
+  if (unit === undefined) {
+    return "0";
+  }
+  return maxZero(
+    subBig(mulQtyPrice(line.quantityMicro, lineUnitPriceCentimes(line, tier)), line.lineDiscountCentimes),
+  );
 }
 
 /**
@@ -242,10 +290,14 @@ export interface PreviewTotals {
 }
 
 /** Cart preview totals (display only; backend commits truth). */
-export function previewTotals(lines: CartLine[], globalDiscountCentimes: string): PreviewTotals {
+export function previewTotals(
+  lines: CartLine[],
+  globalDiscountCentimes: string,
+  tier: CustomerTier = "retail",
+): PreviewTotals {
   let gross = "0";
   for (const line of lines) {
-    gross = addBig(gross, previewLineTotal(line));
+    gross = addBig(gross, previewLineTotal(line, tier));
   }
   const discount = maxZero(globalDiscountCentimes);
   return {

@@ -6,6 +6,7 @@ import { useState, type ReactElement } from "react";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { t, translateBackendError } from "@/lib/i18n";
+import barakaLogo from "@/assets/logo/baraka-logo.png";
 
 export function LoginScreen(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
@@ -29,10 +30,13 @@ export function LoginScreen(): ReactElement {
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 bg-primary-900 p-6">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent-500 text-3xl font-black text-slate-950">
-        ب
-      </div>
+      <img
+        src={barakaLogo}
+        alt="Baraka"
+        className="h-28 w-28 select-none object-contain drop-shadow-lg"
+      />
       <h1 className="text-2xl font-black text-white">{t(locale, "app.title")}</h1>
+      <p className="text-sm text-amber-200/90">{t(locale, "brand.tagline")}</p>
       <p className="text-sm text-white/70">{t(locale, "login.hint")}</p>
       <form
         className="flex w-full max-w-xs flex-col gap-2"

@@ -376,25 +376,30 @@ fn preview_reports_shortage_warning_on_zero_stock() {
     // VIS-8X40 shape at zero stock: no inbound movement ever.
     let (product, unit) = seed_product(&harness, "VIS-8X40", 15_050, false);
     ensure_cash_session(&harness, warehouse);
-    let preview =
-        PreviewSaleTotalsUseCase::new(&harness.catalog, &harness.stock, &harness.warehouses)
-            .execute(
-                &session_with(Role::Vendeur),
-                PreviewTotalsInput {
-                    warehouse_id: warehouse,
-                    doc_type: DocumentType::Ticket,
-                    lines: vec![CartLineInput {
-                        product_id: product,
-                        unit_id: unit,
-                        quantity_micro: 10_000,
-                        unit_price_override: None,
-                        line_discount_centimes: 0,
-                    }],
-                    global_discount_centimes: 0,
-                    payments: vec![],
-                },
-            )
-            .expect("preview");
+    let preview = PreviewSaleTotalsUseCase::new(
+        &harness.catalog,
+        &harness.stock,
+        &harness.warehouses,
+        &harness.customers,
+    )
+    .execute(
+        &session_with(Role::Vendeur),
+        PreviewTotalsInput {
+            warehouse_id: warehouse,
+            doc_type: DocumentType::Ticket,
+            lines: vec![CartLineInput {
+                product_id: product,
+                unit_id: unit,
+                quantity_micro: 10_000,
+                unit_price_override: None,
+                line_discount_centimes: 0,
+            }],
+            customer_id: None,
+            global_discount_centimes: 0,
+            payments: vec![],
+        },
+    )
+    .expect("preview");
     // Totals still price normally (timbre needs no tender here).
     assert_eq!(preview.total_ttc, 15_050);
     assert_eq!(preview.stock_warnings.len(), 1);

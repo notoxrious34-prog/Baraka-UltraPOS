@@ -39,6 +39,8 @@ export interface CartUnitSnapshot {
   factorMicro: string;
   barcode: string | null;
   salePriceCentimes: string;
+  /** Artisan/wholesale price (`null` = fall back to sale price). */
+  wholesalePriceCentimes: string | null;
   isBaseUnit: boolean;
   isDefaultSelling: boolean;
 }
@@ -73,6 +75,8 @@ export interface NamedCustomer {
   policy: "LIMITED" | "UNLIMITED" | "DISABLED";
   limitCentimes: string | null;
   balanceCentimes: string | null;
+  /** Pillar 4 pricing tier (drives backend tier pricing + cart display). */
+  tier: CustomerTier;
   source: "backend";
 }
 

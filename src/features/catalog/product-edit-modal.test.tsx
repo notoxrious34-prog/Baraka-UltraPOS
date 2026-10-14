@@ -83,6 +83,7 @@ describe("formFromProduct", () => {
       barcode: "6111250000013",
       salePrice: "150.5",
       costPrice: "120",
+      wholesalePrice: "",
       isActive: true,
     });
   });
@@ -153,6 +154,7 @@ describe("buildUpdatePayload", () => {
       barcode: "999",
       salePrice: "200",
       costPrice: "150.25",
+      wholesalePrice: "",
       isActive: false,
     });
     expect(payload.name_fr).toBe("Vis 8x42");

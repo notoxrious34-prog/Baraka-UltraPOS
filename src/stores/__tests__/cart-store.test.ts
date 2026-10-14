@@ -20,6 +20,7 @@ function unit(overrides: Partial<CartUnitSnapshot> & { unitId: string }): CartUn
     factorMicro: "10000",
     barcode: null,
     salePriceCentimes: "15020",
+    wholesalePriceCentimes: null,
     isBaseUnit: true,
     isDefaultSelling: true,
     ...overrides,

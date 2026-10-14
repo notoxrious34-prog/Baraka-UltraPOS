@@ -19,6 +19,8 @@ import type {
   CustomerDetail,
   CustomerSummary,
   DocType,
+  ImportProductRow,
+  ImportProductsReport,
   Locale,
   PaymentMethodCode,
   SaleReceipt,
@@ -285,6 +287,27 @@ export async function ipcUpdateCategory(
 export async function ipcSeedStarterCategories(sessionToken: string): Promise<Category[]> {
   return call<Category[]>("category_seed_starter", {
     session_token: sessionToken,
+  });
+}
+
+/**
+ * Atomic bulk product import (mirrors ImportProductsResponseDto). Valid rows
+ * commit inside one `BEGIN IMMEDIATE` transaction; per-row failures arrive in
+ * the structured report. Rejects verbatim on bridge errors.
+ */
+export async function ipcImportProducts(
+  token: string,
+  rows: ImportProductRow[],
+  warehouseId?: string,
+  onDuplicateSku?: "skip" | "error",
+): Promise<ImportProductsReport> {
+  return call<ImportProductsReport>("catalog_import_products", {
+    request: {
+      session_token: token,
+      rows,
+      warehouse_id: warehouseId || null,
+      on_duplicate_sku: onDuplicateSku || "skip",
+    },
   });
 }
 

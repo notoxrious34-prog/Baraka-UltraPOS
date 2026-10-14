@@ -153,6 +153,37 @@ export interface Category {
   is_active: boolean;
 }
 
+/** One bulk-import row (mirrors ImportProductRowDto; money integer centimes). */
+export interface ImportProductRow {
+  sku?: string | null;
+  barcode?: string | null;
+  name_fr: string;
+  name_ar?: string | null;
+  category_id?: string | null;
+  base_unit_name_fr?: string | null;
+  base_unit_name_ar?: string | null;
+  purchase_price_centimes?: number | null;
+  sale_price_centimes: number;
+  initial_quantity_micro?: number | null;
+}
+
+/** Per-row failure entry of the import execution report. */
+export interface ImportRowError {
+  row_index: number;
+  sku: string | null;
+  name_fr: string;
+  error: string;
+}
+
+/** Structured execution report of `catalog_import_products`. */
+export interface ImportProductsReport {
+  total_rows: number;
+  imported_count: number;
+  skipped_count: number;
+  errors: ImportRowError[];
+  duration_ms: number;
+}
+
 /** Catalog unit view (mirrors ProductUnitDto). */
 export interface CatalogUnit {
   unit_id: string;

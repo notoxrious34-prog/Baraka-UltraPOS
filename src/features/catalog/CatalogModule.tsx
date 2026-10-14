@@ -10,12 +10,15 @@
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
-import type { Locale } from "@/types/pos";
+import type { Category, Locale } from "@/types/pos";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
-import { ipcGetStock, ipcSearchCatalog, listWarehouses } from "@/lib/ipc";
+import { ipcGetStock, ipcListCategories, ipcSearchCatalog, listWarehouses } from "@/lib/ipc";
 import { formatMoney, formatQty } from "@/lib/money";
 import type { CatalogProduct } from "@/types/pos";
+import { CategoryManageModal } from "@/features/catalog/CategoryManageModal";
+import { CategoryPillStrip } from "@/features/catalog/CategoryPillStrip";
+import { ProductImportModal } from "@/features/catalog/ProductImportModal";
 import {
   pickDepotId,
   ProductCreateModal,
@@ -148,6 +151,40 @@ export function filterProducts(
   }
 }
 
+/** Category filter over loaded products (`null` keeps every row). Pure. */
+export function filterByCategory(
+  products: CatalogProduct[],
+  selectedCategoryId: string | null,
+): CatalogProduct[] {
+  if (selectedCategoryId === null) {
+    return [...products];
+  }
+  return products.filter((row) => row.category_id === selectedCategoryId);
+}
+
+/** Per-category product tallies over the loaded rows. Pure. */
+export function countProductsByCategory(products: CatalogProduct[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const row of products) {
+    if (row.category_id === null) {
+      continue;
+    }
+    counts[row.category_id] = (counts[row.category_id] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/** Category lookup by id (`null` when unknown). Pure. */
+export function categoryById(
+  categories: Category[],
+  categoryId: string | null,
+): Category | null {
+  if (categoryId === null) {
+    return null;
+  }
+  return categories.find((row) => row.id === categoryId) ?? null;
+}
+
 /** Signed margin amount in centimes as BigInt (`0n` when unit-less). Pure. */
 export function marginOfBigint(product: CatalogProduct): bigint {
   const base = baseUnitOf(product);
@@ -238,6 +275,12 @@ export interface CatalogHubViewProps {
   onFilter: (filter: CatalogFilter) => void;
   onSort: (field: SortField) => void;
   onExport: () => void;
+  onImport?: () => void;
+  /** Taxonomy rows for the pill strip + row badges (empty = strip hidden details). */
+  categories?: Category[];
+  selectedCategoryId?: string | null;
+  onSelectCategory?: (id: string | null) => void;
+  onManageCategories?: () => void;
 }
 
 function marginBadgeClass(pct: number): string {
@@ -285,6 +328,8 @@ function stockCell(
 /** Pure presentational hub (SSR-safe for tests; the container owns IPC). */
 export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
   const { locale, products, stockLevels, loading, error, query, filter, kpis, sort } = props;
+  const categories = props.categories ?? [];
+  const selectedCategoryId = props.selectedCategoryId ?? null;
 
   const sortMark = (field: SortField): string => {
     if (sort === null || sort.field !== field) {
@@ -389,6 +434,14 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
         </button>
         <button
           type="button"
+          onClick={() => props.onImport?.()}
+          className="h-10 rounded-lg bg-slate-200 px-4 text-sm font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+        >
+          {"⤒ "}
+          {t(locale, "cat.importCsv")}
+        </button>
+        <button
+          type="button"
           onClick={props.onExport}
           className="h-10 rounded-lg bg-slate-200 px-4 text-sm font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
         >
@@ -438,6 +491,17 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
           {translateBackendError(error, locale)}
         </p>
       )}
+      {props.onSelectCategory !== undefined && props.onManageCategories !== undefined && (
+        <CategoryPillStrip
+          locale={locale}
+          categories={categories}
+          selectedCategoryId={selectedCategoryId}
+          onSelectCategory={props.onSelectCategory}
+          onManageCategories={props.onManageCategories}
+          productCounts={countProductsByCategory(products)}
+          totalProductsCount={products.length}
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
         <table className="w-full border-collapse text-xs">
@@ -451,6 +515,9 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
               </th>
               <th scope="col" className="px-3 py-2 text-start font-black">
                 {sortButton(t(locale, "cat.colName"), "name", false)}
+              </th>
+              <th scope="col" className="px-3 py-2 text-start font-black">
+                {t(locale, "cat.colCategory")}
               </th>
               <th scope="col" className="px-3 py-2 text-start font-black">
                 {t(locale, "cat.colBaseUnit")}
@@ -498,6 +565,22 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                         {locale === "ar-DZ" ? product.name_fr : product.name_ar}
                       </span>
                     )}
+                  </td>
+                  <td className="px-3 py-1.5">
+                    {(() => {
+                      const category = categoryById(categories, product.category_id);
+                      if (category === null) {
+                        return <span className="font-bold text-slate-400">—</span>;
+                      }
+                      return (
+                        <span
+                          title={category.code}
+                          className="rounded-md bg-slate-100 px-2 py-0.5 font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                        >
+                          {locale === "ar-DZ" ? category.name_ar : category.name_fr}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-3 py-1.5 font-bold">
                     {base === null ? "—" : `${base.unit_name_fr} · ${base.unit_name_ar}`}
@@ -607,6 +690,10 @@ export function CatalogModule(): ReactElement {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<CatalogFilter>("all");
   const [sort, setSort] = useState<CatalogSort | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const depotRef = useRef<string | null | undefined>(undefined);
   const skipFirstDebounce = useRef(true);
   const authed = session !== null && isManagerRole(session.role);
@@ -722,6 +809,30 @@ export function CatalogModule(): ReactElement {
     };
   }, []);
 
+  // Category taxonomy for the pill strip + row badges (inactive included
+  // so reassigned rows still resolve their label).
+  useEffect(() => {
+    if (token === null) {
+      return;
+    }
+    const activeToken: string = token;
+    let cancelled = false;
+    ipcListCategories(activeToken, true)
+      .then((rows) => {
+        if (!cancelled) {
+          setCategories(rows);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCategories([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   // Defense in depth: the screen verifies the role itself, independent of
   // NavRail visibility (URL/state manipulation must never expose the hub).
   if (!authed) {
@@ -741,7 +852,21 @@ export function CatalogModule(): ReactElement {
   };
 
   const kpis = computeKpis(products, stockLevels);
-  const visible = sortProducts(filterProducts(products, stockLevels, filter), stockLevels, sort);
+  const visible = sortProducts(
+    filterByCategory(filterProducts(products, stockLevels, filter), selectedCategoryId),
+    stockLevels,
+    sort,
+  );
+
+  const reloadCategories = (): void => {
+    ipcListCategories(activeToken, true)
+      .then((rows) => {
+        setCategories(rows);
+      })
+      .catch(() => {
+        // The hub stays usable on taxonomy failures; rows show "—".
+      });
+  };
 
   const handleFilter = (next: CatalogFilter): void => {
     setFilter((current) => (current === next ? "all" : next));
@@ -815,6 +940,38 @@ export function CatalogModule(): ReactElement {
         onFilter={handleFilter}
         onSort={handleSort}
         onExport={handleExport}
+        onImport={() => {
+          setIsImportModalOpen(true);
+        }}
+        categories={categories}
+        selectedCategoryId={selectedCategoryId}
+        onSelectCategory={setSelectedCategoryId}
+        onManageCategories={() => {
+          setIsCategoryModalOpen(true);
+        }}
+      />
+      <CategoryManageModal
+        isOpen={isCategoryModalOpen}
+        token={activeToken}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+        }}
+        onChanged={() => {
+          reloadCategories();
+          refresh();
+        }}
+      />
+      <ProductImportModal
+        isOpen={isImportModalOpen}
+        token={activeToken}
+        onClose={() => {
+          setIsImportModalOpen(false);
+        }}
+        onSuccess={() => {
+          reloadCategories();
+          refresh();
+        }}
+        categories={categories}
       />
       <ProductCreateModal
         isOpen={isCreateOpen}

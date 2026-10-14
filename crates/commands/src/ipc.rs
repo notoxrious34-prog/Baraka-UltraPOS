@@ -27,8 +27,9 @@ use baraka_application::use_cases::cash::{
 use baraka_application::use_cases::catalog::CreateProductUseCase;
 use baraka_application::use_cases::catalog::{
     CreateCategoryInput, CreateCategoryUseCase, CreateProductInput, DefineKitUseCase,
-    GetProductWithUnitsUseCase, ListCategoriesUseCase, NewKitItemInput, NewUnitInput,
-    ProductDetail, SearchCatalogUseCase, SeedStarterCategoriesUseCase, UnitUpsert,
+    GetProductWithUnitsUseCase, ImportBatchInput, ImportDuplicatePolicy, ImportProductRow,
+    ImportProductsUseCase, ListCategoriesUseCase, NewKitItemInput, NewUnitInput, ProductDetail,
+    ProductImportRepository, SearchCatalogUseCase, SeedStarterCategoriesUseCase, UnitUpsert,
     UpdateCategoryInput, UpdateCategoryUseCase, UpdateProductInput, UpdateProductUseCase,
 };
 use baraka_application::use_cases::customers::{
@@ -99,9 +100,10 @@ use crate::dto::{
     DocumentsProcessReturnRequestDto, DocumentsProcessReturnResponseDto, DraftSaleResponse,
     GetCustomerRequestDto, GetProductDto, GetSaleResponse, GetSessionReportRequestDto,
     GetStatementRequest, GetStatementResponse, GetStockLevelRequestDto, GetStockLevelResponseDto,
-    GrossMarginRowDto, HealthDto, KitItemDto, ListWarehousesResponseDto, LoginRequestDto,
-    LoginResponseDto, LogoutRequestDto, LowStockRequestDto, LowStockRowDto, NewCustomerRequest,
-    NewProductUnitDto, OpenCashSessionRequestDto, PaymentDto, PaymentLineDto, PreRestoreChecksDto,
+    GrossMarginRowDto, HealthDto, ImportProductsRequestDto, ImportProductsResponseDto,
+    ImportRowErrorDto, KitItemDto, ListWarehousesResponseDto, LoginRequestDto, LoginResponseDto,
+    LogoutRequestDto, LowStockRequestDto, LowStockRowDto, NewCustomerRequest, NewProductUnitDto,
+    OpenCashSessionRequestDto, PaymentDto, PaymentLineDto, PreRestoreChecksDto,
     PreRestoreReportDto, PreRestoreRequestDto, PreviewLineDto, PreviewTotalsRequest,
     PreviewTotalsResponse, PrintStatusResponse, PrinterSettingsDto, ProcessReturnRequestDto,
     ProcessReturnResponseDto, ProductResponseDto, ProductUnitDto, PurchaseLineRequestDto,
@@ -138,6 +140,8 @@ pub struct AppState {
     pub hasher: Arc<dyn PasswordHasher>,
     /// Catalog persistence.
     pub catalog: Arc<dyn ProductRepository>,
+    /// Atomic batch-import engine (same SQLite store, import port).
+    pub imports: Arc<dyn ProductImportRepository>,
     /// Category persistence.
     pub categories: Arc<dyn CategoryRepository>,
     /// Warehouse persistence.
@@ -891,6 +895,66 @@ pub fn catalog_define_kit(
     DefineKitUseCase::new(state.catalog.as_ref())
         .execute(&session, kit_id, items)
         .map_err(|error| error_code(&error))
+}
+
+/// `catalog_import_products` command: atomic batch ingestion (Gerant/Admin).
+///
+/// Valid rows commit inside ONE `BEGIN IMMEDIATE` transaction; per-row
+/// validation and duplicate failures are reported, never partial without
+/// a report. `on_duplicate_sku: "error"` aborts the whole batch instead.
+#[tauri::command(rename_all = "snake_case")]
+pub fn catalog_import_products(
+    state: tauri::State<'_, AppState>,
+    request: ImportProductsRequestDto,
+) -> Result<ImportProductsResponseDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let on_duplicate = match request.on_duplicate_sku.as_deref() {
+        Some("error") => ImportDuplicatePolicy::Error,
+        _ => ImportDuplicatePolicy::Skip,
+    };
+    let rows = request
+        .rows
+        .into_iter()
+        .map(|row| ImportProductRow {
+            sku: row.sku,
+            barcode: row.barcode,
+            name_fr: row.name_fr,
+            name_ar: row.name_ar,
+            category_id: row.category_id,
+            base_unit_name_fr: row.base_unit_name_fr,
+            base_unit_name_ar: row.base_unit_name_ar,
+            purchase_price_centimes: row.purchase_price_centimes,
+            sale_price_centimes: row.sale_price_centimes,
+            initial_quantity_micro: row.initial_quantity_micro,
+        })
+        .collect();
+    let report = ImportProductsUseCase::new(state.imports.as_ref())
+        .execute(
+            &session,
+            ImportBatchInput {
+                rows,
+                warehouse_code: request.warehouse_id,
+                on_duplicate,
+                origin_device_id: state.terminal_id.clone(),
+            },
+        )
+        .map_err(|error| error_code(&error))?;
+    Ok(ImportProductsResponseDto {
+        total_rows: report.total_rows,
+        imported_count: report.imported_count,
+        skipped_count: report.skipped_count,
+        errors: report
+            .errors
+            .into_iter()
+            .map(|error| ImportRowErrorDto {
+                row_index: error.row_index,
+                sku: error.sku,
+                name_fr: error.name_fr,
+                error: error.error,
+            })
+            .collect(),
+        duration_ms: report.duration_ms,
+    })
 }
 
 /// Map a domain category to its wire view.

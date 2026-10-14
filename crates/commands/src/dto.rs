@@ -2354,3 +2354,69 @@ pub struct ResetUserCredentialsRequestDto {
     /// Replacement plaintext PIN, or `None` to keep the current one.
     pub pin: Option<String>,
 }
+
+/// One batch-import row (`catalog_import_products`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportProductRowDto {
+    /// Optional SKU; trimmed + uppercased, generated when absent.
+    pub sku: Option<String>,
+    /// Optional base-unit barcode; cleared when already assigned.
+    pub barcode: Option<String>,
+    /// Required French designation.
+    pub name_fr: String,
+    /// Arabic designation; falls back to `name_fr`.
+    pub name_ar: Option<String>,
+    /// Owning category UUID string; detached when unknown.
+    pub category_id: Option<String>,
+    /// Base-unit French name (`Pièce` default).
+    pub base_unit_name_fr: Option<String>,
+    /// Base-unit Arabic name (`قطعة` default).
+    pub base_unit_name_ar: Option<String>,
+    /// Purchase centimes; zero when absent.
+    pub purchase_price_centimes: Option<i64>,
+    /// Sale centimes; must be non-negative.
+    pub sale_price_centimes: i64,
+    /// Opening quantity in base micros; provisioned when positive.
+    pub initial_quantity_micro: Option<i64>,
+}
+
+/// `catalog_import_products` request: atomic batch ingestion.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportProductsRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Rows to ingest (clamped to 1,000 per call).
+    pub rows: Vec<ImportProductRowDto>,
+    /// Warehouse code or id (default `DEP-01`, else first active depot).
+    pub warehouse_id: Option<String>,
+    /// `skip` (default) or `error` on duplicate SKU.
+    pub on_duplicate_sku: Option<String>,
+}
+
+/// Per-row failure entry of the import execution report.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportRowErrorDto {
+    /// Zero-based input row index.
+    pub row_index: usize,
+    /// Resolved (or supplied) SKU when known.
+    pub sku: Option<String>,
+    /// Row designation for operator display.
+    pub name_fr: String,
+    /// Stable machine-readable reason.
+    pub error: String,
+}
+
+/// `catalog_import_products` response: structured execution report.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportProductsResponseDto {
+    /// Rows ingested (after clamping).
+    pub total_rows: usize,
+    /// Rows fully created with base unit (and stock when requested).
+    pub imported_count: usize,
+    /// Rows skipped on duplicate SKU (`skip` policy).
+    pub skipped_count: usize,
+    /// Per-row validation and skip entries, in row order.
+    pub errors: Vec<ImportRowErrorDto>,
+    /// Wall-clock execution time in milliseconds.
+    pub duration_ms: u64,
+}

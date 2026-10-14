@@ -685,6 +685,223 @@ where
     }
 }
 
+/// Hard ceiling per import call: bounds transaction time for instant UI.
+pub const MAX_IMPORT_ROWS: usize = 1000;
+
+/// Duplicate-SKU policy for batch imports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportDuplicatePolicy {
+    /// Record the row in `skipped` and continue with valid rows.
+    Skip,
+    /// Abort the whole batch (rolls back) on the first duplicate.
+    Error,
+}
+
+/// One raw batch row (application shape; the commands DTO maps onto this).
+#[derive(Debug, Clone)]
+pub struct ImportProductRow {
+    /// Optional SKU; trimmed + uppercased, generated when absent.
+    pub sku: Option<String>,
+    /// Optional base-unit barcode; cleared when already assigned.
+    pub barcode: Option<String>,
+    /// Required French designation.
+    pub name_fr: String,
+    /// Arabic designation; falls back to `name_fr`.
+    pub name_ar: Option<String>,
+    /// Owning category UUID string; detached when unknown.
+    pub category_id: Option<String>,
+    /// Base-unit display names; `Pièce` / `قطعة` defaults.
+    pub base_unit_name_fr: Option<String>,
+    /// Base-unit display names; `Pièce` / `قطعة` defaults.
+    pub base_unit_name_ar: Option<String>,
+    /// Purchase centimes; zero when absent.
+    pub purchase_price_centimes: Option<i64>,
+    /// Sale centimes; must be non-negative.
+    pub sale_price_centimes: i64,
+    /// Opening quantity in base micros; provisioned when positive.
+    pub initial_quantity_micro: Option<i64>,
+}
+
+/// Validated row: names trimmed, prices checked. Pure output of
+/// [`validate_import_row`].
+#[derive(Debug, Clone)]
+pub struct ValidatedImportRow {
+    /// Trimmed French designation (non-empty).
+    pub name_fr: String,
+    /// Trimmed Arabic designation (non-empty; `name_fr` fallback applied).
+    pub name_ar: String,
+    /// Trimmed barcode when supplied.
+    pub barcode: Option<String>,
+    /// Trimmed SKU when supplied.
+    pub sku: Option<String>,
+    /// Trimmed category id when supplied.
+    pub category_id: Option<String>,
+    /// Trimmed base-unit French name when supplied.
+    pub base_unit_name_fr: Option<String>,
+    /// Trimmed base-unit Arabic name when supplied.
+    pub base_unit_name_ar: Option<String>,
+    /// Purchase centimes (zero when absent).
+    pub purchase_price_centimes: i64,
+    /// Sale centimes (non-negative).
+    pub sale_price_centimes: i64,
+    /// Opening quantity in base micros (zero when absent).
+    pub initial_quantity_micro: i64,
+}
+
+/// Batch input: rows plus destination warehouse and duplicate policy.
+#[derive(Debug, Clone)]
+pub struct ImportBatchInput {
+    /// Rows to ingest (clamped to [`MAX_IMPORT_ROWS`]).
+    pub rows: Vec<ImportProductRow>,
+    /// Warehouse code (default `DEP-01`); falls back to first active depot.
+    pub warehouse_code: Option<String>,
+    /// Duplicate-SKU policy (default [`ImportDuplicatePolicy::Skip`]).
+    pub on_duplicate: ImportDuplicatePolicy,
+    /// Terminal id recorded as product origin.
+    pub origin_device_id: String,
+}
+
+/// Per-row failure entry of the execution report.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportRowError {
+    /// Zero-based input row index.
+    pub row_index: usize,
+    /// Resolved (or supplied) SKU when known.
+    pub sku: Option<String>,
+    /// Row designation for operator display.
+    pub name_fr: String,
+    /// Stable machine-readable reason.
+    pub error: String,
+}
+
+/// Structured execution report of one import batch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportBatchReport {
+    /// Rows ingested (after clamping).
+    pub total_rows: usize,
+    /// Rows fully created with base unit (and stock when requested).
+    pub imported_count: usize,
+    /// Rows skipped on duplicate SKU (`Skip` policy).
+    pub skipped_count: usize,
+    /// Per-row validation and skip entries, in row order.
+    pub errors: Vec<ImportRowError>,
+    /// Wall-clock execution time in milliseconds.
+    pub duration_ms: u64,
+}
+
+/// Pure row validation: non-blank French name, non-negative sale price.
+/// Returns the trimmed row or a report entry. Pure and side-effect free.
+pub fn validate_import_row(
+    index: usize,
+    row: &ImportProductRow,
+) -> Result<ValidatedImportRow, ImportRowError> {
+    let name_fr = row.name_fr.trim().to_string();
+    if name_fr.is_empty() {
+        return Err(ImportRowError {
+            row_index: index,
+            sku: row.sku.clone(),
+            name_fr: row.name_fr.clone(),
+            error: "BLANK_NAME_FR".to_string(),
+        });
+    }
+    if row.sale_price_centimes < 0 {
+        return Err(ImportRowError {
+            row_index: index,
+            sku: row.sku.clone(),
+            name_fr,
+            error: "NEGATIVE_SALE_PRICE".to_string(),
+        });
+    }
+    let blank_to_none = |value: &Option<String>| {
+        value
+            .as_deref()
+            .map(str::trim)
+            .filter(|trimmed| !trimmed.is_empty())
+            .map(str::to_string)
+    };
+    Ok(ValidatedImportRow {
+        name_fr: name_fr.clone(),
+        name_ar: match blank_to_none(&row.name_ar) {
+            Some(name_ar) => name_ar,
+            None => name_fr,
+        },
+        barcode: blank_to_none(&row.barcode),
+        sku: blank_to_none(&row.sku),
+        category_id: blank_to_none(&row.category_id),
+        base_unit_name_fr: blank_to_none(&row.base_unit_name_fr),
+        base_unit_name_ar: blank_to_none(&row.base_unit_name_ar),
+        purchase_price_centimes: row.purchase_price_centimes.unwrap_or(0),
+        sale_price_centimes: row.sale_price_centimes,
+        initial_quantity_micro: row.initial_quantity_micro.unwrap_or(0),
+    })
+}
+
+/// Atomic batch-import store: validates-then-writes products, base units,
+/// and opening stock inside ONE `BEGIN IMMEDIATE` transaction.
+pub trait ProductImportRepository: Send + Sync {
+    /// Ingest validated rows atomically; per-row failures are reported,
+    /// never thrown, except the `Error` duplicate policy which aborts.
+    fn import_batch(
+        &self,
+        actor: &SessionContext,
+        rows: Vec<(usize, ValidatedImportRow)>,
+        warehouse_code: Option<String>,
+        on_duplicate: ImportDuplicatePolicy,
+        origin_device_id: &str,
+    ) -> Result<ImportBatchReport, ApplicationError>;
+}
+
+pub struct ImportProductsUseCase<'a, R>
+where
+    R: ?Sized,
+{
+    store: &'a R,
+}
+
+impl<'a, R> ImportProductsUseCase<'a, R>
+where
+    R: ProductImportRepository + ?Sized,
+{
+    /// Wire the use case to its store.
+    pub fn new(store: &'a R) -> Self {
+        Self { store }
+    }
+
+    /// Validate rows (Gerant/Admin), clamp to [`MAX_IMPORT_ROWS`], and
+    /// ingest atomically. Returns the structured execution report.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        input: ImportBatchInput,
+    ) -> Result<ImportBatchReport, ApplicationError> {
+        require_any(session, &MANAGE_PERMISSIONS)?;
+        let started = std::time::Instant::now();
+        let mut rows = Vec::new();
+        let mut early_errors = Vec::new();
+        for (index, row) in input.rows.iter().enumerate().take(MAX_IMPORT_ROWS) {
+            match validate_import_row(index, row) {
+                Ok(valid) => rows.push((index, valid)),
+                Err(error) => early_errors.push(error),
+            }
+        }
+        let total_rows = rows.len() + early_errors.len();
+        let mut report = self.store.import_batch(
+            session,
+            rows,
+            input.warehouse_code,
+            input.on_duplicate,
+            &input.origin_device_id,
+        )?;
+        report.total_rows = total_rows;
+        let mut merged = early_errors;
+        merged.append(&mut report.errors);
+        merged.sort_by_key(|error| error.row_index);
+        report.errors = merged;
+        report.duration_ms = started.elapsed().as_millis() as u64;
+        Ok(report)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1364,5 +1581,84 @@ mod tests {
             seed.execute(&vendeur),
             Err(ApplicationError::Unauthorized)
         ));
+    }
+
+    fn import_row(name_fr: &str, sale_price_centimes: i64) -> ImportProductRow {
+        ImportProductRow {
+            sku: None,
+            barcode: None,
+            name_fr: name_fr.to_string(),
+            name_ar: None,
+            category_id: None,
+            base_unit_name_fr: None,
+            base_unit_name_ar: None,
+            purchase_price_centimes: None,
+            sale_price_centimes,
+            initial_quantity_micro: None,
+        }
+    }
+
+    #[test]
+    fn import_row_validation_rejects_blank_names_and_negative_prices() {
+        let valid = validate_import_row(0, &import_row("Vis Placo", 1_500)).expect("valid");
+        assert_eq!(valid.name_fr, "Vis Placo");
+        assert_eq!(valid.name_ar, "Vis Placo");
+        assert_eq!(valid.purchase_price_centimes, 0);
+        let blank = validate_import_row(3, &import_row("   ", 1_500)).expect_err("blank");
+        assert_eq!(blank.row_index, 3);
+        assert_eq!(blank.error, "BLANK_NAME_FR");
+        let negative = validate_import_row(5, &import_row("Vis", -1)).expect_err("negative");
+        assert_eq!(negative.row_index, 5);
+        assert_eq!(negative.error, "NEGATIVE_SALE_PRICE");
+    }
+
+    struct FakeImportStore {
+        seen: Mutex<Vec<(usize, ValidatedImportRow)>>,
+    }
+
+    impl ProductImportRepository for FakeImportStore {
+        fn import_batch(
+            &self,
+            _actor: &SessionContext,
+            rows: Vec<(usize, ValidatedImportRow)>,
+            _warehouse_code: Option<String>,
+            _on_duplicate: ImportDuplicatePolicy,
+            _origin_device_id: &str,
+        ) -> Result<ImportBatchReport, ApplicationError> {
+            *self.seen.lock().expect("lock") = rows;
+            Ok(ImportBatchReport {
+                total_rows: 0,
+                imported_count: 0,
+                skipped_count: 0,
+                errors: Vec::new(),
+                duration_ms: 0,
+            })
+        }
+    }
+
+    #[test]
+    fn import_use_case_clamps_to_max_rows_and_reports_total() {
+        let store = FakeImportStore {
+            seen: Mutex::new(Vec::new()),
+        };
+        let use_case = ImportProductsUseCase::new(&store);
+        let gerant = session_with(Role::Gerant);
+        let mut rows = Vec::new();
+        for index in 0..(MAX_IMPORT_ROWS + 5) {
+            rows.push(import_row(&format!("Produit {index}"), 1_000));
+        }
+        let report = use_case
+            .execute(
+                &gerant,
+                ImportBatchInput {
+                    rows,
+                    warehouse_code: None,
+                    on_duplicate: ImportDuplicatePolicy::Skip,
+                    origin_device_id: "TERM-1".to_string(),
+                },
+            )
+            .expect("import");
+        assert_eq!(report.total_rows, MAX_IMPORT_ROWS);
+        assert_eq!(store.seen.lock().expect("lock").len(), MAX_IMPORT_ROWS);
     }
 }

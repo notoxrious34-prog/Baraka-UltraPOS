@@ -264,6 +264,7 @@ export const useProductEditStore = create<ProductEditStoreState>()((set, get) =>
                 state.form.barcode.trim() === "" ? null : state.form.barcode.trim(),
               sale_price_centimes: checked.sellingCentimes,
               purchase_price_centimes: checked.costCentimes,
+              wholesale_price_centimes: unit.wholesale_price_centimes,
               is_base_unit: unit.is_base_unit,
               is_default_selling: unit.is_default_selling,
             }
@@ -275,6 +276,7 @@ export const useProductEditStore = create<ProductEditStoreState>()((set, get) =>
               barcode: unit.barcode,
               sale_price_centimes: unit.sale_price_centimes,
               purchase_price_centimes: unit.purchase_price_centimes,
+              wholesale_price_centimes: unit.wholesale_price_centimes,
               is_base_unit: unit.is_base_unit,
               is_default_selling: unit.is_default_selling,
             },

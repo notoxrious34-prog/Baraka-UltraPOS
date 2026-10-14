@@ -71,7 +71,7 @@ fn rerun_is_idempotent() {
             row.get(0)
         })
         .expect("count");
-    assert_eq!(rows, 14);
+    assert_eq!(rows, 15);
 }
 
 #[test]
@@ -154,7 +154,7 @@ fn migration_0002_adds_lockout_columns() {
             row.get(0)
         })
         .expect("count");
-    assert_eq!(versions, 14);
+    assert_eq!(versions, 15);
 }
 
 #[test]

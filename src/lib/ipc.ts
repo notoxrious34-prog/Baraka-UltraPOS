@@ -165,6 +165,7 @@ export interface NewProductUnitWire {
   barcode: string | null;
   sale_price_centimes: string;
   purchase_price_centimes: string;
+  wholesale_price_centimes: string | null;
   is_base_unit: boolean;
   is_default_selling: boolean;
 }
@@ -198,6 +199,7 @@ export interface UpdateProductUnitPayload {
   barcode: string | null;
   sale_price_centimes: string;
   purchase_price_centimes: string;
+  wholesale_price_centimes: string | null;
   is_base_unit: boolean;
   is_default_selling: boolean;
 }
@@ -610,6 +612,13 @@ export interface StockShortageWarningWire {
   requested_qty_micro: string;
 }
 
+/** Margin Guard readout for one preview line (mirrors LineMarginDto). */
+export interface LineMarginWire {
+  line_index: number;
+  margin_basis_points: number;
+  is_below_cost: boolean;
+}
+
 /** Commit-identical totals preview (mirrors PreviewTotalsResponse). */
 export interface PreviewTotalsWire {
   subtotal_ht_centimes: string;
@@ -622,6 +631,8 @@ export interface PreviewTotalsWire {
   remaining_due_centimes: string;
   /** Leaf-level shortages against the requested warehouse (advisory). */
   stock_warnings: StockShortageWarningWire[];
+  /** Per-line Margin Guard readouts in cart order (advisory). */
+  line_margins: LineMarginWire[];
 }
 
 /** Totals preview request body (same cart shape as checkout). */
@@ -694,6 +705,7 @@ export interface NewCustomerWire {
   address: string | null;
   credit_policy: "DISABLED" | "LIMITED" | "UNLIMITED";
   credit_limit_centimes: string | null;
+  customer_tier?: "retail" | "artisan" | "wholesale" | null;
 }
 
 export interface UpdateCustomerWire {
@@ -703,6 +715,7 @@ export interface UpdateCustomerWire {
   address?: string | null;
   credit_policy?: "DISABLED" | "LIMITED" | "UNLIMITED";
   credit_limit_centimes?: string | null;
+  customer_tier?: "retail" | "artisan" | "wholesale" | null;
   is_active?: boolean;
 }
 

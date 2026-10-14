@@ -158,6 +158,7 @@ fn setup() -> (Harness, Fixture) {
                         barcode: Some(Barcode::new(&format!("611125{sku}")).expect("barcode")),
                         sale_price: Money::from_centimes(sale),
                         purchase_price: Money::from_centimes(cost),
+                        wholesale_price: None,
                         is_base_unit: true,
                         is_default_selling: true,
                     }],

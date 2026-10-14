@@ -128,6 +128,7 @@ where
                 address,
                 credit_policy: input.credit_policy,
                 credit_limit_centimes: limit,
+                customer_tier: input.customer_tier,
                 is_active: true,
             },
             terminal_id.trim(),
@@ -214,6 +215,9 @@ where
         }
         if let Some(is_active) = input.is_active {
             update.is_active = Some(is_active);
+        }
+        if let Some(tier) = input.customer_tier {
+            update.customer_tier = Some(tier);
         }
         self.customers.update_customer(customer_id, &update)
     }

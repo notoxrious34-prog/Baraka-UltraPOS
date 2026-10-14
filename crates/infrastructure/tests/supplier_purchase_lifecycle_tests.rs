@@ -151,6 +151,7 @@ fn seed_product(harness: &Harness, sku: &str) -> (ProductId, UnitId) {
                 barcode: Some(Barcode::new(&format!("611125{sku}")).expect("barcode")),
                 sale_price: Money::from_centimes(20_000),
                 purchase_price: Money::from_centimes(8_000),
+                wholesale_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],

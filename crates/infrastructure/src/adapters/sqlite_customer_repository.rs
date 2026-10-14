@@ -1,5 +1,6 @@
 //! SQLite customer credit repository.
 
+use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
@@ -10,13 +11,21 @@ use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
     format_centimes_plain, DebtReceiptDocument, ReceiptLanguage, StoreIdentity,
 };
-use baraka_domain::sales::{CreditPolicy, CreditProfile, Customer, CustomerId};
+use baraka_domain::sales::{CreditPolicy, CreditProfile, Customer, CustomerId, CustomerTier};
 use baraka_domain::user::UserId;
 use chrono::{SecondsFormat, Utc};
 use rusqlite::Connection;
 use uuid::Uuid;
 
 use crate::persistence::transaction::run_transaction;
+
+/// Parse a stored tier code; unknown or NULL values fall back to `Retail`
+/// so pre-0015 rows and loose operator edits never break hydration.
+fn parse_tier(raw: Option<String>) -> CustomerTier {
+    raw.as_deref()
+        .map(|code| CustomerTier::from_str(code).unwrap_or_default())
+        .unwrap_or_default()
+}
 
 /// Static, non-leaking mapping for unexpected storage failures.
 fn store_failure() -> ApplicationError {
@@ -169,8 +178,9 @@ impl CustomerRepository for SqliteCustomerRepository {
                 "INSERT INTO customers
                  (id, code, name, phone, address, credit_policy,
                   credit_limit_centimes, current_balance_centimes, is_active,
+                  customer_tier,
                   created_at, updated_at, revision, origin_device_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?9, 1, ?10)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9, ?10, ?10, 1, ?11)",
                 rusqlite::params![
                     customer.id.to_string(),
                     code,
@@ -180,6 +190,7 @@ impl CustomerRepository for SqliteCustomerRepository {
                     customer.credit_policy.code(),
                     customer.credit_limit_centimes,
                     i64::from(customer.is_active),
+                    customer.customer_tier.as_str(),
                     stamp,
                     origin_device_id,
                 ],
@@ -238,6 +249,10 @@ impl CustomerRepository for SqliteCustomerRepository {
             sets.push(format!("is_active = ?{}", params.len() + 1));
             params.push(i64::from(active).to_string());
         }
+        if let Some(tier) = update.customer_tier {
+            sets.push(format!("customer_tier = ?{}", params.len() + 1));
+            params.push(tier.as_str().to_string());
+        }
         sets.push("revision = revision + 1".to_string());
         let sql = format!(
             "UPDATE customers SET {} WHERE id = ?{}",
@@ -290,7 +305,7 @@ impl CustomerRepository for SqliteCustomerRepository {
         let capped = (limit.clamp(1, 100)) as i64;
         let mut statement = guard
             .prepare(
-                "SELECT id, name, phone, credit_policy FROM customers
+                "SELECT id, name, phone, credit_policy, customer_tier FROM customers
                  WHERE name LIKE ?1 ESCAPE '\\' COLLATE NOCASE
                     OR phone LIKE ?1 ESCAPE '\\'
                     OR code LIKE ?1 ESCAPE '\\'
@@ -304,13 +319,14 @@ impl CustomerRepository for SqliteCustomerRepository {
                 let name: String = row.get(1)?;
                 let phone: Option<String> = row.get(2)?;
                 let policy_text: String = row.get(3)?;
-                Ok((id_text, name, phone, policy_text))
+                let tier_text: Option<String> = row.get(4)?;
+                Ok((id_text, name, phone, policy_text, tier_text))
             })
             .map_err(|_| store_failure())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| store_failure())?;
         rows.into_iter()
-            .map(|(id_text, name, phone, policy_text)| {
+            .map(|(id_text, name, phone, policy_text, tier_text)| {
                 Ok(CustomerSummary {
                     id: Uuid::parse_str(&id_text)
                         .map(CustomerId::from)
@@ -319,6 +335,7 @@ impl CustomerRepository for SqliteCustomerRepository {
                     phone,
                     credit_policy: CreditPolicy::from_code(&policy_text)
                         .map_err(|_| store_failure())?,
+                    customer_tier: parse_tier(tier_text),
                 })
             })
             .collect()
@@ -329,7 +346,7 @@ impl CustomerRepository for SqliteCustomerRepository {
         guard
             .query_row(
                 "SELECT id, name, phone, address, credit_policy, credit_limit_centimes,
-                        is_active
+                        customer_tier, is_active
                  FROM customers WHERE id = ?1",
                 [customer_id.to_string()],
                 |row| {
@@ -339,7 +356,8 @@ impl CustomerRepository for SqliteCustomerRepository {
                     let address: Option<String> = row.get(3)?;
                     let policy_text: String = row.get(4)?;
                     let limit: i64 = row.get(5)?;
-                    let active: bool = row.get::<_, i64>(6)? != 0;
+                    let tier_text: Option<String> = row.get(6)?;
+                    let active: bool = row.get::<_, i64>(7)? != 0;
                     Ok(Customer {
                         id: Uuid::parse_str(&id_text)
                             .map(CustomerId::from)
@@ -353,6 +371,7 @@ impl CustomerRepository for SqliteCustomerRepository {
                             rusqlite::Error::InvalidColumnName("credit_policy".to_string())
                         })?,
                         credit_limit_centimes: limit,
+                        customer_tier: parse_tier(tier_text),
                         is_active: active,
                     })
                 },
@@ -369,7 +388,7 @@ impl CustomerRepository for SqliteCustomerRepository {
         let guard = self.lock()?;
         let mut statement = guard
             .prepare(
-                "SELECT id, name, phone, credit_policy FROM customers
+                "SELECT id, name, phone, credit_policy, customer_tier FROM customers
                  WHERE (?1 = 0 OR is_active = 1) ORDER BY name",
             )
             .map_err(|_| store_failure())?;
@@ -379,13 +398,14 @@ impl CustomerRepository for SqliteCustomerRepository {
                 let name: String = row.get(1)?;
                 let phone: Option<String> = row.get(2)?;
                 let policy_text: String = row.get(3)?;
-                Ok((id_text, name, phone, policy_text))
+                let tier_text: Option<String> = row.get(4)?;
+                Ok((id_text, name, phone, policy_text, tier_text))
             })
             .map_err(|_| store_failure())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| store_failure())?;
         rows.into_iter()
-            .map(|(id_text, name, phone, policy_text)| {
+            .map(|(id_text, name, phone, policy_text, tier_text)| {
                 Ok(CustomerSummary {
                     id: Uuid::parse_str(&id_text)
                         .map(CustomerId::from)
@@ -394,6 +414,7 @@ impl CustomerRepository for SqliteCustomerRepository {
                     phone,
                     credit_policy: CreditPolicy::from_code(&policy_text)
                         .map_err(|_| store_failure())?,
+                    customer_tier: parse_tier(tier_text),
                 })
             })
             .collect()

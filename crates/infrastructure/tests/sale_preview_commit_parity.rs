@@ -136,6 +136,7 @@ fn seed_product(
         barcode: Some(Barcode::new(&format!("611125{sku}")).expect("barcode")),
         sale_price: Money::from_centimes(sale_price),
         purchase_price: Money::from_centimes(cost_price),
+        wholesale_price: None,
         is_base_unit: true,
         is_default_selling: true,
     };

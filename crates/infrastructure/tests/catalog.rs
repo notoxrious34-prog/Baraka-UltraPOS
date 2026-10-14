@@ -52,6 +52,7 @@ fn base_unit_tagged(suffix: &str) -> NewUnitInput {
         barcode: Some(format!("611125{suffix}")),
         sale_price_centimes: 15_000,
         purchase_price_centimes: 12_000,
+        wholesale_price_centimes: None,
         is_base_unit: true,
         is_default_selling: true,
     }
@@ -65,6 +66,7 @@ fn box_unit_tagged(suffix: &str) -> NewUnitInput {
         barcode: Some(format!("611125{suffix}")),
         sale_price_centimes: 1_450_000,
         purchase_price_centimes: 1_150_000,
+        wholesale_price_centimes: None,
         is_base_unit: false,
         is_default_selling: false,
     }
@@ -285,6 +287,7 @@ fn search_and_update_behave() {
                         barcode: Some("6111250000013".to_string()),
                         sale_price_centimes: 16_000,
                         purchase_price_centimes: 12_000,
+                        wholesale_price_centimes: None,
                         is_base_unit: true,
                         is_default_selling: true,
                     },

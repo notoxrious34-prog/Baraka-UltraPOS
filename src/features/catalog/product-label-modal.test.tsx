@@ -38,6 +38,7 @@ function fixture(overrides?: Partial<CatalogProduct>): CatalogProduct {
         barcode: "6111250000013",
         sale_price_centimes: "15050",
         purchase_price_centimes: "12000",
+        wholesale_price_centimes: null,
         is_base_unit: true,
         is_default_selling: true,
       },

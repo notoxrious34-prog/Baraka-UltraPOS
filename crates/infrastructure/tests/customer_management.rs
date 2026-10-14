@@ -12,7 +12,7 @@ use baraka_application::use_cases::customers::{
 };
 use baraka_domain::errors::DomainError;
 use baraka_domain::role::Role;
-use baraka_domain::sales::{CreditPolicy, CustomerId};
+use baraka_domain::sales::{CreditPolicy, CustomerId, CustomerTier};
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::SqliteCustomerRepository;
 use baraka_infrastructure::persistence::connection::open_connection;
@@ -52,6 +52,7 @@ fn disabled_input(name: &str, phone: Option<&str>) -> NewCustomer {
         address: None,
         credit_policy: CreditPolicy::Disabled,
         credit_limit_centimes: 0,
+        customer_tier: CustomerTier::Retail,
     }
 }
 
@@ -118,6 +119,7 @@ fn credit_policy_gating() {
     let limited = NewCustomer {
         credit_policy: CreditPolicy::Limited,
         credit_limit_centimes: 50_000,
+        customer_tier: CustomerTier::Retail,
         ..disabled_input("Limité", None)
     };
     // Caissier may create DISABLED customers but cannot enable credit.
@@ -289,6 +291,7 @@ fn created_customer_persists_terminal_origin_device_id() {
                 address: None,
                 credit_policy: CreditPolicy::Disabled,
                 credit_limit_centimes: 0,
+                customer_tier: CustomerTier::Retail,
             },
             terminal,
         )

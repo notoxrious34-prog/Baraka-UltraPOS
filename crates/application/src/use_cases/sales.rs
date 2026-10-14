@@ -387,6 +387,17 @@ pub struct StockShortageWarning {
     pub requested_qty_micro: i64,
 }
 
+/// Margin Guard readout for one verified cart line (Pillar 4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LineMargin {
+    /// Zero-based cart line index.
+    pub line_index: usize,
+    /// Integer-exact margin in basis points (`100 bps = 1.00%`).
+    pub margin_basis_points: i64,
+    /// True when the agreed unit price is strictly below cost.
+    pub is_below_cost: bool,
+}
+
 /// Commit-identical totals preview (all centimes).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreviewTotalsOutput {
@@ -409,6 +420,8 @@ pub struct PreviewTotalsOutput {
     /// Leaf-level shortages against the requested warehouse (advisory:
     /// levels may move before commit; the atomic engine re-checks).
     pub stock_warnings: Vec<StockShortageWarning>,
+    /// Per-line Margin Guard readouts in cart order (advisory).
+    pub line_margins: Vec<LineMargin>,
 }
 
 /// Read-only totals preview use case (TASK-BRK-031).
@@ -512,6 +525,17 @@ where
             }
         }
         stock_warnings.sort_by(|a, b| a.sku.cmp(&b.sku));
+        // Margin Guard: per-line readouts in cart order (advisory at preview;
+        // the commit path computes the same values on its VerifiedLines).
+        let line_margins = verified
+            .iter()
+            .enumerate()
+            .map(|(line_index, line)| LineMargin {
+                line_index,
+                margin_basis_points: line.margin_basis_points,
+                is_below_cost: line.is_below_cost,
+            })
+            .collect();
         Ok(PreviewTotalsOutput {
             subtotal_ht: priced.subtotal_ht,
             total_tva: priced.total_tva,
@@ -522,6 +546,7 @@ where
             change: priced.change,
             remaining_due: priced.remaining_due,
             stock_warnings,
+            line_margins,
         })
     }
 }

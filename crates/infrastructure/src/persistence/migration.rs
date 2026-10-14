@@ -92,6 +92,11 @@ pub const MIGRATIONS: &[EmbeddedMigration] = &[
         name: "0014_make_print_jobs_document_id_nullable.sql",
         sql: include_str!("../../migrations/0014_make_print_jobs_document_id_nullable.sql"),
     },
+    EmbeddedMigration {
+        version: 15,
+        name: "0015_pricing_tiers.sql",
+        sql: include_str!("../../migrations/0015_pricing_tiers.sql"),
+    },
 ];
 
 /// SHA-256 hex digest of `input` (pure Rust, no extra dependency).

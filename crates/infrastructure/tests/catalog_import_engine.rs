@@ -119,6 +119,7 @@ fn seed_product(harness: &Harness, sku: &str) {
                     barcode: None,
                     sale_price_centimes: 20_000,
                     purchase_price_centimes: 15_000,
+                    wholesale_price_centimes: None,
                     is_base_unit: true,
                     is_default_selling: true,
                 }],

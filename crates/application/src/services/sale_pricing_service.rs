@@ -7,6 +7,7 @@
 
 use baraka_domain::catalog::{convert_to_base_micros, ProductId, UnitId};
 use baraka_domain::errors::DomainError;
+use baraka_domain::sales::pricing::calculate_margin_basis_points;
 
 use crate::errors::ApplicationError;
 use crate::ports::ProductRepository;
@@ -26,6 +27,10 @@ pub struct VerifiedLine {
     pub unit_price_centimes: i64,
     /// Purchase price snapshot in centimes (margin base).
     pub cost_price_centimes: i64,
+    /// Margin Guard: integer-exact margin in basis points.
+    pub margin_basis_points: i64,
+    /// Margin Guard: true when the agreed price is strictly below cost.
+    pub is_below_cost: bool,
     /// True for kit headers (expanded downstream, never moved directly).
     pub is_kit: bool,
     /// Active flag snapshot.
@@ -66,15 +71,20 @@ where
             ))
         })?;
     let unit_price = override_price.unwrap_or_else(|| unit.sale_price.centimes());
+    let cost_price = unit.purchase_price.centimes();
     let quantity_base_micro = convert_to_base_micros(quantity_micro, unit.factor_micro)
         .map_err(ApplicationError::Validation)?;
+    let (margin_basis_points, is_below_cost) =
+        calculate_margin_basis_points(unit_price, cost_price);
     Ok(VerifiedLine {
         product_id,
         unit_id,
         quantity_micro,
         quantity_base_micro,
         unit_price_centimes: unit_price,
-        cost_price_centimes: unit.purchase_price.centimes(),
+        cost_price_centimes: cost_price,
+        margin_basis_points,
+        is_below_cost,
         is_kit: product.is_kit,
         is_active: product.is_active,
     })

@@ -78,12 +78,16 @@ export interface NamedCustomer {
 
 export type ActiveCustomer = GuestCustomer | NamedCustomer;
 
+/** Pricing tier (mirrors CustomerTier; wire codes are lowercase). */
+export type CustomerTier = "retail" | "artisan" | "wholesale";
+
 /** Customer list row (mirrors CustomerSummaryDto). */
 export interface CustomerSummary {
   id: string;
   name: string;
   phone: string | null;
   credit_policy: "LIMITED" | "UNLIMITED" | "DISABLED";
+  customer_tier: CustomerTier;
 }
 
 /** Full customer view (mirrors CustomerDetailDto). */
@@ -94,6 +98,7 @@ export interface CustomerDetail {
   address: string | null;
   credit_policy: "LIMITED" | "UNLIMITED" | "DISABLED";
   credit_limit_centimes: string | null;
+  customer_tier: CustomerTier;
   current_balance_centimes: string;
   is_active: boolean;
 }
@@ -194,8 +199,19 @@ export interface CatalogUnit {
   barcode: string | null;
   sale_price_centimes: string;
   purchase_price_centimes: string;
+  /** Artisan/wholesale price (`null` = fall back to sale price). */
+  wholesale_price_centimes: string | null;
   is_base_unit: boolean;
   is_default_selling: boolean;
+}
+
+/** Margin Guard readout for one preview line (mirrors LineMarginDto). */
+export interface LineMargin {
+  line_index: number;
+  /** Integer-exact margin in basis points (`100 bps = 1.00%`). */
+  margin_basis_points: number;
+  /** True when the agreed unit price is strictly below cost. */
+  is_below_cost: boolean;
 }
 
 /** Checkout tender split (all centime strings). */

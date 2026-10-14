@@ -155,6 +155,7 @@ export function buildUpdatePayload(
       purchase_price_centimes: edited
         ? blankToZero(data.costPrice, parseMoneyToCentimes)
         : unit.purchase_price_centimes,
+      wholesale_price_centimes: unit.wholesale_price_centimes,
       is_base_unit: unit.is_base_unit,
       is_default_selling: unit.is_default_selling,
     };

@@ -19,6 +19,7 @@ use baraka_domain::inventory::{Warehouse, WarehouseCode, WarehouseId};
 use baraka_domain::primitives::{FactorMicro, Money};
 use baraka_domain::role::Role;
 use baraka_domain::sales::CreditPolicy;
+use baraka_domain::sales::CustomerTier;
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::{
     SqliteBackupManager, SqliteCatalogRepository, SqliteCustomerRepository,
@@ -121,6 +122,7 @@ fn seed_retail(harness: &Harness) -> (WarehouseId, ProductId, UnitId) {
                 barcode: Some(Barcode::new("611125BK1001").expect("barcode")),
                 sale_price: Money::from_centimes(10_000),
                 purchase_price: Money::from_centimes(8_000),
+                wholesale_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],
@@ -146,6 +148,7 @@ fn seed_retail(harness: &Harness) -> (WarehouseId, ProductId, UnitId) {
                 address: None,
                 credit_policy: CreditPolicy::Limited,
                 credit_limit_centimes: 100_000,
+                customer_tier: CustomerTier::Retail,
             },
             TEST_TERMINAL,
         )

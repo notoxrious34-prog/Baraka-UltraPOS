@@ -24,8 +24,8 @@ use baraka_domain::inventory::WarehouseId;
 use baraka_domain::primitives::{Money, QtyMicro};
 use baraka_domain::role::Role;
 use baraka_domain::sales::{
-    CreditPolicy, CreditProfile, Customer, CustomerId, Document, DocumentId, DocumentItem,
-    DocumentLanguage, DocumentStatus, DocumentType,
+    CreditPolicy, CreditProfile, Customer, CustomerId, CustomerTier, Document, DocumentId,
+    DocumentItem, DocumentLanguage, DocumentStatus, DocumentType,
 };
 use baraka_domain::user::UserId;
 use uuid::Uuid;
@@ -95,6 +95,7 @@ fn named_customer(name: &str) -> Customer {
         address: None,
         credit_policy: CreditPolicy::Limited,
         credit_limit_centimes: 100_000,
+        customer_tier: CustomerTier::Retail,
         is_active: true,
     }
 }

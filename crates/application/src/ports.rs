@@ -14,8 +14,8 @@ use baraka_domain::inventory::{
 use baraka_domain::primitives::FactorMicro;
 use baraka_domain::role::Role;
 use baraka_domain::sales::{
-    CreditPolicy, CreditProfile, Customer, CustomerId, Document, DocumentId, DocumentItem,
-    DocumentLanguage,
+    CreditPolicy, CreditProfile, Customer, CustomerId, CustomerTier, Document, DocumentId,
+    DocumentItem, DocumentLanguage,
 };
 use baraka_domain::user::{User, UserId};
 use chrono::{DateTime, Utc};
@@ -1100,6 +1100,8 @@ pub struct NewCustomer {
     pub credit_policy: CreditPolicy,
     /// Limit in centimes (required when policy is Limited).
     pub credit_limit_centimes: i64,
+    /// Pricing tier (defaults to Retail).
+    pub customer_tier: CustomerTier,
 }
 
 /// Sparse customer update (only `Some` fields are written).
@@ -1115,6 +1117,8 @@ pub struct CustomerUpdate {
     pub credit_policy: Option<CreditPolicy>,
     /// Replacement limit (required when policy becomes Limited).
     pub credit_limit_centimes: Option<i64>,
+    /// Replacement pricing tier.
+    pub customer_tier: Option<CustomerTier>,
     /// Replacement active flag.
     pub is_active: Option<bool>,
 }
@@ -1130,6 +1134,8 @@ pub struct CustomerSummary {
     pub phone: Option<String>,
     /// Policy code.
     pub credit_policy: CreditPolicy,
+    /// Pricing tier.
+    pub customer_tier: CustomerTier,
 }
 
 /// Recorded credit payment outcome.

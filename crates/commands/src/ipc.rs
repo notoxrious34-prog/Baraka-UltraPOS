@@ -4,6 +4,7 @@
 //! error text (including Debug output) never crosses this boundary. Money
 //! and quantities cross exclusively as canonical integer strings.
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use baraka_application::errors::ApplicationError;
@@ -79,7 +80,8 @@ use baraka_domain::inventory::WarehouseId;
 use baraka_domain::primitives::QtyMicro;
 use baraka_domain::role::{Permission, Role};
 use baraka_domain::sales::{
-    CreditPolicy, CustomerId, DocumentId, DocumentLanguage, DocumentType, PaymentMethod,
+    CreditPolicy, CustomerId, CustomerTier, DocumentId, DocumentLanguage, DocumentType,
+    PaymentMethod,
 };
 use baraka_domain::user::UserId;
 use uuid::Uuid;
@@ -101,9 +103,9 @@ use crate::dto::{
     GetCustomerRequestDto, GetProductDto, GetSaleResponse, GetSessionReportRequestDto,
     GetStatementRequest, GetStatementResponse, GetStockLevelRequestDto, GetStockLevelResponseDto,
     GrossMarginRowDto, HealthDto, ImportProductsRequestDto, ImportProductsResponseDto,
-    ImportRowErrorDto, KitItemDto, ListWarehousesResponseDto, LoginRequestDto, LoginResponseDto,
-    LogoutRequestDto, LowStockRequestDto, LowStockRowDto, NewCustomerRequest, NewProductUnitDto,
-    OpenCashSessionRequestDto, PaymentDto, PaymentLineDto, PreRestoreChecksDto,
+    ImportRowErrorDto, KitItemDto, LineMarginDto, ListWarehousesResponseDto, LoginRequestDto,
+    LoginResponseDto, LogoutRequestDto, LowStockRequestDto, LowStockRowDto, NewCustomerRequest,
+    NewProductUnitDto, OpenCashSessionRequestDto, PaymentDto, PaymentLineDto, PreRestoreChecksDto,
     PreRestoreReportDto, PreRestoreRequestDto, PreviewLineDto, PreviewTotalsRequest,
     PreviewTotalsResponse, PrintStatusResponse, PrinterSettingsDto, ProcessReturnRequestDto,
     ProcessReturnResponseDto, ProductResponseDto, ProductUnitDto, PurchaseLineRequestDto,
@@ -453,9 +455,29 @@ fn parse_unit_dto(dto: &NewProductUnitDto) -> Result<NewUnitInput, ApplicationEr
             &dto.purchase_price_centimes,
             "purchase_price_centimes",
         )?,
+        wholesale_price_centimes: dto
+            .wholesale_price_centimes
+            .as_deref()
+            .map(|text| parse_wire_int(text, "wholesale_price_centimes"))
+            .transpose()?,
         is_base_unit: dto.is_base_unit,
         is_default_selling: dto.is_default_selling,
     })
+}
+
+/// Parse a pricing-tier wire code (`None`/blank = Retail default).
+fn parse_customer_tier(
+    raw: Option<&str>,
+    field: &'static str,
+) -> Result<CustomerTier, ApplicationError> {
+    match raw.map(str::trim) {
+        None | Some("") => Ok(CustomerTier::Retail),
+        Some(code) => CustomerTier::from_str(code).map_err(|_| {
+            ApplicationError::Validation(DomainError::InvalidCanonicalString(format!(
+                "{field} must be retail, artisan, or wholesale"
+            )))
+        }),
+    }
 }
 
 /// Parse one cart line DTO (same field contract as `sales_checkout` and
@@ -506,6 +528,11 @@ fn parse_upsert_unit_dto(dto: &UpdateProductUnitDto) -> Result<UnitUpsert, Appli
                 &dto.purchase_price_centimes,
                 "purchase_price_centimes",
             )?,
+            wholesale_price_centimes: dto
+                .wholesale_price_centimes
+                .as_deref()
+                .map(|text| parse_wire_int(text, "wholesale_price_centimes"))
+                .transpose()?,
             is_base_unit: dto.is_base_unit,
             is_default_selling: dto.is_default_selling,
         },
@@ -526,6 +553,9 @@ fn to_unit_dto(unit: &baraka_domain::catalog::ProductUnit) -> ProductUnitDto {
             .map(str::to_string),
         sale_price_centimes: unit.sale_price.centimes().to_string(),
         purchase_price_centimes: unit.purchase_price.centimes().to_string(),
+        wholesale_price_centimes: unit
+            .wholesale_price
+            .map(|price| price.centimes().to_string()),
         is_base_unit: unit.is_base_unit,
         is_default_selling: unit.is_default_selling,
     }
@@ -1400,6 +1430,15 @@ pub fn sales_preview_totals(
         change_amount_centimes: output.change.to_string(),
         remaining_due_centimes: output.remaining_due.to_string(),
         stock_warnings: output.stock_warnings.iter().map(to_shortage_dto).collect(),
+        line_margins: output
+            .line_margins
+            .iter()
+            .map(|margin| LineMarginDto {
+                line_index: margin.line_index,
+                margin_basis_points: margin.margin_basis_points,
+                is_below_cost: margin.is_below_cost,
+            })
+            .collect(),
     })
 }
 
@@ -2393,6 +2432,11 @@ pub fn customers_create(
                     .transpose()
                     .map_err(|error| error_code(&error))?
                     .unwrap_or(0),
+                customer_tier: parse_customer_tier(
+                    request.customer_tier.as_deref(),
+                    "customer_tier",
+                )
+                .map_err(|error| error_code(&error))?,
             },
             &state.terminal_id,
         )
@@ -2434,6 +2478,13 @@ pub fn customers_update(
                     request.credit_limit_centimes.as_deref(),
                     "credit_limit_centimes",
                 )?,
+                customer_tier: match request.customer_tier.as_deref().map(str::trim) {
+                    None | Some("") => None,
+                    Some(code) => Some(
+                        parse_customer_tier(Some(code), "customer_tier")
+                            .map_err(|error| error_code(&error))?,
+                    ),
+                },
                 is_active: request.is_active,
             },
         )
@@ -2453,6 +2504,7 @@ fn to_summary(summary: &baraka_application::ports::CustomerSummary) -> CustomerS
         name: summary.name.clone(),
         phone: summary.phone.clone(),
         credit_policy: summary.credit_policy.code().to_string(),
+        customer_tier: summary.customer_tier.as_str().to_string(),
     }
 }
 
@@ -2497,6 +2549,7 @@ fn assemble_detail(
         } else {
             None
         },
+        customer_tier: customer.customer_tier.as_str().to_string(),
         current_balance_centimes: profile.current_balance_centimes.to_string(),
         is_active: customer.is_active,
     })

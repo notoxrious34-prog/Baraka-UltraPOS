@@ -152,8 +152,9 @@ fn map_unit(row: &rusqlite::Row) -> Result<ProductUnit, rusqlite::Error> {
     let barcode_text: Option<String> = row.get(5)?;
     let sale: i64 = row.get(6)?;
     let purchase: i64 = row.get(7)?;
-    let is_base: bool = row.get::<_, i64>(8)? != 0;
-    let is_default: bool = row.get::<_, i64>(9)? != 0;
+    let wholesale: Option<i64> = row.get(8)?;
+    let is_base: bool = row.get::<_, i64>(9)? != 0;
+    let is_default: bool = row.get::<_, i64>(10)? != 0;
     Ok(ProductUnit {
         id: Uuid::parse_str(&id_text)
             .map(UnitId::from)
@@ -167,6 +168,7 @@ fn map_unit(row: &rusqlite::Row) -> Result<ProductUnit, rusqlite::Error> {
             .transpose()?,
         sale_price: Money::from_centimes(sale),
         purchase_price: Money::from_centimes(purchase),
+        wholesale_price: wholesale.map(Money::from_centimes),
         is_base_unit: is_base,
         is_default_selling: is_default,
     })
@@ -213,7 +215,7 @@ fn map_category(row: &rusqlite::Row) -> Result<Category, rusqlite::Error> {
 }
 
 const PRODUCT_COLUMNS: &str = "id, sku, barcode, name_ar, name_fr, category_id, is_kit, is_active";
-const UNIT_COLUMNS: &str = "id, product_id, unit_name_ar, unit_name_fr, factor_micro, barcode, sale_price_centimes, purchase_price_centimes, is_base_unit, is_default_selling";
+const UNIT_COLUMNS: &str = "id, product_id, unit_name_ar, unit_name_fr, factor_micro, barcode, sale_price_centimes, purchase_price_centimes, wholesale_price_centimes, is_base_unit, is_default_selling";
 
 fn fetch_product(
     conn: &Connection,
@@ -292,8 +294,9 @@ impl ProductRepository for SqliteCatalogRepository {
                 tx.execute(
                     "INSERT INTO product_units
                      (id, product_id, unit_name_ar, unit_name_fr, factor_micro, barcode,
-                      sale_price_centimes, purchase_price_centimes, is_base_unit, is_default_selling)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                      sale_price_centimes, purchase_price_centimes, wholesale_price_centimes,
+                      is_base_unit, is_default_selling)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                     rusqlite::params![
                         unit.id.to_string(),
                         unit.product_id.to_string(),
@@ -303,6 +306,7 @@ impl ProductRepository for SqliteCatalogRepository {
                         unit.barcode.as_ref().map(Barcode::as_str),
                         unit.sale_price.centimes(),
                         unit.purchase_price.centimes(),
+                        unit.wholesale_price.map(Money::centimes),
                         bool_to_int(unit.is_base_unit),
                         bool_to_int(unit.is_default_selling),
                     ],
@@ -345,9 +349,9 @@ impl ProductRepository for SqliteCatalogRepository {
                     "UPDATE product_units
                      SET unit_name_ar = ?1, unit_name_fr = ?2, factor_micro = ?3,
                          barcode = ?4, sale_price_centimes = ?5,
-                         purchase_price_centimes = ?6, is_base_unit = ?7,
-                         is_default_selling = ?8
-                     WHERE id = ?9",
+                         purchase_price_centimes = ?6, wholesale_price_centimes = ?7,
+                         is_base_unit = ?8, is_default_selling = ?9
+                     WHERE id = ?10",
                     rusqlite::params![
                         unit.unit_name_ar,
                         unit.unit_name_fr,
@@ -355,6 +359,7 @@ impl ProductRepository for SqliteCatalogRepository {
                         unit.barcode.as_ref().map(Barcode::as_str),
                         unit.sale_price.centimes(),
                         unit.purchase_price.centimes(),
+                        unit.wholesale_price.map(Money::centimes),
                         bool_to_int(unit.is_base_unit),
                         bool_to_int(unit.is_default_selling),
                         unit.id.to_string(),
@@ -364,8 +369,9 @@ impl ProductRepository for SqliteCatalogRepository {
                     tx.execute(
                         "INSERT INTO product_units
                          (id, product_id, unit_name_ar, unit_name_fr, factor_micro, barcode,
-                          sale_price_centimes, purchase_price_centimes, is_base_unit, is_default_selling)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                          sale_price_centimes, purchase_price_centimes, wholesale_price_centimes,
+                          is_base_unit, is_default_selling)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                         rusqlite::params![
                             unit.id.to_string(),
                             unit.product_id.to_string(),
@@ -375,6 +381,7 @@ impl ProductRepository for SqliteCatalogRepository {
                             unit.barcode.as_ref().map(Barcode::as_str),
                             unit.sale_price.centimes(),
                             unit.purchase_price.centimes(),
+                            unit.wholesale_price.map(Money::centimes),
                             bool_to_int(unit.is_base_unit),
                             bool_to_int(unit.is_default_selling),
                         ],
@@ -968,8 +975,9 @@ fn import_rows_in_transaction(
         tx.execute(
             "INSERT INTO product_units
              (id, product_id, unit_name_ar, unit_name_fr, factor_micro, barcode,
-              sale_price_centimes, purchase_price_centimes, is_base_unit, is_default_selling)
-             VALUES (?1, ?2, ?3, ?4, 10000, ?5, ?6, ?7, 1, 1)",
+              sale_price_centimes, purchase_price_centimes, wholesale_price_centimes,
+              is_base_unit, is_default_selling)
+             VALUES (?1, ?2, ?3, ?4, 10000, ?5, ?6, ?7, NULL, 1, 1)",
             rusqlite::params![
                 unit_id,
                 product_id,

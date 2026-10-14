@@ -87,6 +87,49 @@ pub struct CreditProfile {
     pub is_active: bool,
 }
 
+/// Customer pricing tier (`customer_tier` column, Pillar 4).
+///
+/// Stored lowercase (`retail`/`artisan`/`wholesale`); parsed loosely so
+/// operator input (`GROS`, `pro`, `détail`…) resolves deterministically.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CustomerTier {
+    /// Walk-in cash / detail price.
+    #[default]
+    Retail,
+    /// Professional artisan trade price.
+    Artisan,
+    /// Wholesale price.
+    Wholesale,
+}
+
+impl CustomerTier {
+    /// Canonical storage/wire code.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Retail => "retail",
+            Self::Artisan => "artisan",
+            Self::Wholesale => "wholesale",
+        }
+    }
+}
+
+impl std::str::FromStr for CustomerTier {
+    type Err = DomainError;
+
+    fn from_str(raw: &str) -> Result<Self, Self::Err> {
+        match raw.trim().to_lowercase().as_str() {
+            "retail" | "comptant" | "detail" | "détail" => Ok(Self::Retail),
+            "artisan" | "pro" | "professionnel" => Ok(Self::Artisan),
+            "wholesale" | "gros" | "grossiste" => Ok(Self::Wholesale),
+            other => Err(DomainError::InvalidCanonicalString(format!(
+                "unknown customer tier: {other}"
+            ))),
+        }
+    }
+}
+
 /// Full customer entity (domain view of the `customers` table).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Customer {
@@ -102,6 +145,8 @@ pub struct Customer {
     pub credit_policy: CreditPolicy,
     /// Limit in centimes (meaningful for `Limited`).
     pub credit_limit_centimes: i64,
+    /// Pricing tier (Pillar 4; defaults to `Retail`).
+    pub customer_tier: CustomerTier,
     /// Active flag.
     pub is_active: bool,
 }
@@ -203,5 +248,39 @@ mod tests {
     fn ledger_codes_round_trip() {
         assert_eq!(CustomerLedgerEntryType::Debit.code(), "DEBIT");
         assert_eq!(CustomerLedgerEntryType::Credit.code(), "CREDIT");
+    }
+
+    #[test]
+    fn tier_codes_and_defaults() {
+        assert_eq!(CustomerTier::default(), CustomerTier::Retail);
+        assert_eq!(CustomerTier::Retail.as_str(), "retail");
+        assert_eq!(CustomerTier::Artisan.as_str(), "artisan");
+        assert_eq!(CustomerTier::Wholesale.as_str(), "wholesale");
+    }
+
+    #[test]
+    fn tier_loose_parsing() {
+        use std::str::FromStr;
+        assert_eq!(
+            CustomerTier::from_str("retail").expect("retail"),
+            CustomerTier::Retail
+        );
+        assert_eq!(
+            CustomerTier::from_str("ARTISAN").expect("artisan"),
+            CustomerTier::Artisan
+        );
+        assert_eq!(
+            CustomerTier::from_str(" gros ").expect("wholesale"),
+            CustomerTier::Wholesale
+        );
+        assert_eq!(
+            CustomerTier::from_str("pro").expect("pro"),
+            CustomerTier::Artisan
+        );
+        assert_eq!(
+            CustomerTier::from_str("détail").expect("detail"),
+            CustomerTier::Retail
+        );
+        assert!(CustomerTier::from_str("unknown").is_err());
     }
 }

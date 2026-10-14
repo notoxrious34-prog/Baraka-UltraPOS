@@ -176,6 +176,8 @@ pub struct NewProductUnitDto {
     pub sale_price_centimes: String,
     /// Purchase price in centimes.
     pub purchase_price_centimes: String,
+    /// Artisan/wholesale price in centimes (`None` = fall back to sale price).
+    pub wholesale_price_centimes: Option<String>,
     /// True for the single base unit.
     pub is_base_unit: bool,
     /// Default POS unit.
@@ -222,6 +224,8 @@ pub struct ProductUnitDto {
     pub sale_price_centimes: String,
     /// Purchase price in centimes.
     pub purchase_price_centimes: String,
+    /// Artisan/wholesale price in centimes (`None` = fall back to sale price).
+    pub wholesale_price_centimes: Option<String>,
     /// True for the single base unit.
     pub is_base_unit: bool,
     /// Default POS unit.
@@ -312,6 +316,8 @@ pub struct UpdateProductUnitDto {
     pub sale_price_centimes: String,
     /// Purchase price in centimes.
     pub purchase_price_centimes: String,
+    /// Artisan/wholesale price in centimes (`None` = fall back to sale price).
+    pub wholesale_price_centimes: Option<String>,
     /// True for the single base unit.
     pub is_base_unit: bool,
     /// Default POS unit.
@@ -633,6 +639,17 @@ pub struct StockShortageWarningDto {
     pub requested_qty_micro: String,
 }
 
+/// Margin Guard readout for one preview line (Pillar 4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LineMarginDto {
+    /// Zero-based cart line index.
+    pub line_index: usize,
+    /// Integer-exact margin in basis points (`100 bps = 1.00%`).
+    pub margin_basis_points: i64,
+    /// True when the agreed unit price is strictly below cost.
+    pub is_below_cost: bool,
+}
+
 /// Read-only totals preview response (commit-identical, all centime strings).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PreviewTotalsResponse {
@@ -655,6 +672,9 @@ pub struct PreviewTotalsResponse {
     /// Leaf-level shortages against the requested warehouse (advisory).
     #[serde(default)]
     pub stock_warnings: Vec<StockShortageWarningDto>,
+    /// Per-line Margin Guard readouts in cart order (advisory).
+    #[serde(default)]
+    pub line_margins: Vec<LineMarginDto>,
 }
 
 /// Draft parking request.
@@ -768,6 +788,8 @@ pub struct NewCustomerRequest {
     pub credit_policy: String,
     /// Limit in centimes (required when policy is LIMITED).
     pub credit_limit_centimes: Option<String>,
+    /// Pricing tier code (`retail`, `artisan`, `wholesale`; defaults to `retail`).
+    pub customer_tier: Option<String>,
 }
 
 /// Customer update request (only `Some` fields are written).
@@ -787,6 +809,8 @@ pub struct UpdateCustomerRequest {
     pub credit_policy: Option<String>,
     /// Replacement limit in centimes.
     pub credit_limit_centimes: Option<String>,
+    /// Replacement pricing tier code.
+    pub customer_tier: Option<String>,
     /// Replacement active flag.
     pub is_active: Option<bool>,
 }
@@ -802,6 +826,8 @@ pub struct CustomerSummaryDto {
     pub phone: Option<String>,
     /// Policy code.
     pub credit_policy: String,
+    /// Pricing tier code.
+    pub customer_tier: String,
 }
 
 /// Full customer view.
@@ -819,6 +845,8 @@ pub struct CustomerDetailDto {
     pub credit_policy: String,
     /// Limit in centimes (`None` unless LIMITED).
     pub credit_limit_centimes: Option<String>,
+    /// Pricing tier code.
+    pub customer_tier: String,
     /// Current ledger balance in centimes.
     pub current_balance_centimes: String,
     /// Active flag.

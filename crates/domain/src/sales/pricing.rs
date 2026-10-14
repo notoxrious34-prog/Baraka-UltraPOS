@@ -56,6 +56,31 @@ pub fn price_line_gross(quantity_micro: i64, unit_price_centimes: i64) -> Result
         .map(|money| money.centimes())
 }
 
+/// Margin Guard (Pillar 4): integer-exact margin in basis points
+/// (`100 bps = 1.00%`, `10_000 bps = 100.00%`) plus a below-cost flag.
+///
+/// Formula: `((selling - cost) * 10_000) / selling`, computed in `i128` —
+/// no floats, no overflow. A non-positive selling price with a positive cost
+/// is a total loss (`-10_000 bps`, below cost); a zero price with zero cost
+/// is neutral.
+pub fn calculate_margin_basis_points(
+    selling_price_centimes: i64,
+    cost_price_centimes: i64,
+) -> (i64, bool) {
+    if selling_price_centimes <= 0 {
+        if cost_price_centimes > 0 {
+            (-10_000, true)
+        } else {
+            (0, false)
+        }
+    } else {
+        let diff = (selling_price_centimes as i128) - (cost_price_centimes as i128);
+        let bps = (diff * 10_000) / (selling_price_centimes as i128);
+        let bps = bps.clamp(i64::MIN as i128, i64::MAX as i128) as i64;
+        (bps, selling_price_centimes < cost_price_centimes)
+    }
+}
+
 /// Line TVA: `round(taxable_ht * rate_bp / 10_000)`.
 pub fn compute_line_tva(
     taxable_ht_centimes: i64,
@@ -544,5 +569,21 @@ mod tests {
             price_document(&bad, 0, DocumentType::Ticket, &[]),
             Err(DomainError::LineDiscountExceedsGross)
         );
+    }
+
+    #[test]
+    fn margin_guard_vectors() {
+        // Profitable: (15000-10000)*10000/15000 = 3333 bps.
+        assert_eq!(calculate_margin_basis_points(15_000, 10_000), (3333, false));
+        // Break-even.
+        assert_eq!(calculate_margin_basis_points(10_000, 10_000), (0, false));
+        // Loss: (8000-10000)*10000/8000 = -2500 bps, below cost.
+        assert_eq!(calculate_margin_basis_points(8_000, 10_000), (-2500, true));
+        // Zero cost: full 10000 bps margin.
+        assert_eq!(calculate_margin_basis_points(10_000, 0), (10_000, false));
+        // Zero price with cost: total loss.
+        assert_eq!(calculate_margin_basis_points(0, 10_000), (-10_000, true));
+        // Zero price, zero cost: neutral.
+        assert_eq!(calculate_margin_basis_points(0, 0), (0, false));
     }
 }

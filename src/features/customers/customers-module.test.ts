@@ -101,6 +101,7 @@ describe("customer helpers", async () => {
     address: null,
     credit_policy: "LIMITED",
     credit_limit_centimes: "10000",
+    customer_tier: "retail",
     current_balance_centimes: "0",
     is_active: true,
     ...over,

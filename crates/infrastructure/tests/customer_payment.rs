@@ -8,7 +8,7 @@ use baraka_application::use_cases::customers::{
     CreateCustomerUseCase, GetCustomerStatementUseCase, RecordCreditPaymentUseCase,
 };
 use baraka_domain::role::Role;
-use baraka_domain::sales::{CreditPolicy, CustomerId};
+use baraka_domain::sales::{CreditPolicy, CustomerId, CustomerTier};
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::SqliteCustomerRepository;
 use baraka_infrastructure::persistence::connection::open_connection;
@@ -64,6 +64,7 @@ fn seed_debtor(harness: &Harness, balance: i64) -> CustomerId {
                 address: None,
                 credit_policy: CreditPolicy::Limited,
                 credit_limit_centimes: 100_000,
+                customer_tier: CustomerTier::Retail,
             },
             TEST_TERMINAL,
         )

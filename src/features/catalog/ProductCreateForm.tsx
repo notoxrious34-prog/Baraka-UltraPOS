@@ -183,6 +183,7 @@ function toWireUnit(unit: UnitFormData, factorMicro: string, isBase: boolean): N
       unit.salePrice.trim() === "" ? "0" : parseMoneyToCentimes(unit.salePrice),
     purchase_price_centimes:
       unit.costPrice.trim() === "" ? "0" : parseMoneyToCentimes(unit.costPrice),
+    wholesale_price_centimes: null,
     is_base_unit: isBase,
     is_default_selling: isBase,
   };

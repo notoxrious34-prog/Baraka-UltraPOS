@@ -22,6 +22,7 @@ use baraka_domain::inventory::{Warehouse, WarehouseCode, WarehouseId};
 use baraka_domain::primitives::{FactorMicro, Money};
 use baraka_domain::role::Role;
 use baraka_domain::sales::CreditPolicy;
+use baraka_domain::sales::CustomerTier;
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::{
     SqliteBackupManager, SqliteCatalogRepository, SqliteCustomerRepository,
@@ -124,6 +125,7 @@ fn seed_consistent(harness: &Harness, doc_number: &str) -> (WarehouseId, Product
                 barcode: Some(Barcode::new("611125RS1001").expect("barcode")),
                 sale_price: Money::from_centimes(10_000),
                 purchase_price: Money::from_centimes(8_000),
+                wholesale_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],
@@ -166,6 +168,7 @@ fn seed_consistent(harness: &Harness, doc_number: &str) -> (WarehouseId, Product
                 address: None,
                 credit_policy: CreditPolicy::Limited,
                 credit_limit_centimes: 100_000,
+                customer_tier: CustomerTier::Retail,
             },
             TEST_TERMINAL,
         )
@@ -617,6 +620,7 @@ fn restore_success_swaps_active_db_and_preserves_quarantine() {
                 barcode: None,
                 sale_price: Money::from_centimes(5_000),
                 purchase_price: Money::from_centimes(4_000),
+                wholesale_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],
@@ -716,6 +720,10 @@ fn restore_older_schema_backup_is_migrated() {
     assert!(app_version >= 2, "migration replay needs a prior version");
     // Mark the backup one version behind through the migration runner's own
     // bookkeeping table, then re-bind the logged hash to the edited bytes.
+    // The columns added by the dropped version must go too: replaying an
+    // ADD COLUMN migration over a backup that still carries the column
+    // fails with "duplicate column name", so the backup is returned to a
+    // genuine prior-version shape before the hash is re-pointed.
     {
         let conn = rusqlite::Connection::open(backup_dir(&harness).join(&meta.file_name))
             .expect("open backup");
@@ -724,6 +732,15 @@ fn restore_older_schema_backup_is_migrated() {
             [app_version],
         )
         .expect("drop latest version row");
+        if app_version >= 15 {
+            conn.execute("ALTER TABLE customers DROP COLUMN customer_tier;", [])
+                .expect("drop v15 customer column");
+            conn.execute(
+                "ALTER TABLE product_units DROP COLUMN wholesale_price_centimes;",
+                [],
+            )
+            .expect("drop v15 unit column");
+        }
     }
     repoint_logged_hash(
         &harness,

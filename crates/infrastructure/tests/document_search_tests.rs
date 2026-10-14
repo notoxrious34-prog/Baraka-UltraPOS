@@ -19,8 +19,8 @@ use baraka_domain::inventory::{Warehouse, WarehouseCode, WarehouseId};
 use baraka_domain::primitives::{FactorMicro, Money};
 use baraka_domain::role::Role;
 use baraka_domain::sales::{
-    CreditPolicy, CustomerId, Document, DocumentId, DocumentItem, DocumentLanguage, DocumentStatus,
-    DocumentType,
+    CreditPolicy, CustomerId, CustomerTier, Document, DocumentId, DocumentItem, DocumentLanguage,
+    DocumentStatus, DocumentType,
 };
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::{
@@ -121,6 +121,7 @@ fn seed_product(harness: &Harness, sku: &str, price: i64) -> (ProductId, UnitId)
                 barcode: Some(Barcode::new(&format!("611125{sku}")).expect("barcode")),
                 sale_price: Money::from_centimes(price),
                 purchase_price: Money::from_centimes(price - 2_000),
+                wholesale_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],
@@ -140,6 +141,7 @@ fn seed_customer(harness: &Harness, name: &str) -> CustomerId {
                 address: None,
                 credit_policy: CreditPolicy::Limited,
                 credit_limit_centimes: 100_000,
+                customer_tier: CustomerTier::Retail,
             },
             TEST_TERMINAL,
         )

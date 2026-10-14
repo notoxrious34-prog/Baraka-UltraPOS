@@ -23,7 +23,7 @@ use baraka_domain::inventory::{Warehouse, WarehouseCode, WarehouseId};
 use baraka_domain::primitives::{FactorMicro, Money};
 use baraka_domain::role::Role;
 use baraka_domain::sales::{
-    CreditPolicy, CustomerId, DocumentLanguage, DocumentType, PaymentMethod,
+    CreditPolicy, CustomerId, CustomerTier, DocumentLanguage, DocumentType, PaymentMethod,
 };
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::{
@@ -105,6 +105,7 @@ pub fn seed_db(db_path: &Path) -> DriverStack {
                 barcode: Some(Barcode::new("611125CRASH1").expect("barcode")),
                 sale_price: Money::from_centimes(UNIT_PRICE_CENTIMES),
                 purchase_price: Money::from_centimes(8_000),
+                wholesale_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],
@@ -203,6 +204,7 @@ pub fn seed_db(db_path: &Path) -> DriverStack {
                 address: None,
                 credit_policy: CreditPolicy::Limited,
                 credit_limit_centimes: 1_000_000,
+                customer_tier: CustomerTier::Retail,
             },
             TERMINAL_ID,
         )

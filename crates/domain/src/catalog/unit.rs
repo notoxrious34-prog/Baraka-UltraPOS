@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::catalog::{Barcode, ProductId};
 use crate::errors::DomainError;
 use crate::primitives::{round_half_away_from_zero, FactorMicro, Money, QtyMicro};
+use crate::sales::customer::CustomerTier;
 
 /// Micros per whole unit (scale 10^4): `1.0000 == 10_000`.
 pub const MICROS_PER_UNIT: i64 = 10_000;
@@ -64,10 +65,27 @@ pub struct ProductUnit {
     pub sale_price: Money,
     /// Purchase price per selling unit.
     pub purchase_price: Money,
+    /// Artisan/wholesale price per selling unit (`None` = fall back to sale price).
+    pub wholesale_price: Option<Money>,
     /// True for the single immutable base unit.
     pub is_base_unit: bool,
     /// Default unit offered on the POS screen.
     pub is_default_selling: bool,
+}
+
+/// Tier price resolution (Pillar 4): retail pays the sale price; artisan and
+/// wholesale pay the wholesale price when set, else the sale price.
+impl ProductUnit {
+    /// Effective unit price in centimes for `tier`.
+    #[must_use]
+    pub fn price_for_tier(&self, tier: CustomerTier) -> Money {
+        match tier {
+            CustomerTier::Retail => self.sale_price,
+            CustomerTier::Artisan | CustomerTier::Wholesale => {
+                self.wholesale_price.unwrap_or(self.sale_price)
+            }
+        }
+    }
 }
 
 /// Enforce the base-unit invariant over a product's full unit set:
@@ -146,6 +164,7 @@ mod tests {
             barcode: None,
             sale_price: Money::from_centimes(15_000),
             purchase_price: Money::from_centimes(12_000),
+            wholesale_price: None,
             is_base_unit: true,
             is_default_selling: true,
         }
@@ -161,6 +180,7 @@ mod tests {
             barcode: None,
             sale_price: Money::from_centimes(1_450_000),
             purchase_price: Money::from_centimes(1_150_000),
+            wholesale_price: None,
             is_base_unit: false,
             is_default_selling: false,
         }
@@ -172,6 +192,39 @@ mod tests {
         let base =
             convert_to_base_micros(25_000, FactorMicro::from_micros(1_000_000)).expect("convert");
         assert_eq!(base, 2_500_000);
+    }
+
+    #[test]
+    fn tier_price_resolution_prefers_wholesale_with_retail_fallback() {
+        let product = product_id();
+        let mut unit = selling_unit(product, 1_000_000);
+        // No wholesale set: every tier pays the sale price.
+        assert_eq!(
+            unit.price_for_tier(CustomerTier::Retail).centimes(),
+            1_450_000
+        );
+        assert_eq!(
+            unit.price_for_tier(CustomerTier::Artisan).centimes(),
+            1_450_000
+        );
+        assert_eq!(
+            unit.price_for_tier(CustomerTier::Wholesale).centimes(),
+            1_450_000
+        );
+        // Wholesale set: artisan and wholesale tiers take it, retail does not.
+        unit.wholesale_price = Some(Money::from_centimes(1_250_000));
+        assert_eq!(
+            unit.price_for_tier(CustomerTier::Retail).centimes(),
+            1_450_000
+        );
+        assert_eq!(
+            unit.price_for_tier(CustomerTier::Artisan).centimes(),
+            1_250_000
+        );
+        assert_eq!(
+            unit.price_for_tier(CustomerTier::Wholesale).centimes(),
+            1_250_000
+        );
     }
 
     #[test]

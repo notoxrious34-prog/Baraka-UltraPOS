@@ -179,6 +179,7 @@ export function buildModalWire(data: ModalFormData, categoryId?: string | null):
       data.salePrice.trim() === "" ? "0" : parseMoneyToCentimes(data.salePrice),
     purchase_price_centimes:
       data.costPrice.trim() === "" ? "0" : parseMoneyToCentimes(data.costPrice),
+    wholesale_price_centimes: null,
     is_base_unit: true,
     is_default_selling: true,
   };

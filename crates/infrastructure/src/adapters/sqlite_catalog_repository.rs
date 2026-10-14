@@ -9,16 +9,25 @@
 //! of them into the opaque store failure, except `QueryReturnedNoRows`
 //! (absence) and UNIQUE violations (named duplicates).
 
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
-use baraka_application::ports::{CategoryRepository, KitComponentRow, ProductRepository};
+use baraka_application::ports::{
+    CategoryRepository, KitComponentRow, ProductRepository, SessionContext,
+};
+use baraka_application::use_cases::catalog::{
+    ImportBatchReport, ImportDuplicatePolicy, ImportRowError, ProductImportRepository,
+    ValidatedImportRow,
+};
 use baraka_domain::catalog::{
+    search_normalization::{normalize_for_search, tokenize_query},
     Barcode, Category, CategoryId, KitItem, Product, ProductId, ProductUnit, Sku, UnitId,
 };
 use baraka_domain::errors::DomainError;
 use baraka_domain::primitives::{FactorMicro, Money, QtyMicro};
 use chrono::{SecondsFormat, Utc};
+use rusqlite::types::ValueRef;
 use rusqlite::Connection;
 use uuid::Uuid;
 
@@ -52,6 +61,33 @@ fn now_stamp() -> String {
 
 fn bool_to_int(value: bool) -> i64 {
     i64::from(value)
+}
+
+/// Escape SQLite LIKE wildcards (`\`, `%`, `_`) with a backslash escape.
+fn escape_like_pattern(text: &str) -> String {
+    text.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+/// Register the deterministic `baraka_search_norm(text)` scalar function
+/// (unified French/Arabic search normalization). Idempotent:
+/// re-registration on the same connection replaces the previous binding.
+fn ensure_functions_registered(conn: &Connection) -> Result<(), rusqlite::Error> {
+    conn.create_scalar_function(
+        "baraka_search_norm",
+        1,
+        rusqlite::functions::FunctionFlags::SQLITE_UTF8
+            | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC,
+        |ctx| {
+            let value = ctx.get_raw(0);
+            if value == ValueRef::Null {
+                return Ok(String::new());
+            }
+            let text = value.as_str()?;
+            Ok(normalize_for_search(text))
+        },
+    )
 }
 
 /// Catalog repository over a shared SQLite connection.
@@ -573,25 +609,87 @@ impl ProductRepository for SqliteCatalogRepository {
             }
             return Ok(out);
         }
-        let escaped = query
-            .replace('\\', "\\\\")
-            .replace('%', "\\%")
-            .replace('_', "\\_");
-        let pattern = format!("%{escaped}%");
-        let mut statement = guard
-            .prepare(
-                "SELECT DISTINCT p.id FROM products p
-                 LEFT JOIN product_units u ON u.product_id = p.id
-                 WHERE p.sku LIKE ?1 ESCAPE '\\'
-                    OR p.name_fr LIKE ?1 ESCAPE '\\'
-                    OR p.name_ar LIKE ?1 ESCAPE '\\'
-                    OR u.barcode = ?2
-                    OR p.barcode = ?2
-                 ORDER BY p.sku LIMIT ?3",
-            )
-            .map_err(|_| store_failure())?;
+        let trimmed = query.trim();
+        // Exact-barcode fast path for single-token queries (scanners).
+        if !trimmed.chars().any(char::is_whitespace) && trimmed.chars().count() >= 3 {
+            let mut statement = guard
+                .prepare(
+                    "SELECT DISTINCT p.id FROM products p
+                     LEFT JOIN product_units u ON u.product_id = p.id
+                     WHERE p.barcode = ?1 OR u.barcode = ?1 LIMIT ?2",
+                )
+                .map_err(|_| store_failure())?;
+            let ids = statement
+                .query_map(rusqlite::params![trimmed, capped], |row| {
+                    row.get::<_, String>(0)
+                })
+                .map_err(|_| store_failure())?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| store_failure())?;
+            if !ids.is_empty() {
+                let mut out = Vec::with_capacity(ids.len());
+                for id in ids {
+                    if let Some(found) = fetch_product(&guard, &id)? {
+                        out.push(found);
+                    }
+                }
+                return Ok(out);
+            }
+        }
+        // Multi-token hybrid search over normalized text with phonetic
+        // alias expansion: every token group must match (AND), variants
+        // within a group match alternatively (OR).
+        ensure_functions_registered(&guard).map_err(|_| store_failure())?;
+        let groups = tokenize_query(trimmed);
+        if groups.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut sql = String::from("SELECT DISTINCT p.id FROM products p WHERE ");
+        let mut patterns: Vec<rusqlite::types::Value> = Vec::new();
+        for (token_index, group) in groups.iter().enumerate() {
+            if token_index > 0 {
+                sql.push_str(" AND ");
+            }
+            sql.push('(');
+            for (variant_index, variant) in group.iter().enumerate() {
+                if variant_index > 0 {
+                    sql.push_str(" OR ");
+                }
+                sql.push_str(
+                    "(baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\\' \
+                     OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\\' \
+                     OR baraka_search_norm(p.sku) LIKE ? ESCAPE '\\')",
+                );
+                let pattern = rusqlite::types::Value::Text(format!(
+                    "%{e}%",
+                    e = escape_like_pattern(variant)
+                ));
+                patterns.push(pattern.clone());
+                patterns.push(pattern.clone());
+                patterns.push(pattern);
+            }
+            sql.push(')');
+        }
+        sql.push_str(" AND p.is_active = 1");
+        // Relevance ranking: exact SKU, SKU prefix, name prefix, then code.
+        let normalized_query = normalize_for_search(trimmed);
+        let name_prefix = format!("{e}%", e = escape_like_pattern(&normalized_query));
+        sql.push_str(
+            " ORDER BY CASE \
+             WHEN baraka_search_norm(p.sku) = ? THEN 0 \
+             WHEN baraka_search_norm(p.sku) LIKE ? ESCAPE '\\' THEN 1 \
+             WHEN baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\\' \
+               OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\\' THEN 2 \
+             ELSE 3 END, p.sku LIMIT ?",
+        );
+        patterns.push(rusqlite::types::Value::Text(normalized_query));
+        patterns.push(rusqlite::types::Value::Text(name_prefix.clone()));
+        patterns.push(rusqlite::types::Value::Text(name_prefix.clone()));
+        patterns.push(rusqlite::types::Value::Text(name_prefix));
+        patterns.push(rusqlite::types::Value::Integer(capped));
+        let mut statement = guard.prepare(&sql).map_err(|_| store_failure())?;
         let ids = statement
-            .query_map(rusqlite::params![pattern, query, capped], |row| {
+            .query_map(rusqlite::params_from_iter(patterns), |row| {
                 row.get::<_, String>(0)
             })
             .map_err(|_| store_failure())?
@@ -685,4 +783,254 @@ impl CategoryRepository for SqliteCatalogRepository {
         })
         .map_err(|_| store_failure())
     }
+}
+
+/// Deterministic collision-free SKU: `PRD-` plus six uppercase hex digits
+/// hashed from (French name, row index, attempt). Identical input order
+/// regenerates identical codes, so re-imports under `Skip` converge to
+/// skips instead of creating near-duplicates.
+fn generate_import_sku(name_fr: &str, row_index: usize, attempt: u32) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    name_fr.hash(&mut hasher);
+    row_index.hash(&mut hasher);
+    attempt.hash(&mut hasher);
+    format!("PRD-{:06X}", (hasher.finish() & 0xFF_FFFF) as u32)
+}
+
+/// True when a row exists; absence is `false`, any real failure aborts.
+fn row_exists(
+    tx: &rusqlite::Transaction,
+    sql: &str,
+    value: &str,
+) -> Result<bool, ApplicationError> {
+    match tx.query_row(sql, rusqlite::params![value], |_| Ok(())) {
+        Ok(()) => Ok(true),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+        Err(_) => Err(store_failure()),
+    }
+}
+
+/// Resolve the destination warehouse: exact code-or-id match first, then
+/// the first active depot by code. Fails only on an empty warehouse table.
+fn resolve_import_warehouse(
+    tx: &rusqlite::Transaction,
+    warehouse_code: Option<&str>,
+) -> Result<String, ApplicationError> {
+    let requested = warehouse_code
+        .map(str::trim)
+        .filter(|code| !code.is_empty())
+        .unwrap_or("DEP-01");
+    if let Ok(id) = tx.query_row(
+        "SELECT id FROM warehouses WHERE (code = ?1 OR id = ?1) AND is_active = 1",
+        rusqlite::params![requested],
+        |row| row.get::<_, String>(0),
+    ) {
+        return Ok(id);
+    }
+    tx.query_row(
+        "SELECT id FROM warehouses WHERE is_active = 1 ORDER BY code LIMIT 1",
+        rusqlite::params![],
+        |row| row.get::<_, String>(0),
+    )
+    .map_err(|_| store_failure())
+}
+
+impl ProductImportRepository for SqliteCatalogRepository {
+    fn import_batch(
+        &self,
+        actor: &SessionContext,
+        rows: Vec<(usize, ValidatedImportRow)>,
+        warehouse_code: Option<String>,
+        on_duplicate: ImportDuplicatePolicy,
+        origin_device_id: &str,
+    ) -> Result<ImportBatchReport, ApplicationError> {
+        let mut guard = self.lock()?;
+        let tx = guard
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(|_| store_failure())?;
+        let outcome = import_rows_in_transaction(
+            &tx,
+            &actor.user_id.to_string(),
+            origin_device_id,
+            &rows,
+            warehouse_code.as_deref(),
+            on_duplicate,
+        );
+        match outcome {
+            Ok(report) => {
+                tx.commit().map_err(|_| store_failure())?;
+                Ok(report)
+            }
+            // Transaction drops uncommitted: full rollback on abort.
+            Err(error) => Err(error),
+        }
+    }
+}
+
+/// Row loop of the atomic import. Products, base units, and opening stock
+/// land in the caller's `BEGIN IMMEDIATE` transaction; any `Err` return
+/// rolls the whole batch back.
+fn import_rows_in_transaction(
+    tx: &rusqlite::Transaction,
+    actor_user_id: &str,
+    origin_device_id: &str,
+    rows: &[(usize, ValidatedImportRow)],
+    warehouse_code: Option<&str>,
+    on_duplicate: ImportDuplicatePolicy,
+) -> Result<ImportBatchReport, ApplicationError> {
+    let warehouse_id = resolve_import_warehouse(tx, warehouse_code)?;
+    let stamp = now_stamp();
+    let mut imported_count = 0usize;
+    let mut skipped_count = 0usize;
+    let mut errors = Vec::new();
+    let mut seen_skus = HashSet::new();
+    let mut seen_barcodes = HashSet::new();
+    for (row_index, row) in rows {
+        let mut sku = row.sku.as_deref().unwrap_or("").trim().to_uppercase();
+        if sku.is_empty() {
+            let mut attempt = 0u32;
+            sku = loop {
+                let candidate = generate_import_sku(&row.name_fr, *row_index, attempt);
+                attempt = attempt.saturating_add(1);
+                let taken = row_exists(tx, "SELECT 1 FROM products WHERE sku = ?1", &candidate)?
+                    || seen_skus.contains(&candidate);
+                if !taken {
+                    break candidate;
+                }
+            };
+        }
+        if row_exists(tx, "SELECT 1 FROM products WHERE sku = ?1", &sku)?
+            || !seen_skus.insert(sku.clone())
+        {
+            match on_duplicate {
+                ImportDuplicatePolicy::Error => {
+                    return Err(ApplicationError::Conflict(format!(
+                        "SKU already exists: {sku}"
+                    )));
+                }
+                ImportDuplicatePolicy::Skip => {
+                    skipped_count += 1;
+                    errors.push(ImportRowError {
+                        row_index: *row_index,
+                        sku: Some(sku),
+                        name_fr: row.name_fr.clone(),
+                        error: "SKU already exists (skipped)".to_string(),
+                    });
+                    continue;
+                }
+            }
+        }
+        // Barcode guard: an already-assigned barcode is cleared so the
+        // product creation still succeeds (UNIQUE lives on product_units).
+        let mut barcode = row.barcode.clone();
+        if let Some(code) = barcode.clone() {
+            let taken = row_exists(tx, "SELECT 1 FROM products WHERE barcode = ?1", &code)?
+                || row_exists(tx, "SELECT 1 FROM product_units WHERE barcode = ?1", &code)?
+                || !seen_barcodes.insert(code);
+            if taken {
+                barcode = None;
+            }
+        }
+        // Category guard: unknown ids detach instead of failing the row.
+        let category_id = match row.category_id.as_deref() {
+            Some(id) if row_exists(tx, "SELECT 1 FROM categories WHERE id = ?1", id)? => {
+                Some(id.to_string())
+            }
+            _ => None,
+        };
+        let product_id = Uuid::new_v4().to_string();
+        tx.execute(
+            "INSERT INTO products
+             (id, sku, barcode, name_ar, name_fr, category_id,
+              is_kit, is_active, created_at, updated_at, revision, origin_device_id)
+             VALUES (?1, ?2, NULL, ?3, ?4, ?5, 0, 1, ?6, ?6, 1, ?7)",
+            rusqlite::params![
+                product_id,
+                sku,
+                row.name_ar,
+                row.name_fr,
+                category_id,
+                stamp,
+                origin_device_id,
+            ],
+        )
+        .map_err(|_| store_failure())?;
+        let unit_id = Uuid::new_v4().to_string();
+        let unit_name_fr = row
+            .base_unit_name_fr
+            .clone()
+            .unwrap_or_else(|| "Pièce".to_string());
+        let unit_name_ar = row
+            .base_unit_name_ar
+            .clone()
+            .unwrap_or_else(|| "قطعة".to_string());
+        tx.execute(
+            "INSERT INTO product_units
+             (id, product_id, unit_name_ar, unit_name_fr, factor_micro, barcode,
+              sale_price_centimes, purchase_price_centimes, is_base_unit, is_default_selling)
+             VALUES (?1, ?2, ?3, ?4, 10000, ?5, ?6, ?7, 1, 1)",
+            rusqlite::params![
+                unit_id,
+                product_id,
+                unit_name_ar,
+                unit_name_fr,
+                barcode,
+                row.sale_price_centimes,
+                row.purchase_price_centimes,
+            ],
+        )
+        .map_err(|_| store_failure())?;
+        // DEP-01 opening stock: upsert the level, then append the audit
+        // movement (`ADJUSTMENT_POSITIVE`, mirroring manual INCREASE).
+        if row.initial_quantity_micro > 0 {
+            let quantity = row.initial_quantity_micro;
+            tx.execute(
+                "INSERT INTO stock_levels
+                 (warehouse_id, product_id, quantity_micro, quantity_base_micro, revision, updated_at)
+                 VALUES (?1, ?2, ?3, ?3, 0, ?4)
+                 ON CONFLICT(warehouse_id, product_id) DO UPDATE SET
+                   quantity_micro = stock_levels.quantity_micro + excluded.quantity_micro,
+                   quantity_base_micro = stock_levels.quantity_base_micro + excluded.quantity_base_micro,
+                   revision = stock_levels.revision + 1,
+                   updated_at = excluded.updated_at",
+                rusqlite::params![warehouse_id, product_id, quantity, stamp],
+            )
+            .map_err(|_| store_failure())?;
+            let sequence_no: i64 = tx
+                .query_row(
+                    "SELECT COALESCE(MAX(sequence_no), 0) + 1 FROM stock_movements",
+                    rusqlite::params![],
+                    |row| row.get(0),
+                )
+                .map_err(|_| store_failure())?;
+            tx.execute(
+                "INSERT INTO stock_movements
+                 (id, sequence_no, warehouse_id, product_id, movement_type, unit_id,
+                  quantity_micro, quantity_base_micro, reference_type, reference_id,
+                  transfer_batch_id, authorized_negative_stock, reason, created_by, created_at)
+                 VALUES (?1, ?2, ?3, ?4, 'ADJUSTMENT_POSITIVE', ?5,
+                         ?6, ?6, NULL, NULL, NULL, 0, 'Stock initial (import)', ?7, ?8)",
+                rusqlite::params![
+                    Uuid::new_v4().to_string(),
+                    sequence_no,
+                    warehouse_id,
+                    product_id,
+                    unit_id,
+                    quantity,
+                    actor_user_id,
+                    stamp,
+                ],
+            )
+            .map_err(|_| store_failure())?;
+        }
+        imported_count += 1;
+    }
+    Ok(ImportBatchReport {
+        total_rows: rows.len(),
+        imported_count,
+        skipped_count,
+        errors,
+        duration_ms: 0,
+    })
 }

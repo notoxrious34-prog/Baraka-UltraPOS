@@ -83,4 +83,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-086 | Release Candidate v1.0.0 Packaging and Production Approval | ACCEPTED |
 | ADR-087 | Artisan & wholesale pricing tiers, Margin Guard, official brand identity | ACCEPTED |
 
-Next free id: ADR-088.
+| ADR-088 | Single-instance application mutex and quincaillerie starter fixture | ACCEPTED |
+
+Next free id: ADR-089.

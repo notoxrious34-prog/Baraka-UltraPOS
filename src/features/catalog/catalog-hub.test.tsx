@@ -682,14 +682,14 @@ describe("KPI strip and export markup", () => {
       />,
     );
 
-  it("renders KPI titles with counts and the export action", () => {
+  it("renders KPI titles with counts and the data-exchange menu trigger", () => {
     const html = view();
     expect(html).toContain("Tous les produits");
     expect(html).toContain("En stock");
     expect(html).toContain("En rupture");
     expect(html).toContain("Inactifs");
-    expect(html).toContain("Exporter CSV");
-    expect(html).toContain("⬇️");
+    expect(html).toContain("Échanges &amp; Données");
+    expect(html).not.toContain("Exporter CSV");
   });
 
   it("marks the active filter and idle sort columns", () => {

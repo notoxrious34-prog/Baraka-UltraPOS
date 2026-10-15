@@ -256,8 +256,15 @@ describe("import modal hub wiring (source pins)", () => {
     ) as string;
     expect(hub).toContain("ProductImportModal");
     expect(hub).toContain("isImportModalOpen");
-    expect(hub).toContain("cat.importCsv");
+    expect(hub).toContain("DataExchangeMenu");
+    expect(hub).toContain("onDownloadTemplate");
     expect(hub).toContain("onSuccess");
+    const menu = readFileSync(
+      join(process.cwd(), "src", "features", "catalog", "components", "DataExchangeMenu.tsx"),
+      "utf8",
+    ) as string;
+    expect(menu).toContain("cat.exchangeImport");
+    expect(menu).toContain("cat.exchangeExport");
   });
 
   it("maps the policy selector to the IPC payload", () => {

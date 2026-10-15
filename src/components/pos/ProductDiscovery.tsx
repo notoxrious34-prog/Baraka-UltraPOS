@@ -8,14 +8,14 @@
  */
 
 import type { ReactElement } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCartStore } from "@/stores/cart-store";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
-import { useProductEditStore } from "@/stores/product-edit-store";
 import { useCatalogSearch } from "@/hooks/use-catalog-search";
+import { ipcGetStock } from "@/lib/ipc";
 import { t } from "@/lib/i18n";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, formatQty } from "@/lib/money";
 import type { CatalogProduct } from "@/types/pos";
 
 type TypeFilter = "all" | "kits" | "goods";
@@ -56,17 +56,63 @@ export function ProductDiscovery(): ReactElement {
   const setSearchQuery = usePosUiStore((state) => state.setSearchQuery);
   const warehouse = useSessionStore((state) => state.warehouse);
   const session = useSessionStore((state) => state.session);
-  const openModal = usePosUiStore((state) => state.openModal);
   const addProduct = useCartStore((state) => state.addProduct);
   const { results, loading, error, scanFlash } = useCatalogSearch();
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  /** Base-micro stock per visible product (`undefined` = not loaded yet). */
+  const [stockById, setStockById] = useState<Record<string, string>>({});
   const [lastScanned, setLastScanned] = useState<{
     name: string;
     sku: string;
     timestamp: number;
   } | null>(null);
   const scanTimer = useRef<number | null>(null);
-  const canEditCatalog = session !== null && (session.role === "GERANT" || session.role === "ADMIN");
+
+  // Tile stock chips: best-effort per-product levels for the visible rows,
+  // same `stock_get` source as the catalog hub. Failures stay "…".
+  useEffect(() => {
+    if (session === null || warehouse === null) {
+      return;
+    }
+    const token = session.token;
+    const depotId = warehouse.id;
+    const rows = results.filter((product) => {
+      if (typeFilter === "kits") {
+        return product.is_kit;
+      }
+      if (typeFilter === "goods") {
+        return !product.is_kit;
+      }
+      return true;
+    });
+    let cancelled = false;
+    void Promise.all(
+      rows.map(async (product) => {
+        try {
+          const level = await ipcGetStock(token, product.product_id, depotId);
+          return [product.product_id, level] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) {
+        return;
+      }
+      setStockById((prev) => {
+        const next = { ...prev };
+        for (const entry of entries) {
+          if (entry !== null) {
+            next[entry[0]] = entry[1];
+          }
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [results, typeFilter, session, warehouse]);
 
   const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key !== "Enter") {
@@ -194,61 +240,71 @@ export function ProductDiscovery(): ReactElement {
           {visible.map((product) => {
             const priced = product.units.find((unit) => unit.is_default_selling) ?? product.units[0];
             const price = priced !== undefined ? priced.sale_price_centimes : "0";
+            const unitName =
+              priced === undefined
+                ? ""
+                : locale === "ar-DZ"
+                  ? priced.unit_name_ar
+                  : priced.unit_name_fr;
+            const micro = stockById[product.product_id];
+            let chip: ReactElement;
+            if (micro === undefined) {
+              chip = <span className="font-mono text-[11px] text-slate-400">…</span>;
+            } else {
+              let empty = false;
+              try {
+                empty = BigInt(micro) <= 0n;
+              } catch {
+                empty = false;
+              }
+              chip = empty ? (
+                <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                  0{unitName === "" ? "" : ` ${unitName}`}
+                </span>
+              ) : (
+                <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                  {formatQty(micro)}
+                  {unitName === "" ? "" : ` ${unitName}`}
+                </span>
+              );
+            }
             return (
               <div
                 key={product.product_id}
-                className="flex min-h-24 flex-col items-start gap-1 rounded-lg border border-slate-200 bg-slate-50 p-2 text-start hover:border-primary-600 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-sky-950/40"
+                onClick={() => {
+                  addProduct(product);
+                }}
+                className="flex min-h-24 cursor-pointer flex-col items-start gap-1 rounded-lg border border-slate-200 bg-slate-50 p-2 text-start transition-colors hover:border-primary-600 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-sky-950/40"
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    addProduct(product);
-                  }}
-                  className="flex w-full min-w-0 flex-col items-start gap-1 text-start"
-                >
-                  <span className="flex w-full items-center gap-1">
-                    <span className="truncate text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                      {locale === "ar-DZ" ? product.name_ar : product.name_fr}
+                <span className="flex w-full items-center gap-1">
+                  <span className="truncate text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                    {locale === "ar-DZ" ? product.name_ar : product.name_fr}
+                  </span>
+                  {product.is_kit && (
+                    <span className="shrink-0 rounded bg-violet-600 px-1 text-[10px] font-black text-white">
+                      {t(locale, "search.kit")}
                     </span>
-                    {product.is_kit && (
-                      <span className="shrink-0 rounded bg-violet-600 px-1 text-[10px] font-black text-white">
-                        {t(locale, "search.kit")}
-                      </span>
-                    )}
-                    {product.units.length > 1 && (
-                      <span
-                        title={product.units
-                          .map((unit) =>
-                            locale === "ar-DZ" ? unit.unit_name_ar : unit.unit_name_fr,
-                          )
-                          .join(", ")}
-                        className="shrink-0 rounded bg-sky-600 px-1 text-[10px] font-black text-white"
-                      >
-                        {locale === "ar-DZ"
-                          ? `${product.units.length} وحدات`
-                          : `${product.units.length} unités`}
-                      </span>
-                    )}
-                  </span>
-                  <span className="font-mono text-[11px] text-slate-500">{product.sku}</span>
-                  <span className="mt-auto font-mono text-sm font-black text-primary-600 dark:text-sky-300">
-                    {formatMoney(price, locale)}
-                  </span>
-                </button>
-                {canEditCatalog && (
-                  <button
-                    type="button"
-                    title={t(locale, "editProduct")}
-                    aria-label={`${t(locale, "editProduct")} — ${product.sku}`}
-                    onClick={() => {
-                      useProductEditStore.getState().openForProduct(product);
-                      openModal("edit-product");
-                    }}
-                    className="self-end rounded-md bg-slate-200 px-2 py-0.5 text-[11px] font-black text-slate-600 hover:bg-accent-500 hover:text-slate-950 dark:bg-slate-700 dark:text-slate-300"
-                  >
-                    ✎ {t(locale, "editProduct")}
-                  </button>
-                )}
+                  )}
+                  {product.units.length > 1 && (
+                    <span
+                      title={product.units
+                        .map((unit) =>
+                          locale === "ar-DZ" ? unit.unit_name_ar : unit.unit_name_fr,
+                        )
+                        .join(", ")}
+                      className="shrink-0 rounded bg-sky-600 px-1 text-[10px] font-black text-white"
+                    >
+                      {locale === "ar-DZ"
+                        ? `${product.units.length} وحدات`
+                        : `${product.units.length} unités`}
+                    </span>
+                  )}
+                </span>
+                <span className="font-mono text-[11px] text-slate-500">{product.sku}</span>
+                {chip}
+                <span className="mt-auto font-mono text-sm font-black text-primary-600 dark:text-sky-300">
+                  {formatMoney(price, locale)}
+                </span>
               </div>
             );
           })}

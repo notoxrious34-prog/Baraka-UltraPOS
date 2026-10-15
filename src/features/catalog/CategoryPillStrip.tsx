@@ -49,7 +49,7 @@ export function CategoryPillStrip(props: CategoryPillStripProps): ReactElement {
   const active = categories.filter((category) => category.is_active);
   return (
     <div
-      className="flex shrink-0 items-center gap-2 overflow-x-auto pb-1"
+      className="flex shrink-0 items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       role="group"
       aria-label={t(locale, "cat.categoryLabel")}
     >

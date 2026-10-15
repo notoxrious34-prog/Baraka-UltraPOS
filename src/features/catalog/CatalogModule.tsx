@@ -18,6 +18,7 @@ import { formatMoney, formatQty } from "@/lib/money";
 import type { CatalogProduct } from "@/types/pos";
 import { CategoryManageModal } from "@/features/catalog/CategoryManageModal";
 import { CategoryPillStrip } from "@/features/catalog/CategoryPillStrip";
+import { DataExchangeMenu } from "@/features/catalog/components/DataExchangeMenu";
 import { ProductImportModal } from "@/features/catalog/ProductImportModal";
 import starterPackCsv from "@/assets/fixtures/quincaillerie_starter_300.csv?raw";
 import {
@@ -25,6 +26,7 @@ import {
   ProductCreateModal,
 } from "@/features/catalog/ProductCreateModal";
 import { buildCatalogCsvContent } from "@/features/catalog/catalog-export";
+import { downloadSampleCsvTemplate } from "@/features/catalog/catalog-import-parser";
 import { downloadTextFile } from "@/features/catalog/desktop-download";
 import {
   formFromProduct,
@@ -275,6 +277,8 @@ export interface CatalogHubViewProps {
   onSort: (field: SortField) => void;
   onExport: () => void;
   onImport?: () => void;
+  /** TASK-DSN-048: template download, served from the exchange menu. */
+  onDownloadTemplate?: () => void;
   /**
    * Last exported filename for the inline confirmation note (TASK-REL-055).
    * Filename only — no authored copy, per the UI-string law.
@@ -438,31 +442,13 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
         >
           {t(locale, "cat.refresh")}
         </button>
-        <button
-          type="button"
-          onClick={() => props.onImport?.()}
-          className="h-10 rounded-lg bg-slate-200 px-4 text-sm font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
-        >
-          {"⤒ "}
-          {t(locale, "cat.importCsv")}
-        </button>
-        <button
-          type="button"
-          onClick={() => props.onStarterPack?.()}
-          title={t(locale, "catalog.starterPackLoaded")}
-          className="h-10 rounded-lg bg-amber-100 px-4 text-sm font-black text-amber-900 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60"
-        >
-          {"✦ "}
-          {t(locale, "catalog.starterPackBtn")}
-        </button>
-        <button
-          type="button"
-          onClick={props.onExport}
-          className="h-10 rounded-lg bg-slate-200 px-4 text-sm font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
-        >
-          {"⬇️ "}
-          {t(locale, "cat.exportCsv")}
-        </button>
+        <DataExchangeMenu
+          locale={locale}
+          onOpenImportModal={() => props.onImport?.()}
+          onImportStarterPack={() => props.onStarterPack?.()}
+          onExportCsv={props.onExport}
+          onDownloadTemplate={() => props.onDownloadTemplate?.()}
+        />
         {props.exportNote !== null &&
           props.exportNote !== undefined &&
           props.exportNote !== "" && (
@@ -530,7 +516,20 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full table-fixed border-collapse text-xs">
+          <colgroup>
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "20%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "4%" }} />
+            <col style={{ width: "6%" }} />
+          </colgroup>
           <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800">
             <tr>
               <th scope="col" className="px-3 py-2 text-start font-black">
@@ -580,10 +579,10 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                   key={product.product_id}
                   className="border-t border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                 >
-                  <td className="px-3 py-1.5 font-mono font-black">{product.sku}</td>
-                  <td className="px-3 py-1.5 font-mono">{product.barcode ?? "—"}</td>
+                  <td className="truncate px-3 py-1.5 font-mono font-black">{product.sku}</td>
+                  <td className="truncate px-3 py-1.5 font-mono">{product.barcode ?? "—"}</td>
                   <td className="px-3 py-1.5">
-                    <span className="block font-bold">
+                    <span className="block break-words font-bold">
                       {locale === "ar-DZ" ? product.name_ar : product.name_fr}
                     </span>
                     {product.name_ar !== "" && (
@@ -601,7 +600,7 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                       return (
                         <span
                           title={category.code}
-                          className="rounded-md bg-slate-100 px-2 py-0.5 font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                          className="inline-block max-w-full truncate rounded-md bg-slate-100 px-2 py-0.5 font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                         >
                           {locale === "ar-DZ" ? category.name_ar : category.name_fr}
                         </span>
@@ -923,6 +922,16 @@ export function CatalogModule(): ReactElement {
     }
   };
 
+  const handleTemplateDownload = (): void => {
+    const outcome = downloadSampleCsvTemplate();
+    setExportNote(outcome.ok ? outcome.filename : null);
+    if (outcome.ok) {
+      window.setTimeout(() => {
+        setExportNote(null);
+      }, 8000);
+    }
+  };
+
   const handleUpdated = (updated: CatalogProduct): void => {
     setProducts((prev) =>
       prev.map((row) => (row.product_id === updated.product_id ? updated : row)),
@@ -980,6 +989,7 @@ export function CatalogModule(): ReactElement {
         onSort={handleSort}
         onExport={handleExport}
         exportNote={exportNote}
+        onDownloadTemplate={handleTemplateDownload}
         onImport={() => {
           setImportPreset(null);
           setIsImportModalOpen(true);

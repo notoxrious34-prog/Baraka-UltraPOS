@@ -71,9 +71,41 @@ export function CartTableView({
 
   if (lines.length === 0) {
     return (
-      <p className="p-6 text-center text-sm font-semibold text-slate-400">
-        {t(locale, "cart.empty")}
-      </p>
+      <div className="flex flex-col items-center gap-2 p-6 text-center">
+        <svg
+          aria-hidden="true"
+          width="36"
+          height="36"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-slate-300 dark:text-slate-600"
+        >
+          <circle cx="9" cy="20" r="1.5" />
+          <circle cx="17" cy="20" r="1.5" />
+          <path d="M2 3h3l2.6 12.5a1 1 0 0 0 1 .5h8.7a1 1 0 0 0 1-.8L20.5 8H6" />
+        </svg>
+        <p className="text-sm font-black text-slate-500 dark:text-slate-400">
+          {t(locale, "cart.empty")}
+        </p>
+        <p className="text-xs font-medium text-slate-400 dark:text-slate-500">
+          {t(locale, "cart.emptyHint")}
+        </p>
+        <div className="flex items-center gap-1.5 pt-1">
+          <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            [F1] {t(locale, "cart.hintSearch")}
+          </span>
+          <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            [F2] {t(locale, "cart.hintClient")}
+          </span>
+          <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            [F12] {t(locale, "cart.hintCheckout")}
+          </span>
+        </div>
+      </div>
     );
   }
 

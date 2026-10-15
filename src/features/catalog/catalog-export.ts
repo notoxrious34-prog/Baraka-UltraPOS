@@ -10,6 +10,10 @@
 
 import type { CatalogProduct } from "@/types/pos";
 import { baseUnitOf, computeMargin } from "@/features/catalog/CatalogModule";
+import {
+  downloadTextFile,
+  type DesktopDownloadOutcome,
+} from "@/features/catalog/desktop-download";
 
 /** UTF-8 Byte Order Mark: forces Excel to decode the file as UTF-8. */
 export const CSV_BOM = "\uFEFF";
@@ -109,23 +113,15 @@ export function buildCatalogCsvContent(
 }
 
 /**
- * Trigger a client-side download of CSV content. No-op outside a browser
+ * Trigger a client-side download of CSV content through the hardened
+ * desktop path (TASK-REL-055): deferred blob-URL revocation so WebView2's
+ * asynchronous download pickup wins the race. Kept `void` for existing
+ * callers; use `downloadTextFile` directly when the outcome (for the
+ * inline confirmation note) is needed. No-op outside a browser
  * (SSR / node test harness).
  */
 export function triggerCsvDownload(content: string, filename: string): void {
-  if (typeof window === "undefined" || typeof document === "undefined") {
-    return;
-  }
-  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  try {
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  downloadTextFile(content, filename);
 }
+
+export type { DesktopDownloadOutcome };

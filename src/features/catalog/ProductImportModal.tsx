@@ -210,6 +210,18 @@ export function ProductImportModal({
   const [policy, setPolicy] = useState<"skip" | "error">("skip");
   const [report, setReport] = useState<ImportProductsReport | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  /** Last downloaded template filename (inline confirmation, TASK-REL-055). */
+  const [templateNote, setTemplateNote] = useState<string | null>(null);
+
+  const handleTemplateDownload = (): void => {
+    const outcome = downloadSampleCsvTemplate();
+    setTemplateNote(outcome.ok ? outcome.filename : null);
+    if (outcome.ok) {
+      window.setTimeout(() => {
+        setTemplateNote(null);
+      }, 8000);
+    }
+  };
   const lookup = useMemo(() => buildCategoryLookup(categories), [categories]);
 
   useEffect(() => {
@@ -357,11 +369,20 @@ export function ProductImportModal({
               />
               <button
                 type="button"
-                onClick={downloadSampleCsvTemplate}
+                onClick={handleTemplateDownload}
                 className="h-10 w-full rounded-lg bg-slate-200 px-4 text-sm font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
               >
                 {t(locale, "imp.downloadTemplate")}
               </button>
+              {templateNote !== null && (
+                <p
+                  role="status"
+                  className="rounded-lg bg-emerald-100 px-3 py-2 font-mono text-xs font-black text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                >
+                  {"✓ "}
+                  {templateNote}
+                </p>
+              )}
             </div>
           )}
           {stage === "preview" && (

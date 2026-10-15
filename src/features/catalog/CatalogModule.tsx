@@ -24,10 +24,8 @@ import {
   pickDepotId,
   ProductCreateModal,
 } from "@/features/catalog/ProductCreateModal";
-import {
-  buildCatalogCsvContent,
-  triggerCsvDownload,
-} from "@/features/catalog/catalog-export";
+import { buildCatalogCsvContent } from "@/features/catalog/catalog-export";
+import { downloadTextFile } from "@/features/catalog/desktop-download";
 import {
   formFromProduct,
   ProductEditModal,
@@ -277,6 +275,11 @@ export interface CatalogHubViewProps {
   onSort: (field: SortField) => void;
   onExport: () => void;
   onImport?: () => void;
+  /**
+   * Last exported filename for the inline confirmation note (TASK-REL-055).
+   * Filename only — no authored copy, per the UI-string law.
+   */
+  exportNote?: string | null;
   /** BRK-069: preload the 300-item starter pack into the import modal. */
   onStarterPack?: () => void;
   /** Taxonomy rows for the pill strip + row badges (empty = strip hidden details). */
@@ -460,6 +463,17 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
           {"⬇️ "}
           {t(locale, "cat.exportCsv")}
         </button>
+        {props.exportNote !== null &&
+          props.exportNote !== undefined &&
+          props.exportNote !== "" && (
+            <span
+              role="status"
+              className="inline-flex h-10 items-center rounded-lg bg-emerald-100 px-3 font-mono text-xs font-black text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+            >
+              {"✓ "}
+              {props.exportNote}
+            </span>
+          )}
         <button
           type="button"
           onClick={props.onNew}
@@ -701,6 +715,8 @@ export function CatalogModule(): ReactElement {
   const [editProduct, setEditProduct] = useState<CatalogProduct | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<CatalogFilter>("all");
+  /** Last exported filename for the inline confirmation note (TASK-REL-055). */
+  const [exportNote, setExportNote] = useState<string | null>(null);
   const [sort, setSort] = useState<CatalogSort | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -895,10 +911,16 @@ export function CatalogModule(): ReactElement {
 
   const handleExport = (): void => {
     const stamp = new Date().toISOString().slice(0, 10);
-    triggerCsvDownload(
+    const outcome = downloadTextFile(
       buildCatalogCsvContent(visible, stockLevels, locale),
       `${t(locale, "cat.csvExportFilename")}-${stamp}.csv`,
     );
+    setExportNote(outcome.ok ? outcome.filename : null);
+    if (outcome.ok) {
+      window.setTimeout(() => {
+        setExportNote(null);
+      }, 8000);
+    }
   };
 
   const handleUpdated = (updated: CatalogProduct): void => {
@@ -957,6 +979,7 @@ export function CatalogModule(): ReactElement {
         onFilter={handleFilter}
         onSort={handleSort}
         onExport={handleExport}
+        exportNote={exportNote}
         onImport={() => {
           setImportPreset(null);
           setIsImportModalOpen(true);

@@ -9,6 +9,10 @@
  */
 
 import type { ImportProductRow } from "@/types/pos";
+import {
+  downloadTextFile,
+  type DesktopDownloadOutcome,
+} from "@/features/catalog/desktop-download";
 
 /** UTF-8 Byte Order Mark stripped from pasted/Excel-saved files. */
 export const IMPORT_CSV_BOM = "﻿";
@@ -312,20 +316,15 @@ export function generateSampleCsvTemplate(): string {
   return `${IMPORT_CSV_BOM}${body}\n`;
 }
 
-/** Browser download of the standard template. SSR/node guarded no-op. */
-export function downloadSampleCsvTemplate(): void {
-  if (typeof document === "undefined") {
-    return;
-  }
-  const blob = new Blob([generateSampleCsvTemplate()], {
-    type: "text/csv;charset=utf-8;",
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = IMPORT_TEMPLATE_FILENAME;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+/**
+ * Desktop download of the standard template through the hardened path
+ * (TASK-REL-055): deferred blob-URL revocation so WebView2's asynchronous
+ * download pickup wins the race. Returns the outcome (with filename) for
+ * the caller's inline confirmation note. Guarded no-op outside a browser.
+ */
+export function downloadSampleCsvTemplate(): DesktopDownloadOutcome {
+  return downloadTextFile(
+    generateSampleCsvTemplate(),
+    IMPORT_TEMPLATE_FILENAME,
+  );
 }

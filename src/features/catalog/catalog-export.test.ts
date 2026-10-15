@@ -152,15 +152,13 @@ describe("triggerCsvDownload", () => {
     expect(triggerCsvDownload("x", "f.csv")).toBeUndefined();
   });
 
-  it("pins the browser Blob/object-URL flow in source", () => {
+  it("delegates to the hardened desktop download helper in source", () => {
     const root = process.cwd();
     const src = readFileSync(
       join(root, "src", "features", "catalog", "catalog-export.ts"),
       "utf8",
     ) as string;
-    expect(src).toContain('typeof window === "undefined"');
-    expect(src).toContain('new Blob([content], { type: "text/csv;charset=utf-8;" })');
-    expect(src).toContain("URL.createObjectURL(blob)");
-    expect(src).toContain("URL.revokeObjectURL(url)");
+    expect(src).toContain("downloadTextFile(content, filename)");
+    expect(src).not.toContain("URL.revokeObjectURL");
   });
 });

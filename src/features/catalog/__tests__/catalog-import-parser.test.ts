@@ -7,14 +7,22 @@
  */
 
 import { describe, expect, it } from "vitest";
+// @ts-expect-error — @types/node is not installed (no new deps authorized); node runtime guaranteed under vitest.
+import { readFileSync } from "node:fs";
+// @ts-expect-error — see above.
+import { join } from "node:path";
 import {
+  downloadSampleCsvTemplate,
   generateSampleCsvTemplate,
+  IMPORT_TEMPLATE_FILENAME,
   IMPORT_TEMPLATE_HEADER,
   parseCatalogCsv,
   parsePriceToCentimes,
   parseQuantityToMicros,
   splitCsvFields,
 } from "@/features/catalog/catalog-import-parser";
+
+declare const process: { cwd(): string };
 
 const SEMICOLON_CSV = [
   "sku;barcode;name_fr;name_ar;purchase_price;sale_price;initial_stock;category_code",
@@ -127,5 +135,44 @@ describe("generateSampleCsvTemplate", () => {
       .split("\n")
       .filter((line) => line.trim() !== "");
     expect(lines).toHaveLength(4);
+  });
+
+  it("keeps the canonical 8-column header contract and sample rows parse-clean", () => {
+    const template = generateSampleCsvTemplate();
+    const { rows, errors } = parseCatalogCsv(template);
+    expect(errors).toEqual([]);
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(row.sku?.length).toBeGreaterThan(0);
+      expect(row.name_fr?.length).toBeGreaterThan(0);
+    }
+    expect(IMPORT_TEMPLATE_HEADER.split(";")).toEqual([
+      "sku",
+      "barcode",
+      "name_fr",
+      "name_ar",
+      "purchase_price",
+      "sale_price",
+      "initial_stock",
+      "category_code",
+    ]);
+  });
+});
+
+describe("downloadSampleCsvTemplate", () => {
+  it("reports a guarded no-op outside a browser (no DOM in this harness)", () => {
+    const outcome = downloadSampleCsvTemplate();
+    expect(outcome.ok).toBe(false);
+    expect(outcome.filename).toBe(IMPORT_TEMPLATE_FILENAME);
+    expect(outcome.reason).toBe("no-dom");
+  });
+
+  it("routes through the hardened desktop download helper in source", () => {
+    const src = readFileSync(
+      join(process.cwd(), "src", "features", "catalog", "catalog-import-parser.ts"),
+      "utf8",
+    ) as string;
+    expect(src).toContain("downloadTextFile(");
+    expect(src).not.toContain("URL.revokeObjectURL");
   });
 });

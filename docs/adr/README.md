@@ -9,7 +9,8 @@ Project: Baraka UltraPOS. Maintained by the Architect (Charter v2.0).
 - Engine invariants (Charter section 5) cannot change without an ADR.
 - Statuses: PROPOSED, ACCEPTED, SUPERSEDED BY ADR-NNN, REJECTED.
 - Owner validation gates stay explicit in each ADR. An ADR never claims legal, tax, or hardware compliance.
-- Next free id: ADR-077.
+- Next free id: ADR-090.
+- ADR-089: Data-Retention Invariants, In-Place Upgrade Safety, and Downgrade Policy — ACCEPTED (docs/adr/ADR-089-data-retention-and-upgrade-preservation.md; drill record docs/operations/DRILL-DATA-RETENTION-UPGRADE-v1.0.0.md).
 
 ## Template
     # ADR-NNN - Title

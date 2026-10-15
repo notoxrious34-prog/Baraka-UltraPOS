@@ -81,5 +81,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-084 | Persisted CTP files authored in Arabic, superseding ADR-080 | SUPERSEDED (by ADR-085) |
 | ADR-085 | English-language CTP persistence re-ratified by owner, superseding ADR-084 | ACCEPTED |
 | ADR-086 | Release Candidate v1.0.0 Packaging and Production Approval | ACCEPTED |
+| ADR-087 | Artisan & wholesale pricing tiers, Margin Guard, official brand identity | ACCEPTED |
 
-Next free id: ADR-087.
+Next free id: ADR-088.

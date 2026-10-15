@@ -85,7 +85,7 @@
 <header class="hero">
   <h1>Baraka UltraPOS — Guide d'utilisation / دليل الاستعمال</h1>
   <p>Merchant handover handbook · Keep next to the cash register · يُحفظ بجانب الصندوق</p>
-  <span class="ver">v1.0.0</span>
+  <span class="ver">v1.0.0-rc.7 · 2026-10-14</span>
 </header>
 
 <main>
@@ -97,6 +97,7 @@
     <li><a href="#p4">Cycle quotidien / العمل اليومي</a></li>
     <li><a href="#p5">Données &amp; sauvegardes / سلامة البيانات</a></li>
     <li><a href="#p6">Check-list drill / قائمة التجربة</a></li>
+    <li><a href="#p9">Nouveautés rc.7 : échanges, caisse rapide / جديد rc.7</a></li>
   </ol>
 </nav>
 
@@ -192,13 +193,18 @@
     <p>Sauvegardez depuis Paramètres → Sauvegardes et copiez le fichier sur une
     <strong>clé USB hors du magasin</strong>. Panne : réinstallez, restaurez (ADMIN),
     vérifiez une vente et le stock avant de reprendre.</p>
+    <p>Montées de version sans perte : chaque mise à jour rejoue automatiquement les
+    migrations de la base et vérifie chaque écriture au centime près — vos ventes,
+    dettes et stocks survivent intacts (garantie prouvée par test automatique en rc.7).</p>
   </div>
   <hr class="sep" />
   <div class="ar" dir="rtl" lang="ar">
     <div class="note">بياناتك في <code>%APPDATA%\com.baraka.ultrapos\baraka.db</code> —
       لا يحذفها التثبيت أو إلغاؤه أبدًا.</div>
     <p>انسخ نسخة احتياطية دوريًا على USB خارج المحل. عند عطل: أعد التثبيت واستعد
-    آخر نسخة ثم تحقق قبل الاستئناف.</p>
+    آخر نسخة ثم تحقق قبل الاستئناف. الترقيات دون فقدان: كل تحديث يعيد تشغيل
+    ترحيلات القاعدة تلقائيًا ويتحقق من كل قيد بالسنتيم — مبيعاتك وديونك ومخزونك
+    تبقى سليمة (ضمان مُثبت باختبار آلي في rc.7).</p>
   </div>
 </section>
 
@@ -289,8 +295,59 @@
     لا مزيد من تعارضات الصندوق أو قاعدة البيانات أو الطابعة.</p>
   </div>
 </section>
+
+<section class="card" id="p9">
+  <h2>9 · Version 1.0.0-rc.7 — Échanges &amp; caisse rapide / التبادل والبيع السريع</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <h3>1. Menu unique « Échanges &amp; Données » (Catalogue)</h3>
+    <p>À côté de « + Nouveau Produit », un seul menu regroupe les 4 opérations :</p>
+    <ol>
+      <li><strong>Importer un catalogue (CSV, TXT)</strong> — assistant en 4 étapes, aperçu avant import.</li>
+      <li><strong>Charger le pack Quincaillerie (300 articles)</strong> — assortiment bilingue prêt à importer.</li>
+      <li><strong>Exporter le catalogue (CSV pour Excel)</strong> — encodage UTF-8 avec BOM :
+        l'arabe s'ouvre parfaitement dans Excel ; le nom du fichier s'affiche en confirmation verte.</li>
+      <li><strong>Télécharger le modèle CSV standard</strong> — en-têtes
+        <code>sku;barcode;name_fr;name_ar;purchase_price;sale_price;initial_stock;category_code</code>.</li>
+    </ol>
+    <p>Le tableau tient désormais sur 11 colonnes calibrées : <strong>aucun défilement
+    horizontal</strong> sur les écrans ≥ 1024 px ; les pastilles de catégories défilent
+    sans barre visible.</p>
+    <h3>2. Tuiles de vente ultra-rapides (Caisse)</h3>
+    <p><strong>Un seul clic</strong> sur une tuile l'ajoute au panier — le bouton
+    administratif « Modifier » a disparu de la grille (la retouche reste dans le
+    Catalogue). Chaque tuile affiche sa pastille de stock :
+    <code>{quantité} {unité}</code> en vert, rouge à zéro.</p>
+    <h3>3. Cockpit compact &amp; aide au panier vide</h3>
+    <p>La barre supérieure passe de 56 à <strong>40 px</strong> (logo unique dans la
+    navigation) : une rangée de produits en plus à l'écran. Panier vide : icône,
+    consigne de scan, et raccourcis <kbd>F1</kbd> Recherche · <kbd>F2</kbd> Client ·
+    <kbd>F12</kbd> Encaisser.</p>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <h3>1. قائمة موحدة «استيراد وتصدير» (الفهرس)</h3>
+    <p>بجانب «+ منتج جديد»، قائمة واحدة تجمع 4 عمليات:</p>
+    <ol>
+      <li><strong>استيراد كتالوج (CSV، TXT)</strong> — مساعد من 4 خطوات مع معاينة قبل الاستيراد.</li>
+      <li><strong>تحميل باقة العقاقير (300 صنف)</strong> — تشكيلة ثنائية اللغة جاهزة للاستيراد.</li>
+      <li><strong>تصدير الكتالوج (CSV لـ Excel)</strong> — ترميز UTF-8 مع BOM: العربية تفتح
+        سليمة في Excel، واسم الملف يظهر في شريط تأكيد أخضر.</li>
+      <li><strong>تحميل نموذج CSV القياسي</strong> — الترويسات:
+        <code>sku;barcode;name_fr;name_ar;purchase_price;sale_price;initial_stock;category_code</code>.</li>
+    </ol>
+    <p>الجدول الآن بـ 11 عمودًا مضبوطًا: <strong>لا تمرير أفقي</strong> على الشاشات 1024px فأكثر.</p>
+    <h3>2. بلاطات بيع فائقة السرعة (الصندوق)</h3>
+    <p><strong>نقرة واحدة</strong> على أي بلاطة تضيفها إلى السلة — أُزيل زر «تعديل» من
+    الشبكة (التعديل يبقى في الفهرس). كل بلاطة تعرض شارة مخزون:
+    <code>{الكمية} {الوحدة}</code> بالأخضر، وبالأحمر عند النفاد.</p>
+    <h3>3. شريط مضغوط ومساعدة السلة الفارغة</h3>
+    <p>الشريط العلوي من 56 إلى <strong>40 px</strong> (شعار واحد في التنقل): صف منتجات
+    إضافي على الشاشة. السلة الفارغة تعرض أيقونة وإرشاد مسح واختصارات
+    <kbd>F1</kbd> بحث · <kbd>F2</kbd> زبون · <kbd>F12</kbd> الدفع.</p>
+  </div>
+</section>
 </main>
 
-<footer>Baraka UltraPOS v1.0.0 · Guide de remise / دليل التسليم · 100% hors-ligne — aucun appel réseau.</footer>
+<footer>Baraka UltraPOS v1.0.0-rc.7 · Guide de remise / دليل التسليم · 100% hors-ligne — aucun appel réseau.</footer>
 </body>
 </html>

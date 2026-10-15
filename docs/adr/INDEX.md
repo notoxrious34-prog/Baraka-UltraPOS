@@ -85,4 +85,8 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-088 | Single-instance application mutex and quincaillerie starter fixture | ACCEPTED |
 
-Next free id: ADR-089.
+| ADR-089 | Data-Retention Invariants, In-Place Upgrade Safety, and Downgrade Policy | ACCEPTED |
+
+| ADR-090 | Data Exchange Hub, POS Fast-Sale Optimization, and Responsive Catalogue Layout | ACCEPTED |
+
+Next free id: ADR-091.

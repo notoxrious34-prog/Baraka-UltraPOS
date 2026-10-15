@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Questionnaire pour l'expert-comptable — Baraka UltraPOS</title>
+<style>
+@page { size: A4; margin: 15mm; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #111; line-height: 1.45; margin: 0; }
+h1 { font-size: 18pt; margin: 0 0 2mm 0; }
+h1, h2, h3, h4 { break-after: avoid; page-break-after: avoid; }
+.subtitle { font-size: 12pt; margin: 0 0 6mm 0; }
+.version { font-size: 11pt; font-weight: bold; margin: 0 0 4mm 0; }
+.idline { margin: 1mm 0; }
+.idline .lab { display: inline-block; min-width: 45mm; font-weight: bold; }
+.idline .fill { display: inline-block; min-width: 100mm; border-bottom: 1px solid #111; }
+.intro { margin: 5mm 0; text-align: justify; }
+.note { font-weight: bold; }
+.cadre { border: 1px solid #111; padding: 3mm 4mm; margin: 4mm 0 6mm 0; }
+.cadre p { font-weight: bold; margin: 0 0 2mm 0; }
+.cadre ul { margin: 0; padding-left: 6mm; }
+h2 { font-size: 14pt; margin: 7mm 0 3mm 0; border-bottom: 1px solid #111; padding-bottom: 1mm; }
+h2.newpage { break-before: page; page-break-before: always; }
+section.q { break-inside: avoid; margin: 0 0 5mm 0; }
+.qq { margin: 0 0 2mm 0; text-align: justify; }
+.lbl { margin: 2mm 0 1mm 0; font-size: 10pt; }
+.abox { border: 1px solid #111; min-height: 22mm; }
+.rbox { border: 1px solid #111; min-height: 8mm; }
+table.mentions { border-collapse: collapse; width: 100%; margin: 2mm 0; }
+table.mentions th, table.mentions td { border: 1px solid #111; padding: 1.5mm 2mm; font-size: 10pt; text-align: left; }
+table.mentions th.c, table.mentions td.c { text-align: center; width: 22mm; }
+table.rule { border-collapse: collapse; width: 100%; margin: 2mm 0; }
+table.rule th, table.rule td { border: 1px solid #111; padding: 1.5mm 2mm; font-size: 10pt; text-align: left; vertical-align: top; }
+table.rule td.c { text-align: center; }
+.cb { display: inline-block; width: 3mm; height: 3mm; border: 1px solid #111; }
+.subblock { border: 1px solid #111; padding: 3mm 4mm; margin: 4mm 0; }
+.subblock h3 { font-size: 12pt; margin: 0 0 2mm 0; }
+.sig { margin-top: 6mm; }
+.sig .lab { display: inline-block; min-width: 60mm; font-weight: bold; }
+.sig .fill { display: inline-block; min-width: 90mm; border-bottom: 1px solid #111; }
+.annex { break-inside: avoid; }
+ul.fields { margin: 2mm 0; padding-left: 6mm; }
+section.q, div.annex, div.cadre, div.secopen, div.subblock, table.mentions, table.rule, tr.mrow, tr.rrow, .abox, .rbox { break-inside: avoid; page-break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<h1>BARAKA ULTRAPOS — Questionnaire de conformité comptable et fiscale (Algérie)</h1>
+<p class="version">Version 2 - révisée le 2026-10-02 - document de travail, non encore transmis.</p>
+<p class="subtitle">Questionnaire pour l'expert-comptable — Logiciel de caisse et de facturation Baraka UltraPOS — validation avant mise en service</p>
+
+<p class="idline"><span class="lab">Commerçant :</span><span class="fill">&nbsp;</span></p>
+<p class="idline"><span class="lab">Activité :</span><span class="fill">&nbsp;</span></p>
+<p class="idline"><span class="lab">Date :</span><span class="fill">&nbsp;</span></p>
+<p class="idline"><span class="lab">Nom du comptable :</span><span class="fill">&nbsp;</span></p>
+
+<p class="intro">Je mets en service un logiciel de caisse et de gestion de magasin (ventes au comptoir, tickets de caisse sur rouleau thermique étroit, suivi des clients à crédit). Il est paramétré pour un commerçant relevant de l'Impôt Forfaitaire Unique (IFU), sans calcul de TVA. Avant le lancement, je souhaite vérifier avec vous les règles à respecter. Merci d'indiquer pour chaque question votre réponse et, si possible, la référence du texte applicable. Ce document ne présume aucune conformité : il sert à recueillir votre avis.</p>
+
+<div class="cadre">
+<p>Cadre actuel du logiciel (à confirmer ou corriger)</p>
+<ul>
+<li>Régime : forfaitaire IFU. Le logiciel ne calcule aucune TVA et ne distingue pas montant HT et montant TTC : il n'y a qu'un seul total par document.</li>
+<li>Documents : le logiciel peut émettre huit types de documents (ticket de caisse, facture, bon de livraison, devis, avoir, bon de commande, bon de réception, facture fournisseur). Tous sont aujourd'hui imprimés sur un rouleau thermique étroit. Aucun modèle A4 n'existe encore.</li>
+<li>Clients : le logiciel enregistre pour chaque client les données suivantes : code client, nom, téléphone, adresse, politique de crédit, plafond de crédit et son solde de crédit, ainsi qu'un indicateur actif ou inactif. Il n'enregistre pas les identifiants fiscaux du client (RC, NIF, NIS, AI) et n'imprime aucune donnée du client sur les documents.</li>
+</ul>
+</div>
+
+<div class="secopen">
+<h2>A. Régime et identification</h2>
+<section class="q"><p class="qq"><strong>Q1.</strong> Confirmez-vous que mon activité relève bien de l'IFU pour l'exercice en cours ? Existe-t-il des conditions (chiffre d'affaires maximal, activités exclues) ou un risque de changement de régime en cours d'année ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+</div>
+
+<section class="q"><p class="qq"><strong>Q2.</strong> Quels identifiants du vendeur doivent figurer sur les tickets et sur les factures (NIF, NIS, RC, article d'imposition, adresse, autres) ? Lesquels sont obligatoires sur le ticket, lesquels sur la facture ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<div class="secopen">
+<h2>B. Documents de vente</h2>
+<section class="q"><p class="qq"><strong>Q3.</strong> Dans quels cas la facture est-elle obligatoire (client particulier, client professionnel, montant minimal, sur demande du client) ? Le ticket de caisse seul suffit-il pour les ventes au comptoir à des particuliers ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+</div>
+
+<section class="q"><p class="qq"><strong>Q4.</strong> Quelles mentions sont obligatoires sur un ticket et sur une facture pour un vendeur soumis à l'IFU ? (Cochez dans le tableau ci-dessous.)</p>
+<table class="mentions">
+<tr><th>Mention</th><th class="c">Ticket</th><th class="c">Facture</th></tr>
+<tr class="mrow"><td>Date et heure</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Numéro d'ordre</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Nom ou raison sociale du vendeur</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Adresse du vendeur</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Identifiants fiscaux du vendeur (NIF, NIS, RC, article d'imposition)</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Identité du client</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Désignation des articles</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Quantités et prix unitaires</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Montant total</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Montant total en toutes lettres</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Mode de règlement</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Mention relative à la TVA ou au régime</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Droit de timbre</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Signature ou cachet</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+<tr class="mrow"><td>Autre (à préciser) :</td><td class="c"><span class="cb"></span></td><td class="c"><span class="cb"></span></td></tr>
+</table>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q5.</strong> Quelle est la mention exacte (texte) à porter sur la facture concernant mon régime (par exemple l'absence de TVA) ? Merci de donner le libellé exact en français et, si possible, en arabe.</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q6.</strong> Quelles sont les règles de numérotation des factures et des tickets : numérotation continue obligatoire ? remise à zéro chaque année ? séries séparées pour les tickets et les factures ? Que faire d'un numéro annulé ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q7.</strong> Comment documenter un retour de marchandise ou une annulation après l'émission d'un document (avoir, facture d'annulation, autre) ? Y a-t-il des délais ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q8.</strong> Le logiciel peut émettre huit types de documents (ticket de caisse, facture, bon de livraison, devis, avoir, bon de commande, bon de réception, facture fournisseur). Pour un commerce de quincaillerie sous régime IFU, lesquels sont obligatoires, lesquels sont facultatifs et lesquels ne doivent pas être émis ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q9.</strong> Aujourd'hui, la facture est imprimée sur le même modèle étroit que le ticket. Un modèle A4 sera créé après vos réponses. Quelles mentions doivent figurer sur une facture A4 émise à un client professionnel ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q10.</strong> Le montant total en toutes lettres est-il exigé sur la facture ou sur le ticket ? Le logiciel ne l'imprime pas actuellement.</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<div class="secopen">
+<h2>C. Droit de timbre</h2>
+<div class="subblock">
+<h3>Règle appliquée par le logiciel (non validée par un professionnel)</h3>
+<table class="rule">
+<tr><th>Point</th><th>Comportement du logiciel</th></tr>
+<tr class="rrow"><td>Documents concernés</td><td>Ticket de caisse et facture uniquement. Les autres documents (devis, bon de livraison, avoir, documents d'achat) ne portent jamais de timbre.</td></tr>
+<tr class="rrow"><td>Condition</td><td>Au moins une partie du règlement est faite en espèces. Les règlements par chèque ou par carte ne déclenchent pas le timbre.</td></tr>
+<tr class="rrow"><td>Base de calcul</td><td>Le total entier du document avant timbre, même si la part payée en espèces est faible. Le montant en espèces sert uniquement à décider si le timbre s'applique.</td></tr>
+<tr class="rrow"><td>Montant</td><td>1 % de la base, arrondi au dinar supérieur (1 DA par tranche de 100 DA entamée).</td></tr>
+<tr class="rrow"><td>Minimum et maximum</td><td>5 DA au minimum, 2 500 DA au maximum.</td></tr>
+<tr class="rrow"><td>Affichage</td><td>Le timbre est ajouté au total à payer et imprimé sur une ligne distincte intitulée Timbre.</td></tr>
+<tr class="rrow"><td>Retour de marchandise</td><td>Le timbre n'est jamais remboursé sur un avoir.</td></tr>
+<tr class="rrow"><td>Encaissement d'une dette</td><td>Aucun timbre n'est calculé aujourd'hui.</td></tr>
+</table>
+<h3>Exemples calculés</h3>
+<table class="rule">
+<tr><th>Situation</th><th>Timbre calculé par le logiciel</th><th>Conforme ?</th></tr>
+<tr class="rrow"><td><strong>Exemple 1.</strong> Ticket dont le total avant timbre est de 10 000 DA, payé entièrement en espèces</td><td>100 DA</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 2.</strong> Ticket dont le total avant timbre est de 10 000 DA : 100 DA payés en espèces, le reste à crédit</td><td>100 DA (calculé sur 10 000 DA et non sur 100 DA)</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 3.</strong> Ticket dont le total avant timbre est de 1 234,50 DA, payé en espèces</td><td>13 DA (12,345 DA arrondi au dinar supérieur)</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 4.</strong> Ticket dont le total avant timbre est de 300 DA, payé en espèces</td><td>5 DA (minimum)</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 5.</strong> Ticket dont le total avant timbre est de 450 000 DA, payé en espèces</td><td>2 500 DA (maximum)</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 6.</strong> Ticket dont le total avant timbre est de 10 000 DA, payé uniquement par chèque ou par carte</td><td>aucun timbre</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 7.</strong> Vente de 10 000 DA entièrement à crédit, sans aucun paiement en espèces</td><td>aucun timbre</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 8.</strong> Client qui règle en espèces 5 000 DA d'une ancienne dette</td><td>aucun timbre</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+</table>
+</div>
+<section class="q"><p class="qq"><strong>Q11.</strong> Le droit de timbre s'applique-t-il à mes ventes payées en espèces ? Sur quels documents (ticket, facture) et à partir de quel montant ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+</div>
+
+<section class="q"><p class="qq"><strong>Q12.</strong> Quel est le barème exact (taux par tranche, minimum, maximum, règle d'arrondi) ? Merci de confirmer ou corriger la règle actuellement programmée (voir Annexe A).</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q13.</strong> À qui incombe le droit de timbre (client ou vendeur), et comment doit-il apparaître sur le document (ligne séparée, inclus dans le total) ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q14.</strong> Pour une vente à crédit réglée plus tard en espèces : sur quel montant et à quel moment le droit de timbre est-il dû ? Qu'en est-il d'un règlement par chèque ou par virement ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q15.</strong> Le logiciel calcule le timbre sur le total entier du document dès qu'une partie, même minime, est payée en espèces (exemple 2). Est-ce correct, ou le timbre doit-il porter uniquement sur la part payée en espèces ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q16.</strong> Les règlements par chèque ou par carte sont aujourd'hui exclus du timbre. Est-ce correct ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q17.</strong> L'arrondi au dinar supérieur, le minimum de 5 DA et le maximum de 2 500 DA sont-ils conformes ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q18.</strong> Lors d'un retour de marchandise avec avoir, le timbre déjà perçu n'est pas remboursé. Est-ce correct ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<div class="secopen">
+<h2>D. Clients professionnels, crédit et paiements en espèces</h2>
+<section class="q"><p class="qq"><strong>Q19.</strong> Pour un client professionnel (commerçant, entreprise, artisan) : quelles informations dois-je saisir et faire figurer sur la facture (NIF, RC, article d'imposition, NIS, autres) ? Un client professionnel peut-il exiger d'un vendeur IFU une facture avec TVA ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+</div>
+
+<section class="q"><p class="qq"><strong>Q20.</strong> Le logiciel n'enregistre pas le RC, le NIF, le NIS ni l'AI des clients, et n'imprime ni le nom, ni l'adresse, ni les identifiants du client sur les documents. Pour une facture à un client professionnel, quels éléments d'identification du client doivent figurer sur la facture et être conservés ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q21.</strong> Pour les ventes à crédit : quel document est requis (facture, bon de livraison, reconnaissance de dette) ? Un versement ultérieur doit-il donner lieu à un reçu numéroté ? Existe-t-il des limites ou des conditions légales ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q22.</strong> Existe-t-il un plafond légal de paiement en espèces pour une opération commerciale ? Comment dois-je le traiter dans les ventes aux professionnels ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<div class="secopen">
+<h2>E. Montants et arrondis</h2>
+<section class="q"><p class="qq"><strong>Q23.</strong> Les centimes sont-ils admis sur les prix et les totaux des documents ? Quelle est la règle d'arrondi du total (au dinar, à 5 DA, autre) pour un paiement en espèces ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+</div>
+
+<div class="secopen">
+<h2>F. Conservation, registres et logiciel</h2>
+<section class="q"><p class="qq"><strong>Q24.</strong> Quelle est la durée de conservation des documents de vente, et sous quelle forme (électronique seulement, ou impression papier obligatoire) ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+</div>
+
+<section class="q"><p class="qq"><strong>Q25.</strong> Dois-je tenir un registre ou livre des ventes et des achats ? Sous quelle forme (papier coté et paraphé, ou électronique) ? Le logiciel peut-il le remplacer ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q26.</strong> Existe-t-il une obligation de déclarer, homologuer ou certifier un logiciel de caisse ou de facturation auprès de l'administration ? Une sauvegarde régulière des données suffit-elle ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q27.</strong> Existe-t-il d'autres obligations (affichage, mentions sur le ticket, déclarations) qu'un logiciel de caisse doit respecter ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q28.</strong> Chaque type de document a sa propre suite de numéros par exercice, au format PREFIXE-ANNEE-NNNNNN (exemple TICK-2026-000001). Une suite séparée par type est-elle acceptable, et la numérotation doit-elle être continue, sans aucun trou ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q29.</strong> Le rapport de clôture de caisse n'a pas de numéro. Doit-il être numéroté et conservé ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q30.</strong> Un document réimprimé porte la mention DUPLICATA. Cette mention est-elle suffisante ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q31.</strong> Après un changement de nom d'un produit, la réimpression d'un ancien document affiche le nom actuel du produit. Est-ce acceptable pour la conservation, ou faut-il figer le libellé au moment de la vente ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<div class="secopen">
+<h2>G. Preuve d'encaissement d'une dette</h2>
+<p class="intro">Le commerçant peut vendre à crédit à des clients enregistrés. Lorsqu'un client règle une dette, le logiciel enregistre le paiement dans le compte du client et dans la caisse, mais n'édite aujourd'hui aucun document. Le commerçant souhaite remettre au client une preuve imprimée à chaque encaissement. Un employé ne peut encaisser qu'après validation par le gérant, au moyen de son code personnel.</p>
+<section class="q"><p class="qq"><strong>Q32.</strong> La preuve d'encaissement doit-elle porter un numéro ? Si oui, une suite de numéros propre est-elle nécessaire, et doit-elle être continue sans trou ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+</div>
+
+<section class="q"><p class="qq"><strong>Q33.</strong> Quelles mentions minimales doit contenir cette preuve (date, nom du client, montant, mode de règlement, signature, cachet, autre) ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q34.</strong> La preuve doit-elle indiquer le solde restant dû par le client ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q35.</strong> Un droit de timbre s'applique-t-il à l'encaissement en espèces d'une dette ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<section class="q"><p class="qq"><strong>Q36.</strong> Aucune annulation d'un encaissement n'existe aujourd'hui. Comment corriger un encaissement saisi par erreur (écriture inverse, document d'annulation, autre) ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<div class="secopen">
+<h2>H. Données personnelles des clients</h2>
+<p class="note">Cette section peut être traitée par un juriste si le comptable n'est pas compétent.</p>
+<p class="intro">Le logiciel conserve pour chaque client les données listées dans le cadre ci-dessus ainsi que l'historique de ses crédits et paiements.</p>
+<section class="q"><p class="qq"><strong>Q37.</strong> Pendant combien de temps ces données doivent-elles ou peuvent-elles être conservées ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+</div>
+
+<section class="q"><p class="qq"><strong>Q38.</strong> Un client peut-il demander la suppression de ses données, et que faire alors de l'historique comptable qui le concerne ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<div class="secopen">
+<h2>I. Taxe sur la valeur ajoutée (régime réel — pour information)</h2>
+<p class="intro">Le logiciel ne calcule aujourd'hui aucune TVA : il est paramétré pour un vendeur relevant de l'IFU, avec un seul total par document. Les deux questions ci-dessous visent uniquement à préparer un éventuel changement de régime ; elles ne présument d'aucun taux applicable.</p>
+<section class="q"><p class="qq"><strong>Q39.</strong> Si l'établissement relevait du régime réel, confirmez-vous les taux à appliquer en quincaillerie (taux normal de 19 %, taux réduit de 9 % pour certains articles, cas d'exonération) et la ventilation de la TVA par taux à faire figurer sur la facture ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+</div>
+
+<section class="q"><p class="qq"><strong>Q40.</strong> En cas de passage de l'IFU au régime réel en cours d'exploitation : que deviennent la numérotation des documents en cours, les crédits clients ouverts et les rapports de clôture déjà émis ? Faut-il une coupure datée et signée ?</p>
+<p class="lbl">Réponse :</p><div class="abox"></div>
+<p class="lbl">Référence du texte (loi, article, note DGI) :</p><div class="rbox"></div></section>
+
+<p class="lbl">Observations libres :</p><div class="abox"></div>
+
+<p class="sig"><span class="lab">Nom et cachet du comptable :</span><span class="fill">&nbsp;</span></p>
+<p class="sig"><span class="lab">Date :</span><span class="fill">&nbsp;</span></p>
+
+<h2 class="newpage">Annexe A - Calcul du timbre tel que programmé</h2>
+<div class="annex">
+<p>Cette annexe décrit le comportement actuel du logiciel ; elle ne constitue pas une interprétation juridique.</p>
+<table class="rule">
+<tr><th>Point</th><th>Comportement du logiciel</th></tr>
+<tr class="rrow"><td>Documents concernés</td><td>Ticket de caisse et facture uniquement. Les autres documents (devis, bon de livraison, avoir, documents d'achat) ne portent jamais de timbre.</td></tr>
+<tr class="rrow"><td>Condition</td><td>Au moins une partie du règlement est faite en espèces. Les règlements par chèque ou par carte ne déclenchent pas le timbre.</td></tr>
+<tr class="rrow"><td>Base de calcul</td><td>Le total entier du document avant timbre, même si la part payée en espèces est faible. Le montant en espèces sert uniquement à décider si le timbre s'applique.</td></tr>
+<tr class="rrow"><td>Montant</td><td>1 % de la base, arrondi au dinar supérieur (1 DA par tranche de 100 DA entamée).</td></tr>
+<tr class="rrow"><td>Minimum et maximum</td><td>5 DA au minimum, 2 500 DA au maximum.</td></tr>
+<tr class="rrow"><td>Affichage</td><td>Le timbre est ajouté au total à payer et imprimé sur une ligne distincte intitulée Timbre.</td></tr>
+<tr class="rrow"><td>Retour de marchandise</td><td>Le timbre n'est jamais remboursé sur un avoir.</td></tr>
+<tr class="rrow"><td>Encaissement d'une dette</td><td>Aucun timbre n'est calculé aujourd'hui.</td></tr>
+</table>
+<table class="rule">
+<tr><th>Situation</th><th>Timbre calculé par le logiciel</th><th>Conforme ?</th></tr>
+<tr class="rrow"><td><strong>Exemple 1.</strong> Ticket dont le total avant timbre est de 10 000 DA, payé entièrement en espèces</td><td>100 DA</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 2.</strong> Ticket dont le total avant timbre est de 10 000 DA : 100 DA payés en espèces, le reste à crédit</td><td>100 DA (calculé sur 10 000 DA et non sur 100 DA)</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 3.</strong> Ticket dont le total avant timbre est de 1 234,50 DA, payé en espèces</td><td>13 DA (12,345 DA arrondi au dinar supérieur)</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 4.</strong> Ticket dont le total avant timbre est de 300 DA, payé en espèces</td><td>5 DA (minimum)</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 5.</strong> Ticket dont le total avant timbre est de 450 000 DA, payé en espèces</td><td>2 500 DA (maximum)</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 6.</strong> Ticket dont le total avant timbre est de 10 000 DA, payé uniquement par chèque ou par carte</td><td>aucun timbre</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 7.</strong> Vente de 10 000 DA entièrement à crédit, sans aucun paiement en espèces</td><td>aucun timbre</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+<tr class="rrow"><td><strong>Exemple 8.</strong> Client qui règle en espèces 5 000 DA d'une ancienne dette</td><td>aucun timbre</td><td class="c"><span class="cb"></span> Oui &nbsp; <span class="cb"></span> À corriger</td></tr>
+</table>
+</div>
+
+<h2 class="newpage">Annexe B — Informations d'identité imprimées sur les documents</h2>
+<div class="annex">
+<table class="rule">
+<tr><th>Champ</th><th>Longueur maximale</th><th>Remarque</th></tr>
+<tr class="rrow"><td>Nom du commerce</td><td>80 caractères</td><td>Toujours imprimé, même s'il est vide</td></tr>
+<tr class="rrow"><td>Adresse</td><td>120 caractères</td><td>Imprimée si renseignée</td></tr>
+<tr class="rrow"><td>Téléphone</td><td>40 caractères</td><td>Imprimé si renseigné</td></tr>
+<tr class="rrow"><td>NIF</td><td>20 caractères</td><td>Imprimé si renseigné</td></tr>
+<tr class="rrow"><td>NIS</td><td>20 caractères</td><td>Imprimé si renseigné</td></tr>
+<tr class="rrow"><td>RC</td><td>20 caractères</td><td>Imprimé si renseigné</td></tr>
+<tr class="rrow"><td>AI</td><td>20 caractères</td><td>Imprimé si renseigné</td></tr>
+<tr class="rrow"><td>Message de pied de ticket</td><td>160 caractères, 3 lignes au maximum</td><td>Remplacé par un message de remerciement par défaut s'il est vide</td></tr>
+</table>
+<p>Ces informations sont saisies une fois dans les paramètres du logiciel et figurent en en-tête de tous les types de documents.</p>
+<p>Aucun logo n'est géré actuellement.</p>
+<p>Pour les clients, aucun identifiant fiscal (RC, NIF, NIS, AI) n'est enregistré et aucune donnée du client n'est imprimée sur les documents.</p>
+</div>
+
+</body>
+</html>

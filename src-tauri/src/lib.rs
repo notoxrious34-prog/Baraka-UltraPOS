@@ -75,6 +75,15 @@ pub fn run() {
     let handle_cell = Arc::clone(&worker_handle_cell);
     tauri::Builder::default()
         .manage(Arc::clone(&worker_stop))
+        // BRK-069: single-instance guard — a second launch focuses the
+        // existing main window instead of starting a rival instance.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(move |app| {
             // ADR-049: the SQLite file lives in the OS-standard per-user
             // application data directory (Tauri official path API), under

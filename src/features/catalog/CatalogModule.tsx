@@ -19,6 +19,7 @@ import type { CatalogProduct } from "@/types/pos";
 import { CategoryManageModal } from "@/features/catalog/CategoryManageModal";
 import { CategoryPillStrip } from "@/features/catalog/CategoryPillStrip";
 import { ProductImportModal } from "@/features/catalog/ProductImportModal";
+import starterPackCsv from "@/assets/fixtures/quincaillerie_starter_300.csv?raw";
 import {
   pickDepotId,
   ProductCreateModal,
@@ -276,6 +277,8 @@ export interface CatalogHubViewProps {
   onSort: (field: SortField) => void;
   onExport: () => void;
   onImport?: () => void;
+  /** BRK-069: preload the 300-item starter pack into the import modal. */
+  onStarterPack?: () => void;
   /** Taxonomy rows for the pill strip + row badges (empty = strip hidden details). */
   categories?: Category[];
   selectedCategoryId?: string | null;
@@ -439,6 +442,15 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
         >
           {"⤒ "}
           {t(locale, "cat.importCsv")}
+        </button>
+        <button
+          type="button"
+          onClick={() => props.onStarterPack?.()}
+          title={t(locale, "catalog.starterPackLoaded")}
+          className="h-10 rounded-lg bg-amber-100 px-4 text-sm font-black text-amber-900 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60"
+        >
+          {"✦ "}
+          {t(locale, "catalog.starterPackBtn")}
         </button>
         <button
           type="button"
@@ -694,6 +706,11 @@ export function CatalogModule(): ReactElement {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importPreset, setImportPreset] = useState<{
+    key: number;
+    filename: string;
+    content: string;
+  } | null>(null);
   const depotRef = useRef<string | null | undefined>(undefined);
   const skipFirstDebounce = useRef(true);
   const authed = session !== null && isManagerRole(session.role);
@@ -941,6 +958,15 @@ export function CatalogModule(): ReactElement {
         onSort={handleSort}
         onExport={handleExport}
         onImport={() => {
+          setImportPreset(null);
+          setIsImportModalOpen(true);
+        }}
+        onStarterPack={() => {
+          setImportPreset({
+            key: Date.now(),
+            filename: "quincaillerie_starter_300.csv",
+            content: starterPackCsv,
+          });
           setIsImportModalOpen(true);
         }}
         categories={categories}
@@ -972,6 +998,7 @@ export function CatalogModule(): ReactElement {
           refresh();
         }}
         categories={categories}
+        preset={importPreset}
       />
       <ProductCreateModal
         isOpen={isCreateOpen}

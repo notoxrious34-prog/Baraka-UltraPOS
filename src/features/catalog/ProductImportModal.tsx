@@ -10,7 +10,7 @@
  * properties for RTL.
  */
 
-import { useMemo, useRef, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import {
   downloadSampleCsvTemplate,
   parseCatalogCsv,
@@ -32,6 +32,12 @@ export interface ProductImportModalProps {
   onClose: () => void;
   onSuccess: () => void;
   categories: Category[];
+  /**
+   * BRK-069 starter-pack preload: when present and the modal opens on the
+   * drop stage, the CSV text is ingested straight to preview (zero file
+   * hunting). `key` distinguishes successive preloads.
+   */
+  preset?: { key: number; filename: string; content: string } | null;
 }
 
 type ImportStage = "drop" | "preview" | "importing" | "report";
@@ -194,6 +200,7 @@ export function ProductImportModal({
   onClose,
   onSuccess,
   categories,
+  preset = null,
 }: ProductImportModalProps): ReactElement | null {
   const locale = usePosUiStore((state) => state.locale);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -204,6 +211,16 @@ export function ProductImportModal({
   const [report, setReport] = useState<ImportProductsReport | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const lookup = useMemo(() => buildCategoryLookup(categories), [categories]);
+
+  useEffect(() => {
+    if (isOpen && preset !== null && preset.content !== "") {
+      setFileName(preset.filename);
+      setParsed(parseCatalogCsv(preset.content, lookup));
+      setFailure(null);
+      setReport(null);
+      setStage("preview");
+    }
+  }, [isOpen, preset, lookup]);
 
   if (!isOpen) {
     return null;

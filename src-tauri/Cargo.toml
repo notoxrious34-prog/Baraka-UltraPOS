@@ -19,6 +19,7 @@ tauri-build = { workspace = true }
 
 [dependencies]
 tauri = { workspace = true }
+tauri-plugin-single-instance = "2"
 baraka-commands = { path = "../crates/commands" }
 baraka-infrastructure = { path = "../crates/infrastructure" }
 baraka-application = { path = "../crates/application" }

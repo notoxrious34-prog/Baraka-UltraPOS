@@ -116,8 +116,9 @@ describe("printer bindings", () => {
   it("loads, updates, and test-prints through the ipc.ts wrappers", () => {
     expect(PRINTER_SRC).toContain("ipcGetPrinterSettings(sessionToken)");
     expect(PRINTER_SRC).toContain(
-      "await ipcUpdatePrinterSettings(sessionToken, serialPort, serialBaud)",
+      "await ipcUpdatePrinterSettings(",
     );
+    expect(PRINTER_SRC).toContain("paperWidthMm,");
     expect(PRINTER_SRC).toContain('handleTestPrint("fr")');
     expect(PRINTER_SRC).toContain('handleTestPrint("ar")');
     expect(IPC_SRC).toContain('"printer_get_settings"');
@@ -128,6 +129,15 @@ describe("printer bindings", () => {
   it("offers baud options and isolates the serial port LTR", () => {
     expect(PRINTER_SRC).toContain("BAUD_OPTIONS");
     expect(PRINTER_SRC).toContain('<bdi dir="ltr"');
+  });
+
+  it("exposes a bilingual 58/80mm paper width selector persisted via IPC", () => {
+    expect(PRINTER_SRC).toContain("settings.paperWidth80");
+    expect(PRINTER_SRC).toContain("settings.paperWidth58");
+    expect(PRINTER_SRC).toContain("setPaperWidthMm(Number(event.target.value))");
+    expect(PRINTER_SRC).toContain("settings.paperWidthMm");
+    expect(IPC_SRC).toContain("paper_width_mm");
+    expect(IPC_SRC).toContain("paperWidthMm: wire.paper_width_mm");
   });
 });
 

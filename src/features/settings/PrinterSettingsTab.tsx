@@ -1,8 +1,9 @@
 /**
- * Printer & hardware tab (DSN-031): loads via
+ * Printer & hardware tab (DSN-031, BAT-072): loads via
  * `ipcGetPrinterSettings(token)`, persists via
- * `ipcUpdatePrinterSettings(token, serialPort, serialBaud)`, and fires
- * bilingual test prints via `printingTestPrint("fr" | "ar")`.
+ * `ipcUpdatePrinterSettings(token, serialPort, serialBaud, paperWidthMm)`
+ * (paper width 58 | 80), and fires bilingual test prints via
+ * `printingTestPrint("fr" | "ar")`.
  */
 
 import { useEffect, useState, type ReactElement } from "react";
@@ -24,7 +25,7 @@ interface PrinterSettingsTabProps {
 export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabProps): ReactElement {
   const [serialPort, setSerialPort] = useState("");
   const [serialBaud, setSerialBaud] = useState<number>(9600);
-  const [paperWidthDots, setPaperWidthDots] = useState<number | null>(null);
+  const [paperWidthMm, setPaperWidthMm] = useState<number>(80);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<TestPrintLanguage | null>(null);
@@ -37,7 +38,7 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
         if (!cancelled) {
           setSerialPort(settings.serialPort);
           setSerialBaud(settings.serialBaud);
-          setPaperWidthDots(settings.paperWidthDots);
+          setPaperWidthMm(settings.paperWidthMm);
           setLoading(false);
         }
       })
@@ -59,10 +60,15 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
     setSaving(true);
     setNotice(null);
     try {
-      const settings = await ipcUpdatePrinterSettings(sessionToken, serialPort, serialBaud);
+      const settings = await ipcUpdatePrinterSettings(
+        sessionToken,
+        serialPort,
+        serialBaud,
+        paperWidthMm,
+      );
       setSerialPort(settings.serialPort);
       setSerialBaud(settings.serialBaud);
-      setPaperWidthDots(settings.paperWidthDots);
+      setPaperWidthMm(settings.paperWidthMm);
       setNotice({ ok: true, text: t(locale, "settings.saved") });
     } catch (failure) {
       setNotice({ ok: false, text: String(failure) });
@@ -125,12 +131,20 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
             ))}
           </select>
         </label>
-        <div className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1 text-sm">
           <span className="font-bold">{t(locale, "settings.paperWidth")}</span>
-          <p className="px-2 py-1.5 text-sm tabular-nums">
-            <bdi dir="ltr">{paperWidthDots === null ? "—" : String(paperWidthDots)}</bdi>
-          </p>
-        </div>
+          <select
+            className={inputClass}
+            value={paperWidthMm}
+            disabled={saving}
+            onChange={(event) => {
+              setPaperWidthMm(Number(event.target.value));
+            }}
+          >
+            <option value={80}>{t(locale, "settings.paperWidth80")}</option>
+            <option value={58}>{t(locale, "settings.paperWidth58")}</option>
+          </select>
+        </label>
       </div>
       <div>
         <button

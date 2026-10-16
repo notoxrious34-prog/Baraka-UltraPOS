@@ -160,6 +160,7 @@ pub fn run() {
                     transport,
                     renderer,
                     settings: printer_settings.clone(),
+                    printer: printer_settings.clone(),
                 },
                 stop_for_setup,
             );

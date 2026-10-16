@@ -122,13 +122,14 @@ where
 /// Production entry: the worker loads the identity per job so settings
 /// changes apply without restart. Identity-unaware `process_one_job`
 /// keeps the legacy header/footer fallback (existing tests unchanged).
-pub fn process_one_job_with_identity<D, J, P, T, R, S>(
+pub fn process_one_job_with_identity<D, J, P, T, R, S, PR>(
     documents: &D,
     jobs: &J,
     products: &P,
     transport: &T,
     renderer: &R,
     identity: &S,
+    printer: &PR,
 ) -> Result<JobOutcome, ApplicationError>
 where
     D: DocumentRepository + ?Sized,
@@ -137,6 +138,7 @@ where
     T: PrinterTransportPort + ?Sized,
     R: ReceiptRendererPort + ?Sized,
     S: crate::ports::StoreIdentityPort + ?Sized,
+    PR: crate::ports::PrinterSettingsPort + ?Sized,
 {
     let claimed = match jobs.claim_next_pending()? {
         Some(job) => job,
@@ -145,6 +147,12 @@ where
     jobs.mark_processing(&claimed.job_id)?;
     let store_identity = identity.load_identity().unwrap_or_default();
     let footer_message = store_identity.ticket_footer_message.clone();
+    // TASK-BAT-072: resolve the configured paper per job; any settings
+    // failure falls back to the 80mm default (never fell the job).
+    let paper = printer
+        .get_printer_settings()
+        .map(|settings| baraka_domain::printing::PaperWidth::from_mm(settings.paper_width_mm))
+        .unwrap_or(baraka_domain::printing::PaperWidth::Width80mm);
     let outcome = process_claimed(
         documents,
         jobs,
@@ -154,6 +162,7 @@ where
         &claimed,
         store_identity,
         footer_message,
+        paper,
     );
     match outcome {
         Ok(done) => Ok(done),
@@ -200,6 +209,8 @@ where
         &claimed,
         baraka_domain::printing::StoreIdentity::default(),
         String::new(),
+        // Legacy entry: no settings port available; 80mm default surface.
+        baraka_domain::printing::PaperWidth::Width80mm,
     );
     match outcome {
         Ok(done) => Ok(done),
@@ -229,6 +240,7 @@ fn process_debt_claimed<J, T, R>(
     transport: &T,
     renderer: &R,
     claimed: &crate::ports::PrintJobRecord,
+    paper: baraka_domain::printing::PaperWidth,
 ) -> Result<JobOutcome, ApplicationError>
 where
     J: PrintJobRepository + ?Sized,
@@ -243,7 +255,7 @@ where
         })?;
     // Defense in depth: a renderer panic must fell the job, never the thread.
     let bytes = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        renderer.render_debt_receipt(&debt_receipt)
+        renderer.render_debt_receipt_with_paper(&debt_receipt, paper)
     })) {
         Ok(Ok(bytes)) => bytes,
         Ok(Err(error)) => {
@@ -321,6 +333,7 @@ fn process_claimed<D, J, P, T, R>(
     claimed: &crate::ports::PrintJobRecord,
     store_identity: baraka_domain::printing::StoreIdentity,
     footer_message: String,
+    paper: baraka_domain::printing::PaperWidth,
 ) -> Result<JobOutcome, ApplicationError>
 where
     D: DocumentRepository + ?Sized,
@@ -335,7 +348,7 @@ where
         // row in `documents`: route them to the independent debt receipt
         // pipeline (ADR-083). The sales flow below stays verbatim.
         None => {
-            return process_debt_claimed(jobs, transport, renderer, claimed);
+            return process_debt_claimed(jobs, transport, renderer, claimed, paper);
         }
     };
     let document = documents
@@ -362,7 +375,7 @@ where
     )?;
     // Defense in depth: a renderer panic must fell the job, never the thread.
     let bytes = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        renderer.render(&receipt)
+        renderer.render_with_paper(&receipt, paper)
     })) {
         Ok(Ok(bytes)) => bytes,
         Ok(Err(error)) => {

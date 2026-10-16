@@ -89,4 +89,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-090 | Data Exchange Hub, POS Fast-Sale Optimization, and Responsive Catalogue Layout | ACCEPTED |
 
-Next free id: ADR-091.
+| ADR-091 | Dual-Width (58mm/80mm) ESC/POS Thermal Pipeline and Font-Shaping Calibration | ACCEPTED |
+
+Next free id: ADR-092.

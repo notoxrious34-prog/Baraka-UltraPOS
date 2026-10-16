@@ -416,7 +416,25 @@ impl ReceiptRendererPort for EscPosRasterizer {
         &self,
         receipt: &baraka_domain::printing::DebtReceiptDocument,
     ) -> Result<Vec<u8>, ApplicationError> {
-        render_debt_canvas(receipt, PaperWidth::Width80mm)
+        self.render_debt_receipt_with_paper(receipt, PaperWidth::Width80mm)
+    }
+
+    fn render_with_paper(
+        &self,
+        receipt: &ReceiptDocument,
+        paper: PaperWidth,
+    ) -> Result<Vec<u8>, ApplicationError> {
+        render_canvas(receipt, paper)
+            .map(|canvas| encode_gs_v0(&canvas))
+            .map_err(|_| ApplicationError::Validation(DomainError::PrintRenderingFailed))
+    }
+
+    fn render_debt_receipt_with_paper(
+        &self,
+        receipt: &baraka_domain::printing::DebtReceiptDocument,
+        paper: PaperWidth,
+    ) -> Result<Vec<u8>, ApplicationError> {
+        render_debt_canvas(receipt, paper)
             .map(|canvas| encode_gs_v0(&canvas))
             .map_err(|_| ApplicationError::Validation(DomainError::PrintRenderingFailed))
     }

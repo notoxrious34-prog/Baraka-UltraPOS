@@ -7,10 +7,12 @@ use std::sync::{Arc, Mutex};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    PrintJobRepository, PrinterTransportPort, ProductRepository, ReceiptRendererPort,
-    SessionContext, SessionToken, StockRepository, WarehouseRepository,
+    PrintJobRepository, PrinterSettingsPort, PrinterTransportPort, ProductRepository,
+    ReceiptRendererPort, SessionContext, SessionToken, StockRepository, WarehouseRepository,
 };
-use baraka_application::services::print_worker_service::{process_one_job, JobOutcome};
+use baraka_application::services::print_worker_service::{
+    process_one_job, process_one_job_with_identity, JobOutcome,
+};
 use baraka_application::use_cases::sales::{
     CartLineInput, CheckoutInput, CheckoutSaleUseCase, PaymentInput,
 };
@@ -561,6 +563,7 @@ fn worker_thread_processes_then_stops_cleanly() {
             transport: transport.clone(),
             renderer,
             settings: Arc::new(SqlitePrinterSettings::new(Arc::clone(&harness.db))),
+            printer: Arc::new(SqlitePrinterSettings::new(Arc::clone(&harness.db))),
         },
         Arc::clone(&stop),
     );
@@ -943,4 +946,56 @@ fn null_document_id_job_enqueues_claims_and_completes() {
     harness.jobs.mark_done(&job_id).expect("done");
     let (status, _, _, _) = job_full(&harness, &job_id);
     assert_eq!(status, "DONE");
+}
+
+#[test]
+fn worker_honors_configured_58mm_paper_width() {
+    use baraka_infrastructure::printing::rasterizer::EscPosRasterizer;
+
+    let harness = setup();
+    let warehouse = seed_warehouse(&harness, "MAIN");
+    let (product, unit) = seed_product(&harness, "P1", 10_000);
+    commit_sale(&harness, warehouse, product, unit);
+
+    // Merchant hardware: compact 58mm printer persisted in settings.
+    let printer = SqlitePrinterSettings::new(Arc::clone(&harness.db));
+    printer
+        .update_printer_settings("COM1", 9_600, Some(58))
+        .expect("store 58mm");
+
+    let transport = FakeTransport::working();
+    let renderer = EscPosRasterizer;
+    let outcome = process_one_job_with_identity(
+        &harness.documents,
+        &harness.jobs,
+        &harness.catalog,
+        &transport,
+        &renderer,
+        &printer,
+        &printer,
+    )
+    .expect("process");
+    assert!(
+        matches!(outcome, JobOutcome::Done { .. }),
+        "unexpected: {outcome:?}"
+    );
+    assert_eq!(transport.sends(), 1, "one raster payload transmitted");
+    let sent = transport.sent.lock().expect("sent");
+    let stream = &sent[0];
+    // Encoder output opens with the GS v 0 band header; 58mm stride is
+    // 48 bytes/scanline (0x30), never the 80mm 72 (0x48).
+    assert!(
+        stream.len() >= 8,
+        "raster stream carries a full band header"
+    );
+    assert_eq!(
+        &stream[0..4],
+        &[0x1D, 0x76, 0x30, 0x00],
+        "stream opens with GS v 0"
+    );
+    assert_eq!(
+        &stream[4..6],
+        &[0x30, 0x00],
+        "worker honored 58mm (48-byte stride)"
+    );
 }

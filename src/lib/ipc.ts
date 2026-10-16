@@ -1199,6 +1199,7 @@ export interface PrinterSettings {
   serialPort: string;
   serialBaud: number;
   paperWidthDots: number;
+  paperWidthMm: number;
 }
 
 /** Read serial printer configuration. */
@@ -1207,6 +1208,7 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     serial_port: string;
     serial_baud: number;
     paper_width_dots: number;
+    paper_width_mm: number;
   }
   const wire = await call<SettingsWire>("printer_get_settings", {
     session_token: sessionToken,
@@ -1215,30 +1217,35 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     serialPort: wire.serial_port,
     serialBaud: wire.serial_baud,
     paperWidthDots: wire.paper_width_dots,
+    paperWidthMm: wire.paper_width_mm,
   };
 }
 
-/** Persist serial port + baud (ADMIN only server-side). */
+/** Persist serial port + baud + paper width (ADMIN only server-side). */
 export async function ipcUpdatePrinterSettings(
   sessionToken: string,
   serialPort: string,
   serialBaud: number,
+  paperWidthMm: number,
 ): Promise<PrinterSettings> {
   const wire = await call<{
     serial_port: string;
     serial_baud: number;
     paper_width_dots: number;
+    paper_width_mm: number;
   }>("printer_update_settings", {
     request: {
       session_token: sessionToken,
       serial_port: serialPort,
       serial_baud: serialBaud,
+      paper_width_mm: paperWidthMm,
     },
   });
   return {
     serialPort: wire.serial_port,
     serialBaud: wire.serial_baud,
     paperWidthDots: wire.paper_width_dots,
+    paperWidthMm: wire.paper_width_mm,
   };
 }
 

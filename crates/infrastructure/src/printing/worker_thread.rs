@@ -13,8 +13,8 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use baraka_application::ports::{
-    DocumentRepository, PrintJobRepository, PrinterTransportPort, ProductRepository,
-    ReceiptRendererPort, StoreIdentityPort, PRINT_STALE_PENDING_SECS,
+    DocumentRepository, PrintJobRepository, PrinterSettingsPort, PrinterTransportPort,
+    ProductRepository, ReceiptRendererPort, StoreIdentityPort, PRINT_STALE_PENDING_SECS,
 };
 use baraka_application::services::print_worker_service::{
     process_one_job_with_identity, JobOutcome,
@@ -42,6 +42,9 @@ pub struct WorkerDeps {
     /// Store identity source (loaded per job; worker prints the
     /// configured header/footer on every document).
     pub settings: Arc<dyn StoreIdentityPort>,
+    /// Printer settings source (paper width resolved per job; any
+    /// failure falls back to the 80mm default surface).
+    pub printer: Arc<dyn PrinterSettingsPort>,
 }
 
 /// Sleep `total`, waking every 100ms to honor `stop` promptly.
@@ -79,6 +82,7 @@ pub fn spawn_print_worker(deps: WorkerDeps, stop: Arc<AtomicBool>) -> JoinHandle
                 deps.transport.as_ref(),
                 deps.renderer.as_ref(),
                 deps.settings.as_ref(),
+                deps.printer.as_ref(),
             );
             match outcome {
                 Ok(JobOutcome::Idle) | Err(_) => sleep_responsive(&stop, POLL_INTERVAL),

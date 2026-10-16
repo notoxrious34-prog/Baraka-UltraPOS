@@ -1359,6 +1359,27 @@ pub trait ReceiptRendererPort: Send + Sync {
             "debt receipt rendering not implemented".to_string(),
         ))
     }
+
+    /// Render a receipt on an explicit paper format (TASK-BAT-072: the print
+    /// worker resolves `PaperWidth` from persisted settings per job).
+    /// Default: width-agnostic `render` (fakes keep compiling).
+    fn render_with_paper(
+        &self,
+        receipt: &baraka_domain::printing::ReceiptDocument,
+        _paper: baraka_domain::printing::PaperWidth,
+    ) -> Result<Vec<u8>, ApplicationError> {
+        self.render(receipt)
+    }
+
+    /// Render a debt-payment receipt on an explicit paper format. Default:
+    /// width-agnostic `render_debt_receipt` (fakes keep compiling).
+    fn render_debt_receipt_with_paper(
+        &self,
+        receipt: &baraka_domain::printing::DebtReceiptDocument,
+        _paper: baraka_domain::printing::PaperWidth,
+    ) -> Result<Vec<u8>, ApplicationError> {
+        self.render_debt_receipt(receipt)
+    }
 }
 
 /// Cash session view (application-level projection of the domain aggregate).

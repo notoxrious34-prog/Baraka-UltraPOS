@@ -85,7 +85,7 @@
 <header class="hero">
   <h1>Baraka UltraPOS — Guide d'utilisation / دليل الاستعمال</h1>
   <p>Merchant handover handbook · Keep next to the cash register · يُحفظ بجانب الصندوق</p>
-  <span class="ver">v1.0.0-rc.7 · 2026-10-14</span>
+  <span class="ver">v1.0.0-rc.8 · 2026-10-16</span>
 </header>
 
 <main>
@@ -98,6 +98,7 @@
     <li><a href="#p5">Données &amp; sauvegardes / سلامة البيانات</a></li>
     <li><a href="#p6">Check-list drill / قائمة التجربة</a></li>
     <li><a href="#p9">Nouveautés rc.7 : échanges, caisse rapide / جديد rc.7</a></li>
+    <li><a href="#p10">Nouveautés rc.8 : imprimante 58/80 mm / جديد rc.8</a></li>
   </ol>
 </nav>
 
@@ -105,9 +106,9 @@
   <h2>1 · Artefact &amp; Installation / ملف التثبيت</h2>
   <div class="fr" dir="ltr" lang="fr">
     <p>Fichier remis par le technicien : <code>Baraka UltraPOS_1.0.0_x64-setup.exe</code>
-    (~211&nbsp;Mo, 221&nbsp;552&nbsp;107 octets). Windows 10/11, <strong>aucune connexion
+    (~212&nbsp;Mo, 222&nbsp;284&nbsp;447 octets). Windows 10/11, <strong>aucune connexion
     internet requise</strong>.</p>
-    <p>SHA-256 :<br /><span class="hash">C608C32A8C96B089CB51E187DE473AD0FCCD3E728E8B1C07D0311C1E65D75934</span></p>
+    <p>SHA-256 :<br /><span class="hash">CE237CEA0D483B8CF2C6A7529FE82A14A46A23DA8E142A3DF8F69047DC650100</span></p>
     <p>Double-cliquez (français proposé en premier), installez depuis le compte Windows de la
     caisse. Écran bleu SmartScreen attendu : « Informations complémentaires » →
     « Exécuter quand même ».</p>
@@ -346,8 +347,44 @@
     <kbd>F1</kbd> بحث · <kbd>F2</kbd> زبون · <kbd>F12</kbd> الدفع.</p>
   </div>
 </section>
+
+<section class="card" id="p10">
+  <h2>10 · Version 1.0.0-rc.8 — Configuration de l'imprimante thermique (58 mm / 80 mm) / إعداد الطابعة الحرارية (58 مم / 80 مم)</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <p>Deux largeurs de rouleau sont prises en charge : <strong>80 mm</strong>
+    (standard, 576 points) et <strong>58 mm</strong> (compact, 384 points).
+    La mise en page et le retour à la ligne du texte arabe s'ajustent
+    automatiquement à la largeur choisie.</p>
+    <ol>
+      <li>Ouvrez <strong>Paramètres → Impression</strong>.</li>
+      <li>Choisissez la largeur du papier : <strong>80 mm</strong> ou
+        <strong>58 mm</strong> (boutons radio) — le choix est enregistré
+        aussitôt.</li>
+      <li>Lancez une <strong>impression de test</strong> : l'aperçu et le
+        ticket physique doivent être identiques (en-tête, totaux, coupe).</li>
+    </ol>
+    <div class="note">Astuce : les rouleaux étroits 58 mm conviennent aux
+      comptoirs exigus ; préférez 80 mm pour les tickets à longues
+      désignations arabes.</div>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <p>يُدعم عرضان للورق: <strong>80 مم</strong> (قياسي، 576 نقطة) و
+    <strong>58 مم</strong> (مدمج، 384 نقطة). يتكيف التخطيط والتفاف النص
+    العربي تلقائيًا مع العرض المختار.</p>
+    <ol>
+      <li>افتح <strong>الإعدادات ← الطباعة</strong>.</li>
+      <li>اختر عرض الورق: <strong>80 مم</strong> أو <strong>58 مم</strong> —
+        يُحفظ الاختيار فورًا.</li>
+      <li>نفّذ <strong>طباعة تجريبية</strong>: يجب أن تتطابق المعاينة مع
+        التذكرة الورقية (الترويسة والمجاميع والقطع).</li>
+    </ol>
+    <div class="note">تلميح: لفافات 58 مم الضيقة مناسبة للمساحات الصغيرة؛
+      ويفضل 80 مم للتذاكر ذات الأسماء العربية الطويلة.</div>
+  </div>
+</section>
 </main>
 
-<footer>Baraka UltraPOS v1.0.0-rc.7 · Guide de remise / دليل التسليم · 100% hors-ligne — aucun appel réseau.</footer>
+<footer>Baraka UltraPOS v1.0.0-rc.8 · Guide de remise / دليل التسليم · 100% hors-ligne — aucun appel réseau.</footer>
 </body>
 </html>

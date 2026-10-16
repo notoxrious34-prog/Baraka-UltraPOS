@@ -472,7 +472,7 @@ fn job_row(harness: &Harness, job_id: &str) -> String {
 fn reprint_appends_duplicata_and_watermarks_output() {
     use baraka_application::use_cases::printing::ReprintDocumentUseCase;
     use baraka_domain::printing::{ReceiptDocument, ReceiptLanguage, StoreIdentity};
-    use baraka_infrastructure::printing::rasterizer::{encode_gs_v0, render_canvas};
+    use baraka_infrastructure::printing::rasterizer::{encode_gs_v0, render_canvas, PaperWidth};
 
     let harness = setup();
     let warehouse = seed_warehouse(&harness, "MAIN");
@@ -535,8 +535,8 @@ fn reprint_appends_duplicata_and_watermarks_output() {
     };
     let mut stamped = receipt.clone();
     stamped.is_duplicata = true;
-    let plain = encode_gs_v0(&render_canvas(&receipt).expect("plain"));
-    let marked = encode_gs_v0(&render_canvas(&stamped).expect("stamped"));
+    let plain = encode_gs_v0(&render_canvas(&receipt, PaperWidth::Width80mm).expect("plain"));
+    let marked = encode_gs_v0(&render_canvas(&stamped, PaperWidth::Width80mm).expect("stamped"));
     assert_ne!(plain, marked, "watermark must alter output");
 }
 

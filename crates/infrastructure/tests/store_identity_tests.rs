@@ -22,7 +22,14 @@ use baraka_infrastructure::persistence::connection::open_connection;
 use baraka_infrastructure::persistence::migration::run_migrations;
 use baraka_infrastructure::printing::blocks::{build_footer_lines, build_identity_lines};
 use baraka_infrastructure::printing::capture::CaptureDevice;
-use baraka_infrastructure::printing::rasterizer::EscPosRasterizer;
+use baraka_infrastructure::printing::rasterizer::{
+    content_width_dots, EscPosRasterizer, PaperWidth,
+};
+
+/// 80mm default content surface shared by the layout goldens below.
+fn golden_max() -> f32 {
+    content_width_dots(PaperWidth::Width80mm)
+}
 
 fn identity_full() -> StoreIdentity {
     StoreIdentity {
@@ -53,7 +60,8 @@ fn preview_texts(
 
 #[test]
 fn identity_header_french_layout_golden() {
-    let lines = build_identity_lines(&identity_full(), ReceiptLanguage::French).expect("build");
+    let lines = build_identity_lines(&identity_full(), ReceiptLanguage::French, golden_max())
+        .expect("build");
     let texts: Vec<String> = lines
         .iter()
         .filter_map(|line| match line {
@@ -95,7 +103,8 @@ fn identity_header_french_layout_golden() {
 
 #[test]
 fn identity_header_arabic_caption_golden() {
-    let lines = build_identity_lines(&identity_full(), ReceiptLanguage::Arabic).expect("build");
+    let lines = build_identity_lines(&identity_full(), ReceiptLanguage::Arabic, golden_max())
+        .expect("build");
     let texts: Vec<String> = lines
         .iter()
         .filter_map(|line| match line {
@@ -126,7 +135,8 @@ fn identity_header_empty_optionals_omitted() {
         store_name: "SHOP".to_string(),
         ..StoreIdentity::default()
     };
-    let lines = build_identity_lines(&identity, ReceiptLanguage::French).expect("build");
+    let lines =
+        build_identity_lines(&identity, ReceiptLanguage::French, golden_max()).expect("build");
     let text_count = lines
         .iter()
         .filter(|line| {
@@ -143,8 +153,12 @@ fn identity_header_empty_optionals_omitted() {
 
 #[test]
 fn footer_multiline_golden_and_truncation() {
-    let lines =
-        build_footer_lines("one\n\ntwo\nthree\nfour", ReceiptLanguage::French).expect("build");
+    let lines = build_footer_lines(
+        "one\n\ntwo\nthree\nfour",
+        ReceiptLanguage::French,
+        golden_max(),
+    )
+    .expect("build");
     let texts: Vec<String> = lines
         .iter()
         .filter_map(|line| match line {

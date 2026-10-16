@@ -7,7 +7,9 @@ use baraka_domain::printing::{
     ReceiptDocument, ReceiptLanguage, ReceiptLine, ReceiptTotals, StoreIdentity,
 };
 use baraka_infrastructure::printing::font_cache;
-use baraka_infrastructure::printing::rasterizer::{encode_gs_v0, render_canvas, PAPER_WIDTH_DOTS};
+use baraka_infrastructure::printing::rasterizer::{
+    encode_gs_v0, render_canvas, PaperWidth, PAPER_WIDTH_DOTS,
+};
 
 #[test]
 fn font_assets_parse_and_cover_required_glyphs() {
@@ -73,7 +75,7 @@ fn dark_pixels(canvas: &image::GrayImage) -> u64 {
 #[test]
 fn arabic_receipt_renders_576_dot_raster() {
     let receipt = sample_receipt(ReceiptLanguage::Arabic, "برغي حديد 8مم");
-    let canvas = render_canvas(&receipt).expect("arabic canvas");
+    let canvas = render_canvas(&receipt, PaperWidth::Width80mm).expect("arabic canvas");
     assert_eq!(canvas.width(), PAPER_WIDTH_DOTS);
     assert!(canvas.height() > 100, "receipt has body height");
     assert!(
@@ -90,7 +92,7 @@ fn arabic_receipt_renders_576_dot_raster() {
 #[test]
 fn french_receipt_renders_576_dot_raster() {
     let receipt = sample_receipt(ReceiptLanguage::French, "Vis acier 8x40 (boite)");
-    let canvas = render_canvas(&receipt).expect("french canvas");
+    let canvas = render_canvas(&receipt, PaperWidth::Width80mm).expect("french canvas");
     assert_eq!(canvas.width(), PAPER_WIDTH_DOTS);
     assert!(dark_pixels(&canvas) > 500);
     let bytes = encode_gs_v0(&canvas);
@@ -100,11 +102,11 @@ fn french_receipt_renders_576_dot_raster() {
 #[test]
 fn empty_designation_never_panics() {
     let receipt = sample_receipt(ReceiptLanguage::Arabic, "");
-    let canvas = render_canvas(&receipt).expect("empty designation canvas");
+    let canvas = render_canvas(&receipt, PaperWidth::Width80mm).expect("empty designation canvas");
     assert_eq!(canvas.width(), PAPER_WIDTH_DOTS);
     // A very long name must wrap-free render without panic or truncation crash.
     let long = sample_receipt(ReceiptLanguage::French, &"Vis ".repeat(200));
-    let wide = render_canvas(&long).expect("long designation canvas");
+    let wide = render_canvas(&long, PaperWidth::Width80mm).expect("long designation canvas");
     assert_eq!(wide.width(), PAPER_WIDTH_DOTS);
     assert!(dark_pixels(&wide) > dark_pixels(&canvas));
 }
@@ -114,8 +116,9 @@ fn duplicata_watermark_changes_output() {
     let plain = sample_receipt(ReceiptLanguage::French, "Vis acier");
     let mut stamped = plain.clone();
     stamped.is_duplicata = true;
-    let plain_bytes = encode_gs_v0(&render_canvas(&plain).expect("plain"));
-    let stamped_bytes = encode_gs_v0(&render_canvas(&stamped).expect("stamped"));
+    let plain_bytes = encode_gs_v0(&render_canvas(&plain, PaperWidth::Width80mm).expect("plain"));
+    let stamped_bytes =
+        encode_gs_v0(&render_canvas(&stamped, PaperWidth::Width80mm).expect("stamped"));
     assert_ne!(
         plain_bytes, stamped_bytes,
         "DUPLICATA watermark must alter raster bytes"

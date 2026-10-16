@@ -379,3 +379,82 @@ fn device_error_code(error: &ApplicationError) -> String {
         _ => "DEVICE_ERROR".to_string(),
     }
 }
+
+/// Read the serial printer configuration (TASK-BRK-070).
+///
+/// Any authenticated session may read; the paper width arrives as
+/// configured millimeters with the derived dot width alongside.
+pub struct GetPrinterSettingsUseCase<'a, P>
+where
+    P: ?Sized,
+{
+    settings: &'a P,
+}
+
+impl<'a, P> GetPrinterSettingsUseCase<'a, P>
+where
+    P: crate::ports::PrinterSettingsPort + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(settings: &'a P) -> Self {
+        Self { settings }
+    }
+
+    /// Return the stored configuration (safe defaults when absent).
+    pub fn execute(
+        &self,
+        _session: &SessionContext,
+    ) -> Result<crate::ports::PrinterSettings, ApplicationError> {
+        self.settings.get_printer_settings()
+    }
+}
+
+/// Persist the serial printer configuration (TASK-BRK-070, ADMIN only).
+///
+/// `paper_width_mm` of `None` keeps the stored width; `Some` must be
+/// exactly 58 or 80 or the update is rejected with zero writes.
+pub struct UpdatePrinterSettingsUseCase<'a, P>
+where
+    P: ?Sized,
+{
+    settings: &'a P,
+}
+
+impl<'a, P> UpdatePrinterSettingsUseCase<'a, P>
+where
+    P: crate::ports::PrinterSettingsPort + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(settings: &'a P) -> Self {
+        Self { settings }
+    }
+
+    /// Validate permission, width, and baud, then persist atomically.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        serial_port: &str,
+        serial_baud: u32,
+        paper_width_mm: Option<u32>,
+    ) -> Result<crate::ports::PrinterSettings, ApplicationError> {
+        if !session
+            .role
+            .has_permission(Permission::ManagePrinterSettings)
+        {
+            return Err(ApplicationError::Unauthorized);
+        }
+        if let Some(mm) = paper_width_mm {
+            baraka_domain::printing::validate_paper_width_mm(mm)?;
+        }
+        if serial_baud == 0 {
+            return Err(ApplicationError::Validation(
+                baraka_domain::errors::DomainError::InvalidCanonicalString(
+                    "serial_baud must be non-zero".to_string(),
+                ),
+            ));
+        }
+        self.settings
+            .update_printer_settings(serial_port, serial_baud, paper_width_mm)?;
+        self.settings.get_printer_settings()
+    }
+}

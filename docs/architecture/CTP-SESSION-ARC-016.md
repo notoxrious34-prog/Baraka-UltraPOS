@@ -599,3 +599,24 @@ counter in every header ("الرد رقم N").
 1. Verify via `git log -1` and `git status` that tree is clean at tag `v1.0.0-rc.6` (or latest commit).
 2. Confirm Rust tests (422/0) and Vitest tests (505/46) are green.
 3. First task for ARC-016: Execute `TASK-REL-054` for fresh-install & upgrade data retention drill, or coordinate Gate 1 & Gate 2 owner sign-offs.
+
+## 17. ARC-017 Handoff Addendum — rc.7 Delivery Record (body predates rc.7)
+
+Sections above (§12 ADR log ends at ADR-088, §14 gates quote 422/505, §16
+boots at tag rc.6) describe the pre-rc.7 state. The ARC-016 session went on
+to deliver Release Candidate v1.0.0-rc.7; this addendum records it so the
+checkpoint is complete. Full cumulative record: CTP-SESSION-ARC-017.
+
+- `11c7fc8` TASK-REL-054/DOC-045: migration replay + data-preservation drill,
+  drill audit `docs/operations/DRILL-DATA-RETENTION-UPGRADE-v1.0.0.md`, ADR-089.
+- `1d929be` TASK-REL-055(+C1): WebView2 CSV repair, 11-pillar forensic drill
+  green, `docs/operations/FORENSIC-AUDIT-REPORT-v1.0.0.md`.
+- `b40e44e` TASK-DSN-048: cockpit compaction + Data Exchange Hub.
+- `7e33c6a` + tag `v1.0.0-rc.7` TASK-REL-056: ADR-090, rc.7 notes, NSIS bundle,
+  delivery zip. Next free id: ADR-091.
+- `f863b9d` TASK-DOC-046: offline handbook rc.7 + re-packed zip.
+- Artifacts: exe 222,211,213 bytes (`11a56da7…4c7628`); rc.7 zip 222,268,828
+  bytes (`5600062a…2276ee`); handbook 20,970 bytes offline. Gates at rc.7:
+  Rust 435/0, Vitest 526/526, fmt/clippy/lint/typecheck/build green.
+- In flight: TASK-BRK-070/BAT-071 dual-width ESC/POS calibration (uncommitted;
+  shaping-scale defect found, see CTP-SESSION-ARC-017 §8).

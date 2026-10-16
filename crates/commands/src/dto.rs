@@ -983,8 +983,10 @@ pub struct PrinterSettingsDto {
     pub serial_port: String,
     /// Baud rate.
     pub serial_baud: u32,
-    /// Paper width in dots.
+    /// Paper width in dots (derived from `paper_width_mm`).
     pub paper_width_dots: u32,
+    /// Configured paper width in millimeters (58 or 80).
+    pub paper_width_mm: u32,
 }
 
 /// Serial printer configuration update.
@@ -996,6 +998,9 @@ pub struct UpdatePrinterSettingsRequest {
     pub serial_port: String,
     /// Baud rate.
     pub serial_baud: u32,
+    /// Paper width in millimeters (58 or 80; absent keeps stored width).
+    #[serde(default)]
+    pub paper_width_mm: Option<u32>,
 }
 
 // Store identity + diagnostics wire types ---------------------------------

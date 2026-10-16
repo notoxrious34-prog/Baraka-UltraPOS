@@ -43,7 +43,8 @@ use baraka_application::use_cases::inventory::{
 };
 use baraka_application::use_cases::printing::{GetPrintStatusUseCase, ReprintDocumentUseCase};
 use baraka_application::use_cases::printing::{
-    SaveStoreIdentityUseCase, TestPrintDeviceOutcome, TestPrintUseCase,
+    GetPrinterSettingsUseCase, SaveStoreIdentityUseCase, TestPrintDeviceOutcome, TestPrintUseCase,
+    UpdatePrinterSettingsUseCase,
 };
 use baraka_application::use_cases::purchases::{
     CreatePurchaseOrderUseCase, GetPurchaseDocumentUseCase, ReceiveGoodsUseCase,
@@ -2704,15 +2705,15 @@ pub fn printer_get_settings(
     state: tauri::State<'_, AppState>,
     session_token: String,
 ) -> Result<PrinterSettingsDto, String> {
-    require_session(&state, &session_token)?;
-    let settings = state
-        .printer_settings
-        .get_printer_settings()
+    let session = require_session(&state, &session_token)?;
+    let settings = GetPrinterSettingsUseCase::new(state.printer_settings.as_ref())
+        .execute(&session)
         .map_err(|error| error_code(&error))?;
     Ok(PrinterSettingsDto {
         serial_port: settings.serial_port,
         serial_baud: settings.serial_baud,
         paper_width_dots: settings.paper_width_dots,
+        paper_width_mm: settings.paper_width_mm,
     })
 }
 
@@ -2723,20 +2724,20 @@ pub fn printer_update_settings(
     request: UpdatePrinterSettingsRequest,
 ) -> Result<PrinterSettingsDto, String> {
     let session = require_session(&state, &request.session_token)?;
-    if !session
-        .role
-        .has_permission(baraka_domain::role::Permission::ManagePrinterSettings)
-    {
-        return Err("UNAUTHORIZED".to_string());
-    }
-    if request.serial_baud == 0 {
-        return Err("INVALID_INPUT".to_string());
-    }
-    state
-        .printer_settings
-        .update_printer_settings(&request.serial_port, request.serial_baud)
+    let settings = UpdatePrinterSettingsUseCase::new(state.printer_settings.as_ref())
+        .execute(
+            &session,
+            &request.serial_port,
+            request.serial_baud,
+            request.paper_width_mm,
+        )
         .map_err(|error| error_code(&error))?;
-    printer_get_settings(state, request.session_token.clone())
+    Ok(PrinterSettingsDto {
+        serial_port: settings.serial_port,
+        serial_baud: settings.serial_baud,
+        paper_width_dots: settings.paper_width_dots,
+        paper_width_mm: settings.paper_width_mm,
+    })
 }
 
 /// `store_identity_get` command: read identity + device kind (session).

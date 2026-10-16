@@ -193,4 +193,7 @@ pub enum DomainError {
     /// A first-admin bootstrap was attempted after one already exists.
     #[error("first admin already bootstrapped")]
     BootstrapAlreadyCompleted,
+    /// A printer paper width was neither 58 nor 80 millimeters.
+    #[error("invalid printer paper width (millimeters): {0}")]
+    InvalidPaperWidthMillimeters(u32),
 }

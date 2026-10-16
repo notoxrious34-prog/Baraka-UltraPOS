@@ -134,7 +134,11 @@ fn shape_run(
     let output = rustybuzz::shape(&face, &[], buffer);
     let infos = output.glyph_infos();
     let positions = output.glyph_positions();
-    let scale = px_size / upem / 64.0;
+    // rustybuzz reports advances in font units (verified against a 1000-upem
+    // Noto face: `BEH`-class glyphs advance ~636 units), so one division by
+    // upem yields pixels. Dividing again by 64 (the old code) compressed
+    // every line ~64x, which silently defeated wrapping on narrow paper.
+    let scale = px_size / upem;
     let mut glyphs = Vec::with_capacity(infos.len());
     let mut pen = 0.0f32;
     for (info, position) in infos.iter().zip(positions.iter()) {

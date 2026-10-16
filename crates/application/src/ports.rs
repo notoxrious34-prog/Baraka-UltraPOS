@@ -1265,8 +1265,10 @@ pub struct PrinterSettings {
     pub serial_port: String,
     /// Baud rate.
     pub serial_baud: u32,
-    /// Paper width in dots.
+    /// Paper width in dots (derived from `paper_width_mm`).
     pub paper_width_dots: u32,
+    /// Configured paper width in millimeters (58 or 80; default 80).
+    pub paper_width_mm: u32,
 }
 
 /// Printer configuration port (`settings` table in infrastructure).
@@ -1274,11 +1276,13 @@ pub trait PrinterSettingsPort: Send + Sync {
     /// Read the current serial printer configuration (with safe defaults).
     fn get_printer_settings(&self) -> Result<PrinterSettings, ApplicationError>;
 
-    /// Persist the serial port and baud rate (ADMIN-gated upstream).
+    /// Persist the serial port, baud rate, and paper width (ADMIN-gated
+    /// upstream; `paper_width_mm` of `None` keeps the stored width).
     fn update_printer_settings(
         &self,
         serial_port: &str,
         serial_baud: u32,
+        paper_width_mm: Option<u32>,
     ) -> Result<(), ApplicationError>;
 }
 

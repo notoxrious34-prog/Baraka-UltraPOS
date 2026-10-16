@@ -46,14 +46,23 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
             .read_key("printer.serial_baud")
             .and_then(|text| text.trim().parse::<u32>().ok())
             .unwrap_or(9_600);
-        let width = self
-            .read_key("printer.paper_width_dots")
+        // Canonical millimeters (default 80); legacy dot values migrate
+        // forward: 384 reads back as 58, anything else as 80.
+        let mm = self
+            .read_key("printer.paper_width_mm")
             .and_then(|text| text.trim().parse::<u32>().ok())
-            .unwrap_or(576);
+            .or_else(|| {
+                self.read_key("printer.paper_width_dots")
+                    .and_then(|text| text.trim().parse::<u32>().ok())
+                    .map(|dots| if dots <= 384 { 58 } else { 80 })
+            })
+            .unwrap_or(80);
+        let width = baraka_domain::printing::PaperWidth::from_mm(mm);
         Ok(PrinterSettings {
             serial_port: self.read_key("printer.serial_port").unwrap_or_default(),
             serial_baud: baud,
-            paper_width_dots: width,
+            paper_width_dots: width.dot_width(),
+            paper_width_mm: width.as_mm(),
         })
     }
 
@@ -61,16 +70,23 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         &self,
         serial_port: &str,
         serial_baud: u32,
+        paper_width_mm: Option<u32>,
     ) -> Result<(), ApplicationError> {
         let mut guard = self.lock()?;
         let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         let port = serial_port.trim().to_string();
         let baud = serial_baud.to_string();
+        let mut pairs: Vec<(&str, String)> =
+            vec![("printer.serial_port", port), ("printer.serial_baud", baud)];
+        // Millimeters are canonical; dots are re-derived so legacy readers
+        // keep working. `None` keeps the stored width untouched.
+        if let Some(mm) = paper_width_mm {
+            let width = baraka_domain::printing::PaperWidth::from_mm(mm);
+            pairs.push(("printer.paper_width_mm", width.as_mm().to_string()));
+            pairs.push(("printer.paper_width_dots", width.dot_width().to_string()));
+        }
         run_transaction(&mut guard, |tx| {
-            for (key, value) in [
-                ("printer.serial_port", port.as_str()),
-                ("printer.serial_baud", baud.as_str()),
-            ] {
+            for (key, value) in &pairs {
                 tx.execute(
                     "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, ?3)
                      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",

@@ -11,12 +11,12 @@ use baraka_domain::printing::{DebtReceiptDocument, ReceiptDocument};
 use image::{GrayImage, Luma};
 
 use crate::printing::blocks::{
-    build_footer_lines, build_identity_lines, label, layout_text, LayoutLine,
+    build_footer_lines, build_identity_lines, label, layout_lines, LayoutLine,
 };
 use crate::printing::font_cache;
 use crate::printing::shaping::LineDirection;
 
-/// Paper width in dots (80mm @ 203dpi).
+/// Default paper width in dots (80mm @ 203dpi; see [PaperWidth]).
 pub const PAPER_WIDTH_DOTS: u32 = 576;
 /// Body text pixel em size.
 pub const BODY_PX: f32 = 24.0;
@@ -26,38 +26,56 @@ pub const TITLE_PX: f32 = 32.0;
 pub const MAX_BAND_HEIGHT: u32 = 255;
 /// Side margin in dots.
 pub const MARGIN_DOTS: f32 = 8.0;
+/// Calibrated paper format (re-exported for integration tests).
+pub use baraka_domain::printing::PaperWidth;
+
+/// Printable content width in dots for a paper format (margins excluded).
+pub fn content_width_dots(paper: PaperWidth) -> f32 {
+    (paper.dot_width() as f32 - 2.0 * MARGIN_DOTS).max(1.0)
+}
 
 /// Build the ordered logical lines of a receipt (content only, no drawing).
-fn build_lines(receipt: &ReceiptDocument) -> Result<Vec<LayoutLine>, DomainError> {
+fn build_lines(
+    receipt: &ReceiptDocument,
+    paper: PaperWidth,
+) -> Result<Vec<LayoutLine>, DomainError> {
+    let max = content_width_dots(paper);
     let language = receipt.language;
     let mut lines = Vec::new();
     if receipt.store_identity.store_name.trim().is_empty() {
-        lines.push(layout_text(&receipt.shop_name, TITLE_PX, true)?);
+        lines.extend(layout_lines(&receipt.shop_name, TITLE_PX, true, max)?);
     } else {
-        lines.extend(build_identity_lines(&receipt.store_identity, language)?);
+        lines.extend(build_identity_lines(
+            &receipt.store_identity,
+            language,
+            max,
+        )?);
     }
     if receipt.is_duplicata {
-        lines.push(layout_text(
+        lines.extend(layout_lines(
             &label(language, "*** نسخة مكررة ***", "*** DUPLICATA ***"),
             TITLE_PX,
             true,
+            max,
         )?);
     }
-    lines.push(layout_text(
+    lines.extend(layout_lines(
         &format!("{}  {}", receipt.number, receipt.created_at),
         BODY_PX,
         true,
+        max,
     )?);
     lines.push(LayoutLine::Rule { height_px: 2.0 });
     for line in &receipt.lines {
-        lines.push(layout_text(&line.designation, BODY_PX, false)?);
-        lines.push(layout_text(
+        lines.extend(layout_lines(&line.designation, BODY_PX, false, max)?);
+        lines.extend(layout_lines(
             &format!(
                 "{} x {} = {}",
                 line.quantity_text, line.unit_price_text, line.total_text
             ),
             BODY_PX,
             false,
+            max,
         )?);
     }
     lines.push(LayoutLine::Rule { height_px: 2.0 });
@@ -70,14 +88,15 @@ fn build_lines(receipt: &ReceiptDocument) -> Result<Vec<LayoutLine>, DomainError
         ("المدفوع", "Payé", &receipt.totals.paid),
     ];
     for (arabic, french, value) in totals {
-        lines.push(layout_text(
+        lines.extend(layout_lines(
             &format!("{}: {}", label(language, arabic, french), value),
             BODY_PX,
             false,
+            max,
         )?);
     }
     if receipt.totals.change != "0.00" {
-        lines.push(layout_text(
+        lines.extend(layout_lines(
             &format!(
                 "{}: {}",
                 label(language, "الباقي", "Rendu"),
@@ -85,20 +104,27 @@ fn build_lines(receipt: &ReceiptDocument) -> Result<Vec<LayoutLine>, DomainError
             ),
             BODY_PX,
             false,
+            max,
         )?);
     }
     for (method, amount) in &receipt.payments {
-        lines.push(layout_text(&format!("{method}: {amount}"), BODY_PX, false)?);
+        lines.extend(layout_lines(
+            &format!("{method}: {amount}"),
+            BODY_PX,
+            false,
+            max,
+        )?);
     }
     lines.push(LayoutLine::Rule { height_px: 2.0 });
     if receipt.footer_message.trim().is_empty() {
-        lines.push(layout_text(
+        lines.extend(layout_lines(
             &label(language, "شكرا لزيارتكم", "Merci de votre visite"),
             BODY_PX,
             true,
+            max,
         )?);
     } else {
-        lines.extend(build_footer_lines(&receipt.footer_message, language)?);
+        lines.extend(build_footer_lines(&receipt.footer_message, language, max)?);
     }
     lines.push(LayoutLine::Gap { height_px: 24.0 });
     Ok(lines)
@@ -158,7 +184,7 @@ fn line_px(line: &LayoutLine) -> f32 {
 ///
 /// Shared by the document renderer and the test-print diagnostics path:
 /// both travel this exact function, so layout behavior cannot diverge.
-pub fn render_lines(lines: &[LayoutLine]) -> Result<GrayImage, DomainError> {
+pub fn render_lines(lines: &[LayoutLine], paper: PaperWidth) -> Result<GrayImage, DomainError> {
     let mut heights: Vec<f32> = Vec::with_capacity(lines.len());
     let mut total: f32 = 0.0;
     for line in lines {
@@ -170,7 +196,8 @@ pub fn render_lines(lines: &[LayoutLine]) -> Result<GrayImage, DomainError> {
         total += height;
     }
     let canvas_height = total.ceil().max(1.0) as u32;
-    let mut canvas = GrayImage::from_pixel(PAPER_WIDTH_DOTS, canvas_height, Luma([255u8]));
+    let width = paper.dot_width();
+    let mut canvas = GrayImage::from_pixel(width, canvas_height, Luma([255u8]));
     let mut cursor_y = 0.0f32;
     for (line, height) in lines.iter().zip(heights.iter()) {
         match line {
@@ -178,7 +205,7 @@ pub fn render_lines(lines: &[LayoutLine]) -> Result<GrayImage, DomainError> {
                 let thickness = (*height_px as u32).max(1);
                 let y0 = cursor_y as u32;
                 for y in y0..(y0 + thickness).min(canvas_height) {
-                    for x in 0..PAPER_WIDTH_DOTS {
+                    for x in 0..width {
                         canvas.put_pixel(x, y, Luma([0u8]));
                     }
                 }
@@ -194,11 +221,11 @@ pub fn render_lines(lines: &[LayoutLine]) -> Result<GrayImage, DomainError> {
                 let px = line_px(line);
                 let content_width: f32 = runs.iter().map(|run| run.width_px).sum();
                 let origin_x = if *centered {
-                    ((PAPER_WIDTH_DOTS as f32 - content_width) / 2.0).max(MARGIN_DOTS)
+                    ((width as f32 - content_width) / 2.0).max(MARGIN_DOTS)
                 } else {
                     match direction {
                         LineDirection::Rtl => {
-                            (PAPER_WIDTH_DOTS as f32 - MARGIN_DOTS - content_width).max(MARGIN_DOTS)
+                            (width as f32 - MARGIN_DOTS - content_width).max(MARGIN_DOTS)
                         }
                         LineDirection::Ltr => MARGIN_DOTS,
                     }
@@ -216,10 +243,13 @@ pub fn render_lines(lines: &[LayoutLine]) -> Result<GrayImage, DomainError> {
     Ok(canvas)
 }
 
-/// Compose the full monochrome canvas for a receipt.
-pub fn render_canvas(receipt: &ReceiptDocument) -> Result<GrayImage, DomainError> {
-    let lines = build_lines(receipt)?;
-    render_lines(&lines)
+/// Compose the full monochrome canvas for a receipt on `paper`.
+pub fn render_canvas(
+    receipt: &ReceiptDocument,
+    paper: PaperWidth,
+) -> Result<GrayImage, DomainError> {
+    let lines = build_lines(receipt, paper)?;
+    render_lines(&lines, paper)
 }
 
 /// Build the ordered logical lines of a debt-payment receipt.
@@ -228,26 +258,36 @@ pub fn render_canvas(receipt: &ReceiptDocument) -> Result<GrayImage, DomainError
 /// sale, so sales-specific totals rows (HT/TVA/Timbre) never appear
 /// here. Only display-ready strings from [`DebtReceiptDocument`] are
 /// transcribed; no financial computation happens in this function.
-fn build_debt_receipt_lines(receipt: &DebtReceiptDocument) -> Result<Vec<LayoutLine>, DomainError> {
+fn build_debt_receipt_lines(
+    receipt: &DebtReceiptDocument,
+    paper: PaperWidth,
+) -> Result<Vec<LayoutLine>, DomainError> {
+    let max = content_width_dots(paper);
     let language = receipt.language;
     let mut lines = Vec::new();
     if receipt.store_identity.store_name.trim().is_empty() {
-        lines.push(layout_text(&receipt.shop_name, TITLE_PX, true)?);
+        lines.extend(layout_lines(&receipt.shop_name, TITLE_PX, true, max)?);
     } else {
-        lines.extend(build_identity_lines(&receipt.store_identity, language)?);
+        lines.extend(build_identity_lines(
+            &receipt.store_identity,
+            language,
+            max,
+        )?);
     }
-    lines.push(layout_text(
+    lines.extend(layout_lines(
         &label(language, "وصل تسديد دَين", "Reçu de paiement"),
         TITLE_PX,
         true,
+        max,
     )?);
-    lines.push(layout_text(
+    lines.extend(layout_lines(
         &format!("{}  {}", receipt.receipt_number, receipt.created_at),
         BODY_PX,
         true,
+        max,
     )?);
     lines.push(LayoutLine::Rule { height_px: 2.0 });
-    lines.push(layout_text(
+    lines.extend(layout_lines(
         &format!(
             "{}: {}",
             label(language, "الزبون", "Client"),
@@ -255,8 +295,9 @@ fn build_debt_receipt_lines(receipt: &DebtReceiptDocument) -> Result<Vec<LayoutL
         ),
         BODY_PX,
         false,
+        max,
     )?);
-    lines.push(layout_text(
+    lines.extend(layout_lines(
         &format!(
             "{}: {}",
             label(language, "المبلغ المحصَّل", "Montant encaissé"),
@@ -264,8 +305,9 @@ fn build_debt_receipt_lines(receipt: &DebtReceiptDocument) -> Result<Vec<LayoutL
         ),
         BODY_PX,
         false,
+        max,
     )?);
-    lines.push(layout_text(
+    lines.extend(layout_lines(
         &format!(
             "{}: {}",
             label(language, "الرصيد الجديد", "Nouveau solde"),
@@ -273,25 +315,28 @@ fn build_debt_receipt_lines(receipt: &DebtReceiptDocument) -> Result<Vec<LayoutL
         ),
         BODY_PX,
         false,
+        max,
     )?);
     if let Some(reference) = receipt.reference_text.as_deref() {
         if !reference.trim().is_empty() {
-            lines.push(layout_text(
+            lines.extend(layout_lines(
                 &format!("{}: {}", label(language, "المرجع", "Référence"), reference),
                 BODY_PX,
                 false,
+                max,
             )?);
         }
     }
     lines.push(LayoutLine::Rule { height_px: 2.0 });
     if receipt.footer_message.trim().is_empty() {
-        lines.push(layout_text(
+        lines.extend(layout_lines(
             &label(language, "شكرا لثقتكم", "Merci de votre confiance"),
             BODY_PX,
             true,
+            max,
         )?);
     } else {
-        lines.extend(build_footer_lines(&receipt.footer_message, language)?);
+        lines.extend(build_footer_lines(&receipt.footer_message, language, max)?);
     }
     lines.push(LayoutLine::Gap { height_px: 24.0 });
     Ok(lines)
@@ -301,14 +346,20 @@ fn build_debt_receipt_lines(receipt: &DebtReceiptDocument) -> Result<Vec<LayoutL
 ///
 /// Shares the single pixel-drawing core [`render_lines`] with the sales
 /// path, so layout behavior cannot diverge between the two pipelines.
-pub fn render_debt_canvas(receipt: &DebtReceiptDocument) -> Result<GrayImage, DomainError> {
-    let lines = build_debt_receipt_lines(receipt)?;
-    render_lines(&lines)
+pub fn render_debt_canvas(
+    receipt: &DebtReceiptDocument,
+    paper: PaperWidth,
+) -> Result<GrayImage, DomainError> {
+    let lines = build_debt_receipt_lines(receipt, paper)?;
+    render_lines(&lines, paper)
 }
 
 /// Build the ordered logical lines of a receipt (shared with test print).
-pub fn receipt_lines(receipt: &ReceiptDocument) -> Result<Vec<LayoutLine>, DomainError> {
-    build_lines(receipt)
+pub fn receipt_lines(
+    receipt: &ReceiptDocument,
+    paper: PaperWidth,
+) -> Result<Vec<LayoutLine>, DomainError> {
+    build_lines(receipt, paper)
 }
 
 /// Encode a monochrome canvas as `GS v 0` raster bands + feed.
@@ -347,11 +398,16 @@ pub fn encode_gs_v0(canvas: &GrayImage) -> Vec<u8> {
 }
 
 /// Receipt raster renderer (ESC/POS transport edge).
+///
+/// Unit struct renders the 80mm default surface. Width-aware callers use
+/// [render_canvas] with an explicit [PaperWidth]; live worker selection
+/// from persisted settings is a follow-up (the worker owns no settings
+/// port today).
 pub struct EscPosRasterizer;
 
 impl ReceiptRendererPort for EscPosRasterizer {
     fn render(&self, receipt: &ReceiptDocument) -> Result<Vec<u8>, ApplicationError> {
-        render_canvas(receipt)
+        render_canvas(receipt, PaperWidth::Width80mm)
             .map(|canvas| encode_gs_v0(&canvas))
             .map_err(|_| ApplicationError::Validation(DomainError::PrintRenderingFailed))
     }
@@ -360,7 +416,7 @@ impl ReceiptRendererPort for EscPosRasterizer {
         &self,
         receipt: &baraka_domain::printing::DebtReceiptDocument,
     ) -> Result<Vec<u8>, ApplicationError> {
-        render_debt_canvas(receipt)
+        render_debt_canvas(receipt, PaperWidth::Width80mm)
             .map(|canvas| encode_gs_v0(&canvas))
             .map_err(|_| ApplicationError::Validation(DomainError::PrintRenderingFailed))
     }
@@ -370,7 +426,7 @@ impl ReceiptRendererPort for EscPosRasterizer {
         receipt: &ReceiptDocument,
     ) -> Result<Vec<baraka_domain::printing::PreviewLine>, ApplicationError> {
         use baraka_domain::printing::PreviewLine;
-        build_lines(receipt)
+        build_lines(receipt, PaperWidth::Width80mm)
             .map(|lines| {
                 lines
                     .iter()

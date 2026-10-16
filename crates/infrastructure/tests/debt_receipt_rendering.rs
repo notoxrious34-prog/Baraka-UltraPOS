@@ -9,7 +9,7 @@
 use baraka_application::ports::ReceiptRendererPort;
 use baraka_domain::printing::{DebtReceiptDocument, ReceiptLanguage, StoreIdentity};
 use baraka_infrastructure::printing::rasterizer::{
-    encode_gs_v0, render_debt_canvas, EscPosRasterizer, PAPER_WIDTH_DOTS,
+    encode_gs_v0, render_debt_canvas, EscPosRasterizer, PaperWidth, PAPER_WIDTH_DOTS,
 };
 
 fn sample_debt_receipt(language: ReceiptLanguage) -> DebtReceiptDocument {
@@ -30,7 +30,7 @@ fn sample_debt_receipt(language: ReceiptLanguage) -> DebtReceiptDocument {
 #[test]
 fn debt_receipt_renders_french_with_reference() {
     let receipt = sample_debt_receipt(ReceiptLanguage::French);
-    let canvas = render_debt_canvas(&receipt).expect("french debt canvas");
+    let canvas = render_debt_canvas(&receipt, PaperWidth::Width80mm).expect("french debt canvas");
     assert_eq!(canvas.width(), PAPER_WIDTH_DOTS);
     let bytes = encode_gs_v0(&canvas);
     assert!(!bytes.is_empty(), "debt receipt must produce output bytes");
@@ -46,7 +46,7 @@ fn debt_receipt_renders_french_with_reference() {
 fn debt_receipt_renders_arabic() {
     let mut receipt = sample_debt_receipt(ReceiptLanguage::Arabic);
     receipt.customer_name = "محمد بن علي".to_string();
-    let canvas = render_debt_canvas(&receipt).expect("arabic debt canvas");
+    let canvas = render_debt_canvas(&receipt, PaperWidth::Width80mm).expect("arabic debt canvas");
     assert_eq!(canvas.width(), PAPER_WIDTH_DOTS);
     let bytes = encode_gs_v0(&canvas);
     assert!(
@@ -60,10 +60,13 @@ fn debt_receipt_none_reference_renders_without_reference_line() {
     let with_reference = sample_debt_receipt(ReceiptLanguage::French);
     let mut without_reference = with_reference.clone();
     without_reference.reference_text = None;
-    let with_bytes =
-        encode_gs_v0(&render_debt_canvas(&with_reference).expect("with reference canvas"));
-    let without_bytes =
-        encode_gs_v0(&render_debt_canvas(&without_reference).expect("without reference canvas"));
+    let with_bytes = encode_gs_v0(
+        &render_debt_canvas(&with_reference, PaperWidth::Width80mm).expect("with reference canvas"),
+    );
+    let without_bytes = encode_gs_v0(
+        &render_debt_canvas(&without_reference, PaperWidth::Width80mm)
+            .expect("without reference canvas"),
+    );
     assert!(!without_bytes.is_empty());
     assert_ne!(
         with_bytes, without_bytes,
@@ -79,11 +82,15 @@ fn debt_receipt_none_reference_renders_without_reference_line() {
 fn debt_receipt_whitespace_reference_renders_without_reference_line() {
     let mut receipt = sample_debt_receipt(ReceiptLanguage::French);
     receipt.reference_text = Some("   ".to_string());
-    let bytes = encode_gs_v0(&render_debt_canvas(&receipt).expect("whitespace ref canvas"));
+    let bytes = encode_gs_v0(
+        &render_debt_canvas(&receipt, PaperWidth::Width80mm).expect("whitespace ref canvas"),
+    );
     assert!(!bytes.is_empty());
     let mut no_reference = sample_debt_receipt(ReceiptLanguage::French);
     no_reference.reference_text = None;
-    let expected = encode_gs_v0(&render_debt_canvas(&no_reference).expect("none ref canvas"));
+    let expected = encode_gs_v0(
+        &render_debt_canvas(&no_reference, PaperWidth::Width80mm).expect("none ref canvas"),
+    );
     assert_eq!(
         bytes, expected,
         "whitespace-only reference must render exactly like None"
@@ -94,7 +101,9 @@ fn debt_receipt_whitespace_reference_renders_without_reference_line() {
 fn debt_receipt_empty_footer_uses_default_line() {
     let receipt = sample_debt_receipt(ReceiptLanguage::French);
     assert!(receipt.footer_message.is_empty());
-    let bytes = encode_gs_v0(&render_debt_canvas(&receipt).expect("default footer canvas"));
+    let bytes = encode_gs_v0(
+        &render_debt_canvas(&receipt, PaperWidth::Width80mm).expect("default footer canvas"),
+    );
     assert!(!bytes.is_empty());
 }
 
@@ -102,7 +111,9 @@ fn debt_receipt_empty_footer_uses_default_line() {
 fn debt_receipt_empty_store_name_uses_shop_name_fallback() {
     let receipt = sample_debt_receipt(ReceiptLanguage::Arabic);
     assert!(receipt.store_identity.store_name.is_empty());
-    let bytes = encode_gs_v0(&render_debt_canvas(&receipt).expect("fallback header canvas"));
+    let bytes = encode_gs_v0(
+        &render_debt_canvas(&receipt, PaperWidth::Width80mm).expect("fallback header canvas"),
+    );
     assert!(!bytes.is_empty());
 }
 
@@ -111,7 +122,7 @@ fn debt_receipt_long_customer_name_never_panics() {
     let mut receipt = sample_debt_receipt(ReceiptLanguage::French);
     receipt.customer_name = "Benali ".repeat(200);
     assert!(receipt.customer_name.len() >= 200);
-    let canvas = render_debt_canvas(&receipt).expect("long name canvas");
+    let canvas = render_debt_canvas(&receipt, PaperWidth::Width80mm).expect("long name canvas");
     assert_eq!(canvas.width(), PAPER_WIDTH_DOTS);
     let bytes = encode_gs_v0(&canvas);
     assert!(!bytes.is_empty());

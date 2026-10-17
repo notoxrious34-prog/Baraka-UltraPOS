@@ -9,7 +9,7 @@
  * No floats, no hardcoded colors, logical properties for RTL.
  */
 
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
 import {
   ipcCreateCategory,
@@ -24,6 +24,11 @@ export interface CategoryManageModalProps {
   isOpen: boolean;
   token: string;
   onClose: () => void;
+  onChanged: () => void;
+}
+
+export interface CategoryManagePanelProps {
+  token: string;
   onChanged: () => void;
 }
 
@@ -54,12 +59,10 @@ export function validateCategoryForm(data: {
 const inputClass =
   "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold outline-none focus:border-primary-600 dark:border-slate-700 dark:bg-slate-800";
 
-export function CategoryManageModal({
-  isOpen,
+export function CategoryManagePanel({
   token,
-  onClose,
   onChanged,
-}: CategoryManageModalProps): ReactElement | null {
+}: CategoryManagePanelProps): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
@@ -72,7 +75,6 @@ export function CategoryManageModal({
   const [nameAr, setNameAr] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [attempted, setAttempted] = useState(false);
-  const cardRef = useRef<HTMLDivElement | null>(null);
 
   const reload = async (tok: string, alive: () => boolean): Promise<void> => {
     setLoading(true);
@@ -94,9 +96,6 @@ export function CategoryManageModal({
   };
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
     setCode("");
     setNameFr("");
     setNameAr("");
@@ -112,50 +111,7 @@ export function CategoryManageModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, token]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        if (!busy && !seeding) {
-          onClose();
-        }
-        return;
-      }
-      if (event.key !== "Tab" || cardRef.current === null) {
-        return;
-      }
-      const focusables = cardRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusables.length === 0) {
-        return;
-      }
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (first === undefined || last === undefined) {
-        return;
-      }
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [isOpen, busy, seeding, onClose]);
-
-  if (!isOpen) {
-    return null;
-  }
+  }, [token]);
 
   const errors = attempted ? validateCategoryForm({ code, nameFr, nameAr }) : {};
 
@@ -281,32 +237,9 @@ export function CategoryManageModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t(locale, "cat.manageTitle")}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy && !seeding) {
-          onClose();
-        }
-      }}
-    >
-      <div
-        ref={cardRef}
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
-      >
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
         <div className="flex h-14 shrink-0 items-center justify-between bg-primary-900 px-4 text-white">
           <h2 className="text-base font-extrabold">{t(locale, "cat.manageTitle")}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy || seeding}
-            aria-label="Close"
-            className="rounded-md px-3 py-1 text-sm font-bold text-white/80 hover:bg-white/10 hover:text-white disabled:opacity-50"
-          >
-            ✕
-          </button>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
@@ -495,6 +428,44 @@ export function CategoryManageModal({
             </div>
           )}
         </div>
+    </div>
+  );
+}
+
+/**
+ * Category management modal: thin overlay wrapper around the shared
+ * `CategoryManagePanel` (Escape/backdrop dismissal).
+ * Retained for compatibility; new surfaces mount the panel directly.
+ */
+export function CategoryManageModal({
+  isOpen,
+  token,
+  onClose,
+  onChanged,
+}: CategoryManageModalProps): ReactElement | null {
+  const locale = usePosUiStore((state) => state.locale);
+  if (!isOpen) {
+    return null;
+  }
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t(locale, "cat.manageTitle")}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          onClose();
+        }
+      }}
+    >
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <CategoryManagePanel token={token} onChanged={onChanged} />
       </div>
     </div>
   );

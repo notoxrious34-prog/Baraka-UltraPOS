@@ -371,7 +371,6 @@ describe("CatalogHubView markup", () => {
         sort={null}
         onFilter={noopFilter}
         onSort={noopSort}
-        onExport={noop}
       />,
     );
     expect(html).toContain("VIS-8X40");
@@ -413,7 +412,6 @@ describe("CatalogHubView markup", () => {
         sort={null}
         onFilter={noopFilter}
         onSort={noopSort}
-        onExport={noop}
       />,
     );
     expect(html).toContain("لا توجد منتجات");
@@ -440,7 +438,6 @@ describe("CatalogHubView markup", () => {
         sort={null}
         onFilter={noopFilter}
         onSort={noopSort}
-        onExport={noop}
       />,
     );
     expect(pending).toContain("…");
@@ -471,7 +468,6 @@ describe("CatalogHubView markup", () => {
         sort={null}
         onFilter={noopFilter}
         onSort={noopSort}
-        onExport={noop}
       />,
     );
     expect(html).toContain("—");
@@ -683,17 +679,18 @@ describe("KPI strip and export markup", () => {
         onToggleActive={noop}
         onFilter={noop}
         onSort={noop}
-        onExport={noop}
       />,
     );
 
-  it("renders KPI titles with counts and the data-exchange menu trigger", () => {
+  it("renders KPI titles with counts and no data-exchange menu trigger", () => {
     const html = view();
     expect(html).toContain("Tous les produits");
     expect(html).toContain("En stock");
     expect(html).toContain("En rupture");
     expect(html).toContain("Inactifs");
-    expect(html).toContain("Échanges &amp; Données");
+    // DSN-053: exchange lives in Settings — the purified hub toolbar
+    // carries search, refresh, and new-product only.
+    expect(html).not.toContain("Échanges &amp; Données");
     expect(html).not.toContain("Exporter CSV");
   });
 

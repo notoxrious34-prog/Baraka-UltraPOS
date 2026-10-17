@@ -249,16 +249,15 @@ describe("ipcImportProducts wire contract", () => {
 });
 
 describe("import modal hub wiring (source pins)", () => {
-  it("mounts the modal from the catalog hub with reload callbacks", () => {
-    const hub = readFileSync(
-      join(process.cwd(), "src", "features", "catalog", "CatalogModule.tsx"),
+  it("mounts the modal from the settings exchange tab", () => {
+    const tab = readFileSync(
+      join(process.cwd(), "src", "features", "settings", "DataExchangeSettingsTab.tsx"),
       "utf8",
     ) as string;
-    expect(hub).toContain("ProductImportModal");
-    expect(hub).toContain("isImportModalOpen");
-    expect(hub).toContain("DataExchangeMenu");
-    expect(hub).toContain("onDownloadTemplate");
-    expect(hub).toContain("onSuccess");
+    expect(tab).toContain("ProductImportModal");
+    expect(tab).toContain("onSuccess");
+    expect(tab).toContain("buildCatalogCsvContent");
+    expect(tab).toContain("downloadSampleCsvTemplate");
     const menu = readFileSync(
       join(process.cwd(), "src", "features", "catalog", "components", "DataExchangeMenu.tsx"),
       "utf8",

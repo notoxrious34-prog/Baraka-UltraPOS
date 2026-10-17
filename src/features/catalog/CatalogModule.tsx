@@ -8,30 +8,21 @@
  * quantities stay canonical strings; the UI converts with BigInt only.
  */
 
-import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
 import type { Category, Locale } from "@/types/pos";
 import { usePosUiStore } from "@/stores/pos-ui-store";
-import type { WarehouseItem } from "@/lib/ipc";
-import { StarterPackBanner } from "@/features/catalog/StarterPackBanner";
 import { useSessionStore } from "@/stores/session-store";
 import { ipcGetStock, ipcListCategories, ipcSearchCatalog, listWarehouses } from "@/lib/ipc";
 import { ipcDeleteProduct, type DeleteEntityResult } from "@/lib/ipc";
 import { SafeDeleteModal } from "@/components/common/SafeDeleteModal";
 import { formatMoney, formatQty } from "@/lib/money";
 import type { CatalogProduct } from "@/types/pos";
-import { CategoryManageModal } from "@/features/catalog/CategoryManageModal";
 import { CategoryPillStrip } from "@/features/catalog/CategoryPillStrip";
-import { DataExchangeMenu } from "@/features/catalog/components/DataExchangeMenu";
-import { ProductImportModal } from "@/features/catalog/ProductImportModal";
-import starterPackCsv from "@/assets/fixtures/quincaillerie_starter_300.csv?raw";
 import {
   pickDepotId,
   ProductCreateModal,
 } from "@/features/catalog/ProductCreateModal";
-import { buildCatalogCsvContent } from "@/features/catalog/catalog-export";
-import { downloadSampleCsvTemplate } from "@/features/catalog/catalog-import-parser";
-import { downloadTextFile } from "@/features/catalog/desktop-download";
 import {
   formFromProduct,
   ProductEditModal,
@@ -280,24 +271,10 @@ export interface CatalogHubViewProps {
   onToggleActive: (product: CatalogProduct) => void;
   onFilter: (filter: CatalogFilter) => void;
   onSort: (field: SortField) => void;
-  onExport: () => void;
-  onImport?: () => void;
-  /** TASK-DSN-048: template download, served from the exchange menu. */
-  onDownloadTemplate?: () => void;
-  /**
-   * Last exported filename for the inline confirmation note (TASK-REL-055).
-   * Filename only — no authored copy, per the UI-string law.
-   */
-  exportNote?: string | null;
-  /** BRK-069: preload the 300-item starter pack into the import modal. */
-  onStarterPack?: () => void;
   /** Taxonomy rows for the pill strip + row badges (empty = strip hidden details). */
   categories?: Category[];
   selectedCategoryId?: string | null;
   onSelectCategory?: (id: string | null) => void;
-  onManageCategories?: () => void;
-  /** Starter-pack cockpit element rendered above the hub toolbar. */
-  banner?: ReactNode;
 }
 
 function marginBadgeClass(pct: number): string {
@@ -413,7 +390,6 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
   ];
   return (
     <section className="flex h-full flex-col gap-3 p-4">
-      {props.banner}
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <h2 className="text-lg font-black">{t(locale, "cat.masterTitle")}</h2>
         <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-black dark:bg-slate-700">
@@ -450,24 +426,6 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
         >
           {t(locale, "cat.refresh")}
         </button>
-        <DataExchangeMenu
-          locale={locale}
-          onOpenImportModal={() => props.onImport?.()}
-          onImportStarterPack={() => props.onStarterPack?.()}
-          onExportCsv={props.onExport}
-          onDownloadTemplate={() => props.onDownloadTemplate?.()}
-        />
-        {props.exportNote !== null &&
-          props.exportNote !== undefined &&
-          props.exportNote !== "" && (
-            <span
-              role="status"
-              className="inline-flex h-10 items-center rounded-lg bg-emerald-100 px-3 font-mono text-xs font-black text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
-            >
-              {"✓ "}
-              {props.exportNote}
-            </span>
-          )}
         <button
           type="button"
           onClick={props.onNew}
@@ -511,13 +469,12 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
           {translateBackendError(error, locale)}
         </p>
       )}
-      {props.onSelectCategory !== undefined && props.onManageCategories !== undefined && (
+      {props.onSelectCategory !== undefined && (
         <CategoryPillStrip
           locale={locale}
           categories={categories}
           selectedCategoryId={selectedCategoryId}
           onSelectCategory={props.onSelectCategory}
-          onManageCategories={props.onManageCategories}
           productCounts={countProductsByCategory(products)}
           totalProductsCount={products.length}
         />
@@ -750,21 +707,10 @@ export function CatalogModule(): ReactElement {
   const [deleteNote, setDeleteNote] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<CatalogFilter>("all");
-  /** Last exported filename for the inline confirmation note (TASK-REL-055). */
-  const [exportNote, setExportNote] = useState<string | null>(null);
   const [sort, setSort] = useState<CatalogSort | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importPreset, setImportPreset] = useState<{
-    key: number;
-    filename: string;
-    content: string;
-  } | null>(null);
   const depotRef = useRef<string | null | undefined>(undefined);
-  /** Warehouse rows for the starter-pack cockpit depot selector. */
-  const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
   const skipFirstDebounce = useRef(true);
   const authed = session !== null && isManagerRole(session.role);
   const token: string | null = authed && session !== null ? session.token : null;
@@ -778,7 +724,6 @@ export function CatalogModule(): ReactElement {
       if (!alive()) {
         return null;
       }
-      setWarehouses(rows);
       depotRef.current = pickDepotId(rows);
     } catch {
       if (!alive()) {
@@ -929,46 +874,12 @@ export function CatalogModule(): ReactElement {
     sort,
   );
 
-  const reloadCategories = (): void => {
-    ipcListCategories(activeToken, true)
-      .then((rows) => {
-        setCategories(rows);
-      })
-      .catch(() => {
-        // The hub stays usable on taxonomy failures; rows show "—".
-      });
-  };
-
   const handleFilter = (next: CatalogFilter): void => {
     setFilter((current) => (current === next ? "all" : next));
   };
 
   const handleSort = (field: SortField): void => {
     setSort((current) => nextSort(current, field));
-  };
-
-  const handleExport = (): void => {
-    const stamp = new Date().toISOString().slice(0, 10);
-    const outcome = downloadTextFile(
-      buildCatalogCsvContent(visible, stockLevels, locale),
-      `${t(locale, "cat.csvExportFilename")}-${stamp}.csv`,
-    );
-    setExportNote(outcome.ok ? outcome.filename : null);
-    if (outcome.ok) {
-      window.setTimeout(() => {
-        setExportNote(null);
-      }, 8000);
-    }
-  };
-
-  const handleTemplateDownload = (): void => {
-    const outcome = downloadSampleCsvTemplate();
-    setExportNote(outcome.ok ? outcome.filename : null);
-    if (outcome.ok) {
-      window.setTimeout(() => {
-        setExportNote(null);
-      }, 8000);
-    }
   };
 
   const handleUpdated = (updated: CatalogProduct): void => {
@@ -1037,62 +948,9 @@ export function CatalogModule(): ReactElement {
         onToggleActive={toggleActive}
         onFilter={handleFilter}
         onSort={handleSort}
-        onExport={handleExport}
-        exportNote={exportNote}
-        onDownloadTemplate={handleTemplateDownload}
-        onImport={() => {
-          setImportPreset(null);
-          setIsImportModalOpen(true);
-        }}
-        onStarterPack={() => {
-          setImportPreset({
-            key: Date.now(),
-            filename: "quincaillerie_starter_300.csv",
-            content: starterPackCsv,
-          });
-          setIsImportModalOpen(true);
-        }}
         categories={categories}
         selectedCategoryId={selectedCategoryId}
         onSelectCategory={setSelectedCategoryId}
-        onManageCategories={() => {
-          setIsCategoryModalOpen(true);
-        }}
-        banner={
-          token === null ? undefined : (
-            <StarterPackBanner
-              locale={locale}
-              token={token}
-              warehouses={warehouses}
-              products={products}
-              onChanged={refresh}
-            />
-          )
-        }
-      />
-      <CategoryManageModal
-        isOpen={isCategoryModalOpen}
-        token={activeToken}
-        onClose={() => {
-          setIsCategoryModalOpen(false);
-        }}
-        onChanged={() => {
-          reloadCategories();
-          refresh();
-        }}
-      />
-      <ProductImportModal
-        isOpen={isImportModalOpen}
-        token={activeToken}
-        onClose={() => {
-          setIsImportModalOpen(false);
-        }}
-        onSuccess={() => {
-          reloadCategories();
-          refresh();
-        }}
-        categories={categories}
-        preset={importPreset}
       />
       <ProductCreateModal
         isOpen={isCreateOpen}

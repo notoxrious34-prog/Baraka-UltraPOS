@@ -4,7 +4,8 @@
  *
  * Pure presentational component: active categories render as selectable
  * pills (locale-aware label + optional product count), prefixed by the
- * "Tous / الكل" pill and suffixed by the management action pill.
+ * "Tous / الكل" pill and optionally suffixed by the management action pill
+ * (rendered only when `onManageCategories` is provided).
  * No floats, no fixed positioning, design tokens only.
  */
 
@@ -17,7 +18,8 @@ export interface CategoryPillStripProps {
   categories: Category[];
   selectedCategoryId: string | null;
   onSelectCategory: (id: string | null) => void;
-  onManageCategories: () => void;
+  /** Management CTA (Settings-owned); omit to render a pure filter strip. */
+  onManageCategories?: () => void;
   productCounts?: Record<string, number>;
   totalProductsCount: number;
 }
@@ -90,14 +92,16 @@ export function CategoryPillStrip(props: CategoryPillStripProps): ReactElement {
           </button>
         );
       })}
-      <button
-        type="button"
-        onClick={props.onManageCategories}
-        className="shrink-0 rounded-full border border-dashed border-slate-300 px-3 py-1.5 text-xs font-black text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
-      >
-        {"⚙ "}
-        {t(locale, "cat.manageCta")}
-      </button>
+      {props.onManageCategories !== undefined && (
+        <button
+          type="button"
+          onClick={props.onManageCategories}
+          className="shrink-0 rounded-full border border-dashed border-slate-300 px-3 py-1.5 text-xs font-black text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
+        >
+          {"⚙ "}
+          {t(locale, "cat.manageCta")}
+        </button>
+      )}
     </div>
   );
 }

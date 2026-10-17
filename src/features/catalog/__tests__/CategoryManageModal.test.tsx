@@ -232,11 +232,9 @@ describe("CatalogHubView category column", () => {
         sort={null}
         onFilter={noopEdit}
         onSort={noopEdit}
-        onExport={noop}
         categories={[category({})]}
         selectedCategoryId={null}
         onSelectCategory={noopEdit}
-        onManageCategories={noop}
       />,
     );
     expect(html).toContain("Rayon");
@@ -385,9 +383,14 @@ describe("category wiring (source pins)", () => {
     expect(hubSrc).toContain("filterByCategory(");
     expect(hubSrc).toContain("selectedCategoryId");
     expect(hubSrc).toContain("<CategoryPillStrip");
-    expect(hubSrc).toContain("<CategoryManageModal");
-    expect(hubSrc).toContain("isCategoryModalOpen");
-    expect(hubSrc).toContain("onManageCategories");
+    // DSN-053: config surfaces live in Settings — the hub keeps a pure
+    // filter strip with no manage trigger and no modal mount.
+    expect(hubSrc).not.toContain("<CategoryManageModal");
+    expect(hubSrc).not.toContain("isCategoryModalOpen");
+    expect(hubSrc).not.toContain("onManageCategories");
+    expect(hubSrc).not.toContain("<DataExchangeMenu");
+    expect(hubSrc).not.toContain("StarterPackBanner");
+    expect(manageSrc).toContain("CategoryManagePanel");
   });
 
   it("seeds the starter pack and refreshes the list in place", () => {

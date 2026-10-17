@@ -85,7 +85,7 @@
 <header class="hero">
   <h1>Baraka UltraPOS — Guide d'utilisation / دليل الاستعمال</h1>
   <p>Merchant handover handbook · Keep next to the cash register · يُحفظ بجانب الصندوق</p>
-  <span class="ver">v1.0.0-rc.8 · 2026-10-16</span>
+  <span class="ver">v1.0.0-rc.9 · 2026-10-17</span>
 </header>
 
 <main>
@@ -99,6 +99,7 @@
     <li><a href="#p6">Check-list drill / قائمة التجربة</a></li>
     <li><a href="#p9">Nouveautés rc.7 : échanges, caisse rapide / جديد rc.7</a></li>
     <li><a href="#p10">Nouveautés rc.8 : imprimante 58/80 mm / جديد rc.8</a></li>
+    <li><a href="#p11">Nouveautés rc.9 : recherche &amp; scan / جديد rc.9</a></li>
   </ol>
 </nav>
 
@@ -106,9 +107,9 @@
   <h2>1 · Artefact &amp; Installation / ملف التثبيت</h2>
   <div class="fr" dir="ltr" lang="fr">
     <p>Fichier remis par le technicien : <code>Baraka UltraPOS_1.0.0_x64-setup.exe</code>
-    (~212&nbsp;Mo, 222&nbsp;284&nbsp;447 octets). Windows 10/11, <strong>aucune connexion
+    (~212&nbsp;Mo, 222&nbsp;281&nbsp;701 octets). Windows 10/11, <strong>aucune connexion
     internet requise</strong>.</p>
-    <p>SHA-256 :<br /><span class="hash">CE237CEA0D483B8CF2C6A7529FE82A14A46A23DA8E142A3DF8F69047DC650100</span></p>
+    <p>SHA-256 :<br /><span class="hash">4E62019C15F3EC4D7B70DD831A409785E88F9CDAF43E23598D9505AD609CAE01</span></p>
     <p>Double-cliquez (français proposé en premier), installez depuis le compte Windows de la
     caisse. Écran bleu SmartScreen attendu : « Informations complémentaires » →
     « Exécuter quand même ».</p>
@@ -383,8 +384,46 @@
       ويفضل 80 مم للتذاكر ذات الأسماء العربية الطويلة.</div>
   </div>
 </section>
+
+<section class="card" id="p11">
+  <h2>11 · Version 1.0.0-rc.9 — Recherche intelligente &amp; lecture rapide / البحث الذكي والقراءة السريعة للباركود</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <p>La recherche du catalogue comprend désormais les <strong>mots partiels</strong> :
+    tapez <code>douchette</code> pour retrouver « Pomme de douchette », ou combinez
+    plusieurs mots : <code>vis 4x35</code> ne montre que les articles contenant
+    <strong>tous</strong> les termes. L'orthographe arabe est tolérée
+    (hamza, <code>ة</code>/<code>ه</code>, <code>ي</code>/<code>ى</code>).</p>
+    <ol>
+      <li>Scannez ou tapez dans <strong>Recherche</strong> (touche <kbd>F1</kbd> pour y revenir).</li>
+      <li>Si le code-barres est exact, <strong>Entrée</strong> ajoute aussitôt l'article
+        au panier (quantité +1 s'il y est déjà), vide la recherche et garde le curseur prêt.</li>
+      <li>Même si le curseur est ailleurs (panier, boutons), la douchette reste
+        opérationnelle : la première frappe ramène automatiquement le curseur
+        dans la recherche <strong>sans perdre le caractère</strong>.</li>
+    </ol>
+    <div class="note">Astuce : après chaque bip du lecteur, vérifiez le bandeau vert
+      « ajouté au panier ».</div>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <p>البحث في الفهرس صار يفهم <strong>الكلمات الجزئية</strong>: اكتب
+    <code>douchette</code> لتجد «Pomme de douchette»، أو اجمع عدة كلمات:
+    <code>vis 4x35</code> يعرض فقط الأصناف التي تحوي <strong>كل</strong>
+    الكلمات. الإملاء العربي متسامَح (الهمزة، <code>ة</code>/<code>ه</code>،
+    <code>ي</code>/<code>ى</code>).</p>
+    <ol>
+      <li>امسح أو اكتب في <strong>البحث</strong> (زر <kbd>F1</kbd> للعودة إليه).</li>
+      <li>عند مسح باركود صحيح، زر <strong>Enter</strong> يضيف الصنف فورًا إلى
+        السلة (ويزيد الكمية إن كان موجودًا)، ويمسح البحث ويُبقي المؤشر جاهزًا.</li>
+      <li>حتى لو كان المؤشر خارج البحث (السلة أو الأزرار)، يبقى القارئ فعّالًا:
+        أول حرف يعيد المؤشر تلقائيًا إلى البحث <strong>دون ضياع الحرف</strong>.</li>
+    </ol>
+    <div class="note">تلميح: بعد كل صوت من القارئ، تحقق من الشريط الأخضر
+      «تمت إضافته إلى السلة».</div>
+  </div>
+</section>
 </main>
 
-<footer>Baraka UltraPOS v1.0.0-rc.8 · Guide de remise / دليل التسليم · 100% hors-ligne — aucun appel réseau.</footer>
+<footer>Baraka UltraPOS v1.0.0-rc.9 · Guide de remise / دليل التسليم · 100% hors-ligne — aucun appel réseau.</footer>
 </body>
 </html>

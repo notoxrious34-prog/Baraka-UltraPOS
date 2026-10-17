@@ -8,10 +8,12 @@
  * quantities stay canonical strings; the UI converts with BigInt only.
  */
 
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
 import type { Category, Locale } from "@/types/pos";
 import { usePosUiStore } from "@/stores/pos-ui-store";
+import type { WarehouseItem } from "@/lib/ipc";
+import { StarterPackBanner } from "@/features/catalog/StarterPackBanner";
 import { useSessionStore } from "@/stores/session-store";
 import { ipcGetStock, ipcListCategories, ipcSearchCatalog, listWarehouses } from "@/lib/ipc";
 import { ipcDeleteProduct, type DeleteEntityResult } from "@/lib/ipc";
@@ -294,6 +296,8 @@ export interface CatalogHubViewProps {
   selectedCategoryId?: string | null;
   onSelectCategory?: (id: string | null) => void;
   onManageCategories?: () => void;
+  /** Starter-pack cockpit element rendered above the hub toolbar. */
+  banner?: ReactNode;
 }
 
 function marginBadgeClass(pct: number): string {
@@ -409,6 +413,7 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
   ];
   return (
     <section className="flex h-full flex-col gap-3 p-4">
+      {props.banner}
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <h2 className="text-lg font-black">{t(locale, "cat.masterTitle")}</h2>
         <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-black dark:bg-slate-700">
@@ -758,6 +763,8 @@ export function CatalogModule(): ReactElement {
     content: string;
   } | null>(null);
   const depotRef = useRef<string | null | undefined>(undefined);
+  /** Warehouse rows for the starter-pack cockpit depot selector. */
+  const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
   const skipFirstDebounce = useRef(true);
   const authed = session !== null && isManagerRole(session.role);
   const token: string | null = authed && session !== null ? session.token : null;
@@ -771,6 +778,7 @@ export function CatalogModule(): ReactElement {
       if (!alive()) {
         return null;
       }
+      setWarehouses(rows);
       depotRef.current = pickDepotId(rows);
     } catch {
       if (!alive()) {
@@ -1050,6 +1058,17 @@ export function CatalogModule(): ReactElement {
         onManageCategories={() => {
           setIsCategoryModalOpen(true);
         }}
+        banner={
+          token === null ? undefined : (
+            <StarterPackBanner
+              locale={locale}
+              token={token}
+              warehouses={warehouses}
+              products={products}
+              onChanged={refresh}
+            />
+          )
+        }
       />
       <CategoryManageModal
         isOpen={isCategoryModalOpen}

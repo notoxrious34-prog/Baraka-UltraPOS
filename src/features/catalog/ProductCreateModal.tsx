@@ -2,9 +2,10 @@
  * Product creation modal with direct initial stock provisioning (TASK-DSN-041).
  *
  * Creation flow: `catalog_create_product` first, then — when an initial
- * quantity was entered — one `stock.adjust` INCREASE on the principal depot
- * (resolved by code `DEP-01` to its UUID; the wire contract only accepts
- * UUIDs). Optional post-creation XP-410B label trigger via `onCreated`.
+ * quantity was entered — one `stock.adjust` INCREASE on the user-selected
+ * target warehouse (resolved by code `DEP-01` to its UUID by default; the
+ * wire contract only accepts UUIDs). Optional post-creation XP-410B label
+ * trigger via `onCreated`.
  *
  * All money/quantity conversions use the canonical string/BigInt converters
  * from @/lib/money — parseFloat/Number are never used on these values.
@@ -41,7 +42,7 @@ export interface ProductCreateModalProps {
   token: string;
 }
 
-/** Principal depot code: initial stock is credited on this warehouse. */
+/** Principal depot code: default target for initial stock (user-overridable). */
 export const PRINCIPAL_DEPOT_CODE = "DEP-01";
 
 /** Human reason recorded on the automatic initial-stock movement. */
@@ -326,6 +327,7 @@ export function ProductCreateModal({
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [depotId, setDepotId] = useState<string | null>(null);
+  const [depots, setDepots] = useState<WarehouseItem[]>([]);
   const [created, setCreated] = useState<CatalogProduct | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState("");
@@ -342,17 +344,20 @@ export function ProductCreateModal({
     setSubmitError(null);
     setCreated(null);
     setDepotId(null);
+    setDepots([]);
     setCategories([]);
     setCategoryId("");
     let cancelled = false;
     listWarehouses(token)
       .then((rows) => {
         if (!cancelled) {
+          setDepots(rows.filter((row) => row.is_active));
           setDepotId(pickDepotId(rows));
         }
       })
       .catch(() => {
         if (!cancelled) {
+          setDepots([]);
           setDepotId(null);
         }
       });
@@ -730,6 +735,22 @@ export function ProductCreateModal({
                 className={`${inputClass} font-mono`}
               />
               {fieldError(errors, "initialStock", locale)}
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold">{t(locale, "cat.depotSelect")}</span>
+              <select
+                value={depotId ?? ""}
+                onChange={(event) => {
+                  setDepotId(event.target.value === "" ? null : event.target.value);
+                }}
+                className={inputClass}
+              >
+                {depots.map((depot) => (
+                  <option key={depot.id} value={depot.id}>
+                    {`${depot.name} (${depot.code})`}
+                  </option>
+                ))}
+              </select>
             </label>
             <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
               {t(locale, "cat.depotNote")}

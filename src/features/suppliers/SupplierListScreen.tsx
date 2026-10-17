@@ -4,7 +4,7 @@
  * Manager-only; mounted via the non-POS NavRail view switch in App.tsx.
  */
 
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { t, translateBackendError, type I18nKey } from "@/lib/i18n";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
@@ -36,6 +36,22 @@ export function SuppliersModule(): ReactElement {
   const [editing, setEditing] = useState<SupplierView | null>(null);
 
   const token = session?.token ?? null;
+
+  // Instant debounced search: every keystroke refreshes results ~150 ms
+  // after the user stops typing. Enter/button submit stays immediate.
+  // Guarded on token so the pre-login render issues no IPC call.
+  useEffect(() => {
+    if (token === null) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      void search(token, query);
+    }, 150);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [query, search, token]);
+
   if (token === null) {
     return <div />;
   }

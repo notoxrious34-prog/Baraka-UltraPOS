@@ -4,11 +4,26 @@
  * strings, zero floats), wrapped in <bdi dir="ltr"> tabular figures.
  */
 
-import type { ReactElement } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { t } from "@/lib/i18n";
 import { formatQty } from "@/lib/money";
 import type { Locale } from "@/types/pos";
 import type { LowStockRow } from "@/types/reports";
+
+/**
+ * Client-side instant filter over displayed stock rows (TASK-DSN-050).
+ * Case-insensitive substring match on French designation or SKU; blank
+ * queries return the rows untouched. Pure — unit-tested directly.
+ */
+export function filterStockRows(rows: LowStockRow[], query: string): LowStockRow[] {
+  const q = query.trim().toLowerCase();
+  if (q === "") {
+    return rows;
+  }
+  return rows.filter(
+    (row) => row.nameFr.toLowerCase().includes(q) || row.sku.toLowerCase().includes(q),
+  );
+}
 
 interface StockOverviewPaneProps {
   locale: Locale;
@@ -44,6 +59,12 @@ function HudCard(props: { label: string; value: string; alert: boolean }): React
 
 export function StockOverviewPane(props: StockOverviewPaneProps): ReactElement {
   const { locale } = props;
+  // Instant client-side text filter over the displayed rows.
+  const [stockQuery, setStockQuery] = useState("");
+  const filteredRows = useMemo(
+    () => filterStockRows(props.rows, stockQuery),
+    [props.rows, stockQuery],
+  );
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
       <div className="flex shrink-0 flex-wrap gap-2">
@@ -58,6 +79,15 @@ export function StockOverviewPane(props: StockOverviewPaneProps): ReactElement {
           alert={props.rows.length > 0}
         />
       </div>
+      <input
+        id="stock-search-input"
+        value={stockQuery}
+        onChange={(event) => {
+          setStockQuery(event.target.value);
+        }}
+        placeholder={t(locale, "stock.searchPlaceholder")}
+        className="h-9 w-full max-w-xs shrink-0 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold outline-none focus:border-primary-600 dark:border-slate-700 dark:bg-slate-950"
+      />
       <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950">
         {props.loading && (
           <p className="p-6 text-center text-xs font-bold text-slate-500">
@@ -81,7 +111,7 @@ export function StockOverviewPane(props: StockOverviewPaneProps): ReactElement {
               </tr>
             </thead>
             <tbody>
-              {props.rows.map((row) => (
+              {filteredRows.map((row) => (
                 <tr
                   key={`${row.warehouseId}:${row.productId}`}
                   className="border-b border-slate-100 dark:border-slate-800"

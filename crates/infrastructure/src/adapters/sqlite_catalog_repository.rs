@@ -70,6 +70,24 @@ fn escape_like_pattern(text: &str) -> String {
         .replace('_', "\\_")
 }
 
+/// Arabic-tolerant LIKE infix for one escaped token (TASK-BRK-073).
+///
+/// The token is already normalized ([`normalize_for_search`]) and
+/// LIKE-escaped. The remaining free orthographic variants — alef `ا`
+/// (all hamza forms fold here), `ه` (taa marbuta folds here) and `ي`
+/// (alef maqsura folds here) — become single-character `_` wildcards so
+/// cashier spelling variants match each other. Safe to compose with the
+/// backslash escape: neither the escape character nor `%` is affected.
+fn arabic_tolerant_like_pattern(escaped: &str) -> String {
+    escaped
+        .chars()
+        .map(|c| match c {
+            'ا' | 'ه' | 'ي' => '_',
+            other => other,
+        })
+        .collect()
+}
+
 /// Register the deterministic `baraka_search_norm(text)` scalar function
 /// (unified French/Arabic search normalization). Idempotent:
 /// re-registration on the same connection replaces the previous binding.
@@ -645,7 +663,9 @@ impl ProductRepository for SqliteCatalogRepository {
         }
         // Multi-token hybrid search over normalized text with phonetic
         // alias expansion: every token group must match (AND), variants
-        // within a group match alternatively (OR).
+        // within a group match alternatively (OR). Token conditions span
+        // both names, the SKU, the product barcode and unit barcodes, so
+        // infix fragments and scanned unit codes participate (TASK-BRK-073).
         ensure_functions_registered(&guard).map_err(|_| store_failure())?;
         let groups = tokenize_query(trimmed);
         if groups.is_empty() {
@@ -665,34 +685,45 @@ impl ProductRepository for SqliteCatalogRepository {
                 sql.push_str(
                     "(baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\\' \
                      OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\\' \
-                     OR baraka_search_norm(p.sku) LIKE ? ESCAPE '\\')",
+                     OR baraka_search_norm(p.sku) LIKE ? ESCAPE '\\' \
+                     OR baraka_search_norm(p.barcode) LIKE ? ESCAPE '\\' \
+                     OR EXISTS (SELECT 1 FROM product_units pu WHERE pu.product_id = p.id AND baraka_search_norm(pu.barcode) LIKE ? ESCAPE '\\'))",
                 );
                 let pattern = rusqlite::types::Value::Text(format!(
-                    "%{e}%",
-                    e = escape_like_pattern(variant)
+                    "%{infix}%",
+                    infix = arabic_tolerant_like_pattern(&escape_like_pattern(variant))
                 ));
-                patterns.push(pattern.clone());
-                patterns.push(pattern.clone());
-                patterns.push(pattern);
+                for _ in 0..5 {
+                    patterns.push(pattern.clone());
+                }
             }
             sql.push(')');
         }
         sql.push_str(" AND p.is_active = 1");
-        // Relevance ranking: exact SKU, SKU prefix, name prefix, then code.
+        // Relevance ranking: exact barcode (product or unit) first,
+        // then name prefix, then first-token name infix, then SKU and
+        // any other match. Tie-break on SKU for determinism.
         let normalized_query = normalize_for_search(trimmed);
         let name_prefix = format!("{e}%", e = escape_like_pattern(&normalized_query));
+        let first_token_infix = format!(
+            "%{i}%",
+            i = arabic_tolerant_like_pattern(&escape_like_pattern(&groups[0][0]))
+        );
         sql.push_str(
             " ORDER BY CASE \
-             WHEN baraka_search_norm(p.sku) = ? THEN 0 \
-             WHEN baraka_search_norm(p.sku) LIKE ? ESCAPE '\\' THEN 1 \
+             WHEN (p.barcode = ? OR EXISTS (SELECT 1 FROM product_units pu WHERE pu.product_id = p.id AND pu.barcode = ?)) THEN 0 \
+             WHEN baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\\' \
+               OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\\' THEN 1 \
              WHEN baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\\' \
                OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\\' THEN 2 \
              ELSE 3 END, p.sku LIMIT ?",
         );
-        patterns.push(rusqlite::types::Value::Text(normalized_query));
-        patterns.push(rusqlite::types::Value::Text(name_prefix.clone()));
+        patterns.push(rusqlite::types::Value::Text(trimmed.to_string()));
+        patterns.push(rusqlite::types::Value::Text(trimmed.to_string()));
         patterns.push(rusqlite::types::Value::Text(name_prefix.clone()));
         patterns.push(rusqlite::types::Value::Text(name_prefix));
+        patterns.push(rusqlite::types::Value::Text(first_token_infix.clone()));
+        patterns.push(rusqlite::types::Value::Text(first_token_infix));
         patterns.push(rusqlite::types::Value::Integer(capped));
         let mut statement = guard.prepare(&sql).map_err(|_| store_failure())?;
         let ids = statement

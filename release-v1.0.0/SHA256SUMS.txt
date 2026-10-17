@@ -1,2 +1,2 @@
-4e62019c15f3ec4d7b70dd831a409785e88f9cdaf43e23598d9505ad609cae01 *Baraka UltraPOS_1.0.0_x64-setup.exe
-7587ead9aa297570de82ff18d2a4c5ce5074a9e896d6ce0a7c49b21299ef2bb8 *Baraka-UltraPOS-v1.0.0-rc.9-Delivery.zip
+5512cb43106ce911a1f31659df9000b9f41011f01b59c66005efd04730c0df5d *Baraka UltraPOS_1.0.0_x64-setup.exe
+06a020d56fba5814f6d4a558af6f9d6a5c9d3369b7d20d6d396f4788dd73b4b0 *Baraka-UltraPOS-v1.0.0-rc.10-Delivery.zip

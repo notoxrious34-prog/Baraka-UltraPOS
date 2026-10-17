@@ -85,7 +85,7 @@
 <header class="hero">
   <h1>Baraka UltraPOS — Guide d'utilisation / دليل الاستعمال</h1>
   <p>Merchant handover handbook · Keep next to the cash register · يُحفظ بجانب الصندوق</p>
-  <span class="ver">v1.0.0-rc.9 · 2026-10-17</span>
+  <span class="ver">v1.0.0-rc.10 · 2026-10-17</span>
 </header>
 
 <main>
@@ -100,6 +100,9 @@
     <li><a href="#p9">Nouveautés rc.7 : échanges, caisse rapide / جديد rc.7</a></li>
     <li><a href="#p10">Nouveautés rc.8 : imprimante 58/80 mm / جديد rc.8</a></li>
     <li><a href="#p11">Nouveautés rc.9 : recherche &amp; scan / جديد rc.9</a></li>
+    <li><a href="#p12">Suppression sécurisée double voie / الحذف الآمن ثنائي المسار</a></li>
+    <li><a href="#p13">Pack quincaillerie 300 &amp; dépôts / حزمة الخردوات والمستودعات</a></li>
+    <li><a href="#p14">Timbre fiscal optionnel / رسم الطابع الجبائي</a></li>
   </ol>
 </nav>
 
@@ -107,9 +110,9 @@
   <h2>1 · Artefact &amp; Installation / ملف التثبيت</h2>
   <div class="fr" dir="ltr" lang="fr">
     <p>Fichier remis par le technicien : <code>Baraka UltraPOS_1.0.0_x64-setup.exe</code>
-    (~212&nbsp;Mo, 222&nbsp;281&nbsp;701 octets). Windows 10/11, <strong>aucune connexion
+    (~212&nbsp;Mo, 222&nbsp;308&nbsp;475 octets). Windows 10/11, <strong>aucune connexion
     internet requise</strong>.</p>
-    <p>SHA-256 :<br /><span class="hash">4E62019C15F3EC4D7B70DD831A409785E88F9CDAF43E23598D9505AD609CAE01</span></p>
+    <p>SHA-256 :<br /><span class="hash">5512CB43106CE911A1F31659DF9000B9F41011F01B59C66005EFD04730C0DF5D</span></p>
     <p>Double-cliquez (français proposé en premier), installez depuis le compte Windows de la
     caisse. Écran bleu SmartScreen attendu : « Informations complémentaires » →
     « Exécuter quand même ».</p>
@@ -422,8 +425,121 @@
       «تمت إضافته إلى السلة».</div>
   </div>
 </section>
+
+<section class="card" id="p12">
+  <h2>12 · Suppression sécurisée &amp; désactivation automatique (double voie) / الحذف الآمن والتعطيل التلقائي ثنائي المسار</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <p>Chaque bouton <strong>Supprimer</strong> (produits, clients, fournisseurs,
+    dépôts) ouvre une confirmation qui explique les deux voies :</p>
+    <ol>
+      <li><strong>Sans historique</strong> (aucune vente, aucun mouvement, aucun
+        document) : l'élément est <strong>définitivement supprimé</strong>.</li>
+      <li><strong>Avec historique</strong> : l'élément est <strong>automatiquement
+        désactivé et archivé</strong> — il disparaît des listes actives mais vos
+        registres comptables restent intacts. Le message vert précise le cas :
+        « supprimé définitivement » ou « archivé et désactivé ».</li>
+    </ol>
+    <p>Protections inviolables : le dépôt principal <code>DEP-01</code> ne peut
+    jamais être supprimé ; un client avec un solde ouvert
+    (dette ou avance ≠ 0) est <strong>bloqué</strong> — le bouton reste grisé
+    avec l'explication ; un dépôt contenant du stock ne peut pas être supprimé.</p>
+    <div class="note">Astuce : pour nettoyer un vieux catalogue, supprimez sans
+      crainte — l'historique de ventes est toujours préservé par l'archivage.</div>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <p>كل زر <strong>حذف</strong> (منتجات، عملاء، مورّدون، مستودعات) يفتح نافذة
+    تأكيد تشرح المسارين:</p>
+    <ol>
+      <li><strong>بلا سجل</strong> (لا مبيعات ولا حركات ولا وثائق): يُحذف العنصر
+        <strong>نهائياً</strong>.</li>
+      <li><strong>ذو سجل</strong>: يُعطَّل العنصر <strong>ويُؤرشف تلقائياً</strong> —
+        يختفي من القوائم النشطة وتبقى دفاترك سليمة. الرسالة الخضراء توضح الحالة:
+        «تم الحذف نهائياً» أو «تمت الأرشفة والتعطيل».</li>
+    </ol>
+    <p>حمايات مطلقة: المستودع الرئيسي <code>DEP-01</code> لا يُحذف أبدًا؛ العميل
+    ذو الرصيد المفتوح (دين أو تسبقة ≠ 0) <strong>محظور</strong> — يبقى الزر رماديًا
+    مع التفسير؛ والمستودع الذي يحوي مخزونًا لا يمكن حذفه.</p>
+    <div class="note">تلميح: لتنظيف فهرس قديم، احذف بلا خوف — فالمبيعات السابقة
+      محفوظة دائمًا بالأرشفة.</div>
+  </div>
+</section>
+
+<section class="card" id="p13">
+  <h2>13 · Pack Quincaillerie Générale (300 articles) &amp; gestion des dépôts / حزمة الخردوات العامة (300 مادة) واختيار المستودع</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <p>En haut du <strong>Catalogue</strong>, la carte du pack installe en un clic
+    les <strong>300 articles standards</strong> (visserie, outillage, plomberie,
+    électricité) avec prix et unités :</p>
+    <ol>
+      <li>Choisissez le <strong>dépôt cible</strong> (le dépôt actif est présélectionné).</li>
+      <li>Cliquez <strong>Installer le Pack</strong>, confirmez : la barre de
+        progression affiche <code>X / 300 (Y %)</code> en direct ; les doublons
+        existants sont ignorés sans interrompre l'installation.</li>
+      <li>Le compteur <code>installés / 300</code> passe au vert : le catalogue
+        est prêt à vendre.</li>
+    </ol>
+    <p>À la création manuelle d'un produit, le champ <strong>Dépôt</strong> envoie
+    le stock initial directement dans le dépôt choisi. Dans
+    <strong>Dépôts &amp; Transferts</strong>, l'onglet <strong>Dépôts</strong>
+    permet de renommer les dépôts et de les activer/désactiver
+    (<code>DEP-01</code> reste verrouillé).</p>
+    <p><strong>Désinstaller le Pack</strong> demande confirmation puis applique
+    la double voie : les articles jamais vendus sont supprimés, les articles
+    vendus sont archivés — le résumé final donne les deux chiffres exacts.</p>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <p>أعلى <strong>الفهرس</strong>، بطاقة الحزمة تثبّت بنقرة واحدة
+    <strong>300 منتج قياسي</strong> (براغي، أدوات، ترصيص، كهرباء) بالأسعار
+    والوحدات:</p>
+    <ol>
+      <li>اختر <strong>المستودع المستهدف</strong> (المستودع النشط محدد مسبقًا).</li>
+      <li>اضغط <strong>تثبيت الحزمة</strong> وأكّد: شريط التقدم يعرض
+        <code>X / 300 (Y%)</code> مباشرة؛ والمنتجات الموجودة تُتجاهَل دون
+        إيقاف التثبيت.</li>
+      <li>العدّاد <code>المثبت / 300</code> يتحول للأخضر: الفهرس جاهز للبيع.</li>
+    </ol>
+    <p>عند إنشاء منتج يدويًا، حقل <strong>المستودع</strong> يرسل المخزون الأولي
+    مباشرة إلى المستودع المختار. وفي <strong>المستودعات والتحويلات</strong>، تبويب
+    <strong>المستودعات</strong> يتيح إعادة التسمية والتفعيل/التعطيل
+    (<code>DEP-01</code> يبقى مقفلًا).</p>
+    <p><strong>إلغاء تثبيت الحزمة</strong> يطلب التأكيد ثم يطبق المسارين: المنتجات
+    التي لم تُبع تُحذف، والمباعة تُؤرشف — والملخص النهائي يعرض الرقمين بدقة.</p>
+  </div>
+</section>
+
+<section class="card" id="p14">
+  <h2>14 · Fiscalité &amp; droit de Timbre fiscal (optionnel) / الجبائية ورسم الطابع الجبائي</h2>
+  <div class="fr" dir="ltr" lang="fr">
+    <p>Dans <strong>Paramètres → Fiscalité</strong>, l'interrupteur
+    <strong>Droit de Timbre Fiscal (1 %)</strong> contrôle le timbre des tickets
+    au comptant :</p>
+    <ol>
+      <li><strong>Activé</strong> (par défaut) : le timbre de 1 % s'applique sur
+        les ventes au comptant dès 500&nbsp;DA, selon la règle fiscale
+        (aperçu et ticket identiques).</li>
+      <li><strong>Désactivé</strong> : aucun timbre n'est ajouté — les totaux
+        affichés et imprimés excluent le timbre.</li>
+    </ol>
+    <div class="note">Réservé à l'administrateur : la modification est
+      enregistrée aussitôt et confirmée par un message.</div>
+  </div>
+  <hr class="sep" />
+  <div class="ar" dir="rtl" lang="ar">
+    <p>في <strong>الإعدادات ← الجبائية</strong>، مفتاح
+    <strong>رسم الطابع الجبائي (1%)</strong> يتحكم في طابع التذاكر النقدية:</p>
+    <ol>
+      <li><strong>مفعّل</strong> (افتراضي): يُطبق الطابع 1% على المبيعات النقدية
+        ابتداءً من 500 دج وفق القاعدة الجبائية (المعاينة والتذكرة متطابقان).</li>
+      <li><strong>معطّل</strong>: لا يُضاف أي طابع — المجاميع المعروضة
+        والمطبوعة تستثني الطابع.</li>
+    </ol>
+    <div class="note">خاص بالمدير: يُحفظ التغيير فورًا ويُؤكَّد برسالة.</div>
+  </div>
+</section>
 </main>
 
-<footer>Baraka UltraPOS v1.0.0-rc.9 · Guide de remise / دليل التسليم · 100% hors-ligne — aucun appel réseau.</footer>
+<footer>Baraka UltraPOS v1.0.0-rc.10 · Guide de remise / دليل التسليم · 100% hors-ligne — aucun appel réseau.</footer>
 </body>
 </html>

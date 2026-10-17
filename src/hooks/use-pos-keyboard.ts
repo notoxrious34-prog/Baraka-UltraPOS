@@ -196,6 +196,12 @@ export function usePosKeyboard(): void {
         }
         return;
       }
+      // TASK-DSN-049: F11 has no cockpit action, but the WebView2 default
+      // (fullscreen toggle) must never fire while POS is active.
+      if (event.key === "F11") {
+        event.preventDefault();
+        return;
+      }
       if (event.key === "F12") {
         event.preventDefault();
         // Section 15 bindings unchanged (no new shortcut); F12 is a no-op

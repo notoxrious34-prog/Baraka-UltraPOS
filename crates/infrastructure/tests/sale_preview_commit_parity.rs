@@ -235,6 +235,8 @@ fn preview_equals_commit_tick_2026_000002_scenario() {
             customer_id: None,
             global_discount_centimes: 0,
             payments: payments.clone(),
+
+            timbre_enabled: true,
         },
     )
     .expect("preview");
@@ -274,6 +276,8 @@ fn preview_equals_commit_tick_2026_000002_scenario() {
             payments,
             allow_negative_stock: false,
             notes: None,
+
+            timbre_enabled: true,
         },
         TEST_TERMINAL,
     )
@@ -345,6 +349,8 @@ fn preview_equals_commit_with_discounts_bl_no_timbre() {
             customer_id: None,
             global_discount_centimes: 4_050,
             payments: vec![],
+
+            timbre_enabled: true,
         },
     )
     .expect("preview");
@@ -384,6 +390,8 @@ fn preview_equals_commit_with_discounts_bl_no_timbre() {
             customer_id: None,
             global_discount_centimes: 4_050,
             payments: payments.clone(),
+
+            timbre_enabled: true,
         },
     )
     .expect("preview with tender");
@@ -420,6 +428,8 @@ fn preview_equals_commit_with_discounts_bl_no_timbre() {
             payments,
             allow_negative_stock: false,
             notes: None,
+
+            timbre_enabled: true,
         },
         TEST_TERMINAL,
     )
@@ -472,6 +482,8 @@ fn preview_is_read_only_and_rejects_empty_cart() {
                 method: PaymentMethod::Cash,
                 amount_centimes: 10_000,
             }],
+
+            timbre_enabled: true,
         },
     )
     .expect_err("empty cart");
@@ -504,6 +516,8 @@ fn preview_is_read_only_and_rejects_empty_cart() {
             customer_id: None,
             global_discount_centimes: 0,
             payments: vec![],
+
+            timbre_enabled: true,
         },
     )
     .expect_err("unsupported doc type");

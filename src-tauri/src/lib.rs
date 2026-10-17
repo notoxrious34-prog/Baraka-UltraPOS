@@ -17,9 +17,9 @@ use baraka_commands::ipc::AppState;
 use baraka_infrastructure::adapters::{
     Argon2PasswordHasher, InMemorySessionStore, SqliteBackupManager, SqliteCashSessionRepository,
     SqliteCatalogRepository, SqliteCheckoutRepository, SqliteCustomerRepository,
-    SqliteDocumentRepository, SqlitePrintJobRepository, SqlitePrinterSettings,
-    SqlitePurchaseRepository, SqliteReportingRepository, SqliteReturnRepository,
-    SqliteStockRepository, SqliteSupplierRepository, SqliteUserRepository,
+    SqliteDocumentRepository, SqliteFiscalSettings, SqlitePrintJobRepository,
+    SqlitePrinterSettings, SqlitePurchaseRepository, SqliteReportingRepository,
+    SqliteReturnRepository, SqliteStockRepository, SqliteSupplierRepository, SqliteUserRepository,
     SqliteWarehouseRepository, SystemClock,
 };
 use baraka_infrastructure::persistence::connection::{
@@ -123,6 +123,7 @@ pub fn run() {
             let transport = Arc::new(SerialPrinterTransport::new(Arc::clone(&db)));
             let renderer = Arc::new(EscPosRasterizer);
             let printer_settings = Arc::new(SqlitePrinterSettings::new(Arc::clone(&db)));
+            let fiscal_settings = Arc::new(SqliteFiscalSettings::new(Arc::clone(&db)));
             let state = AppState {
                 users: Arc::new(SqliteUserRepository::new(Arc::clone(&db))),
                 sessions: Arc::new(InMemorySessionStore::new(clock.clone())),
@@ -139,6 +140,7 @@ pub fn run() {
                 print_jobs: print_jobs.clone(),
                 printer_settings: printer_settings.clone(),
                 store_identity: printer_settings.clone(),
+                fiscal: fiscal_settings,
                 printer_transport: transport.clone(),
                 printer_capture: Arc::new(CaptureDevice::from_db_path(&db_path)),
                 printer_renderer: renderer.clone(),
@@ -212,6 +214,7 @@ pub fn run() {
             baraka_commands::ipc::users_reset_credentials,
             baraka_commands::ipc::catalog_create_product,
             baraka_commands::ipc::catalog_update_product,
+            baraka_commands::ipc::catalog_delete_product,
             baraka_commands::ipc::catalog_get_product,
             baraka_commands::ipc::catalog_search,
             baraka_commands::ipc::catalog_define_kit,
@@ -222,6 +225,8 @@ pub fn run() {
             baraka_commands::ipc::category_seed_starter,
             baraka_commands::ipc::warehouses_create,
             baraka_commands::ipc::warehouses_list,
+            baraka_commands::ipc::warehouses_update,
+            baraka_commands::ipc::warehouses_delete,
             baraka_commands::ipc::stock_get,
             baraka_commands::ipc::stock_adjust,
             baraka_commands::ipc::stock_transfer,
@@ -244,6 +249,7 @@ pub fn run() {
             baraka_commands::ipc::backups_restore,
             baraka_commands::ipc::customers_create,
             baraka_commands::ipc::customers_update,
+            baraka_commands::ipc::customers_delete,
             baraka_commands::ipc::customers_search,
             baraka_commands::ipc::customers_get,
             baraka_commands::ipc::customers_list,
@@ -256,6 +262,8 @@ pub fn run() {
             baraka_commands::ipc::printer_test_print,
             baraka_commands::ipc::store_identity_get,
             baraka_commands::ipc::store_identity_save,
+            baraka_commands::ipc::fiscal_settings_get,
+            baraka_commands::ipc::fiscal_settings_update,
             baraka_commands::ipc::cash_open,
             baraka_commands::ipc::cash_begin_closing,
             baraka_commands::ipc::cash_cancel_closing,
@@ -265,6 +273,7 @@ pub fn run() {
             baraka_commands::ipc::cash_get_session_report,
             baraka_commands::ipc::suppliers_create,
             baraka_commands::ipc::suppliers_update,
+            baraka_commands::ipc::suppliers_delete,
             baraka_commands::ipc::suppliers_get,
             baraka_commands::ipc::suppliers_search,
             baraka_commands::ipc::suppliers_get_statement,

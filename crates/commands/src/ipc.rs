@@ -10,8 +10,8 @@ use std::sync::Arc;
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
     BackupRepository, CaptureSink, CashSessionRepository, CategoryRepository, CheckoutRepository,
-    Clock, CustomerRepository, DocumentRepository, DocumentSearchFilter, NewSupplier,
-    PasswordHasher, PrintJobRepository, PrinterSettingsPort, PrinterTransportPort,
+    Clock, CustomerRepository, DocumentRepository, DocumentSearchFilter, FiscalSettingsPort,
+    NewSupplier, PasswordHasher, PrintJobRepository, PrinterSettingsPort, PrinterTransportPort,
     ProductRepository, PurchaseLineInput, PurchaseRepository, ReceiptRendererPort,
     ReportingRepository, ReturnRepository, SessionContext, SessionStore, SessionToken,
     StockRepository, StoreIdentityPort, SupplierRepository, SupplierUpdate, UserRepository,
@@ -36,6 +36,10 @@ use baraka_application::use_cases::catalog::{
 use baraka_application::use_cases::customers::{
     CreateCustomerUseCase, GetCustomerStatementUseCase, GetCustomerUseCase, ListCustomersUseCase,
     RecordCreditPaymentUseCase, SearchCustomersUseCase, UpdateCustomerUseCase,
+};
+use baraka_application::use_cases::deletion::{
+    DeleteCustomerUseCase, DeleteProductUseCase, DeleteSupplierUseCase, DeleteWarehouseUseCase,
+    UpdateWarehouseUseCase,
 };
 use baraka_application::use_cases::inventory::{
     AdjustStockInput, AdjustStockUseCase, CreateWarehouseUseCase, GetStockLevelUseCase,
@@ -62,8 +66,9 @@ use baraka_application::use_cases::returns::{
 use baraka_application::use_cases::sales::{
     CartLineInput, CheckoutInput, CheckoutSaleUseCase, ClosingInput, ClosingPaymentInput,
     ConvertBlToFactureUseCase, ConvertDevisToBlInput, ConvertDevisToBlUseCase,
-    CreateDraftSaleUseCase, DiscardDraftSaleUseCase, DraftInput, GetSaleUseCase, PaymentInput,
-    PreviewSaleTotalsUseCase, PreviewTotalsInput, SearchDocumentsUseCase, StockShortageWarning,
+    CreateDraftSaleUseCase, DiscardDraftSaleUseCase, DraftInput, GetFiscalSettingsUseCase,
+    GetSaleUseCase, PaymentInput, PreviewSaleTotalsUseCase, PreviewTotalsInput,
+    SearchDocumentsUseCase, StockShortageWarning, UpdateFiscalSettingsUseCase,
 };
 use baraka_application::use_cases::suppliers::{
     CreateSupplierUseCase, GetSupplierStatementUseCase, GetSupplierUseCase, SearchSuppliersUseCase,
@@ -98,15 +103,16 @@ use crate::dto::{
     CreateBackupRequestDto, CreateCategoryRequestDto, CreateDraftSaleRequest, CreateProductDto,
     CreatePurchaseOrderRequestDto, CreateSupplierRequestDto, CreateUserRequestDto,
     CreateWarehouseRequestDto, CreditOutstandingRowDto, CustomerDetailDto, CustomerSummaryDto,
-    DailySalesSummaryDto, DecodeSummaryDto, DefineKitDto, DocumentDto, DocumentItemDto,
-    DocumentSearchRequest, DocumentSearchResponse, DocumentSummaryDto,
-    DocumentsProcessReturnRequestDto, DocumentsProcessReturnResponseDto, DraftSaleResponse,
-    GetCustomerRequestDto, GetProductDto, GetSaleResponse, GetSessionReportRequestDto,
-    GetStatementRequest, GetStatementResponse, GetStockLevelRequestDto, GetStockLevelResponseDto,
-    GrossMarginRowDto, HealthDto, ImportProductsRequestDto, ImportProductsResponseDto,
-    ImportRowErrorDto, KitItemDto, LineMarginDto, ListWarehousesResponseDto, LoginRequestDto,
-    LoginResponseDto, LogoutRequestDto, LowStockRequestDto, LowStockRowDto, NewCustomerRequest,
-    NewProductUnitDto, OpenCashSessionRequestDto, PaymentDto, PaymentLineDto, PreRestoreChecksDto,
+    DailySalesSummaryDto, DecodeSummaryDto, DefineKitDto, DeleteEntityRequestDto,
+    DeleteEntityResultDto, DocumentDto, DocumentItemDto, DocumentSearchRequest,
+    DocumentSearchResponse, DocumentSummaryDto, DocumentsProcessReturnRequestDto,
+    DocumentsProcessReturnResponseDto, DraftSaleResponse, FiscalSettingsDto, GetCustomerRequestDto,
+    GetProductDto, GetSaleResponse, GetSessionReportRequestDto, GetStatementRequest,
+    GetStatementResponse, GetStockLevelRequestDto, GetStockLevelResponseDto, GrossMarginRowDto,
+    HealthDto, ImportProductsRequestDto, ImportProductsResponseDto, ImportRowErrorDto, KitItemDto,
+    LineMarginDto, ListWarehousesResponseDto, LoginRequestDto, LoginResponseDto, LogoutRequestDto,
+    LowStockRequestDto, LowStockRowDto, NewCustomerRequest, NewProductUnitDto,
+    OpenCashSessionRequestDto, PaymentDto, PaymentLineDto, PreRestoreChecksDto,
     PreRestoreReportDto, PreRestoreRequestDto, PreviewLineDto, PreviewTotalsRequest,
     PreviewTotalsResponse, PrintStatusResponse, PrinterSettingsDto, ProcessReturnRequestDto,
     ProcessReturnResponseDto, ProductResponseDto, ProductUnitDto, PurchaseLineRequestDto,
@@ -122,10 +128,11 @@ use crate::dto::{
     StockShortageWarningDto, StoreIdentityDto, StoreIdentityResponse, SupplierDto,
     SupplierIdRequestDto, SupplierLedgerEntryDto, SupplierPaymentOutcomeDto, SupplierStatementDto,
     TestPrintRequest, TestPrintResponse, TransferStockRequestDto, TransferStockResponseDto,
-    UpdateCategoryRequestDto, UpdateCustomerRequest, UpdatePrinterSettingsRequest,
-    UpdateProductDto, UpdateProductUnitDto, UpdatePurchaseOrderRequestDto,
-    UpdateSupplierRequestDto, UpdateUserRequestDto, UserActivityRequestDto, UserActivityRowDto,
-    UserSummaryDto, VerifyBackupRequestDto, VerifyBackupResponseDto, WarehouseDto,
+    UpdateCategoryRequestDto, UpdateCustomerRequest, UpdateFiscalSettingsRequestDto,
+    UpdatePrinterSettingsRequest, UpdateProductDto, UpdateProductUnitDto,
+    UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto, UpdateUserRequestDto,
+    UpdateWarehouseRequestDto, UserActivityRequestDto, UserActivityRowDto, UserSummaryDto,
+    VerifyBackupRequestDto, VerifyBackupResponseDto, WarehouseDto,
 };
 
 /// Shared backend handles for command handlers.
@@ -163,6 +170,8 @@ pub struct AppState {
     pub printer_settings: Arc<dyn PrinterSettingsPort>,
     /// Store identity + diagnostics settings (same table, identity port).
     pub store_identity: Arc<dyn StoreIdentityPort>,
+    /// Fiscal stamp settings (`fiscal.*` keys, ADR-092).
+    pub fiscal: Arc<dyn FiscalSettingsPort>,
     /// Physical printer transport edge.
     pub printer_transport: Arc<dyn PrinterTransportPort>,
     /// Immutable test-print artifact sink.
@@ -855,6 +864,26 @@ pub fn catalog_update_product(
     Ok(to_response(detail))
 }
 
+/// `catalog_delete_product` command: dual-track safe deletion (ADR-092).
+/// Hard-purges unreferenced products; deactivates historically referenced
+/// ones. Catalog-manage roles only.
+#[tauri::command(rename_all = "snake_case")]
+pub fn catalog_delete_product(
+    state: tauri::State<'_, AppState>,
+    request: DeleteEntityRequestDto,
+) -> Result<DeleteEntityResultDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let id = parse_wire_id(&request.id, "id").map_err(|error| error_code(&error))?;
+    let outcome = DeleteProductUseCase::new(state.catalog.as_ref())
+        .execute(&session, ProductId::from(id))
+        .map_err(|error| error_code(&error))?;
+    Ok(DeleteEntityResultDto {
+        id: outcome.id,
+        mode: outcome.mode.to_string(),
+        message: outcome.message.to_string(),
+    })
+}
+
 /// `catalog_get_product` command: full product detail view.
 #[tauri::command(rename_all = "snake_case")]
 pub fn catalog_get_product(
@@ -1135,6 +1164,56 @@ pub fn warehouses_list(
     })
 }
 
+/// `warehouses_update` command: sparse rename and/or (de)activation
+/// (ADR-092, ADMIN only via `ManageWarehouses`; DEP-01 deactivation
+/// rejected upstream).
+#[tauri::command(rename_all = "snake_case")]
+pub fn warehouses_update(
+    state: tauri::State<'_, AppState>,
+    request: UpdateWarehouseRequestDto,
+) -> Result<WarehouseDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let id = parse_wire_id(&request.id, "id").map_err(|error| error_code(&error))?;
+    UpdateWarehouseUseCase::new(state.warehouses.as_ref())
+        .execute(
+            &session,
+            WarehouseId::from(id),
+            request.name,
+            request.is_active,
+        )
+        .map_err(|error| error_code(&error))?;
+    let warehouse = state
+        .warehouses
+        .get_by_id(WarehouseId::from(id))
+        .map_err(|error| error_code(&error))?
+        .ok_or_else(|| "INTERNAL_ERROR".to_string())?;
+    Ok(WarehouseDto {
+        id: warehouse.id.to_string(),
+        code: warehouse.code.as_str().to_string(),
+        name: warehouse.name.clone(),
+        is_active: warehouse.is_active,
+    })
+}
+
+/// `warehouses_delete` command: dual-track safe deletion (ADR-092).
+/// DEP-01 immutable; non-zero stock blocks; history deactivates.
+#[tauri::command(rename_all = "snake_case")]
+pub fn warehouses_delete(
+    state: tauri::State<'_, AppState>,
+    request: DeleteEntityRequestDto,
+) -> Result<DeleteEntityResultDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let id = parse_wire_id(&request.id, "id").map_err(|error| error_code(&error))?;
+    let outcome = DeleteWarehouseUseCase::new(state.warehouses.as_ref())
+        .execute(&session, WarehouseId::from(id))
+        .map_err(|error| error_code(&error))?;
+    Ok(DeleteEntityResultDto {
+        id: outcome.id,
+        mode: outcome.mode.to_string(),
+        message: outcome.message.to_string(),
+    })
+}
+
 /// `stock_get` command (`stock.get`): level read, 0 when absent.
 #[tauri::command(rename_all = "snake_case")]
 pub fn stock_get(
@@ -1337,6 +1416,7 @@ pub fn sales_checkout(
         payments,
         allow_negative_stock: request.allow_negative_stock,
         notes: request.notes,
+        timbre_enabled: state.fiscal.timbre_enabled().unwrap_or(true),
     };
     let receipt = CheckoutSaleUseCase::new(
         state.catalog.as_ref(),
@@ -1428,6 +1508,7 @@ pub fn sales_preview_totals(
             )
             .map_err(|error| error_code(&error))?,
             payments,
+            timbre_enabled: state.fiscal.timbre_enabled().unwrap_or(true),
         },
     )
     .map_err(|error| error_code(&error))?;
@@ -2509,6 +2590,27 @@ pub fn customers_update(
     )
 }
 
+/// `customers_delete` command: guarded dual-track safe deletion (ADR-092).
+/// Non-zero balances reject; history deactivates. Credit-manage roles only.
+#[tauri::command(rename_all = "snake_case")]
+pub fn customers_delete(
+    state: tauri::State<'_, AppState>,
+    request: DeleteEntityRequestDto,
+) -> Result<DeleteEntityResultDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let id = parse_wire_id(&request.id, "id")
+        .map(CustomerId::from)
+        .map_err(|error| error_code(&error))?;
+    let outcome = DeleteCustomerUseCase::new(state.customers.as_ref())
+        .execute(&session, id)
+        .map_err(|error| error_code(&error))?;
+    Ok(DeleteEntityResultDto {
+        id: outcome.id,
+        mode: outcome.mode.to_string(),
+        message: outcome.message.to_string(),
+    })
+}
+
 fn to_summary(summary: &baraka_application::ports::CustomerSummary) -> CustomerSummaryDto {
     CustomerSummaryDto {
         id: summary.id.to_string(),
@@ -2790,6 +2892,34 @@ pub fn store_identity_save(
         identity: to_identity_dto(&saved),
         device_kind,
     })
+}
+
+/// `fiscal_settings_get` command: read the timbre toggle (ADR-092,
+/// any authenticated session; absent key reads as enabled).
+#[tauri::command(rename_all = "snake_case")]
+pub fn fiscal_settings_get(
+    state: tauri::State<'_, AppState>,
+    session_token: String,
+) -> Result<FiscalSettingsDto, String> {
+    let session = require_session(&state, &session_token)?;
+    let timbre_enabled = GetFiscalSettingsUseCase::new(state.fiscal.as_ref())
+        .execute(&session)
+        .map_err(|error| error_code(&error))?;
+    Ok(FiscalSettingsDto { timbre_enabled })
+}
+
+/// `fiscal_settings_update` command: persist the timbre toggle (ADR-092,
+/// ADMIN only via `SystemSettingsManage`).
+#[tauri::command(rename_all = "snake_case")]
+pub fn fiscal_settings_update(
+    state: tauri::State<'_, AppState>,
+    request: UpdateFiscalSettingsRequestDto,
+) -> Result<FiscalSettingsDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let timbre_enabled = UpdateFiscalSettingsUseCase::new(state.fiscal.as_ref())
+        .execute(&session, request.timbre_enabled)
+        .map_err(|error| error_code(&error))?;
+    Ok(FiscalSettingsDto { timbre_enabled })
 }
 
 /// `printer_test_print` command (SystemSettingsManage): synchronous
@@ -3161,6 +3291,26 @@ pub fn suppliers_update(
         )
         .map_err(|error| error_code(&error))?;
     Ok(to_supplier_dto(&view))
+}
+
+/// `suppliers_delete` command: dual-track safe deletion (ADR-092).
+/// Hard-purges unreferenced suppliers; deactivates historically referenced
+/// ones. Gerant/Admin only.
+#[tauri::command(rename_all = "snake_case")]
+pub fn suppliers_delete(
+    state: tauri::State<'_, AppState>,
+    request: DeleteEntityRequestDto,
+) -> Result<DeleteEntityResultDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let supplier_id = parse_supplier_id(&request.id)?;
+    let outcome = DeleteSupplierUseCase::new(state.suppliers.as_ref())
+        .execute(&session, &supplier_id)
+        .map_err(|error| error_code(&error))?;
+    Ok(DeleteEntityResultDto {
+        id: outcome.id,
+        mode: outcome.mode.to_string(),
+        message: outcome.message.to_string(),
+    })
 }
 
 /// `suppliers.get` command: full supplier view.

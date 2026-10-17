@@ -133,4 +133,102 @@ impl WarehouseRepository for SqliteWarehouseRepository {
             .map_err(|_| store_failure())?;
         Ok(warehouses)
     }
+
+    fn update_warehouse(
+        &self,
+        id: WarehouseId,
+        name: Option<&str>,
+        is_active: Option<bool>,
+    ) -> Result<(), ApplicationError> {
+        let guard = self.lock()?;
+        let exists: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM warehouses WHERE id = ?1",
+                [id.to_string()],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        if exists == 0 {
+            return Err(ApplicationError::NotFound("warehouse".to_string()));
+        }
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        if let Some(text) = name {
+            guard
+                .execute(
+                    "UPDATE warehouses SET name = ?1, updated_at = ?2 WHERE id = ?3",
+                    rusqlite::params![text, stamp, id.to_string()],
+                )
+                .map_err(|_| store_failure())?;
+        }
+        if let Some(active) = is_active {
+            guard
+                .execute(
+                    "UPDATE warehouses SET is_active = ?1, updated_at = ?2 WHERE id = ?3",
+                    rusqlite::params![i64::from(active), stamp, id.to_string()],
+                )
+                .map_err(|_| store_failure())?;
+        }
+        Ok(())
+    }
+
+    fn count_warehouse_references(&self, id: WarehouseId) -> Result<u64, ApplicationError> {
+        let guard = self.lock()?;
+        let key = id.to_string();
+        let movements: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM stock_movements WHERE warehouse_id = ?1",
+                [&key],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        let documents: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM documents WHERE warehouse_id = ?1",
+                [&key],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        Ok(movements.max(0) as u64 + documents.max(0) as u64)
+    }
+
+    fn count_warehouse_nonzero_levels(&self, id: WarehouseId) -> Result<u64, ApplicationError> {
+        let guard = self.lock()?;
+        let count: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM stock_levels WHERE warehouse_id = ?1 AND quantity_base_micro != 0",
+                [id.to_string()],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        Ok(count.max(0) as u64)
+    }
+
+    fn hard_delete_warehouse(&self, id: WarehouseId) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
+        let key = id.to_string();
+        run_transaction(&mut guard, |tx| {
+            tx.execute("DELETE FROM stock_levels WHERE warehouse_id = ?1", [&key])?;
+            let removed = tx.execute("DELETE FROM warehouses WHERE id = ?1", [&key])?;
+            if removed == 0 {
+                return Err(rusqlite::Error::QueryReturnedNoRows.into());
+            }
+            Ok(())
+        })
+        .map_err(|_| store_failure())
+    }
+
+    fn set_warehouse_active(&self, id: WarehouseId, active: bool) -> Result<(), ApplicationError> {
+        let guard = self.lock()?;
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let removed = guard
+            .execute(
+                "UPDATE warehouses SET is_active = ?1, updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![i64::from(active), stamp, id.to_string()],
+            )
+            .map_err(|_| store_failure())?;
+        if removed == 0 {
+            return Err(ApplicationError::NotFound("warehouse".to_string()));
+        }
+        Ok(())
+    }
 }

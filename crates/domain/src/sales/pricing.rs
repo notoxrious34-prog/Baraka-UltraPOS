@@ -293,6 +293,7 @@ pub fn price_document(
     global_discount_centimes: i64,
     doc_type: DocumentType,
     payments: &[PaymentShare],
+    timbre_enabled: bool,
 ) -> Result<PricedDocument, DomainError> {
     if lines.is_empty() {
         return Err(DomainError::EmptyCart);
@@ -359,7 +360,13 @@ pub fn price_document(
     let timbre_base = subtotal_ht
         .checked_add(total_tva)
         .ok_or(DomainError::MoneyOverflow)?;
-    let timbre = compute_timbre(doc_type, cash_tendered, timbre_base);
+    // ADR-092: the fiscal stamp is configurable; when disabled the kernel
+    // prices timbre as exactly zero (same gate as preview and checkout).
+    let timbre = if timbre_enabled {
+        compute_timbre(doc_type, cash_tendered, timbre_base)
+    } else {
+        0
+    };
     let total_ttc = subtotal_ht
         .checked_add(total_tva)
         .and_then(|sum| sum.checked_add(timbre))
@@ -534,7 +541,8 @@ mod tests {
             method: PaymentMethod::Cash,
             amount_centimes: 30_000,
         }];
-        let priced = price_document(&lines, 1_000, DocumentType::Ticket, &payments).expect("price");
+        let priced =
+            price_document(&lines, 1_000, DocumentType::Ticket, &payments, true).expect("price");
         // Gross: 20,000 + 4,500 after line discount; global 1,000 splits.
         assert_eq!(priced.global_discount, 1_000);
         let allocated: i64 = priced
@@ -561,14 +569,32 @@ mod tests {
     #[test]
     fn empty_cart_and_bad_discounts_rejected() {
         assert_eq!(
-            price_document(&[], 0, DocumentType::Ticket, &[]),
+            price_document(&[], 0, DocumentType::Ticket, &[], true),
             Err(DomainError::EmptyCart)
         );
         let bad = [input(10_000, 1_000, 2_000, 0, 0)];
         assert_eq!(
-            price_document(&bad, 0, DocumentType::Ticket, &[]),
+            price_document(&bad, 0, DocumentType::Ticket, &[], true),
             Err(DomainError::LineDiscountExceedsGross)
         );
+    }
+
+    #[test]
+    fn timbre_toggle_gates_stamp_computation() {
+        // Base 50,000 with 60,000 cash prices a 500 stamp when enabled.
+        let lines = [input(10_000, 50_000, 0, 0, 0)];
+        let payments = [PaymentShare {
+            method: PaymentMethod::Cash,
+            amount_centimes: 60_000,
+        }];
+        let enabled =
+            price_document(&lines, 0, DocumentType::Ticket, &payments, true).expect("price");
+        assert_eq!(enabled.timbre, 500);
+        assert_eq!(enabled.total_ttc, 50_000 + 500);
+        let disabled =
+            price_document(&lines, 0, DocumentType::Ticket, &payments, false).expect("price");
+        assert_eq!(disabled.timbre, 0);
+        assert_eq!(disabled.total_ttc, 50_000);
     }
 
     #[test]

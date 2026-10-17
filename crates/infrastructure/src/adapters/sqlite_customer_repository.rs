@@ -658,4 +658,57 @@ impl CustomerRepository for SqliteCustomerRepository {
         }
         Ok(out)
     }
+
+    fn count_customer_references(&self, customer_id: CustomerId) -> Result<u64, ApplicationError> {
+        let guard = self.lock()?;
+        let key = customer_id.to_string();
+        let documents: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM documents WHERE party_type = 'CUSTOMER' AND party_id = ?1",
+                [&key],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        let ledger: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM customer_ledger WHERE customer_id = ?1",
+                [&key],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        Ok(documents.max(0) as u64 + ledger.max(0) as u64)
+    }
+
+    fn hard_delete_customer(&self, customer_id: CustomerId) -> Result<(), ApplicationError> {
+        let guard = self.lock()?;
+        let removed = guard
+            .execute(
+                "DELETE FROM customers WHERE id = ?1",
+                [customer_id.to_string()],
+            )
+            .map_err(|_| store_failure())?;
+        if removed == 0 {
+            return Err(ApplicationError::NotFound("customer".to_string()));
+        }
+        Ok(())
+    }
+
+    fn set_customer_active(
+        &self,
+        customer_id: CustomerId,
+        active: bool,
+    ) -> Result<(), ApplicationError> {
+        let guard = self.lock()?;
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let removed = guard
+            .execute(
+                "UPDATE customers SET is_active = ?1, updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![i64::from(active), stamp, customer_id.to_string()],
+            )
+            .map_err(|_| store_failure())?;
+        if removed == 0 {
+            return Err(ApplicationError::NotFound("customer".to_string()));
+        }
+        Ok(())
+    }
 }

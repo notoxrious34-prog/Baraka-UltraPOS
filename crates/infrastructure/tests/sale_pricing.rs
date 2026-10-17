@@ -150,6 +150,7 @@ fn priced_document_invariants_hold() {
             method: PaymentMethod::Cash,
             amount_centimes: 60_000,
         }],
+        true,
     )
     .expect("price");
     assert_eq!(

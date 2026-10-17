@@ -315,6 +315,8 @@ fn checkout_input(
         }],
         allow_negative_stock: false,
         notes: None,
+
+        timbre_enabled: true,
     }
 }
 

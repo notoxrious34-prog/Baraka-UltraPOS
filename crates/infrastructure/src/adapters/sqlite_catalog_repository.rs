@@ -741,6 +741,63 @@ impl ProductRepository for SqliteCatalogRepository {
         }
         Ok(out)
     }
+
+    fn count_product_references(&self, id: ProductId) -> Result<u64, ApplicationError> {
+        let guard = self.lock()?;
+        let key = id.to_string();
+        let documents: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM document_items WHERE product_id = ?1",
+                [&key],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        let movements: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM stock_movements WHERE product_id = ?1",
+                [&key],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        let kits: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM product_kit_items WHERE kit_product_id = ?1 OR component_product_id = ?1",
+                [&key],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        Ok(documents.max(0) as u64 + movements.max(0) as u64 + kits.max(0) as u64)
+    }
+
+    fn hard_delete_product(&self, id: ProductId) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
+        let key = id.to_string();
+        run_transaction(&mut guard, |tx| {
+            tx.execute("DELETE FROM stock_levels WHERE product_id = ?1", [&key])?;
+            tx.execute("DELETE FROM product_units WHERE product_id = ?1", [&key])?;
+            let removed = tx.execute("DELETE FROM products WHERE id = ?1", [&key])?;
+            if removed == 0 {
+                return Err(rusqlite::Error::QueryReturnedNoRows.into());
+            }
+            Ok(())
+        })
+        .map_err(|_| store_failure())
+    }
+
+    fn set_product_active(&self, id: ProductId, active: bool) -> Result<(), ApplicationError> {
+        let guard = self.lock()?;
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let removed = guard
+            .execute(
+                "UPDATE products SET is_active = ?1, updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![i64::from(active), stamp, id.to_string()],
+            )
+            .map_err(|_| store_failure())?;
+        if removed == 0 {
+            return Err(ApplicationError::NotFound("product".to_string()));
+        }
+        Ok(())
+    }
 }
 
 impl CategoryRepository for SqliteCatalogRepository {

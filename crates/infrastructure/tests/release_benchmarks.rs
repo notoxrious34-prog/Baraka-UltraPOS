@@ -343,6 +343,7 @@ fn bench_m2_atomic_sale() {
             }],
             allow_negative_stock: false,
             notes: None,
+            timbre_enabled: true,
         };
         let start = Instant::now();
         use_case
@@ -390,6 +391,7 @@ fn bench_m3_print_job_insert() {
                 }],
                 allow_negative_stock: false,
                 notes: None,
+                timbre_enabled: true,
             },
             TERMINAL_ID,
         )

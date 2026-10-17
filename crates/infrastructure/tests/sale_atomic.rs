@@ -224,6 +224,8 @@ fn cash_input(
         }],
         allow_negative_stock: false,
         notes: None,
+
+        timbre_enabled: true,
     }
 }
 
@@ -397,6 +399,8 @@ fn preview_reports_shortage_warning_on_zero_stock() {
             customer_id: None,
             global_discount_centimes: 0,
             payments: vec![],
+
+            timbre_enabled: true,
         },
     )
     .expect("preview");

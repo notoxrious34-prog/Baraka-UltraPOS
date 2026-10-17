@@ -142,6 +142,7 @@ fn input_for(
         }],
         allow_negative_stock: false,
         notes: None,
+        timbre_enabled: true,
     }
 }
 

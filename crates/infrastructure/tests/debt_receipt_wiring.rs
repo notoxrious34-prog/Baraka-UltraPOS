@@ -477,6 +477,8 @@ fn commit_sale(
             }],
             allow_negative_stock: false,
             notes: None,
+
+            timbre_enabled: true,
         },
         TEST_TERMINAL,
     )

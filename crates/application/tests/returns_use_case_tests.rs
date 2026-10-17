@@ -347,6 +347,22 @@ impl CustomerRepository for FakeCustomers {
     ) -> Result<Vec<LedgerEntryRow>, ApplicationError> {
         panic!("out of scope for return tests");
     }
+
+    fn count_customer_references(&self, _customer_id: CustomerId) -> Result<u64, ApplicationError> {
+        panic!("out of scope for return tests");
+    }
+
+    fn hard_delete_customer(&self, _customer_id: CustomerId) -> Result<(), ApplicationError> {
+        panic!("out of scope for return tests");
+    }
+
+    fn set_customer_active(
+        &self,
+        _customer_id: CustomerId,
+        _active: bool,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for return tests");
+    }
 }
 
 struct FakeCash {

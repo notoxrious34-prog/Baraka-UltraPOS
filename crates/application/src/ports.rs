@@ -273,6 +273,16 @@ pub trait ProductRepository: Send + Sync {
         &self,
         kit_product_id: ProductId,
     ) -> Result<Vec<KitComponentRow>, ApplicationError>;
+
+    /// Count historical references to a product: document lines, stock
+    /// movements, and kit edges (either side). Drives dual-track deletion.
+    fn count_product_references(&self, id: ProductId) -> Result<u64, ApplicationError>;
+
+    /// Permanently purge an unreferenced product with its units and levels.
+    fn hard_delete_product(&self, id: ProductId) -> Result<(), ApplicationError>;
+
+    /// Soft-deactivate a historically referenced product.
+    fn set_product_active(&self, id: ProductId, active: bool) -> Result<(), ApplicationError>;
 }
 
 /// Category persistence port (SQLite repository in infrastructure).
@@ -318,6 +328,27 @@ pub trait WarehouseRepository: Send + Sync {
 
     /// List active warehouses ordered by code.
     fn list_active(&self) -> Result<Vec<Warehouse>, ApplicationError>;
+
+    /// Rename and/or (de)activate a warehouse (DEP-01 guard lives upstream).
+    fn update_warehouse(
+        &self,
+        id: WarehouseId,
+        name: Option<&str>,
+        is_active: Option<bool>,
+    ) -> Result<(), ApplicationError>;
+
+    /// Count historical references: stock movements + sale/purchase
+    /// documents touching the warehouse. Drives dual-track deletion.
+    fn count_warehouse_references(&self, id: WarehouseId) -> Result<u64, ApplicationError>;
+
+    /// Count stock level rows holding non-zero quantity in the warehouse.
+    fn count_warehouse_nonzero_levels(&self, id: WarehouseId) -> Result<u64, ApplicationError>;
+
+    /// Permanently purge an unreferenced, empty warehouse.
+    fn hard_delete_warehouse(&self, id: WarehouseId) -> Result<(), ApplicationError>;
+
+    /// Soft-deactivate a historically referenced warehouse.
+    fn set_warehouse_active(&self, id: WarehouseId, active: bool) -> Result<(), ApplicationError>;
 }
 
 /// Atomic stock-movement command (single ledger line + level update).
@@ -1085,6 +1116,19 @@ pub trait CustomerRepository: Send + Sync {
         from_date: Option<String>,
         to_date: Option<String>,
     ) -> Result<Vec<LedgerEntryRow>, ApplicationError>;
+
+    /// Count historical references: sale documents (party) + ledger rows.
+    fn count_customer_references(&self, customer_id: CustomerId) -> Result<u64, ApplicationError>;
+
+    /// Permanently purge an unreferenced, zero-balance customer.
+    fn hard_delete_customer(&self, customer_id: CustomerId) -> Result<(), ApplicationError>;
+
+    /// Soft-deactivate a historically referenced customer.
+    fn set_customer_active(
+        &self,
+        customer_id: CustomerId,
+        active: bool,
+    ) -> Result<(), ApplicationError>;
 }
 
 /// Customer creation payload (validated by the use case first).
@@ -1284,6 +1328,16 @@ pub trait PrinterSettingsPort: Send + Sync {
         serial_baud: u32,
         paper_width_mm: Option<u32>,
     ) -> Result<(), ApplicationError>;
+}
+
+/// Fiscal stamp settings port (`fiscal.*` keys in the existing `settings`
+/// table — zero schema changes, ADR-092).
+pub trait FiscalSettingsPort: Send + Sync {
+    /// Read the timbre toggle; absent keys default to enabled (`true`).
+    fn timbre_enabled(&self) -> Result<bool, ApplicationError>;
+
+    /// Persist the timbre toggle (ADMIN-gated upstream).
+    fn set_timbre_enabled(&self, enabled: bool) -> Result<(), ApplicationError>;
 }
 
 /// Store identity + diagnostics port (`store.*` / `printing.*` keys in
@@ -1672,6 +1726,15 @@ pub trait SupplierRepository: Send + Sync {
         &self,
         supplier_id: &str,
     ) -> Result<Option<SupplierStatement>, ApplicationError>;
+
+    /// Count historical references: purchase documents (party) + ledger rows.
+    fn count_supplier_references(&self, supplier_id: &str) -> Result<u64, ApplicationError>;
+
+    /// Permanently purge an unreferenced supplier.
+    fn hard_delete_supplier(&self, supplier_id: &str) -> Result<(), ApplicationError>;
+
+    /// Soft-deactivate a historically referenced supplier.
+    fn set_supplier_active(&self, supplier_id: &str, active: bool) -> Result<(), ApplicationError>;
 }
 
 /// One purchase document line (input to create/receive/invoice).

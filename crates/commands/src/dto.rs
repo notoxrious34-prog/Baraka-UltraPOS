@@ -2456,3 +2456,52 @@ pub struct ImportProductsResponseDto {
     /// Wall-clock execution time in milliseconds.
     pub duration_ms: u64,
 }
+
+/// Dual-track deletion request (session + target id).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeleteEntityRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Target entity id (UUID string).
+    pub id: String,
+}
+
+/// Dual-track deletion outcome (mirrors `DeleteEntityOutcome`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeleteEntityResultDto {
+    /// Deleted or deactivated entity id.
+    pub id: String,
+    /// `"hard_deleted"` or `"deactivated"`.
+    pub mode: String,
+    /// Stable wire message (French copy resolves in the frontend).
+    pub message: String,
+}
+
+/// `warehouses_update` request: sparse rename and/or (de)activation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateWarehouseRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Target warehouse id (UUID string).
+    pub id: String,
+    /// Replacement display name.
+    pub name: Option<String>,
+    /// Replacement active flag.
+    pub is_active: Option<bool>,
+}
+
+/// Fiscal stamp settings view (mirrors the `fiscal.*` settings keys).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FiscalSettingsDto {
+    /// Algerian fiscal stamp toggle.
+    pub timbre_enabled: bool,
+}
+
+/// `fiscal_settings_update` request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateFiscalSettingsRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Algerian fiscal stamp toggle.
+    pub timbre_enabled: bool,
+}

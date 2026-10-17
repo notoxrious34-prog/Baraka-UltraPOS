@@ -147,6 +147,23 @@ export async function ipcGetProduct(
   });
 }
 
+/** Dual-track deletion outcome (ADR-092): purge or soft-deactivation. */
+export interface DeleteEntityResult {
+  id: string;
+  mode: "hard_deleted" | "deactivated";
+  message: string;
+}
+
+/** Dual-track safe product deletion: purge when unreferenced, deactivate on history. */
+export async function ipcDeleteProduct(
+  sessionToken: string,
+  productId: string,
+): Promise<DeleteEntityResult> {
+  return call<DeleteEntityResult>("catalog_delete_product", {
+    request: { session_token: sessionToken, id: productId },
+  });
+}
+
 /** Prefix/multilingual catalog search (150ms debounce applied by caller). */
 export async function ipcSearchCatalog(
   sessionToken: string,
@@ -423,6 +440,50 @@ export async function ipcCreateWarehouse(
     name: wire.name,
     isActive: wire.is_active,
   };
+}
+
+/** Sparse warehouse update payload (ADR-092): rename and/or (de)activate. */
+export interface WarehouseUpdateInput {
+  name?: string;
+  isActive?: boolean;
+}
+
+/** Sparse warehouse update (ADMIN only server-side; DEP-01 deactivation rejected). */
+export async function ipcUpdateWarehouse(
+  sessionToken: string,
+  warehouseId: string,
+  input: WarehouseUpdateInput,
+): Promise<WarehouseInfo> {
+  interface WarehouseWire {
+    id: string;
+    code: string;
+    name: string;
+    is_active: boolean;
+  }
+  const wire = await call<WarehouseWire>("warehouses_update", {
+    request: {
+      session_token: sessionToken,
+      id: warehouseId,
+      name: input.name,
+      is_active: input.isActive,
+    },
+  });
+  return {
+    id: wire.id,
+    code: wire.code,
+    name: wire.name,
+    isActive: wire.is_active,
+  };
+}
+
+/** Dual-track safe warehouse deletion: purge when unreferenced, deactivate on history. */
+export async function ipcDeleteWarehouse(
+  sessionToken: string,
+  warehouseId: string,
+): Promise<DeleteEntityResult> {
+  return call<DeleteEntityResult>("warehouses_delete", {
+    request: { session_token: sessionToken, id: warehouseId },
+  });
 }
 
 /** Managed operator view (mirrors UserSummaryDto; never carries hashes). */
@@ -728,6 +789,16 @@ export async function ipcUpdateCustomer(
 ): Promise<CustomerDetail> {
   return call<CustomerDetail>("customers_update", {
     request: { session_token: sessionToken, ...input },
+  });
+}
+
+/** Guarded dual-track customer deletion: rejects non-zero balances, deactivates on history. */
+export async function ipcDeleteCustomer(
+  sessionToken: string,
+  customerId: string,
+): Promise<DeleteEntityResult> {
+  return call<DeleteEntityResult>("customers_delete", {
+    request: { session_token: sessionToken, id: customerId },
   });
 }
 
@@ -1247,6 +1318,30 @@ export async function ipcUpdatePrinterSettings(
     paperWidthDots: wire.paper_width_dots,
     paperWidthMm: wire.paper_width_mm,
   };
+}
+
+/** Fiscal stamp settings view (ADR-092: `fiscal.timbre_enabled`, default true). */
+export interface FiscalSettings {
+  timbreEnabled: boolean;
+}
+
+/** Read the fiscal stamp toggle (any authenticated session). */
+export async function ipcGetFiscalSettings(sessionToken: string): Promise<FiscalSettings> {
+  const wire = await call<{ timbre_enabled: boolean }>("fiscal_settings_get", {
+    session_token: sessionToken,
+  });
+  return { timbreEnabled: wire.timbre_enabled };
+}
+
+/** Persist the fiscal stamp toggle (ADMIN only server-side). */
+export async function ipcUpdateFiscalSettings(
+  sessionToken: string,
+  input: FiscalSettings,
+): Promise<FiscalSettings> {
+  const wire = await call<{ timbre_enabled: boolean }>("fiscal_settings_update", {
+    request: { session_token: sessionToken, timbre_enabled: input.timbreEnabled },
+  });
+  return { timbreEnabled: wire.timbre_enabled };
 }
 
 /** Render + transmit a bilingual test page (ADMIN only server-side). */
@@ -1801,6 +1896,16 @@ export async function ipcGetSupplier(
     request: { session_token: sessionToken, id: supplierId },
   });
   return toSupplier(wire);
+}
+
+/** Dual-track safe supplier deletion: purge when unreferenced, deactivate on history. */
+export async function ipcDeleteSupplier(
+  sessionToken: string,
+  supplierId: string,
+): Promise<DeleteEntityResult> {
+  return call<DeleteEntityResult>("suppliers_delete", {
+    request: { session_token: sessionToken, id: supplierId },
+  });
 }
 
 /** Supplier directory search (blank query returns no rows). */

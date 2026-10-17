@@ -266,6 +266,8 @@ fn build_input(
         payments,
         allow_negative_stock: false,
         notes: None,
+
+        timbre_enabled: true,
     }
 }
 

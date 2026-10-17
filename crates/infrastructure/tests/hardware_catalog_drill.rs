@@ -916,6 +916,8 @@ fn drill_atomic_sale_two_items_cash() {
                 }],
                 allow_negative_stock: false,
                 notes: None,
+
+                timbre_enabled: true,
             },
             TERMINAL_ID,
         )

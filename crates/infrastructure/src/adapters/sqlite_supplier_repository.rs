@@ -311,4 +311,49 @@ impl SupplierRepository for SqliteSupplierRepository {
             current_balance_centimes: supplier.current_balance_centimes,
         }))
     }
+
+    fn count_supplier_references(&self, supplier_id: &str) -> Result<u64, ApplicationError> {
+        let guard = self.lock()?;
+        let documents: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM documents WHERE party_type = 'SUPPLIER' AND party_id = ?1",
+                [supplier_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        let ledger: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM supplier_ledger WHERE supplier_id = ?1",
+                [supplier_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        Ok(documents.max(0) as u64 + ledger.max(0) as u64)
+    }
+
+    fn hard_delete_supplier(&self, supplier_id: &str) -> Result<(), ApplicationError> {
+        let guard = self.lock()?;
+        let removed = guard
+            .execute("DELETE FROM suppliers WHERE id = ?1", [supplier_id])
+            .map_err(|_| store_failure())?;
+        if removed == 0 {
+            return Err(ApplicationError::NotFound("supplier".to_string()));
+        }
+        Ok(())
+    }
+
+    fn set_supplier_active(&self, supplier_id: &str, active: bool) -> Result<(), ApplicationError> {
+        let guard = self.lock()?;
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let removed = guard
+            .execute(
+                "UPDATE suppliers SET is_active = ?1, updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![i64::from(active), stamp, supplier_id],
+            )
+            .map_err(|_| store_failure())?;
+        if removed == 0 {
+            return Err(ApplicationError::NotFound("supplier".to_string()));
+        }
+        Ok(())
+    }
 }

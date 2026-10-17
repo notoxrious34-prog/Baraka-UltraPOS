@@ -15,12 +15,12 @@ use crate::errors::ApplicationError;
 use crate::ports::{CategoryRepository, ProductRepository, SessionContext};
 
 /// Roles allowed to mutate the catalog.
-const MANAGE_PERMISSIONS: [Permission; 2] = [
+pub(crate) const MANAGE_PERMISSIONS: [Permission; 2] = [
     Permission::StockAdjustment,
     Permission::SystemSettingsManage,
 ];
 
-fn require_any(
+pub(crate) fn require_any(
     session: &SessionContext,
     permissions: &[Permission],
 ) -> Result<(), ApplicationError> {
@@ -1099,6 +1099,29 @@ mod tests {
                     quantity_micro: item.quantity_micro.micros(),
                 })
                 .collect())
+        }
+
+        fn count_product_references(&self, _id: ProductId) -> Result<u64, ApplicationError> {
+            Ok(0)
+        }
+
+        fn hard_delete_product(&self, id: ProductId) -> Result<(), ApplicationError> {
+            let mut products = self.products.lock().expect("products");
+            match products.remove(&id) {
+                Some(_) => Ok(()),
+                None => Err(ApplicationError::NotFound("product".to_string())),
+            }
+        }
+
+        fn set_product_active(&self, id: ProductId, active: bool) -> Result<(), ApplicationError> {
+            let mut products = self.products.lock().expect("products");
+            match products.get_mut(&id) {
+                Some((product, _)) => {
+                    product.is_active = active;
+                    Ok(())
+                }
+                None => Err(ApplicationError::NotFound("product".to_string())),
+            }
         }
     }
 

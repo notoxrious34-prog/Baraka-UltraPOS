@@ -263,6 +263,8 @@ fn commit_sale(
             }],
             allow_negative_stock: false,
             notes: None,
+
+            timbre_enabled: true,
         },
         TEST_TERMINAL,
     )
@@ -619,6 +621,8 @@ fn arabic_document_renders_through_worker() {
             }],
             allow_negative_stock: false,
             notes: None,
+
+            timbre_enabled: true,
         },
         TEST_TERMINAL,
     )

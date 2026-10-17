@@ -65,6 +65,8 @@ pub struct PaymentInput {
 /// catalog verification (override permission gate included), kernel
 /// line construction, then the domain `price_document` kernel — so a
 /// previewed total can never diverge from the committed one.
+/// Explicit `timbre_enabled` switch per ADR-092 (arity allow matches ports.rs precedent).
+#[allow(clippy::too_many_arguments)]
 pub fn verify_and_price_cart<P>(
     products: &P,
     session: &SessionContext,
@@ -73,6 +75,7 @@ pub fn verify_and_price_cart<P>(
     doc_type: DocumentType,
     payments: &[PaymentInput],
     tier: CustomerTier,
+    timbre_enabled: bool,
 ) -> Result<(Vec<VerifiedLine>, PricedDocument), ApplicationError>
 where
     P: ProductRepository + ?Sized,
@@ -119,6 +122,7 @@ where
         global_discount_centimes,
         doc_type,
         &kernel_payments,
+        timbre_enabled,
     )
     .map_err(ApplicationError::Validation)?;
     Ok((verified, priced))
@@ -148,6 +152,9 @@ pub struct CheckoutInput {
     pub allow_negative_stock: bool,
     /// Operator note, if any.
     pub notes: Option<String>,
+    /// Fiscal stamp toggle resolved from `fiscal.timbre_enabled` at the IPC
+    /// edge (ADR-092). `false` prices timbre as exactly zero.
+    pub timbre_enabled: bool,
 }
 
 /// Atomic sale orchestrator (pre-validates, then issues one atomic call).
@@ -234,6 +241,7 @@ where
             input.doc_type,
             &input.payments,
             tier,
+            input.timbre_enabled,
         )?;
         // Credit authorization (reads only).
         let mut credit_amount: i128 = 0;
@@ -386,6 +394,9 @@ pub struct PreviewTotalsInput {
     pub global_discount_centimes: i64,
     /// Tender lines exactly as currently entered by the operator.
     pub payments: Vec<PaymentInput>,
+    /// Fiscal stamp toggle resolved from `fiscal.timbre_enabled` at the IPC
+    /// edge (ADR-092). `false` prices timbre as exactly zero.
+    pub timbre_enabled: bool,
 }
 
 /// One leaf-level stock shortage surfaced by the preview (TASK-BRK-033).
@@ -520,6 +531,7 @@ where
             input.doc_type,
             &input.payments,
             tier,
+            input.timbre_enabled,
         )?;
         // Leaf-level shortage scan: expand kits exactly as the commit
         // does, aggregate requested base micros per leaf product, and
@@ -756,7 +768,7 @@ where
                 remaining_due: 0,
             }
         } else {
-            price_document(&priced_inputs, 0, DocumentType::Ticket, &[])
+            price_document(&priced_inputs, 0, DocumentType::Ticket, &[], true)
                 .map_err(ApplicationError::Validation)?
         };
         let now = self.clock.now();
@@ -1329,5 +1341,62 @@ where
             query,
             limit: Some(limit),
         })
+    }
+}
+
+/// Read the fiscal stamp toggle (ADR-092, any authenticated session).
+pub struct GetFiscalSettingsUseCase<'a, F>
+where
+    F: ?Sized,
+{
+    fiscal: &'a F,
+}
+
+impl<'a, F> GetFiscalSettingsUseCase<'a, F>
+where
+    F: crate::ports::FiscalSettingsPort + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(fiscal: &'a F) -> Self {
+        Self { fiscal }
+    }
+
+    /// Return the toggle (absent key reads as enabled).
+    pub fn execute(&self, _session: &SessionContext) -> Result<bool, ApplicationError> {
+        self.fiscal.timbre_enabled()
+    }
+}
+
+/// Persist the fiscal stamp toggle (ADR-092, ADMIN only).
+pub struct UpdateFiscalSettingsUseCase<'a, F>
+where
+    F: ?Sized,
+{
+    fiscal: &'a F,
+}
+
+impl<'a, F> UpdateFiscalSettingsUseCase<'a, F>
+where
+    F: crate::ports::FiscalSettingsPort + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(fiscal: &'a F) -> Self {
+        Self { fiscal }
+    }
+
+    /// Validate permission, then persist the toggle.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        timbre_enabled: bool,
+    ) -> Result<bool, ApplicationError> {
+        if !session
+            .role
+            .has_permission(Permission::SystemSettingsManage)
+        {
+            return Err(ApplicationError::Unauthorized);
+        }
+        self.fiscal.set_timbre_enabled(timbre_enabled)?;
+        self.fiscal.timbre_enabled()
     }
 }

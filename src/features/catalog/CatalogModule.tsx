@@ -14,6 +14,8 @@ import type { Category, Locale } from "@/types/pos";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { ipcGetStock, ipcListCategories, ipcSearchCatalog, listWarehouses } from "@/lib/ipc";
+import { ipcDeleteProduct, type DeleteEntityResult } from "@/lib/ipc";
+import { SafeDeleteModal } from "@/components/common/SafeDeleteModal";
 import { formatMoney, formatQty } from "@/lib/money";
 import type { CatalogProduct } from "@/types/pos";
 import { CategoryManageModal } from "@/features/catalog/CategoryManageModal";
@@ -272,6 +274,7 @@ export interface CatalogHubViewProps {
   onNew: () => void;
   onPrintLabel: (product: CatalogProduct) => void;
   onEdit: (product: CatalogProduct) => void;
+  onDelete: (product: CatalogProduct) => void;
   onToggleActive: (product: CatalogProduct) => void;
   onFilter: (filter: CatalogFilter) => void;
   onSort: (field: SortField) => void;
@@ -684,6 +687,31 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                       >
                         ✏️
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          props.onDelete(product);
+                        }}
+                        aria-label={t(locale, "del.delete")}
+                        title={t(locale, "del.delete")}
+                        className="rounded-md bg-red-50 px-2 py-1 text-xs font-black text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50"
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.75"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                          <path d="M19 6 18 20a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        </svg>
+                      </button>
                     </span>
                   </td>
                 </tr>
@@ -712,6 +740,9 @@ export function CatalogModule(): ReactElement {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [labelProduct, setLabelProduct] = useState<CatalogProduct | null>(null);
   const [editProduct, setEditProduct] = useState<CatalogProduct | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<CatalogProduct | null>(null);
+  /** Inline confirmation after a safe deletion (mode-aware copy). */
+  const [deleteNote, setDeleteNote] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<CatalogFilter>("all");
   /** Last exported filename for the inline confirmation note (TASK-REL-055). */
@@ -939,6 +970,16 @@ export function CatalogModule(): ReactElement {
     setEditProduct(null);
   };
 
+  const handleDeleted = (result: DeleteEntityResult): void => {
+    setDeleteProduct(null);
+    setEditProduct(null);
+    setDeleteNote(t(locale, result.mode === "hard_deleted" ? "del.deleted" : "del.archived"));
+    window.setTimeout(() => {
+      setDeleteNote(null);
+    }, 8000);
+    refresh();
+  };
+
   // Quick status toggle: full-state update with the flag flipped, then the
   // fresh row swapped in place (stock cache untouched).
   const toggleActive = (target: CatalogProduct): void => {
@@ -984,6 +1025,7 @@ export function CatalogModule(): ReactElement {
         }}
         onPrintLabel={setLabelProduct}
         onEdit={setEditProduct}
+        onDelete={setDeleteProduct}
         onToggleActive={toggleActive}
         onFilter={handleFilter}
         onSort={handleSort}
@@ -1062,7 +1104,29 @@ export function CatalogModule(): ReactElement {
           setEditProduct(null);
         }}
         onUpdated={handleUpdated}
+        onDelete={setDeleteProduct}
       />
+      {deleteProduct !== null && (
+        <SafeDeleteModal
+          isOpen
+          titleKey="del.productTitle"
+          entityName={locale === "ar-DZ" ? deleteProduct.name_ar : deleteProduct.name_fr}
+          entityCode={deleteProduct.sku}
+          onClose={() => {
+            setDeleteProduct(null);
+          }}
+          onConfirm={() => ipcDeleteProduct(activeToken, deleteProduct.product_id)}
+          onSuccess={handleDeleted}
+        />
+      )}
+      {deleteNote !== null && (
+        <p
+          role="status"
+          className="fixed bottom-4 start-4 z-50 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-lg"
+        >
+          {deleteNote}
+        </p>
+      )}
     </>
   );
 }

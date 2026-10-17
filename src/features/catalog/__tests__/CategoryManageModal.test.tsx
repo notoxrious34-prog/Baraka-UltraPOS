@@ -224,6 +224,7 @@ describe("CatalogHubView category column", () => {
         onNew={noop}
         onPrintLabel={noop}
         onEdit={noopEdit}
+        onDelete={noopEdit}
         onToggleActive={noopEdit}
         togglingId={null}
         filter="all"

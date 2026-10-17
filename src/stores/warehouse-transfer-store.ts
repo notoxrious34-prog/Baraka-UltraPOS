@@ -12,7 +12,9 @@
 import { create } from "zustand";
 import {
   createWarehouse,
+  ipcDeleteWarehouse,
   ipcSearchCatalog,
+  ipcUpdateWarehouse,
   listWarehouses,
   transferStock,
   type WarehouseItem,
@@ -21,7 +23,7 @@ import type { CatalogProduct } from "@/types/pos";
 import { parseQtyToMicro } from "@/lib/money";
 import { useSessionStore } from "@/stores/session-store";
 
-export type WarehouseTransferTab = "transfer" | "create_warehouse";
+export type WarehouseTransferTab = "transfer" | "create_warehouse" | "manage";
 
 export interface TransferLineItem {
   productId: string;
@@ -98,6 +100,13 @@ interface WarehouseTransferStoreState {
   setNewWarehouseCode: (code: string) => void;
   setNewWarehouseName: (name: string) => void;
   submitCreateWarehouse: () => Promise<boolean>;
+  /** Sparse rename/(de)activate; refreshes the depot list on success. */
+  submitUpdateWarehouse: (
+    id: string,
+    input: { name?: string; isActive?: boolean },
+  ) => Promise<boolean>;
+  /** Dual-track delete; resolves the backend mode (null = rejected). */
+  submitDeleteWarehouse: (id: string) => Promise<"hard_deleted" | "deactivated" | null>;
   reset: () => void;
 }
 
@@ -306,6 +315,51 @@ export const useWarehouseTransferStore = create<WarehouseTransferStoreState>()(
       } catch (failure: unknown) {
         set({ errorMessage: typeof failure === "string" ? failure : "INTERNAL_ERROR" });
         return false;
+      } finally {
+        set({ isSubmitting: false });
+      }
+    },
+
+    submitUpdateWarehouse: async (id, input) => {
+      const session = useSessionStore.getState().session;
+      if (session === null) {
+        set({ errorMessage: "IPC_NO_ACTIVE_SESSION" });
+        return false;
+      }
+      if (get().isSubmitting) {
+        return false;
+      }
+      set({ isSubmitting: true, errorMessage: null, successMessage: null });
+      try {
+        await ipcUpdateWarehouse(session.token, id, input);
+        await get().loadWarehouses();
+        set({ successMessage: "settings.saved" });
+        return true;
+      } catch (failure: unknown) {
+        set({ errorMessage: typeof failure === "string" ? failure : "INTERNAL_ERROR" });
+        return false;
+      } finally {
+        set({ isSubmitting: false });
+      }
+    },
+
+    submitDeleteWarehouse: async (id) => {
+      const session = useSessionStore.getState().session;
+      if (session === null) {
+        set({ errorMessage: "IPC_NO_ACTIVE_SESSION" });
+        return null;
+      }
+      if (get().isSubmitting) {
+        return null;
+      }
+      set({ isSubmitting: true, errorMessage: null, successMessage: null });
+      try {
+        const result = await ipcDeleteWarehouse(session.token, id);
+        await get().loadWarehouses();
+        return result.mode;
+      } catch (failure: unknown) {
+        set({ errorMessage: typeof failure === "string" ? failure : "INTERNAL_ERROR" });
+        return null;
       } finally {
         set({ isSubmitting: false });
       }

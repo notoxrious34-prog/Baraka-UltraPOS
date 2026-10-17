@@ -12,6 +12,8 @@ import { useSupplierStore } from "@/stores/supplier-store";
 import { formatMoney } from "@/lib/money";
 import type { SupplierView } from "@/types/supplier";
 import { SupplierFormModal } from "@/features/suppliers/SupplierFormModal";
+import { ipcDeleteSupplier, type DeleteEntityResult } from "@/lib/ipc";
+import { SafeDeleteModal } from "@/components/common/SafeDeleteModal";
 import { SupplierStatementView } from "@/features/suppliers/SupplierStatementView";
 import { PurchaseOrderFormScreen } from "@/features/purchases/PurchaseOrderFormScreen";
 import { GoodsReceiptFormScreen } from "@/features/purchases/GoodsReceiptFormScreen";
@@ -19,7 +21,7 @@ import { SupplierInvoiceFormScreen } from "@/features/purchases/SupplierInvoiceF
 import { RecordSupplierPaymentModal } from "@/features/purchases/RecordSupplierPaymentModal";
 
 type Panel = "none" | "order" | "receive" | "invoice";
-type Overlay = "none" | "create" | "edit" | "statement" | "payment";
+type Overlay = "none" | "create" | "edit" | "statement" | "payment" | "delete";
 
 export function SuppliersModule(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
@@ -34,6 +36,9 @@ export function SuppliersModule(): ReactElement {
   const [panel, setPanel] = useState<Panel>("none");
   const [overlay, setOverlay] = useState<Overlay>("none");
   const [editing, setEditing] = useState<SupplierView | null>(null);
+  const [deleting, setDeleting] = useState<SupplierView | null>(null);
+  /** Inline confirmation after a safe deletion (mode-aware copy). */
+  const [deleteNote, setDeleteNote] = useState<string | null>(null);
 
   const token = session?.token ?? null;
 
@@ -58,6 +63,19 @@ export function SuppliersModule(): ReactElement {
 
   const runSearch = (): void => {
     void search(token, query);
+  };
+
+  const handleDeleted = (result: DeleteEntityResult): void => {
+    setDeleting(null);
+    setOverlay("none");
+    if (selected?.id === result.id) {
+      select(null);
+    }
+    setDeleteNote(t(locale, result.mode === "hard_deleted" ? "del.deleted" : "del.archived"));
+    window.setTimeout(() => {
+      setDeleteNote(null);
+    }, 8000);
+    runSearch();
   };
 
   const toolButton = (
@@ -196,6 +214,18 @@ export function SuppliersModule(): ReactElement {
                   >
                     {t(locale, "sup.edit")}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleting(supplier);
+                      setOverlay("delete");
+                    }}
+                    aria-label={t(locale, "del.delete")}
+                    title={t(locale, "del.delete")}
+                    className="rounded-md bg-red-50 px-2 py-0.5 font-black text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50"
+                  >
+                    {t(locale, "del.delete")}
+                  </button>
                 </td>
               </tr>
             ))}
@@ -256,6 +286,25 @@ export function SuppliersModule(): ReactElement {
             setOverlay("none");
           }}
         />
+      )}
+      {overlay === "delete" && deleting !== null && (
+        <SafeDeleteModal
+          isOpen
+          titleKey="del.supplierTitle"
+          entityName={deleting.name}
+          entityCode={deleting.phone ?? undefined}
+          onClose={() => {
+            setDeleting(null);
+            setOverlay("none");
+          }}
+          onConfirm={() => ipcDeleteSupplier(token, deleting.id)}
+          onSuccess={handleDeleted}
+        />
+      )}
+      {deleteNote !== null && (
+        <p role="status" className="text-xs font-black text-emerald-700 dark:text-emerald-300">
+          {deleteNote}
+        </p>
       )}
     </section>
   );

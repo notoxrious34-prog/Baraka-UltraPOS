@@ -8,9 +8,13 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
+import { formatMoney } from "@/lib/money";
+import type { Locale } from "@/types/pos";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { ipcGetCustomer, ipcListCustomers, ipcSearchCustomers } from "@/lib/ipc";
+import { ipcDeleteCustomer, type DeleteEntityResult } from "@/lib/ipc";
+import { SafeDeleteModal } from "@/components/common/SafeDeleteModal";
 import type { CustomerDetail, CustomerSummary } from "@/types/pos";
 import { CustomerListPane, type DirectoryRow } from "@/features/customers/CustomerListPane";
 import { CustomerDossierPane } from "@/features/customers/CustomerDossierPane";
@@ -20,6 +24,26 @@ import { filterCustomers, type CustomerFilter } from "@/features/customers/custo
 /** Same manager rule as App.tsx isManagerRole (ADMIN or GERANT). */
 function isManagerRole(role: string): boolean {
   return role === "GERANT" || role === "ADMIN";
+}
+
+/** Non-zero canonical balance (either sign) blocks deletion (ADR-092). Pure. */
+export function hasOpenBalance(balanceCentimes: string): boolean {
+  try {
+    return BigInt(balanceCentimes) !== 0n;
+  } catch {
+    return true;
+  }
+}
+
+/** Best-effort balance copy for the blocked-deletion card (never throws). */
+export function blockedBalanceReason(balanceCentimes: string, locale: Locale): string {
+  let amount = balanceCentimes;
+  try {
+    amount = formatMoney(balanceCentimes, locale);
+  } catch {
+    // Fall through with the raw canonical string.
+  }
+  return `${t(locale, "del.blockedBalance")} (${amount})`;
 }
 
 export function CustomersModule(): ReactElement {
@@ -33,6 +57,9 @@ export function CustomersModule(): ReactElement {
   const [listError, setListError] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<CustomerFormMode | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<CustomerDetail | null>(null);
+  /** Inline confirmation after a safe deletion (mode-aware copy). */
+  const [deleteNote, setDeleteNote] = useState<string | null>(null);
 
   // Defense in depth: the screen verifies the role itself, independent of
   // NavRail visibility.
@@ -95,6 +122,18 @@ export function CustomersModule(): ReactElement {
   }));
   const selected = details.find((detail) => detail.id === selectedId) ?? null;
 
+  const handleDeleted = (result: DeleteEntityResult): void => {
+    setDeleteTarget(null);
+    setSelectedId(null);
+    setDeleteNote(t(locale, result.mode === "hard_deleted" ? "del.deleted" : "del.archived"));
+    window.setTimeout(() => {
+      setDeleteNote(null);
+    }, 8000);
+    setReloadTick((tick) => tick + 1);
+  };
+
+  const blocked = deleteTarget !== null && hasOpenBalance(deleteTarget.current_balance_centimes);
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex h-10 shrink-0 items-center px-4">
@@ -130,7 +169,20 @@ export function CustomersModule(): ReactElement {
               setFormMode({ kind: "edit", detail: selected });
             }
           }}
+          onDelete={() => {
+            if (selected !== null) {
+              setDeleteTarget(selected);
+            }
+          }}
         />
+        {deleteNote !== null && (
+          <p
+            role="status"
+            className="shrink-0 px-4 pt-2 text-xs font-black text-emerald-700 dark:text-emerald-300"
+          >
+            {deleteNote}
+          </p>
+        )}
       </div>
       {formMode !== null && (
         <CustomerFormModal
@@ -146,6 +198,23 @@ export function CustomersModule(): ReactElement {
             setSelectedId(detail.id);
             setReloadTick((tick) => tick + 1);
           }}
+        />
+      )}
+      {deleteTarget !== null && (
+        <SafeDeleteModal
+          isOpen
+          titleKey="del.customerTitle"
+          entityName={deleteTarget.name}
+          entityCode={deleteTarget.phone ?? undefined}
+          isBlocked={blocked}
+          blockedReason={
+            blocked ? blockedBalanceReason(deleteTarget.current_balance_centimes, locale) : null
+          }
+          onClose={() => {
+            setDeleteTarget(null);
+          }}
+          onConfirm={() => ipcDeleteCustomer(token, deleteTarget.id)}
+          onSuccess={handleDeleted}
         />
       )}
       </div>

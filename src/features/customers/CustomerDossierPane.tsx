@@ -16,6 +16,7 @@ interface CustomerDossierPaneProps {
   token: string;
   detail: CustomerDetail | null;
   onEdit: () => void;
+  onDelete: () => void;
 }
 
 function fmtAmount(centimes: string, locale: Locale): string {
@@ -88,6 +89,15 @@ export function CustomerDossierPane(props: CustomerDossierPaneProps): ReactEleme
           className="h-10 shrink-0 rounded-lg bg-primary-900 px-4 text-sm font-bold text-white hover:bg-primary-800 dark:bg-primary-700"
         >
           {t(locale, "customers.edit")}
+        </button>
+        <button
+          type="button"
+          onClick={props.onDelete}
+          aria-label={t(locale, "del.delete")}
+          title={t(locale, "del.delete")}
+          className="h-10 shrink-0 rounded-lg border border-red-300 px-4 text-sm font-black text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-200 dark:hover:bg-red-900/30"
+        >
+          {t(locale, "del.delete")}
         </button>
       </div>
       <div className="flex shrink-0 flex-wrap gap-2">

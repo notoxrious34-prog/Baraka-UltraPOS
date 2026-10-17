@@ -29,6 +29,8 @@ export interface ProductEditModalProps {
   product: CatalogProduct | null;
   onClose: () => void;
   onUpdated: (updatedProduct: CatalogProduct) => void;
+  /** Delete entry point (absent = no delete affordance in the footer). */
+  onDelete?: (product: CatalogProduct) => void;
   token: string;
 }
 
@@ -240,6 +242,8 @@ export interface ProductEditModalViewProps {
   onPatch: (field: keyof EditFormData, value: string | boolean) => void;
   onClose: () => void;
   onSubmit: () => void;
+  /** Delete entry point (absent = no delete affordance in the footer). */
+  onDelete?: () => void;
   /** Active taxonomy rows for the rayon selector (absent = selector hidden). */
   categories?: Category[];
   categoryId?: string;
@@ -474,6 +478,18 @@ export function ProductEditModalView(props: ProductEditModalViewProps): ReactEle
           >
             {t(locale, "cat.cancel")}
           </button>
+          {props.onDelete !== undefined && (
+            <button
+              type="button"
+              onClick={props.onDelete}
+              disabled={busy}
+              aria-label={t(locale, "del.delete")}
+              title={t(locale, "del.delete")}
+              className="h-10 rounded-lg border border-red-300 px-4 text-sm font-black text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-200 dark:hover:bg-red-900/30"
+            >
+              {t(locale, "del.delete")}
+            </button>
+          )}
           <button
             type="button"
             onClick={props.onSubmit}
@@ -493,6 +509,7 @@ export function ProductEditModal({
   product,
   onClose,
   onUpdated,
+  onDelete,
   token,
 }: ProductEditModalProps): ReactElement | null {
   const locale = usePosUiStore((state) => state.locale);
@@ -616,6 +633,13 @@ export function ProductEditModal({
       onPatch={patch}
       onClose={onClose}
       onSubmit={submit}
+      onDelete={
+        onDelete === undefined || product === null
+          ? undefined
+          : () => {
+              onDelete(product);
+            }
+      }
       categories={categories}
       categoryId={categoryId}
       onCategory={setCategoryId}

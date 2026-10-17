@@ -24,7 +24,9 @@ import {
 import { t, translateBackendError } from "@/lib/i18n";
 import { formatQty } from "@/lib/money";
 import { ModalShell } from "@/components/pos/modals/ModalShell";
-import type { CatalogProduct } from "@/types/pos";
+import { SafeDeleteModal } from "@/components/common/SafeDeleteModal";
+import type { CatalogProduct, Locale } from "@/types/pos";
+import type { WarehouseItem } from "@/lib/ipc";
 
 function fmtQty(micro: bigint): string {
   try {
@@ -32,6 +34,205 @@ function fmtQty(micro: bigint): string {
   } catch {
     return "…";
   }
+}
+
+/** Canonical primary-depot code: strictly immutable (ADR-092). */
+const PRINCIPAL_DEPOT_CODE = "DEP-01";
+
+/**
+ * Depot management tab (TASK-DSN-051, ADMIN only): inline rename,
+ * active toggle, and dual-track deletion with DEP-01 lock badges.
+ */
+function ManageDepotsTab({ admin }: { admin: boolean }): ReactElement {
+  const locale: Locale = usePosUiStore((state) => state.locale);
+  const s = useWarehouseTransferStore();
+  const [drafts, setDrafts] = useState<Record<string, { name: string; isActive: boolean }>>({});
+  const [deleting, setDeleting] = useState<WarehouseItem | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    const seeded: Record<string, { name: string; isActive: boolean }> = {};
+    for (const warehouse of s.warehouses) {
+      seeded[warehouse.id] = { name: warehouse.name, isActive: warehouse.is_active };
+    }
+    setDrafts(seeded);
+  }, [s.warehouses]);
+
+  if (!admin) {
+    return (
+      <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+        {t(locale, "adminOnlyTab")}
+      </p>
+    );
+  }
+
+  const draftOf = (warehouse: WarehouseItem): { name: string; isActive: boolean } =>
+    drafts[warehouse.id] ?? { name: warehouse.name, isActive: warehouse.is_active };
+
+  const save = (warehouse: WarehouseItem): void => {
+    const draft = draftOf(warehouse);
+    const name = draft.name.trim();
+    if (name === "" || s.isSubmitting) {
+      return;
+    }
+    const input: { name?: string; isActive?: boolean } = {};
+    if (name !== warehouse.name) {
+      input.name = name;
+    }
+    if (draft.isActive !== warehouse.is_active) {
+      input.isActive = draft.isActive;
+    }
+    if (Object.keys(input).length === 0) {
+      return;
+    }
+    void s.submitUpdateWarehouse(warehouse.id, input).then((ok) => {
+      if (ok) {
+        setNote(t(locale, "settings.saved"));
+        window.setTimeout(() => {
+          setNote(null);
+        }, 8000);
+      }
+    });
+  };
+
+  return (
+    <>
+      {s.isLoadingWarehouses && (
+        <p className="text-center text-xs font-bold text-slate-500">{t(locale, "cash.loading")}</p>
+      )}
+      <div className="flex flex-col gap-2">
+        {s.warehouses.map((warehouse) => {
+          const locked = warehouse.code === PRINCIPAL_DEPOT_CODE;
+          const draft = draftOf(warehouse);
+          return (
+            <div
+              key={warehouse.id}
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-700"
+            >
+              <bdi
+                dir="ltr"
+                className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-black tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              >
+                {warehouse.code}
+              </bdi>
+              {locked && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-black text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="4" y="11" width="16" height="10" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                  {t(locale, "wh.locked")}
+                </span>
+              )}
+              <input
+                value={draft.name}
+                disabled={locked || s.isSubmitting}
+                onChange={(event) => {
+                  const name = event.target.value;
+                  setDrafts((prev) => ({
+                    ...prev,
+                    [warehouse.id]: { name, isActive: draft.isActive },
+                  }));
+                }}
+                aria-label={t(locale, "wh.rename")}
+                autoComplete="off"
+                className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold outline-none focus:border-primary-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
+              />
+              <label className="flex shrink-0 cursor-pointer items-center gap-1 text-xs font-bold">
+                <input
+                  type="checkbox"
+                  checked={draft.isActive}
+                  disabled={locked || s.isSubmitting}
+                  onChange={(event) => {
+                    const isActive = event.target.checked;
+                    setDrafts((prev) => ({
+                      ...prev,
+                      [warehouse.id]: { name: draft.name, isActive },
+                    }));
+                  }}
+                  className="h-4 w-4 accent-emerald-600"
+                />
+                <span>{t(locale, "wh.active")}</span>
+              </label>
+              {!locked && (
+                <>
+                  <button
+                    type="button"
+                    disabled={s.isSubmitting}
+                    onClick={() => {
+                      save(warehouse);
+                    }}
+                    className="h-9 shrink-0 rounded-md bg-slate-200 px-3 text-xs font-black hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:hover:bg-slate-600"
+                  >
+                    {t(locale, "sup.save")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={s.isSubmitting}
+                    onClick={() => {
+                      setDeleting(warehouse);
+                    }}
+                    aria-label={`${t(locale, "del.delete")} — ${warehouse.code}`}
+                    title={t(locale, "del.delete")}
+                    className="h-9 shrink-0 rounded-md bg-red-50 px-3 text-xs font-black text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50"
+                  >
+                    {t(locale, "del.delete")}
+                  </button>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {s.errorMessage !== null && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
+          {translateBackendError(s.errorMessage, locale)}
+        </p>
+      )}
+      {note !== null && (
+        <p role="status" className="text-center text-xs font-black text-emerald-700 dark:text-emerald-300">
+          {note}
+        </p>
+      )}
+      {deleting !== null && (
+        <SafeDeleteModal
+          isOpen
+          titleKey="del.warehouseTitle"
+          entityName={deleting.name}
+          entityCode={deleting.code}
+          isBlocked={false}
+          onClose={() => {
+            setDeleting(null);
+          }}
+          onConfirm={() =>
+            s.submitDeleteWarehouse(deleting.id).then((mode) => {
+              if (mode === null) {
+                throw new Error(s.errorMessage ?? "INTERNAL_ERROR");
+              }
+              return { id: deleting.id, mode, message: mode };
+            })
+          }
+          onSuccess={(result) => {
+            setDeleting(null);
+            setNote(t(locale, result.mode === "hard_deleted" ? "del.deleted" : "del.archived"));
+            window.setTimeout(() => {
+              setNote(null);
+            }, 8000);
+          }}
+        />
+      )}
+    </>
+  );
 }
 
 export function WarehouseTransferModal(): ReactElement {
@@ -146,6 +347,7 @@ export function WarehouseTransferModal(): ReactElement {
         <div className="flex gap-2">
           {tabButton("transfer", "tabTransfer")}
           {tabButton("create_warehouse", "tabCreateWarehouse")}
+          {tabButton("manage", "wh.manage")}
         </div>
 
         {s.successMessage !== null && (
@@ -356,7 +558,7 @@ export function WarehouseTransferModal(): ReactElement {
               </button>
             </div>
           </>
-        ) : (
+        ) : s.activeTab === "create_warehouse" ? (
           <>
             {!admin && (
               <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
@@ -421,6 +623,8 @@ export function WarehouseTransferModal(): ReactElement {
               </button>
             </div>
           </>
+        ) : (
+          <ManageDepotsTab admin={admin} />
         )}
       </div>
     </ModalShell>

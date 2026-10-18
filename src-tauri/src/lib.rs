@@ -276,6 +276,7 @@ pub fn run() {
             baraka_commands::ipc::suppliers_delete,
             baraka_commands::ipc::suppliers_get,
             baraka_commands::ipc::suppliers_search,
+            baraka_commands::ipc::suppliers_list,
             baraka_commands::ipc::suppliers_get_statement,
             baraka_commands::ipc::purchases_create_order,
             baraka_commands::ipc::purchases_update_order,

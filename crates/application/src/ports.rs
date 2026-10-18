@@ -1721,6 +1721,9 @@ pub trait SupplierRepository: Send + Sync {
         limit: usize,
     ) -> Result<Vec<SupplierView>, ApplicationError>;
 
+    /// List suppliers ordered by name.
+    fn list_suppliers(&self, active_only: bool) -> Result<Vec<SupplierView>, ApplicationError>;
+
     /// Ledger rows in ledger order with running balances.
     fn get_statement(
         &self,

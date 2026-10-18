@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
     NewSupplier, ProductRepository, PurchaseLineInput, PurchaseRepository, StockRepository,
-    WarehouseRepository,
+    SupplierRepository, WarehouseRepository,
 };
 use baraka_application::use_cases::cash::OpenCashSessionUseCase;
 use baraka_application::use_cases::purchases::{
@@ -20,8 +20,8 @@ use baraka_application::use_cases::purchases::{
     RecordSupplierInvoiceUseCase, RecordSupplierPaymentUseCase, UpdatePurchaseOrderUseCase,
 };
 use baraka_application::use_cases::suppliers::{
-    CreateSupplierUseCase, GetSupplierStatementUseCase, SearchSuppliersUseCase,
-    UpdateSupplierUseCase,
+    CreateSupplierUseCase, GetSupplierStatementUseCase, ListSuppliersUseCase,
+    SearchSuppliersUseCase, UpdateSupplierUseCase,
 };
 use baraka_domain::catalog::{Barcode, Product, ProductId, ProductUnit, Sku, UnitId};
 use baraka_domain::errors::DomainError;
@@ -1315,4 +1315,53 @@ fn supplier_search_and_update_follow_customer_module_semantics() {
         ),
         Err(ApplicationError::Validation(DomainError::SupplierInactive))
     ));
+}
+
+/// TASK-BRK-057: `suppliers_list` mirror of `customers_list` — repository
+/// level (all N in name order, active flag) + use-case level (populated
+/// list, RBAC). Same TempDir/migrate pattern as `customer_management.rs`.
+#[test]
+fn list_suppliers_returns_all_in_name_order_respecting_active_flag() {
+    let harness = setup();
+    create_supplier(&harness, "Zebra Fournitures");
+    let midi = create_supplier(&harness, "Midi Grossiste");
+    create_supplier(&harness, "Alpha Négoce");
+    UpdateSupplierUseCase::new(&harness.suppliers)
+        .execute(
+            &gerant(),
+            &midi,
+            baraka_application::ports::SupplierUpdate {
+                is_active: Some(false),
+                ..baraka_application::ports::SupplierUpdate::default()
+            },
+        )
+        .expect("deactivate");
+
+    // (a) Repository level: all N, ORDER BY name.
+    let all = harness.suppliers.list_suppliers(false).expect("list all");
+    let names: Vec<&str> = all.iter().map(|view| view.name.as_str()).collect();
+    assert_eq!(
+        names,
+        vec!["Alpha Négoce", "Midi Grossiste", "Zebra Fournitures"]
+    );
+
+    // active_only=true excludes the deactivated supplier.
+    let active = harness.suppliers.list_suppliers(true).expect("list active");
+    let active_names: Vec<&str> = active.iter().map(|view| view.name.as_str()).collect();
+    assert_eq!(active_names, vec!["Alpha Négoce", "Zebra Fournitures"]);
+
+    // (b) Use-case level: populated list (never a silent empty vec).
+    let via_use_case = ListSuppliersUseCase::new(&harness.suppliers)
+        .execute(&gerant(), true)
+        .expect("use case list");
+    assert_eq!(via_use_case.len(), 2);
+
+    // RBAC: vendeur cannot list.
+    assert!(
+        matches!(
+            ListSuppliersUseCase::new(&harness.suppliers).execute(&vendeur(), true),
+            Err(ApplicationError::Unauthorized)
+        ),
+        "supplier list must be denied"
+    );
 }

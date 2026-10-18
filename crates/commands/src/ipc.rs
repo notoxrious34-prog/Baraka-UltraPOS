@@ -71,8 +71,8 @@ use baraka_application::use_cases::sales::{
     SearchDocumentsUseCase, StockShortageWarning, UpdateFiscalSettingsUseCase,
 };
 use baraka_application::use_cases::suppliers::{
-    CreateSupplierUseCase, GetSupplierStatementUseCase, GetSupplierUseCase, SearchSuppliersUseCase,
-    UpdateSupplierUseCase,
+    CreateSupplierUseCase, GetSupplierStatementUseCase, GetSupplierUseCase, ListSuppliersUseCase,
+    SearchSuppliersUseCase, UpdateSupplierUseCase,
 };
 use baraka_application::use_cases::users::{
     CreateUserUseCase, ListUsersUseCase, ResetUserCredentialsUseCase, UpdateUserUseCase,
@@ -3337,6 +3337,21 @@ pub fn suppliers_search(
     let limit = request.limit.unwrap_or(20) as usize;
     let views = SearchSuppliersUseCase::new(state.suppliers.as_ref())
         .execute(&session, &request.query, limit)
+        .map_err(|error| error_code(&error))?;
+    Ok(SearchSuppliersResponseDto {
+        suppliers: views.iter().map(to_supplier_dto).collect(),
+    })
+}
+
+/// `suppliers_list` command: directory listing (Gerant/Admin).
+#[tauri::command(rename_all = "snake_case")]
+pub fn suppliers_list(
+    state: tauri::State<'_, AppState>,
+    session_token: String,
+) -> Result<SearchSuppliersResponseDto, String> {
+    let session = require_session(&state, &session_token)?;
+    let views = ListSuppliersUseCase::new(state.suppliers.as_ref())
+        .execute(&session, true)
         .map_err(|error| error_code(&error))?;
     Ok(SearchSuppliersResponseDto {
         suppliers: views.iter().map(to_supplier_dto).collect(),

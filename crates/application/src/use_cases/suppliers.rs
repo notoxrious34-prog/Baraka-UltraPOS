@@ -1,6 +1,6 @@
 //! Supplier management use cases: master data and statements.
 //!
-//! RBAC is enforced before any repository contact: all five operations need
+//! RBAC is enforced before any repository contact: all six operations need
 //! `SupplierManage` (Gerant/Admin only). Search, get, and statement mirror
 //! the exact established customer-module pattern (TASK-BRK-009), including
 //! its LIKE-based search.
@@ -172,6 +172,34 @@ where
         }
         self.suppliers
             .search_suppliers(trimmed, limit.clamp(1, 100))
+    }
+}
+
+/// List the supplier directory ordered by name.
+pub struct ListSuppliersUseCase<'a, S>
+where
+    S: ?Sized,
+{
+    suppliers: &'a S,
+}
+
+impl<'a, S> ListSuppliersUseCase<'a, S>
+where
+    S: SupplierRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(suppliers: &'a S) -> Self {
+        Self { suppliers }
+    }
+
+    /// List suppliers ordered by name.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        active_only: bool,
+    ) -> Result<Vec<SupplierView>, ApplicationError> {
+        require(session, Permission::SupplierManage)?;
+        self.suppliers.list_suppliers(active_only)
     }
 }
 

@@ -239,6 +239,22 @@ impl SupplierRepository for SqliteSupplierRepository {
         Ok(rows)
     }
 
+    fn list_suppliers(&self, active_only: bool) -> Result<Vec<SupplierView>, ApplicationError> {
+        let guard = self.lock()?;
+        let mut statement = guard
+            .prepare(&format!(
+                "SELECT {SUPPLIER_COLUMNS} FROM suppliers
+                 WHERE (?1 = 0 OR is_active = 1) ORDER BY name"
+            ))
+            .map_err(|_| store_failure())?;
+        let rows = statement
+            .query_map([i64::from(active_only)], map_supplier)
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?;
+        Ok(rows)
+    }
+
     fn get_statement(
         &self,
         supplier_id: &str,

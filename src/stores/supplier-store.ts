@@ -9,7 +9,7 @@ import type {
   SupplierUpdateInput,
   SupplierView,
 } from "@/types/supplier";
-import { ipcCreateSupplier, ipcSearchSuppliers, ipcUpdateSupplier } from "@/lib/ipc";
+import { ipcCreateSupplier, ipcListSuppliers, ipcSearchSuppliers, ipcUpdateSupplier } from "@/lib/ipc";
 
 interface SupplierState {
   suppliers: SupplierView[];
@@ -35,7 +35,11 @@ export const useSupplierStore = create<SupplierState>()((set, get) => ({
   search: async (sessionToken, query) => {
     set({ loading: true, error: null });
     try {
-      const suppliers = await ipcSearchSuppliers(sessionToken, query, 50);
+      // Empty query lists the directory (TASK-BRK-057); non-empty searches.
+      const suppliers =
+        query.trim() === ""
+          ? await ipcListSuppliers(sessionToken)
+          : await ipcSearchSuppliers(sessionToken, query, 50);
       set({ suppliers, loading: false });
     } catch (error: unknown) {
       const code = typeof error === "string" ? error : "INTERNAL_ERROR";

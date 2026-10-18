@@ -1923,6 +1923,17 @@ export async function ipcSearchSuppliers(
   return wire.suppliers.map(toSupplier);
 }
 
+/** List suppliers (active only). */
+export async function ipcListSuppliers(sessionToken: string): Promise<SupplierView[]> {
+  interface ListWire {
+    suppliers: SupplierWire[];
+  }
+  const wire = await call<ListWire>("suppliers_list", {
+    session_token: sessionToken,
+  });
+  return wire.suppliers.map(toSupplier);
+}
+
 /** Supplier statement with server-side running balances. */
 export async function ipcGetSupplierStatement(
   sessionToken: string,

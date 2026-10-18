@@ -1,0 +1,40 @@
+[
+  {
+    "dark": false,
+    "items": [
+      {
+        "key": "nomatch-lead",
+        "found": true,
+        "tag": "P",
+        "text": "Aucun fournisseur ne correspond à « Ciment introuvable ».",
+        "fg": "rgb(51, 65, 85)",
+        "bg": "rgb(248, 250, 252)",
+        "fs": 14,
+        "fw": "700",
+        "ratio": 9.9,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "nomatch-light"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "nomatch-lead",
+        "found": true,
+        "tag": "P",
+        "text": "Aucun fournisseur ne correspond à « Ciment introuvable ».",
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 14,
+        "fw": "700",
+        "ratio": 7.34,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "nomatch-dark"
+  }
+]

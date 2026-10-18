@@ -147,6 +147,7 @@ commercial law) with no colloquialisms:
 | 114 | Code QR | رمز الاستجابة السريعة | Formal term, RATIFIED REL-047 (not from ARC-007). No v1 feature binding. |
 | 115 | Ajustement manuel du stock | تعديل يدوي للمخزون | Formal term, RATIFIED REL-047 (not from ARC-007). No v1 UI binding: shipped stock-adjust labels use تسوية مخزون (`stock.adjust`) — no UI change in v1. |
 | 116 | Relevé de compte client | كشف حساب العميل | Formal long form, RATIFIED REL-047 (not from ARC-007). Short form in row 55 (كشف الحساب) matches the shipped `customers.statement` label. |
+| 117 | Historique de crédit (registre « crédi ») | سجل الكريدي | Teaching-panel copy (`customers.emptyBody`), author-approved verbatim TASK-DSN-054. Colloquial-register transliteration of « crédit », used only inside this panel; formal UI term for credit stays الائتمان/الدين (rows 3, 35, 51–52). |
 
 ## 4. Ratification record (open points closed)
 

@@ -151,13 +151,111 @@ export function SuppliersModule(): ReactElement {
 
       {loading && <p className="text-xs font-bold">{t(locale, "cash.loading")}</p>}
       {storeError !== null && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
-          {translateBackendError(storeError, locale)}
-        </p>
+        <div className="flex flex-col items-center gap-2 rounded-md bg-red-50 px-3 py-6 text-center dark:bg-red-900/30">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="text-red-400 dark:text-red-300"
+          >
+            <path d="M3 21h18" />
+            <path d="M5 21V7l7-4 7 4v14" />
+            <path d="M9 21v-4h6v4" />
+          </svg>
+          <p className="text-sm font-bold text-red-700 dark:text-red-200">
+            {t(locale, "sup.loadError")}
+          </p>
+          <button
+            type="button"
+            onClick={runSearch}
+            className="h-10 rounded-lg bg-red-700 px-4 text-sm font-bold text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500"
+          >
+            {t(locale, "sup.retry")}
+          </button>
+          <p className="font-mono text-[11px] text-red-500 dark:text-red-300">
+            {translateBackendError(storeError, locale)}
+          </p>
+        </div>
       )}
 
-      {suppliers.length === 0 && !loading && (
-        <p className="text-sm font-bold text-slate-500">{t(locale, "sup.noResults")}</p>
+      {storeError === null && suppliers.length === 0 && !loading && query.trim() !== "" && (
+        <div className="flex flex-col items-center gap-2 px-3 py-6 text-center">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="text-line-strong"
+          >
+            <path d="M3 21h18" />
+            <path d="M5 21V7l7-4 7 4v14" />
+            <path d="M9 21v-4h6v4" />
+          </svg>
+          <p className="text-sm font-bold text-ink-secondary">
+            {t(locale, "sup.noMatchLead")}
+            {locale === "ar-DZ" ? " «" : " « "}
+            <bdi dir={/[A-Za-z0-9]/.test(query) ? "ltr" : undefined} className="tabular-nums">{query.trim()}</bdi>
+            {locale === "ar-DZ" ? "»." : " »."}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+            }}
+            className="h-10 rounded-lg bg-slate-200 px-4 text-sm font-bold text-slate-800 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600"
+          >
+            {t(locale, "sup.clearSearch")}
+          </button>
+        </div>
+      )}
+      {/* Empty query with zero rows: zero-database first-run teaching state
+          (TASK-DSN-054-C2). The store lists the directory on empty query, so
+          reaching here means the database holds no suppliers at all. */}
+      {storeError === null && suppliers.length === 0 && !loading && query.trim() === "" && (
+        <div className="flex flex-col items-center gap-2 px-3 py-6 text-center">
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="text-line-strong"
+          >
+            <path d="M3 21h18" />
+            <path d="M5 21V7l7-4 7 4v14" />
+            <path d="M9 21v-4h6v4" />
+          </svg>
+          <h2 className="text-base font-bold text-ink-primary">
+            {t(locale, "sup.emptyTitle")}
+          </h2>
+          <p className="max-w-md text-sm font-bold text-ink-secondary">
+            {t(locale, "sup.emptyBody")}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setOverlay("create");
+            }}
+            className="h-10 rounded-lg bg-accent-500 px-4 text-sm font-bold text-slate-950 hover:bg-accent-400"
+          >
+            {t(locale, "sup.emptyCta")}
+          </button>
+        </div>
       )}
       {suppliers.length > 0 && (
         <table className="w-full text-start text-xs font-bold">
@@ -181,7 +279,7 @@ export function SuppliersModule(): ReactElement {
                 <td className="py-1.5 text-start">{supplier.name}</td>
                 <td className="py-1.5 text-start font-mono">{supplier.phone ?? "—"}</td>
                 <td className="py-1.5 text-start font-mono tabular-nums">
-                  {formatMoney(supplier.currentBalanceCentimes, locale)}
+                  <bdi dir="ltr">{formatMoney(supplier.currentBalanceCentimes, locale)}</bdi>
                 </td>
                 <td className="py-1.5">
                   <span

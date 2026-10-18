@@ -134,6 +134,12 @@ export function CustomersModule(): ReactElement {
 
   const blocked = deleteTarget !== null && hasOpenBalance(deleteTarget.current_balance_centimes);
 
+  // Single create-customer entry point (TASK-DSN-054): the directory "new"
+  // button and the empty-selection teaching panel share this handler.
+  const openCreate = (): void => {
+    setFormMode({ kind: "create" });
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex h-10 shrink-0 items-center px-4">
@@ -149,9 +155,7 @@ export function CustomersModule(): ReactElement {
         rows={rows}
         selectedId={selectedId}
         onSelect={setSelectedId}
-        onNew={() => {
-          setFormMode({ kind: "create" });
-        }}
+        onNew={openCreate}
         loading={loading}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -174,6 +178,7 @@ export function CustomersModule(): ReactElement {
               setDeleteTarget(selected);
             }
           }}
+          onNew={openCreate}
         />
         {deleteNote !== null && (
           <p

@@ -17,6 +17,7 @@ interface CustomerDossierPaneProps {
   detail: CustomerDetail | null;
   onEdit: () => void;
   onDelete: () => void;
+  onNew: () => void;
 }
 
 function fmtAmount(centimes: string, locale: Locale): string {
@@ -50,11 +51,40 @@ function HudCard(props: {
 export function CustomerDossierPane(props: CustomerDossierPaneProps): ReactElement {
   const { locale, detail } = props;
   if (detail === null) {
+    // Teaching default panel (TASK-DSN-054): an unresolvable selection
+    // (selectedId null, deactivated/deleted record) lands here, never blank.
     return (
-      <section className="flex min-h-0 flex-1 items-center justify-center p-8">
-        <p className="max-w-md text-center text-sm font-medium text-slate-500">
-          {t(locale, "customers.selectHint")}
+      <section className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className="text-line-strong"
+        >
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+        <h2 className="text-base font-bold text-ink-primary">
+          {t(locale, "customers.emptyTitle")}
+        </h2>
+        <p className="max-w-md text-sm font-bold text-ink-secondary">
+          {t(locale, "customers.emptyBody")}
         </p>
+        <button
+          type="button"
+          onClick={props.onNew}
+          className="h-10 rounded-lg bg-accent-500 px-4 text-sm font-bold text-slate-950 hover:bg-accent-400"
+        >
+          {t(locale, "customers.emptyCta")}
+        </button>
       </section>
     );
   }

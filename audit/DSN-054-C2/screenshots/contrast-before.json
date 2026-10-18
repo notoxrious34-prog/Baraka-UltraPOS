@@ -1,0 +1,21 @@
+[
+  {
+    "dark": false,
+    "items": [
+      {
+        "key": "before-text",
+        "found": true,
+        "tag": "P",
+        "text": "Aucun fournisseur — lancez une recherche",
+        "fg": "rgb(100, 116, 139)",
+        "bg": "rgb(248, 250, 252)",
+        "fs": 14,
+        "fw": "700",
+        "ratio": 4.55,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "before"
+  }
+]

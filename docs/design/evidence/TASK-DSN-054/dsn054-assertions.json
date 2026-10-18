@@ -1,0 +1,806 @@
+[
+  {
+    "file": "dsn054-customers-empty-S-fr-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "ltr",
+    "scrollW": 1024,
+    "clientW": 1024,
+    "scrollH": 650,
+    "clientH": 650,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "body": {
+      "fg": "rgb(51, 65, 85)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 711.9921875,
+      "scopeCx": 712,
+      "w": 134.765625
+    },
+    "icon": {
+      "cx": 712,
+      "scopeCx": 712
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 9.9
+  },
+  {
+    "file": "dsn054-customers-empty-S-fr-dark.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": true,
+    "dir": "ltr",
+    "scrollW": 1024,
+    "clientW": 1024,
+    "scrollH": 650,
+    "clientH": 650,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(255, 255, 255)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "body": {
+      "fg": "rgb(226, 232, 240)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 711.9921875,
+      "scopeCx": 712,
+      "w": 134.765625
+    },
+    "icon": {
+      "cx": 712,
+      "scopeCx": 712
+    },
+    "titleRatio": 1.05,
+    "bodyRatio": 1.18
+  },
+  {
+    "file": "dsn054-customers-empty-M-fr-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "ltr",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "body": {
+      "fg": "rgb(51, 65, 85)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 839.9921875,
+      "scopeCx": 840,
+      "w": 134.765625
+    },
+    "icon": {
+      "cx": 840,
+      "scopeCx": 840
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 9.9
+  },
+  {
+    "file": "dsn054-customers-empty-M-fr-dark.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": true,
+    "dir": "ltr",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(255, 255, 255)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "body": {
+      "fg": "rgb(226, 232, 240)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 839.9921875,
+      "scopeCx": 840,
+      "w": 134.765625
+    },
+    "icon": {
+      "cx": 840,
+      "scopeCx": 840
+    },
+    "titleRatio": 1.05,
+    "bodyRatio": 1.18
+  },
+  {
+    "file": "dsn054-customers-empty-L-fr-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "ltr",
+    "scrollW": 1920,
+    "clientW": 1920,
+    "scrollH": 1080,
+    "clientH": 1080,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "body": {
+      "fg": "rgb(51, 65, 85)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 1159.9921875,
+      "scopeCx": 1160,
+      "w": 134.765625
+    },
+    "icon": {
+      "cx": 1160,
+      "scopeCx": 1160
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 9.9
+  },
+  {
+    "file": "dsn054-customers-empty-L-fr-dark.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": true,
+    "dir": "ltr",
+    "scrollW": 1920,
+    "clientW": 1920,
+    "scrollH": 1080,
+    "clientH": 1080,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(255, 255, 255)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "body": {
+      "fg": "rgb(226, 232, 240)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 1159.9921875,
+      "scopeCx": 1160,
+      "w": 134.765625
+    },
+    "icon": {
+      "cx": 1160,
+      "scopeCx": 1160
+    },
+    "titleRatio": 1.05,
+    "bodyRatio": 1.18
+  },
+  {
+    "file": "dsn054-customers-empty-S-ar-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "rtl",
+    "scrollW": 1024,
+    "clientW": 1024,
+    "scrollH": 650,
+    "clientH": 650,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "body": {
+      "fg": "rgb(51, 65, 85)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "cta": {
+      "dir": "rtl",
+      "btnCx": 312,
+      "scopeCx": 312,
+      "w": 91.03125
+    },
+    "icon": {
+      "cx": 312,
+      "scopeCx": 312
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 9.9
+  },
+  {
+    "file": "dsn054-customers-empty-S-ar-dark.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": true,
+    "dir": "rtl",
+    "scrollW": 1024,
+    "clientW": 1024,
+    "scrollH": 650,
+    "clientH": 650,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(255, 255, 255)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "body": {
+      "fg": "rgb(226, 232, 240)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "cta": {
+      "dir": "rtl",
+      "btnCx": 312,
+      "scopeCx": 312,
+      "w": 91.03125
+    },
+    "icon": {
+      "cx": 312,
+      "scopeCx": 312
+    },
+    "titleRatio": 1.05,
+    "bodyRatio": 1.18
+  },
+  {
+    "file": "dsn054-customers-empty-M-ar-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "rtl",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "body": {
+      "fg": "rgb(51, 65, 85)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "cta": {
+      "dir": "rtl",
+      "btnCx": 440,
+      "scopeCx": 440,
+      "w": 91.03125
+    },
+    "icon": {
+      "cx": 440,
+      "scopeCx": 440
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 9.9
+  },
+  {
+    "file": "dsn054-customers-empty-M-ar-dark.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": true,
+    "dir": "rtl",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(255, 255, 255)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "body": {
+      "fg": "rgb(226, 232, 240)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "cta": {
+      "dir": "rtl",
+      "btnCx": 440,
+      "scopeCx": 440,
+      "w": 91.03125
+    },
+    "icon": {
+      "cx": 440,
+      "scopeCx": 440
+    },
+    "titleRatio": 1.05,
+    "bodyRatio": 1.18
+  },
+  {
+    "file": "dsn054-customers-empty-L-ar-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "rtl",
+    "scrollW": 1920,
+    "clientW": 1920,
+    "scrollH": 1080,
+    "clientH": 1080,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "body": {
+      "fg": "rgb(51, 65, 85)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "cta": {
+      "dir": "rtl",
+      "btnCx": 760,
+      "scopeCx": 760,
+      "w": 91.03125
+    },
+    "icon": {
+      "cx": 760,
+      "scopeCx": 760
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 9.9
+  },
+  {
+    "file": "dsn054-customers-empty-L-ar-dark.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": true,
+    "dir": "rtl",
+    "scrollW": 1920,
+    "clientW": 1920,
+    "scrollH": 1080,
+    "clientH": 1080,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(255, 255, 255)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "body": {
+      "fg": "rgb(226, 232, 240)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "cta": {
+      "dir": "rtl",
+      "btnCx": 760,
+      "scopeCx": 760,
+      "w": 91.03125
+    },
+    "icon": {
+      "cx": 760,
+      "scopeCx": 760
+    },
+    "titleRatio": 1.05,
+    "bodyRatio": 1.18
+  },
+  {
+    "file": "dsn054-customers-empty-L-fr-light-dpr2.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "ltr",
+    "scrollW": 1920,
+    "clientW": 1920,
+    "scrollH": 1080,
+    "clientH": 1080,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "body": {
+      "fg": "rgb(51, 65, 85)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 1159.9921875,
+      "scopeCx": 1160,
+      "w": 134.765625
+    },
+    "icon": {
+      "cx": 1160,
+      "scopeCx": 1160
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 9.9
+  },
+  {
+    "file": "dsn054-customers-selected-M-fr-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "ltr",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [
+      {
+        "text": "0550123456",
+        "bdiLtr": false,
+        "tabular": ""
+      },
+      {
+        "text": "1 250,50 DZD",
+        "bdiLtr": true,
+        "tabular": "tabular-nums"
+      },
+      {
+        "text": "0550987654",
+        "bdiLtr": false,
+        "tabular": ""
+      },
+      {
+        "text": "0,00 DZD",
+        "bdiLtr": true,
+        "tabular": "tabular-nums"
+      }
+    ],
+    "title": null,
+    "body": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgba(245, 158, 11, 0.1)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 199.5,
+      "scopeCx": 200,
+      "w": 375
+    },
+    "bodyRatio": 8.31
+  },
+  {
+    "file": "dsn054-customers-selected-M-ar-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "rtl",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [
+      {
+        "text": "0550123456",
+        "bdiLtr": false,
+        "tabular": ""
+      },
+      {
+        "text": "1 250,50 د.ج",
+        "bdiLtr": true,
+        "tabular": "tabular-nums"
+      },
+      {
+        "text": "0550987654",
+        "bdiLtr": false,
+        "tabular": ""
+      },
+      {
+        "text": "0,00 د.ج",
+        "bdiLtr": true,
+        "tabular": "tabular-nums"
+      }
+    ],
+    "title": null,
+    "body": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgba(245, 158, 11, 0.1)",
+      "dir": "rtl"
+    },
+    "cta": {
+      "dir": "rtl",
+      "btnCx": 1080.5,
+      "scopeCx": 1080,
+      "w": 375
+    },
+    "bodyRatio": 8.31
+  },
+  {
+    "file": "dsn054-suppliers-nomatch-M-fr-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "ltr",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [
+      {
+        "text": "Ciment CPJ 45",
+        "bdiLtr": true,
+        "tabular": "tabular-nums"
+      }
+    ],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "body": {
+      "fg": "rgb(51, 65, 85)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 1042.0078125,
+      "scopeCx": 640,
+      "w": 111.015625
+    },
+    "icon": {
+      "cx": 640,
+      "scopeCx": 640
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 9.9
+  },
+  {
+    "file": "dsn054-suppliers-nomatch-M-fr-dark.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": true,
+    "dir": "ltr",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [
+      {
+        "text": "Ciment CPJ 45",
+        "bdiLtr": true,
+        "tabular": "tabular-nums"
+      }
+    ],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "body": {
+      "fg": "rgb(226, 232, 240)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 1042.0078125,
+      "scopeCx": 640,
+      "w": 111.015625
+    },
+    "icon": {
+      "cx": 640,
+      "scopeCx": 640
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 1.18
+  },
+  {
+    "file": "dsn054-suppliers-nomatch-M-ar-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "rtl",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [
+      {
+        "text": "Ciment CPJ 45",
+        "bdiLtr": true,
+        "tabular": "tabular-nums"
+      }
+    ],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "body": {
+      "fg": "rgb(51, 65, 85)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "cta": {
+      "dir": "rtl",
+      "btnCx": 139.8359375,
+      "scopeCx": 640,
+      "w": 57.453125
+    },
+    "icon": {
+      "cx": 640,
+      "scopeCx": 640
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 9.9
+  },
+  {
+    "file": "dsn054-suppliers-nomatch-M-ar-dark.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": true,
+    "dir": "rtl",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [
+      {
+        "text": "Ciment CPJ 45",
+        "bdiLtr": true,
+        "tabular": "tabular-nums"
+      }
+    ],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "body": {
+      "fg": "rgb(226, 232, 240)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "cta": {
+      "dir": "rtl",
+      "btnCx": 139.8359375,
+      "scopeCx": 640,
+      "w": 57.453125
+    },
+    "icon": {
+      "cx": 640,
+      "scopeCx": 640
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 1.18
+  },
+  {
+    "file": "dsn054-suppliers-error-M-fr-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "ltr",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "ltr"
+    },
+    "body": {
+      "fg": "rgb(185, 28, 28)",
+      "bg": "rgb(254, 242, 242)",
+      "dir": "ltr"
+    },
+    "cta": {
+      "dir": "ltr",
+      "btnCx": 1042.0078125,
+      "scopeCx": 640,
+      "w": 111.015625
+    },
+    "icon": {
+      "cx": 640,
+      "scopeCx": 640
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 5.91
+  },
+  {
+    "file": "dsn054-suppliers-error-M-ar-light.png",
+    "found": true,
+    "tag": "SECTION",
+    "dark": false,
+    "dir": "rtl",
+    "scrollW": 1280,
+    "clientW": 1280,
+    "scrollH": 720,
+    "clientH": 720,
+    "fixed": 0,
+    "emoji": false,
+    "digits": [],
+    "title": {
+      "fg": "rgb(15, 23, 42)",
+      "bg": "rgb(248, 250, 252)",
+      "dir": "rtl"
+    },
+    "body": {
+      "fg": "rgb(185, 28, 28)",
+      "bg": "rgb(254, 242, 242)",
+      "dir": "rtl"
+    },
+    "cta": {
+      "dir": "rtl",
+      "btnCx": 139.8359375,
+      "scopeCx": 640,
+      "w": 57.453125
+    },
+    "icon": {
+      "cx": 640,
+      "scopeCx": 640
+    },
+    "titleRatio": 17.06,
+    "bodyRatio": 5.91
+  }
+]

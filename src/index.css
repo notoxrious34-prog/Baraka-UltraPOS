@@ -91,10 +91,59 @@ body,
   height: 100%;
 }
 
+/* Semantic design tokens (ADR-094). Light values are the pre-existing
+   hardcoded body colors, verbatim; dark values are new. */
+:root {
+  --color-surface-canvas: #f8fafc;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #eef2f6;
+  --color-ink-primary: #0f172a;
+  /* NOTE (TASK-DSN-055): draft was #475569; adjusted to #334155 (existing
+     slate-700 body copy) to preserve pixel-identical light rendering. */
+  --color-ink-secondary: #334155;
+  /* NOTE (TASK-DSN-056): light pinned EXACTLY to resolved text-slate-500
+     (#64748b, confirmed Tailwind default — no slate override in
+     tailwind.config.js — and measured rgb(100,116,139) in AUD-015/DSN-055);
+     dark #94a3b8 computed for >= 4.5:1 on dark canvas (7.34:1). */
+  --color-ink-muted: #64748b;
+  --color-ink-inverse: #f8fafc;
+  --color-line-default: #e2e8f0;
+  --color-line-strong: #94a3b8;
+  --color-success-bg: #dcfce7;
+  --color-success-fg: #16803c;
+  --color-warning-bg: #fef3c7;
+  --color-warning-fg: #b45309;
+  --color-danger-bg: #fee2e2;
+  --color-danger-fg: #c62828;
+  --color-info-bg: #dbeafe;
+  /* NOTE (TASK-DSN-055): draft was #2563eb (4.24:1 on info-bg, below AA);
+     darkened to #1d4ed8 (5.49:1), same hue. */
+  --color-info-fg: #1d4ed8;
+}
+:root.dark {
+  --color-surface-canvas: #0b1120;
+  --color-surface-raised: #111827;
+  --color-surface-sunken: #0a0f1a;
+  --color-ink-primary: #f1f5f9;
+  --color-ink-secondary: #94a3b8;
+  --color-ink-muted: #94a3b8;
+  --color-ink-inverse: #0f172a;
+  --color-line-default: #1e293b;
+  --color-line-strong: #334155;
+  --color-success-bg: #14321f;
+  --color-success-fg: #4ade80;
+  --color-warning-bg: #3a2a0a;
+  --color-warning-fg: #fbbf24;
+  --color-danger-bg: #3b1414;
+  --color-danger-fg: #f87171;
+  --color-info-bg: #0f2744;
+  --color-info-fg: #60a5fa;
+}
+
 body {
   font-family: Inter, Cairo, system-ui, "Segoe UI", Tahoma, sans-serif;
-  background-color: #f8fafc;
-  color: #0f172a;
+  background: var(--color-surface-canvas);
+  color: var(--color-ink-primary);
   -webkit-font-smoothing: antialiased;
 }
 

@@ -1,0 +1,118 @@
+[
+  {
+    "dark": false,
+    "items": [
+      {
+        "key": "row-name",
+        "found": true,
+        "tag": "TD",
+        "text": "Quincaillerie El Amel",
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(248, 250, 252)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 17.06,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "row-bal-pos",
+        "found": true,
+        "tag": "BDI",
+        "text": "15 250,00 DZD",
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(248, 250, 252)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 17.06,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "row-bal-neg",
+        "found": true,
+        "tag": "BDI",
+        "text": "-4 250,75 DZD",
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(248, 250, 252)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 17.06,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "row-bal-zero",
+        "found": true,
+        "tag": "BDI",
+        "text": "15 250,00 DZD",
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(248, 250, 252)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 17.06,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "list-light"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "row-name",
+        "found": true,
+        "tag": "TD",
+        "text": "Quincaillerie El Amel",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "row-bal-pos",
+        "found": true,
+        "tag": "BDI",
+        "text": "15 250,00 DZD",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "row-bal-neg",
+        "found": true,
+        "tag": "BDI",
+        "text": "-4 250,75 DZD",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "row-bal-zero",
+        "found": true,
+        "tag": "BDI",
+        "text": "15 250,00 DZD",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "list-dark"
+  }
+]

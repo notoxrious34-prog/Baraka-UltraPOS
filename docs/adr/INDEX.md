@@ -91,4 +91,12 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-091 | Dual-Width (58mm/80mm) ESC/POS Thermal Pipeline and Font-Shaping Calibration | ACCEPTED |
 
-Next free id: ADR-092.
+| ADR-092 | Dual-Track Safe Deletion and Configurable Fiscal Stamp | ACCEPTED |
+
+| ADR-093 | Settings Command Center and Catalog Purification | ACCEPTED |
+
+| ADR-094 | Dark Mode via Semantic Design Tokens | ACCEPTED |
+
+| ADR-095 | Ink-Muted Token Tier Refinement | ACCEPTED |
+
+Next free id: ADR-096.

@@ -1,0 +1,92 @@
+[
+  {
+    "dark": false,
+    "items": [
+      {
+        "key": "teach-title",
+        "found": true,
+        "tag": "H2",
+        "text": "Ajoutez votre premier fournisseur",
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(248, 250, 252)",
+        "fs": 16,
+        "fw": "700",
+        "ratio": 17.06,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "teach-body",
+        "found": true,
+        "tag": "P",
+        "text": "Aucun fournisseur enregistré. Ajoutez votre premier fourniss",
+        "fg": "rgb(51, 65, 85)",
+        "bg": "rgb(248, 250, 252)",
+        "fs": 14,
+        "fw": "700",
+        "ratio": 9.9,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "teach-cta",
+        "found": true,
+        "tag": "BUTTON",
+        "text": "+ Nouveau fournisseur",
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(226, 232, 240)",
+        "fs": 12,
+        "fw": "900",
+        "ratio": 14.48,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "teaching-light"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "teach-title",
+        "found": true,
+        "tag": "H2",
+        "text": "Ajoutez votre premier fournisseur",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 16,
+        "fw": "700",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "teach-body",
+        "found": true,
+        "tag": "P",
+        "text": "Aucun fournisseur enregistré. Ajoutez votre premier fourniss",
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 14,
+        "fw": "700",
+        "ratio": 7.34,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "teach-cta",
+        "found": true,
+        "tag": "BUTTON",
+        "text": "+ Nouveau fournisseur",
+        "fg": "rgb(226, 232, 240)",
+        "bg": "rgb(30, 41, 59)",
+        "fs": 12,
+        "fw": "900",
+        "ratio": 11.87,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "teaching-dark"
+  }
+]

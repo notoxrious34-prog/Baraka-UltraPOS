@@ -73,7 +73,7 @@ export function ReportsHomeScreen(): ReactElement {
     <section className="flex h-full flex-col gap-3 overflow-y-auto p-4">
       <div>
         <h2 className="text-lg font-black">{t(locale, "rep.title")}</h2>
-        <p className="text-xs font-bold text-slate-500">{t(locale, "rep.subtitle")}</p>
+        <p className="text-xs font-bold text-ink-muted">{t(locale, "rep.subtitle")}</p>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {TILES.map((tile) => (

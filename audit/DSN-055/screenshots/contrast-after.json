@@ -1,0 +1,379 @@
+[
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "discovery-empty",
+        "found": true,
+        "tag": "P",
+        "text": "Catalogue vide — ajoutez des produits pour commencer",
+        "fg": "rgb(100, 116, 139)",
+        "bg": "rgb(15, 23, 42)",
+        "fs": 14,
+        "fw": "500",
+        "ratio": 3.75,
+        "threshold": 4.5,
+        "verdict": "FAIL"
+      },
+      {
+        "key": "pos-nav-active",
+        "found": true,
+        "tag": "BUTTON",
+        "text": "Caisse",
+        "fg": "rgb(2, 6, 23)",
+        "bg": "rgb(245, 158, 11)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 9.39,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "first-button",
+        "found": true,
+        "tag": "BUTTON",
+        "text": "Caisse",
+        "fg": "rgb(2, 6, 23)",
+        "bg": "rgb(245, 158, 11)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 9.39,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "pos"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "settings-h1",
+        "found": true,
+        "tag": "H1",
+        "text": "Paramètres & Configuration",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(15, 23, 42)",
+        "fs": 18,
+        "fw": "800",
+        "ratio": 16.3,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "settings-section-label",
+        "found": false
+      },
+      {
+        "key": "about-body",
+        "found": true,
+        "tag": "P",
+        "text": "Version 1.0.0 — moteur unifié hors-ligne",
+        "fg": "rgb(226, 232, 240)",
+        "bg": "rgb(51, 65, 85)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 8.4,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "settings"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "product-name-1",
+        "found": true,
+        "tag": "SPAN",
+        "text": "Savon de Marseille",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(15, 23, 42)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 16.3,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "product-name-2",
+        "found": true,
+        "tag": "SPAN",
+        "text": "Ciment CPJ 45",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(15, 23, 42)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 16.3,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "catalog-h2",
+        "found": true,
+        "tag": "H2",
+        "text": "Catalogue des Produits",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 18,
+        "fw": "900",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "catalog"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "stock-h1",
+        "found": true,
+        "tag": "H1",
+        "text": "Stock & Dépôts",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(15, 23, 42)",
+        "fs": 14,
+        "fw": "900",
+        "ratio": 16.3,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "stock-th",
+        "found": false
+      },
+      {
+        "key": "stock-row-name",
+        "found": false
+      }
+    ],
+    "screen": "stock"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "cust-h1",
+        "found": true,
+        "tag": "H1",
+        "text": "Clients & Crédit",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 14,
+        "fw": "900",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "cust-row-name",
+        "found": true,
+        "tag": "P",
+        "text": "Amine Benali",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 14,
+        "fw": "800",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "cust-balance",
+        "found": true,
+        "tag": "BDI",
+        "text": "1 250,50 DZD",
+        "fg": "rgb(251, 191, 36)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 11.28,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "customers"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "sup-h2",
+        "found": true,
+        "tag": "H2",
+        "text": "Fournisseurs",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 18,
+        "fw": "900",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "sup-row-name",
+        "found": true,
+        "tag": "TD",
+        "text": "Fournisseur Test Alpha",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "sup-balance",
+        "found": true,
+        "tag": "TD",
+        "text": "2 500,00 DZD",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "suppliers"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "rep-h2",
+        "found": true,
+        "tag": "H2",
+        "text": "Rapports",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 18,
+        "fw": "900",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "rep-card-title",
+        "found": true,
+        "tag": "SPAN",
+        "text": "Marges brutes",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(15, 23, 42)",
+        "fs": 14,
+        "fw": "900",
+        "ratio": 16.3,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "rep-first-p",
+        "found": true,
+        "tag": "P",
+        "text": "Analyses d’activité — lecture seule",
+        "fg": "rgb(100, 116, 139)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 12,
+        "fw": "700",
+        "ratio": 3.96,
+        "threshold": 4.5,
+        "verdict": "FAIL"
+      }
+    ],
+    "screen": "reports"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "teach-title",
+        "found": true,
+        "tag": "H2",
+        "text": "Sélectionnez un client",
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 16,
+        "fw": "700",
+        "ratio": 17.19,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      },
+      {
+        "key": "teach-body",
+        "found": true,
+        "tag": "P",
+        "text": "Choisissez un client dans la liste pour afficher son compte,",
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 14,
+        "fw": "700",
+        "ratio": 7.34,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "customers-empty"
+  },
+  {
+    "dark": true,
+    "items": [
+      {
+        "key": "nomatch-body",
+        "found": true,
+        "tag": "P",
+        "text": "Aucun fournisseur ne correspond à « Ciment CPJ 45 ».",
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(11, 17, 32)",
+        "fs": 14,
+        "fw": "700",
+        "ratio": 7.34,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "suppliers-nomatch"
+  },
+  {
+    "dark": false,
+    "items": [
+      {
+        "key": "light-body-text",
+        "found": true,
+        "tag": "P",
+        "text": "Catalogue vide — ajoutez des produits pour commencer",
+        "fg": "rgb(100, 116, 139)",
+        "bg": "rgb(255, 255, 255)",
+        "fs": 14,
+        "fw": "500",
+        "ratio": 4.76,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "pos-light"
+  },
+  {
+    "dark": false,
+    "items": [
+      {
+        "key": "light-h1",
+        "found": true,
+        "tag": "H1",
+        "text": "Paramètres & Configuration",
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(248, 250, 252)",
+        "fs": 18,
+        "fw": "800",
+        "ratio": 17.06,
+        "threshold": 4.5,
+        "verdict": "PASS"
+      }
+    ],
+    "screen": "settings-light"
+  }
+]

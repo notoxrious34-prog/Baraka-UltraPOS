@@ -1,0 +1,65 @@
+{
+  "generated_by": "TASK-DSN-063 step5",
+  "viewport": "1280x720",
+  "locale": "fr",
+  "threshold": 4.5,
+  "elements": [
+    {
+      "screen": "catalog",
+      "light": {
+        "foreground": "rgb(15, 23, 42)",
+        "foreground_hex": "#0f172a",
+        "background": "rgb(255, 255, 255)",
+        "background_hex": "#ffffff",
+        "ratio": 17.85,
+        "pass": true
+      },
+      "dark": {
+        "foreground": "rgb(241, 245, 249)",
+        "foreground_hex": "#f1f5f9",
+        "background": "rgb(15, 23, 42)",
+        "background_hex": "#0f172a",
+        "ratio": 16.3,
+        "pass": true
+      }
+    },
+    {
+      "screen": "settings",
+      "light": {
+        "foreground": "rgb(15, 23, 42)",
+        "foreground_hex": "#0f172a",
+        "background": "rgb(248, 250, 252)",
+        "background_hex": "#f8fafc",
+        "ratio": 17.06,
+        "pass": true
+      },
+      "dark": {
+        "foreground": "rgb(241, 245, 249)",
+        "foreground_hex": "#f1f5f9",
+        "background": "rgb(15, 23, 42)",
+        "background_hex": "#0f172a",
+        "ratio": 16.3,
+        "pass": true
+      }
+    },
+    {
+      "screen": "stock",
+      "light": {
+        "foreground": "rgb(15, 23, 42)",
+        "foreground_hex": "#0f172a",
+        "background": "rgb(248, 250, 252)",
+        "background_hex": "#f8fafc",
+        "ratio": 17.06,
+        "pass": true
+      },
+      "dark": {
+        "foreground": "rgb(241, 245, 249)",
+        "foreground_hex": "#f1f5f9",
+        "background": "rgb(15, 23, 42)",
+        "background_hex": "#0f172a",
+        "ratio": 16.3,
+        "pass": true
+      }
+    }
+  ]
+}

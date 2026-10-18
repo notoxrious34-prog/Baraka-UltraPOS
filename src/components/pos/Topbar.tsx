@@ -6,6 +6,7 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import { usePosUiStore } from "@/stores/pos-ui-store";
+import { useThemeStore } from "@/stores/theme-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useCartStore } from "@/stores/cart-store";
 import { t } from "@/lib/i18n";
@@ -27,14 +28,6 @@ function useClock(): string {
   return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
 
-function useDarkMode(): { dark: boolean; toggle: () => void } {
-  const [dark, setDark] = useState(false);
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
-  return { dark, toggle: () => setDark((value) => !value) };
-}
-
 export function Topbar(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const toggleLocale = usePosUiStore((state) => state.toggleLocale);
@@ -46,7 +39,8 @@ export function Topbar(): ReactElement {
   const selectWarehouse = useSessionStore((state) => state.selectWarehouse);
   const logout = useSessionStore((state) => state.logout);
   const clock = useClock();
-  const { dark, toggle } = useDarkMode();
+  const dark = useThemeStore((state) => state.isDark);
+  const toggle = useThemeStore((state) => state.toggleTheme);
   const cartLineCount = useCartStore((state) => state.lines.length);
   const [parkedCount, setParkedCount] = useState(0);
 

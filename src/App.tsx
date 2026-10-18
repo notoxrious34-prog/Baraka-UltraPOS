@@ -9,6 +9,7 @@ import { useEffect, useState, type ReactElement } from "react";
 import { useSessionStore } from "@/stores/session-store";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useAppViewStore, type AppView } from "@/stores/app-view-store";
+import { useThemeStore } from "@/stores/theme-store";
 import { PosShell } from "@/components/pos/PosShell";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { FirstRunSetupScreen } from "@/features/auth/FirstRunSetupScreen";
@@ -120,6 +121,11 @@ export default function App(): ReactElement {
   const setView = useAppViewStore((state) => state.setView);
   const manager = session !== null && isManagerRole(session.role);
   const isAdmin = session !== null && session.role === "ADMIN";
+
+  // Restore the persisted theme preference on startup (TASK-DSN-065).
+  useEffect(() => {
+    useThemeStore.getState().initTheme();
+  }, []);
 
   return (
     <div

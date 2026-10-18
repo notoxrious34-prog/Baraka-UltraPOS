@@ -12,6 +12,7 @@
 import { create } from "zustand";
 import {
   adjustStock,
+  ipcGetProduct,
   ipcGetStock,
   ipcSearchCatalog,
   listWarehouses,
@@ -187,6 +188,42 @@ export const useStockAdjustModalStore = create<StockAdjustModalStoreState>()((se
     }
   }
 
+  /**
+   * Row-entry unit resolution (TASK-DSN-064): a table-row prefill carries no
+   * units array, so `unitId` stays null and the confirm action can never
+   * validate. Resolve the product's default unit via catalog_get_product using
+   * the same precedence as the manual picker (default-selling, base, first).
+   * Stale-safe: no-ops when the product changed or a unit is already set.
+   */
+  async function resolvePrefillUnit(productId: string): Promise<void> {
+    const token = useSessionStore.getState().getSessionToken();
+    if (token === null) {
+      return;
+    }
+    const current = get();
+    if (current.productId !== productId || current.unitId !== null) {
+      return;
+    }
+    try {
+      const product = await ipcGetProduct(token, productId);
+      const unit =
+        product.units.find((candidate) => candidate.is_default_selling) ??
+        product.units.find((candidate) => candidate.is_base_unit) ??
+        product.units[0];
+      if (unit === undefined) {
+        set({ errorMessage: "CATALOG_PRODUCT_HAS_NO_UNITS" });
+        return;
+      }
+      const fresh = get();
+      if (fresh.productId !== productId || fresh.unitId !== null) {
+        return;
+      }
+      set({ unitId: unit.unit_id, unitName: unit.unit_name_fr });
+    } catch (failure: unknown) {
+      set({ errorMessage: typeof failure === "string" ? failure : "INTERNAL_ERROR" });
+    }
+  }
+
   return {
     ...initialState,
 
@@ -205,6 +242,9 @@ export const useStockAdjustModalStore = create<StockAdjustModalStoreState>()((se
         const state = get();
         if (state.productId !== null && state.selectedWarehouseId !== null) {
           void refreshStock();
+        }
+        if (state.productId !== null && state.unitId === null) {
+          void resolvePrefillUnit(state.productId);
         }
       });
     },

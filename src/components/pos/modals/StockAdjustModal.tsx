@@ -10,7 +10,7 @@
  * translateBackendError; the backend is final.
  */
 
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import {
@@ -91,6 +91,41 @@ export function StockAdjustModal(): ReactElement {
   const [pickedMeta, setPickedMeta] = useState<{ sku: string; barcode: string | null } | null>(
     null,
   );
+  const modalProductId = useStockAdjustModalStore((state) => state.productId);
+  // Instant debounced picker search (TASK-DSN-064): fire catalog_search 175ms
+  // after the last keystroke. The timer + ticket guard keep stale responses
+  // from overwriting newer results. Enter remains as an explicit fallback.
+  const searchTicket = useRef(0);
+  useEffect(() => {
+    if (pickerQuery.trim() === "" || session === null || modalProductId !== null) {
+      return;
+    }
+    const ticket = searchTicket.current + 1;
+    searchTicket.current = ticket;
+    const query = pickerQuery;
+    const timer = window.setTimeout(() => {
+      setPickerBusy(true);
+      searchAdjustProducts(query)
+        .then((products) => {
+          if (searchTicket.current === ticket) {
+            setPickerResults(products);
+          }
+        })
+        .catch(() => {
+          if (searchTicket.current === ticket) {
+            setPickerResults([]);
+          }
+        })
+        .finally(() => {
+          if (searchTicket.current === ticket) {
+            setPickerBusy(false);
+          }
+        });
+    }, 175);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [pickerQuery, session, modalProductId]);
 
   const delta = parseMicro(s.computedDeltaMicro);
   const newStock = parseMicro(s.computedNewStockMicro);
@@ -273,7 +308,6 @@ export function StockAdjustModal(): ReactElement {
             </label>
 
             {s.productId === null && (
-              <div className="flex gap-2">
               <input
                 value={pickerQuery}
                 onChange={(event) => {
@@ -289,15 +323,6 @@ export function StockAdjustModal(): ReactElement {
                 disabled={s.isSubmitting}
                 className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold outline-none focus:border-primary-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
               />
-              <button
-                type="button"
-                onClick={runPickerSearch}
-                disabled={s.isSubmitting || pickerBusy}
-                className="h-11 shrink-0 rounded-lg bg-primary-600 px-3 text-sm font-black text-white disabled:opacity-50"
-              >
-                {t(locale, "returns.search")}
-              </button>
-              </div>
             )}
             {pane === "loading" && s.productId === null && (
               <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
@@ -452,7 +477,9 @@ export function StockAdjustModal(): ReactElement {
                     : `${t(locale, "stockAdjust.lossBadge")} (${fmtQty(delta)})`}
               </span>
               <span className="font-mono">
-                {fmtQty(parseMicro(s.currentStockMicro))} → {fmtQty(newStock)}
+                <bdi dir="ltr" className="tabular-nums">
+                  {fmtQty(parseMicro(s.currentStockMicro))} → {fmtQty(newStock)}
+                </bdi>
               </span>
             </div>
             {newStock < 0n && (

@@ -157,6 +157,8 @@ interface ReturnModalStoreState {
   closeModal: () => void;
   setSearchQuery: (query: string) => void;
   searchAndLoadDocument: (documentNumberOrId: string) => Promise<void>;
+  /** Monotonic lookup ticket (TASK-DSN-067 stale guard); not UI state. */
+  searchTicket: number;
   setItemQuantity: (itemId: string, qtyMicroStr: string) => void;
   setReturnAll: () => void;
   resetQuantities: () => void;
@@ -169,6 +171,7 @@ interface ReturnModalStoreState {
 const initialState = {
   isOpen: false,
   searchQuery: "",
+  searchTicket: 0,
   isSearching: false,
   isLoadingContext: false,
   isSubmitting: false,
@@ -252,6 +255,9 @@ export const useReturnModalStore = create<ReturnModalStoreState>()((set, get) =>
       if (trimmed === "") {
         return;
       }
+      // Monotonic ticket (TASK-DSN-067): a newer lookup supersedes this one.
+      const ticket = get().searchTicket + 1;
+      set({ searchTicket: ticket });
       // UUIDs load directly; human numbers resolve via the search index.
       if (UUID_RE.test(trimmed)) {
         await loadContext(trimmed);
@@ -266,6 +272,9 @@ export const useReturnModalStore = create<ReturnModalStoreState>()((set, get) =>
           query: trimmed,
           limit: 5,
         });
+        if (get().searchTicket !== ticket) {
+          return;
+        }
         const first = response.documents[0];
         if (first === undefined) {
           set({ errorMessage: "DOCUMENT_NOT_FOUND" });
@@ -273,9 +282,13 @@ export const useReturnModalStore = create<ReturnModalStoreState>()((set, get) =>
         }
         await loadContext(first.id);
       } catch (failure: unknown) {
-        set({ errorMessage: typeof failure === "string" ? failure : "INTERNAL_ERROR" });
+        if (get().searchTicket === ticket) {
+          set({ errorMessage: typeof failure === "string" ? failure : "INTERNAL_ERROR" });
+        }
       } finally {
-        set({ isSearching: false });
+        if (get().searchTicket === ticket) {
+          set({ isSearching: false });
+        }
       }
     },
 

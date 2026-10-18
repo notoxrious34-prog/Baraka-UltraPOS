@@ -11,7 +11,7 @@
  * backend is final.
  */
 
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { isCheckoutPermitted, useCashSessionStore } from "@/stores/cash-session-store";
@@ -25,6 +25,7 @@ import {
   type ReturnRefundMethod,
 } from "@/stores/return-modal-store";
 import { t, translateBackendError } from "@/lib/i18n";
+import { createDebouncedSearchRunner } from "@/lib/debounced-search";
 import { formatMoney, formatQty } from "@/lib/money";
 import { ipcReprint } from "@/lib/ipc";
 import { ModalShell } from "@/components/pos/modals/ModalShell";
@@ -59,6 +60,27 @@ export function ReturnModal(): ReactElement {
   const cashSession = useCashSessionStore((state) => state.session);
   const s = useReturnModalStore();
   const [printing, setPrinting] = useState(false);
+  // Instant debounced document lookup (TASK-DSN-067): 200ms, min length 2.
+  // Enter keeps its direct immediate path (barcode-safe, bypasses the gate).
+  const lookupSearchRef = useRef<ReturnType<typeof createDebouncedSearchRunner> | null>(null);
+  if (lookupSearchRef.current === null) {
+    lookupSearchRef.current = createDebouncedSearchRunner({
+      delayMs: 200,
+      shouldSearch: (firedQuery) => firedQuery.trim().length >= 2,
+      onSearch: (firedQuery) => {
+        void s.searchAndLoadDocument(firedQuery);
+      },
+    });
+  }
+  useEffect(() => {
+    lookupSearchRef.current?.search(s.searchQuery);
+  }, [s.searchQuery]);
+  useEffect(
+    () => () => {
+      lookupSearchRef.current?.dispose();
+    },
+    [],
+  );
 
   const token = session !== null ? session.token : null;
   const guest = isGuestContext(s.context);
@@ -160,6 +182,7 @@ export function ReturnModal(): ReactElement {
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
+                    lookupSearchRef.current?.reset();
                     void s.searchAndLoadDocument(s.searchQuery);
                   }
                 }}
@@ -169,16 +192,6 @@ export function ReturnModal(): ReactElement {
                 disabled={s.isSearching || s.isLoadingContext}
                 className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 font-mono text-sm font-bold outline-none focus:border-primary-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
               />
-              <button
-                type="button"
-                onClick={() => {
-                  void s.searchAndLoadDocument(s.searchQuery);
-                }}
-                disabled={s.isSearching || s.isLoadingContext}
-                className="h-11 shrink-0 rounded-lg bg-primary-600 px-4 text-sm font-black text-white disabled:opacity-50"
-              >
-                {t(locale, "returns.search")}
-              </button>
             </div>
             {(s.isSearching || s.isLoadingContext) && (
               <p className="text-center text-xs font-bold text-slate-500">

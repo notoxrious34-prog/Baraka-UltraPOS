@@ -5,8 +5,9 @@
  * Submitting allocates a gapless DRAFT purchase order with zero side effects.
  */
 
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
+import { createDebouncedSearchRunner } from "@/lib/debounced-search";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { ipcCreatePurchaseOrder, ipcSearchCatalog } from "@/lib/ipc";
@@ -33,13 +34,47 @@ export function PurchaseLinesEditor({
   const locale = usePosUiStore((state) => state.locale);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CatalogProduct[]>([]);
-
-  const runProductSearch = async (): Promise<void> => {
-    try {
-      setResults(await ipcSearchCatalog(token, query, 12));
-    } catch {
+  // Instant debounced product search (TASK-DSN-067): 175ms, ticket-guarded.
+  const searchRef = useRef<ReturnType<typeof createDebouncedSearchRunner> | null>(null);
+  if (searchRef.current === null) {
+    const runner = createDebouncedSearchRunner({
+      delayMs: 175,
+      onSearch: (firedQuery, ticket) => {
+        void ipcSearchCatalog(token, firedQuery, 12)
+          .then((found) => {
+            if (runner.isLatest(ticket)) {
+              setResults(found);
+            }
+          })
+          .catch(() => {
+            if (runner.isLatest(ticket)) {
+              setResults([]);
+            }
+          });
+      },
+    });
+    searchRef.current = runner;
+  }
+  useEffect(() => {
+    searchRef.current?.search(query);
+    if (query.trim() === "") {
       setResults([]);
     }
+  }, [query]);
+  useEffect(
+    () => () => {
+      searchRef.current?.dispose();
+    },
+    [],
+  );
+
+  const flushProductSearch = (): void => {
+    const runner = searchRef.current;
+    if (runner === null) {
+      return;
+    }
+    runner.search(query);
+    runner.flush();
   };
 
   const addRow = (product: CatalogProduct): void => {
@@ -76,21 +111,16 @@ export function PurchaseLinesEditor({
           }}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
-              void runProductSearch();
+              flushProductSearch();
+            } else if (event.key === "Escape") {
+              searchRef.current?.reset();
+              setQuery("");
+              setResults([]);
             }
           }}
           placeholder={t(locale, "pur.productSearch")}
           className="h-9 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold outline-none focus:border-primary-600 dark:border-slate-700 dark:bg-slate-800"
         />
-        <button
-          type="button"
-          onClick={() => {
-            void runProductSearch();
-          }}
-          className="h-9 rounded-lg bg-primary-600 px-3 text-xs font-black text-white"
-        >
-          {t(locale, "sup.search")}
-        </button>
       </div>
       {results.length > 0 && (
         <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-lg border border-slate-200 p-1 dark:border-slate-700">

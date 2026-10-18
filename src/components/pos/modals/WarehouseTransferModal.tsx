@@ -10,7 +10,7 @@
  * final.
  */
 
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import {
@@ -22,6 +22,7 @@ import {
   type WarehouseTransferTab,
 } from "@/stores/warehouse-transfer-store";
 import { t, translateBackendError } from "@/lib/i18n";
+import { createDebouncedSearchRunner } from "@/lib/debounced-search";
 import { formatQty } from "@/lib/money";
 import { ModalShell } from "@/components/pos/modals/ModalShell";
 import { SafeDeleteModal } from "@/components/common/SafeDeleteModal";
@@ -243,6 +244,49 @@ export function WarehouseTransferModal(): ReactElement {
   const [pickerQuery, setPickerQuery] = useState("");
   const [pickerResults, setPickerResults] = useState<CatalogProduct[]>([]);
   const [pickerBusy, setPickerBusy] = useState(false);
+  // Instant debounced picker search (TASK-DSN-067): 175ms, ticket-guarded.
+  const pickerSearchRef = useRef<ReturnType<typeof createDebouncedSearchRunner> | null>(null);
+  if (pickerSearchRef.current === null) {
+    const runner = createDebouncedSearchRunner({
+      delayMs: 175,
+      onSearch: (firedQuery, ticket) => {
+        setPickerBusy(true);
+        searchTransferProducts(firedQuery)
+          .then((products) => {
+            if (runner.isLatest(ticket)) {
+              setPickerResults(products);
+            }
+          })
+          .catch(() => {
+            if (runner.isLatest(ticket)) {
+              setPickerResults([]);
+            }
+          })
+          .finally(() => {
+            if (runner.isLatest(ticket)) {
+              setPickerBusy(false);
+            }
+          });
+      },
+    });
+    pickerSearchRef.current = runner;
+  }
+  useEffect(() => {
+    const runner = pickerSearchRef.current;
+    if (runner === null) {
+      return;
+    }
+    runner.search(pickerQuery);
+    if (pickerQuery.trim() === "") {
+      setPickerResults([]);
+    }
+  }, [pickerQuery]);
+  useEffect(
+    () => () => {
+      pickerSearchRef.current?.dispose();
+    },
+    [],
+  );
 
   const role = session !== null ? session.role : "";
   const manager = isManagerRole(role);
@@ -286,22 +330,13 @@ export function WarehouseTransferModal(): ReactElement {
     closeModal();
   };
 
-  const runPickerSearch = (): void => {
-    if (pickerQuery.trim() === "") {
-      setPickerResults([]);
+  const flushPickerSearch = (): void => {
+    const runner = pickerSearchRef.current;
+    if (runner === null) {
       return;
     }
-    setPickerBusy(true);
-    searchTransferProducts(pickerQuery)
-      .then((products) => {
-        setPickerResults(products);
-      })
-      .catch(() => {
-        setPickerResults([]);
-      })
-      .finally(() => {
-        setPickerBusy(false);
-      });
+    runner.search(pickerQuery);
+    runner.flush();
   };
 
   const tabButton = (tab: WarehouseTransferTab, labelKey: Parameters<typeof t>[1]): ReactElement => (
@@ -395,7 +430,11 @@ export function WarehouseTransferModal(): ReactElement {
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
-                    runPickerSearch();
+                    flushPickerSearch();
+                  } else if (event.key === "Escape") {
+                    pickerSearchRef.current?.reset();
+                    setPickerQuery("");
+                    setPickerResults([]);
                   }
                 }}
                 placeholder={t(locale, "transferProductSearch")}
@@ -403,15 +442,12 @@ export function WarehouseTransferModal(): ReactElement {
                 disabled={s.isSubmitting}
                 className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold outline-none focus:border-primary-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
               />
-              <button
-                type="button"
-                onClick={runPickerSearch}
-                disabled={s.isSubmitting || pickerBusy}
-                className="h-11 shrink-0 rounded-lg bg-primary-600 px-3 text-sm font-black text-white disabled:opacity-50"
-              >
-                {t(locale, "addItemToTransfer")}
-              </button>
             </div>
+            {pickerBusy && pickerQuery.trim() !== "" && (
+              <p className="text-center text-xs font-bold text-ink-muted">
+                {t(locale, "stock.searching")}
+              </p>
+            )}
             {pickerResults.length > 0 && (
               <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
                 {pickerResults.map((product) => {

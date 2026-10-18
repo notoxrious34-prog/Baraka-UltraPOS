@@ -1,0 +1,42 @@
+[
+  {
+    "element": "pos-empty-catalogue",
+    "mode": "dark",
+    "foreground": "rgb(148, 163, 184)",
+    "background": "rgb(15, 23, 42)",
+    "ratio": 6.96,
+    "pass": true
+  },
+  {
+    "element": "totals-footer-sub",
+    "mode": "dark",
+    "foreground": "rgb(148, 163, 184)",
+    "background": "rgb(15, 23, 42)",
+    "ratio": 6.96,
+    "pass": true
+  },
+  {
+    "element": "parked-meta",
+    "mode": "dark",
+    "foreground": "rgb(148, 163, 184)",
+    "background": "rgb(15, 23, 42)",
+    "ratio": 6.96,
+    "pass": true
+  },
+  {
+    "element": "discount-label",
+    "mode": "dark",
+    "foreground": "rgb(148, 163, 184)",
+    "background": "rgb(15, 23, 42)",
+    "ratio": 6.96,
+    "pass": true
+  },
+  {
+    "element": "doctable-thead",
+    "mode": "dark",
+    "foreground": "rgb(148, 163, 184)",
+    "background": "rgb(30, 41, 59)",
+    "ratio": 5.71,
+    "pass": true
+  }
+]

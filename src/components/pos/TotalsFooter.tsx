@@ -22,15 +22,15 @@ export function TotalsFooter(): ReactElement {
 
   return (
     <div className="shrink-0 border-t border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+      <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
         <span>{t(locale, "totals.subtotal")}</span>
         <span className="font-mono">{formatMoney(totals.gross, locale)}</span>
       </div>
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+      <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
         <span>{t(locale, "totals.discount")}</span>
         <span className="font-mono">−{formatMoney(totals.globalDiscount, locale)}</span>
       </div>
-      <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+      <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
         <span>{t(locale, "totals.tva")}</span>
         <span className="font-mono">{formatMoney("0", locale)}</span>
       </div>

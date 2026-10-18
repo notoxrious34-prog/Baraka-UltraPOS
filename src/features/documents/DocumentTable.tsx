@@ -63,7 +63,7 @@ export function DocumentTable(props: DocumentTableProps): ReactElement {
     <div className="min-h-0 flex-1 overflow-auto">
       <table className="w-full border-collapse text-xs">
         <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800">
-          <tr className="text-start text-slate-500">
+          <tr className="text-start text-ink-secondary">
             <th className="px-2 py-2 text-start font-bold">{t(locale, "documents.colNumber")}</th>
             <th className="px-2 py-2 text-start font-bold">{t(locale, "documents.colType")}</th>
             <th className="px-2 py-2 text-start font-bold">{t(locale, "documents.colDate")}</th>

@@ -58,7 +58,7 @@ export function DiscountModal(): ReactElement {
     <ModalShell title={t(locale, "discount.title")} onClose={closeModal}>
       <div className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-500">{t(locale, "discount.global")}</span>
+          <span className="text-xs font-bold text-ink-muted">{t(locale, "discount.global")}</span>
           <input
             value={globalText}
             onChange={(event) => {
@@ -70,7 +70,7 @@ export function DiscountModal(): ReactElement {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-slate-500">{t(locale, "discount.line")}</span>
+          <span className="text-xs font-bold text-ink-muted">{t(locale, "discount.line")}</span>
           <input
             value={lineText}
             onChange={(event) => {

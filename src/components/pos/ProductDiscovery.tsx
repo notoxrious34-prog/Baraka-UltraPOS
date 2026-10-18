@@ -228,7 +228,7 @@ export function ProductDiscovery(): ReactElement {
           <p className="p-4 text-center text-sm font-semibold text-red-600">{error}</p>
         )}
         {warehouse !== null && !loading && error === null && visible.length === 0 && (
-          <div className="flex flex-col items-center justify-center p-8 text-center text-sm text-slate-500">
+          <div className="flex flex-col items-center justify-center p-8 text-center text-sm text-ink-muted">
             <p className="font-medium">
               {searchQuery.trim() === ""
                 ? t(locale, "search.catalogEmpty")

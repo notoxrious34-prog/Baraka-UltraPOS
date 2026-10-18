@@ -208,7 +208,7 @@ export function ParkedSalesModal(): ReactElement {
         </p>
       )}
       {!loading && error === null && drafts.length === 0 && (
-        <div className="flex flex-col items-center justify-center p-8 text-center text-sm text-slate-500">
+        <div className="flex flex-col items-center justify-center p-8 text-center text-sm text-ink-muted">
           <p className="font-medium">{t(locale, "parked.empty")}</p>
         </div>
       )}
@@ -221,12 +221,12 @@ export function ParkedSalesModal(): ReactElement {
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-extrabold">{draft.document_number}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-ink-muted">
                   {draft.items_count} {t(locale, "parked.itemCount")} ·{" "}
                   {fmtAmount(draft.total_ttc_centimes, locale)}
                 </p>
                 {draft.party_name !== null && (
-                  <p className="truncate text-xs text-slate-500">{draft.party_name}</p>
+                  <p className="truncate text-xs text-ink-muted">{draft.party_name}</p>
                 )}
               </div>
               <button

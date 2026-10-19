@@ -7,6 +7,7 @@
 
 import { useEffect } from "react";
 import { useCartStore } from "@/stores/cart-store";
+import { useQuickProductsStore } from "@/stores/quick-products-store";
 import { useCashSessionStore } from "@/stores/cash-session-store";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
@@ -41,6 +42,27 @@ export function isPrintableKey(event: {
   metaKey: boolean;
 }): boolean {
   return event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey;
+}
+
+/**
+ * Quick-palette slot for an Alt+Digit keystroke (TASK-DSN-069).
+ * Digit1..8 / Numpad1..8 → slots 0..7; anything else (or any extra
+ * modifier) → null. Pure: unit-tested without DOM.
+ */
+export function altDigitSlotIndex(event: {
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  code: string;
+}): number | null {
+  if (!event.altKey || event.ctrlKey || event.metaKey) {
+    return null;
+  }
+  const match = /^(?:Digit|Numpad)([1-8])$/.exec(event.code);
+  if (match === null) {
+    return null;
+  }
+  return Number(match[1]) - 1;
 }
 
 /** True when the active customer blocks checkout on credit grounds. */
@@ -127,6 +149,15 @@ export function usePosKeyboard(): void {
         } else {
           usePosUiStore.getState().setSelectedLineIndex(0);
         }
+        return;
+      }
+
+      // Quick-products palette (TASK-DSN-069): Alt+1..8 always intercepted
+      // outside modals, never typed into inputs, never seen by the wedge.
+      const quickSlot = altDigitSlotIndex(event);
+      if (quickSlot !== null && !modalOpen) {
+        event.preventDefault();
+        useQuickProductsStore.getState().dispatchSlot(quickSlot);
         return;
       }
 

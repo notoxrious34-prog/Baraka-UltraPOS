@@ -13,6 +13,7 @@ import { useCartStore } from "@/stores/cart-store";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useCatalogSearch } from "@/hooks/use-catalog-search";
+import { QuickProductPalette } from "@/features/pos/QuickProductPalette";
 import { ipcGetStock } from "@/lib/ipc";
 import { t } from "@/lib/i18n";
 import { formatMoney, formatQty } from "@/lib/money";
@@ -212,6 +213,8 @@ export function ProductDiscovery(): ReactElement {
           </button>
         ))}
       </div>
+
+      <QuickProductPalette />
 
       <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
         {warehouse === null && (

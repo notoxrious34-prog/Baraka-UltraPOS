@@ -328,12 +328,12 @@ I accept this charter. I will deliver a finished, honest, beautiful and fast pro
 =====BEGIN-PART-2-CTP-ARC-022=====
 # CONTEXT TRANSFER PACKAGE — SESSION-ARC-022
 
-## 0. CHARTER v2.0 STATUS & REQUIRED DOCUMENTS
-- **Charter Status**: Appointment Charter v2.0 is fully binding and sovereign.
-- **Governing Invariants**:
-  * Offline-first absolute: SQLite WAL, synchronous=FULL, foreign_keys=ON, busy_timeout=5000.
-  * Financial calculations strictly in Rust domain: Money = `i64` centimes, quantities = fixed-point 10^4.
-  * Sale is ONE atomic transaction (idempotency, gapless sequence, stock movements, payments, audit, print job).
+## 0. CHARTER v2.0 STATUS & GOVERNING INVARIANTS
+- **Charter Status**: Appointment Charter v2.0 is fully binding, active, and sovereign.
+- **Governing Invariants (Untouchable without ADR)**:
+  * Offline-first absolute: SQLite WAL, `synchronous=FULL`, `foreign_keys=ON`, `busy_timeout=5000`.
+  * Financial integrity strictly in Rust domain: Money = `i64` centimes, quantities/factors = fixed-point 10^4. Zero floats in financial paths.
+  * Sale is ONE atomic transaction (idempotency claim, BEGIN IMMEDIATE, sequence allocation, document + items, stock movements, payments, credit ledger, cash movements, audit event, print job, COMMIT).
   * Finalized documents immutable; ledgers append-only via database triggers.
   * Law of Intellectual Honesty (§1.4): zero guessing; unknown facts verified via read-only audit.
   * Law of Regression (§5): every bug fix demonstrated to fail before fix is accepted.
@@ -341,19 +341,21 @@ I accept this charter. I will deliver a finished, honest, beautiful and fast pro
   * Floating UI prohibition: zero `position: fixed` elements except modal overlays, toasts, and command palette.
 - **Required Documents for Incoming Architect**:
   * `docs/architecture/CHARTER-v2.0.md`
+  * `docs/architecture/BOOT-SESSION-ARC-022.md`
   * `docs/architecture/CTP-SESSION-ARC-022.md`
   * `docs/adr/INDEX.md`
   * `docs/architecture/design-tokens.md`
-  * `audit/AUD-023/REPORT.md`, `audit/AUD-024/REPORT.md`, `audit/AUD-025/REPORT.md`
+  * `audit/AUD-023/REPORT.md`, `audit/AUD-024/REPORT.md`, `audit/AUD-025/REPORT.md`, `audit/AUD-026/REPORT.md`
 
-## 1. SESSION IDENTITY & CONTINUITY
+## 1. SESSION IDENTITY & HISTORICAL LINEAGE
 - **Session ID**: SESSION-ARC-022
 - **Predecessor Session**: SESSION-ARC-021 (CLOSED)
-- **Lineage**: SESSION-ARC-018 → SESSION-ARC-019 → SESSION-ARC-020 → SESSION-ARC-021 → SESSION-ARC-022
-- **Baseline Git Commit at Session Open**: `3d955cb`
+- **Lineage Chain**: SESSION-ARC-017 → SESSION-ARC-018 → SESSION-ARC-019 → SESSION-ARC-020 → SESSION-ARC-021 → SESSION-ARC-022
+- **Historical Audit Evidence**: Unbroken chain verified in `audit/AUD-026/REPORT.md` (commit `5f2bc3a`, 140,025 bytes, 1,911 lines).
+- **Baseline Git Commit at Session Open**: `5f2bc3a`
 - **Active Git Branch**: `master`
 - **Canonical Repository Path**: `D:/Dev/Baraka UltraPOS` (STRICT: `D:/Baraka Project/Baraka UltraPOS` is stale and forbidden).
-- **Session Reply Count**: 13 replies in SESSION-ARC-021.
+- **Session Reply Count**: 15 replies in SESSION-ARC-021.
 
 ## 2. EXECUTIVE SUMMARY & VISUAL ACCEPTANCE HISTORY
 In SESSION-ARC-021, the presentation rebuilding reached operational maturity through five major achievements driven by empirical measurement and direct owner feedback:
@@ -379,7 +381,9 @@ In SESSION-ARC-021, the presentation rebuilding reached operational maturity thr
 
 ## 3. ARCHITECTURE DECISION RECORDS (ADR) LOG
 - **ADR-001 through ADR-065**: Historical reconstructed architecture baseline.
-- **ADR-066 through ADR-095**: Recorded in repository `docs/adr/INDEX.md`.
+- **ADR-066 through ADR-093**: Recorded in repository `docs/adr/INDEX.md` (Module refactoring, customer dossier, suppliers list).
+- **ADR-094**: *Semantic Design Token Architecture* (Elimination of ad-hoc Tailwind colors in favor of surface and ink semantic tokens).
+- **ADR-095**: *Dark Mode Contrast Architecture* (WCAG AA compliant dark surface and ink pairings).
 - **ADR-096**: *Law of Exploratory Pre-Verification* (Mandatory read-only AUD task before any execution/modification task).
 - **ADR-097**: *Persistent Global Theme Architecture* (Centralized Zustand theme store with `localStorage` persistence and immediate root class synchronization, replacing unmount-vulnerable local state).
 - **ADR-098**: *Universal Monotonic-Ticket Debounced Search Pattern* (Standard 175–200ms debounce with monotonic sequence ticket counter to eliminate async out-of-order race conditions across all dialog and secondary pickers).
@@ -397,7 +401,8 @@ In SESSION-ARC-021, the presentation rebuilding reached operational maturity thr
 - `TASK-AUD-025` (Commit `359fdd0`): Pre-verification of Alt+1..8 shortcuts and POS layout slotting.
 - `TASK-DSN-069` (Commit `5c11a2e`): Quick-Products Palette with Alt+1..8 keyboard bindings.
 - `TASK-DSN-069-C1` (Commit `3d955cb`): Commit `docs/architecture/CTP-SESSION-ARC-021.md`.
-- `TASK-REL-002`: Commit `docs/architecture/CTP-SESSION-ARC-022.md` and `docs/architecture/BOOT-SESSION-ARC-022.md`.
+- `TASK-AUD-026` (Commit `5f2bc3a`): Consolidate historical CTPs 017 through 021 into `audit/AUD-026/REPORT.md`.
+- `TASK-REL-002`: Generate and commit `CTP-SESSION-ARC-022.md` and `BOOT-SESSION-ARC-022.md`.
 
 ## 5. CODEBASE TAXONOMY & KEY REUSABLE ASSETS
 - Feature modules live under `src/features/` (12 primary modules):
@@ -465,5 +470,5 @@ In SESSION-ARC-021, the presentation rebuilding reached operational maturity thr
 
 ## 9. BOOT INSTRUCTIONS FOR SESSION-ARC-022
 - **First Sentence to Say**: "أؤكد استلام حزمة الإقلاع BOOT-SESSION-ARC-022، واستعادة الذاكرة المعمارية الكاملة لنظام Baraka UltraPOS. نحن جاهزون للانطلاق فوراً في الجلسة 022."
-- **First Operational Task**: Issue `TASK-AUD-026` (Exploratory Audit of User Management, Authentication Commands, and Role Gating Infrastructure).
+- **First Operational Task**: Issue `TASK-AUD-027` (Exploratory Audit of User Management, Authentication Commands, and Role Gating Infrastructure).
 =====END-PART-2-CTP-ARC-022=====

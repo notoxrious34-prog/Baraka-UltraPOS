@@ -1,0 +1,31 @@
+{
+  "failed": 0,
+  "total": 5,
+  "results": [
+    {
+      "name": "C1 authorized modal renders with unlocked execute (fr/light)",
+      "ok": true,
+      "detail": "execTitle=null 1280x800 dpr=1 noPageScroll=true"
+    },
+    {
+      "name": "C2a depot tab shows management guidance note (ar/dark)",
+      "ok": true,
+      "detail": "note present 1280x800 dpr=1 noPageScroll=true"
+    },
+    {
+      "name": "C2b create-depot tab button disabled with guidance (ar/dark)",
+      "ok": true,
+      "detail": "disabled=true title=\"إنشاء المستودعات مخصص للمسؤولي\" 1280x800 noPageScroll=true"
+    },
+    {
+      "name": "C3 modal at 1024x600 without page scroll (fr/light)",
+      "ok": true,
+      "detail": "1024x600 dpr=1 noPageScroll=true"
+    },
+    {
+      "name": "zero console errors across captures",
+      "ok": true,
+      "detail": "0 console errors, all stubbed commands responded"
+    }
+  ]
+}

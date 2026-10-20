@@ -9,11 +9,13 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
+// @ts-expect-error — @types/node is not installed (no new deps authorized); node runtime guaranteed under vitest.
+import { readFileSync } from "node:fs";
+// @ts-expect-error — @types/node is not installed (no new deps authorized); node runtime guaranteed under vitest.
+import { join } from "node:path";
 import {
   canSubmitTransfer,
   defaultEndpoints,
-  isAdminRole,
-  isManagerRole,
   parseTransferQtyInput,
   useWarehouseTransferStore,
 } from "@/stores/warehouse-transfer-store";
@@ -45,6 +47,16 @@ function primeSession(role: SessionInfo["role"] = "GERANT"): void {
   useSessionStore.setState({ session });
   useWarehouseTransferStore.getState().reset();
 }
+
+// Minimal ambient typing for the single Node global used below.
+// Type-only; zero runtime impact.
+declare const process: { cwd(): string };
+
+const ROOT = process.cwd();
+const readSrc = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), "utf8");
+
+const STORE_SRC = readSrc("src", "stores", "warehouse-transfer-store.ts");
+const MODAL_SRC = readSrc("src", "components", "pos", "modals", "WarehouseTransferModal.tsx");
 
 const WAREHOUSES = [
   { id: "w1", code: "DEP-01", name: "Dépôt", is_active: true },
@@ -116,13 +128,28 @@ describe("canSubmitTransfer", () => {
   });
 });
 
-describe("role helpers", () => {
-  it("gates manager and admin surfaces", () => {
-    expect(isManagerRole("GERANT")).toBe(true);
-    expect(isManagerRole("ADMIN")).toBe(true);
-    expect(isManagerRole("CAISSIER")).toBe(false);
-    expect(isAdminRole("ADMIN")).toBe(true);
-    expect(isAdminRole("GERANT")).toBe(false);
+describe("permission gates (TASK-DSN-080)", () => {
+  it("exports no role-string helper from the transfer store", () => {
+    expect(STORE_SRC).not.toContain("isAdminRole");
+    expect(STORE_SRC).not.toContain("isManagerRole");
+    expect(STORE_SRC).not.toContain('role === "ADMIN"');
+    expect(STORE_SRC).not.toContain('role === "GERANT"');
+  });
+
+  it("gates transfer execution by TRANSFER_STOCK with guidance", () => {
+    expect(MODAL_SRC).toContain('hasPermission("TRANSFER_STOCK")');
+    expect(MODAL_SRC).toContain("disabled={");
+    expect(MODAL_SRC).toContain("!canTransfer");
+    expect(MODAL_SRC).toContain("stock.transferReservedGuidance");
+    expect(MODAL_SRC).not.toContain("isManagerRole");
+  });
+
+  it("gates warehouse creation and depot management by MANAGE_WAREHOUSES", () => {
+    expect(MODAL_SRC).toContain('hasPermission("MANAGE_WAREHOUSES")');
+    expect(MODAL_SRC).toContain("!canManageWarehouses");
+    expect(MODAL_SRC).toContain("stock.warehouseCreateReservedGuidance");
+    expect(MODAL_SRC).not.toContain("isAdminRole");
+    expect(MODAL_SRC).not.toContain("session.role");
   });
 });
 

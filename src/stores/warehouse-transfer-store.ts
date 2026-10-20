@@ -60,14 +60,6 @@ export function canSubmitTransfer(args: {
   );
 }
 
-export function isAdminRole(role: string): boolean {
-  return role === "ADMIN";
-}
-
-export function isManagerRole(role: string): boolean {
-  return role === "GERANT" || role === "ADMIN";
-}
-
 interface WarehouseTransferStoreState {
   isOpen: boolean;
   activeTab: WarehouseTransferTab;

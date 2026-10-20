@@ -1,21 +1,20 @@
 /**
- * Warehouse transfer cockpit (TASK-BRK-051): inter-warehouse transfers
- * plus ADMIN-only warehouse creation.
+ * Warehouse transfer cockpit (TASK-BRK-051, realigned TASK-DSN-080):
+ * inter-warehouse transfers plus warehouse creation / depot management.
  *
  * Transfer tab: endpoint selectors with a same-warehouse guard, product
  * picker over catalog_search, per-line BigInt-micro quantities, one atomic
  * OUT/IN pair per line server-side. Create tab: code/name form gated to
- * ADMIN (ManageWarehouses). All money/quantities are canonical strings;
- * backend errors surface through translateBackendError; the backend is
- * final.
+ * MANAGE_WAREHOUSES. Transfer execution gated to TRANSFER_STOCK; both
+ * render Disabled-with-Guidance when unauthorized. All money/quantities
+ * are canonical strings; backend errors surface through
+ * translateBackendError; the backend is final.
  */
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import {
-  isAdminRole,
-  isManagerRole,
   parseTransferQtyInput,
   searchTransferProducts,
   useWarehouseTransferStore,
@@ -41,10 +40,10 @@ function fmtQty(micro: bigint): string {
 const PRINCIPAL_DEPOT_CODE = "DEP-01";
 
 /**
- * Depot management tab (TASK-DSN-051, ADMIN only): inline rename,
- * active toggle, and dual-track deletion with DEP-01 lock badges.
+ * Depot management tab (TASK-DSN-051, MANAGE_WAREHOUSES only): inline
+ * rename, active toggle, and dual-track deletion with DEP-01 lock badges.
  */
-function ManageDepotsTab({ admin }: { admin: boolean }): ReactElement {
+function ManageDepotsTab({ canManage }: { canManage: boolean }): ReactElement {
   const locale: Locale = usePosUiStore((state) => state.locale);
   const s = useWarehouseTransferStore();
   const [drafts, setDrafts] = useState<Record<string, { name: string; isActive: boolean }>>({});
@@ -59,10 +58,10 @@ function ManageDepotsTab({ admin }: { admin: boolean }): ReactElement {
     setDrafts(seeded);
   }, [s.warehouses]);
 
-  if (!admin) {
+  if (!canManage) {
     return (
       <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-        {t(locale, "adminOnlyTab")}
+        {t(locale, "stock.warehouseCreateReservedGuidance")}
       </p>
     );
   }
@@ -288,9 +287,11 @@ export function WarehouseTransferModal(): ReactElement {
     [],
   );
 
-  const role = session !== null ? session.role : "";
-  const manager = isManagerRole(role);
-  const admin = isAdminRole(role);
+  const hasPermission = useSessionStore((state) => state.hasPermission);
+  const canTransfer =
+    session !== null && hasPermission("TRANSFER_STOCK");
+  const canManageWarehouses =
+    session !== null && hasPermission("MANAGE_WAREHOUSES");
   const sameEndpoints =
     s.sourceWarehouseId !== null &&
     s.sourceWarehouseId === s.destinationWarehouseId;
@@ -312,7 +313,7 @@ export function WarehouseTransferModal(): ReactElement {
     };
   }, [s.isSubmitting]);
 
-  if (!manager) {
+  if (session === null) {
     return (
       <ModalShell title={t(locale, "warehousesTitle")} onClose={closeModal}>
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
@@ -343,8 +344,12 @@ export function WarehouseTransferModal(): ReactElement {
     <button
       key={tab}
       type="button"
-      disabled={s.isSubmitting || (tab === "create_warehouse" && !admin)}
-      title={tab === "create_warehouse" && !admin ? t(locale, "adminOnlyTab") : undefined}
+      disabled={s.isSubmitting || (tab === "create_warehouse" && !canManageWarehouses)}
+      title={
+        tab === "create_warehouse" && !canManageWarehouses
+          ? t(locale, "stock.warehouseCreateReservedGuidance")
+          : undefined
+      }
       onClick={() => {
         s.setActiveTab(tab);
       }}
@@ -577,14 +582,21 @@ export function WarehouseTransferModal(): ReactElement {
               <button
                 type="button"
                 onClick={() => {
+                  if (!canTransfer) {
+                    return;
+                  }
                   void s.submitTransfer();
                 }}
                 disabled={
                   s.isSubmitting ||
+                  !canTransfer ||
                   sameEndpoints ||
                   s.sourceWarehouseId === null ||
                   s.destinationWarehouseId === null ||
                   !s.transferItems.some((line) => line.quantityMicro > 0n)
+                }
+                title={
+                  canTransfer ? undefined : t(locale, "stock.transferReservedGuidance")
                 }
                 className="h-11 flex-[2] rounded-lg bg-accent-500 text-sm font-black text-slate-950 hover:bg-amber-400 disabled:opacity-40"
               >
@@ -596,9 +608,9 @@ export function WarehouseTransferModal(): ReactElement {
           </>
         ) : s.activeTab === "create_warehouse" ? (
           <>
-            {!admin && (
+            {!canManageWarehouses && (
               <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-                {t(locale, "adminOnlyTab")}
+                {t(locale, "stock.warehouseCreateReservedGuidance")}
               </p>
             )}
             <label className="flex flex-col gap-1">
@@ -610,7 +622,7 @@ export function WarehouseTransferModal(): ReactElement {
                 }}
                 autoComplete="off"
                 dir="ltr"
-                disabled={s.isSubmitting || !admin}
+                disabled={s.isSubmitting || !canManageWarehouses}
                 className="h-11 rounded-lg border border-slate-300 bg-white px-3 font-mono text-sm font-black uppercase outline-none focus:border-primary-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
               />
             </label>
@@ -622,7 +634,7 @@ export function WarehouseTransferModal(): ReactElement {
                   s.setNewWarehouseName(event.target.value);
                 }}
                 autoComplete="off"
-                disabled={s.isSubmitting || !admin}
+                disabled={s.isSubmitting || !canManageWarehouses}
                 className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold outline-none focus:border-primary-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
               />
             </label>
@@ -643,13 +655,21 @@ export function WarehouseTransferModal(): ReactElement {
               <button
                 type="button"
                 onClick={() => {
+                  if (!canManageWarehouses) {
+                    return;
+                  }
                   void s.submitCreateWarehouse();
                 }}
                 disabled={
                   s.isSubmitting ||
-                  !admin ||
+                  !canManageWarehouses ||
                   s.newWarehouseCode.trim() === "" ||
                   s.newWarehouseName.trim() === ""
+                }
+                title={
+                  canManageWarehouses
+                    ? undefined
+                    : t(locale, "stock.warehouseCreateReservedGuidance")
                 }
                 className="h-11 flex-[2] rounded-lg bg-accent-500 text-sm font-black text-slate-950 hover:bg-amber-400 disabled:opacity-40"
               >
@@ -660,7 +680,7 @@ export function WarehouseTransferModal(): ReactElement {
             </div>
           </>
         ) : (
-          <ManageDepotsTab admin={admin} />
+          <ManageDepotsTab canManage={canManageWarehouses} />
         )}
       </div>
     </ModalShell>

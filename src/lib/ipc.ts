@@ -166,14 +166,30 @@ export async function ipcDeleteProduct(
   });
 }
 
+/** Database-level catalog aggregates for the management hub KPIs. */
+export interface CatalogMetricsDto {
+  total_products: number;
+  in_stock: number;
+  out_of_stock: number;
+  inactive: number;
+}
+
 /** Prefix/multilingual catalog search (150ms debounce applied by caller). */
 export async function ipcSearchCatalog(
   sessionToken: string,
   query: string,
-  limit: number,
+  limit = 20,
+  includeInactive = false,
 ): Promise<CatalogProduct[]> {
   return call<CatalogProduct[]>("catalog_search", {
-    request: { session_token: sessionToken, query, limit },
+    request: { session_token: sessionToken, query, limit, include_inactive: includeInactive },
+  });
+}
+
+/** Database-level catalog aggregates (total / in-stock / out-of-stock / inactive). */
+export async function ipcGetCatalogMetrics(sessionToken: string): Promise<CatalogMetricsDto> {
+  return call<CatalogMetricsDto>("catalog_get_metrics", {
+    session_token: sessionToken,
   });
 }
 

@@ -216,6 +216,20 @@ pub trait SessionStore: Send + Sync {
     fn invalidate_session(&self, token: &SessionToken);
 }
 
+/// Database-level catalog aggregates for the management hub KPIs.
+/// Computed in one SQL statement (never from a paginated slice).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CatalogMetrics {
+    /// Every stored product row, active or not.
+    pub total_products: i64,
+    /// Active products with a strictly positive summed base-micro level.
+    pub in_stock: i64,
+    /// Active products with zero or negative summed level (or no level row).
+    pub out_of_stock: i64,
+    /// Products with `is_active = 0`.
+    pub inactive: i64,
+}
+
 /// Catalog persistence port (SQLite repository in infrastructure).
 pub trait ProductRepository: Send + Sync {
     /// Persist a product with its full unit set atomically.
@@ -262,11 +276,18 @@ pub trait ProductRepository: Send + Sync {
     fn get_all_kit_edges(&self) -> Result<Vec<(ProductId, ProductId)>, ApplicationError>;
 
     /// Prefix/multilingual search capped at `limit` products.
+    /// `include_inactive` selects whether `is_active = 0` rows participate
+    /// (management views) or are excluded (POS discovery and sale paths).
     fn search(
         &self,
         query: &str,
         limit: usize,
+        include_inactive: bool,
     ) -> Result<Vec<(Product, Vec<ProductUnit>)>, ApplicationError>;
+
+    /// Database-level catalog aggregates (total / in-stock /
+    /// out-of-stock / inactive) in a single query.
+    fn get_metrics(&self) -> Result<CatalogMetrics, ApplicationError>;
 
     /// Direct BOM rows for a kit header (no recursion; used by expansion).
     fn get_direct_kit_items(

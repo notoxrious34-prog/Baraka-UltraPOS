@@ -158,7 +158,9 @@ fn infix_token_matches_inside_product_name() {
     seed_catalog(&harness, &gerant);
     let search = SearchCatalogUseCase::new(&harness.repo);
     // "douchette" is a secondary noun, not a name prefix.
-    let hits = search.execute(&gerant, "douchette", 20).expect("search");
+    let hits = search
+        .execute(&gerant, "douchette", 20, false)
+        .expect("search");
     assert_eq!(skus_of(&hits), vec!["DOUCH-01".to_string()]);
 }
 
@@ -169,7 +171,7 @@ fn multi_token_query_enforces_and_conjunction() {
     seed_catalog(&harness, &gerant);
     let search = SearchCatalogUseCase::new(&harness.repo);
     for query in ["vis 4x35", "4x35 vis"] {
-        let hits = search.execute(&gerant, query, 20).expect("search");
+        let hits = search.execute(&gerant, query, 20, false).expect("search");
         let skus = skus_of(&hits);
         assert_eq!(skus, vec!["VIS-435".to_string()], "query {query:?}");
         assert!(
@@ -185,7 +187,9 @@ fn exact_unit_barcode_ranks_first() {
     let gerant = session_with(Role::Gerant);
     seed_catalog(&harness, &gerant);
     let search = SearchCatalogUseCase::new(&harness.repo);
-    let hits = search.execute(&gerant, "613000000004", 20).expect("search");
+    let hits = search
+        .execute(&gerant, "613000000004", 20, false)
+        .expect("search");
     assert_eq!(
         hits.first().map(|(p, _)| p.sku.as_str()),
         Some("VIS-420"),
@@ -199,7 +203,9 @@ fn exact_product_barcode_ranks_first() {
     let gerant = session_with(Role::Gerant);
     seed_catalog(&harness, &gerant);
     let search = SearchCatalogUseCase::new(&harness.repo);
-    let hits = search.execute(&gerant, "613000000003", 20).expect("search");
+    let hits = search
+        .execute(&gerant, "613000000003", 20, false)
+        .expect("search");
     assert_eq!(
         hits.first().map(|(p, _)| p.sku.as_str()),
         Some("VIS-435"),
@@ -216,7 +222,7 @@ fn arabic_alef_hamza_variants_match() {
     // Stored with hamza (أداة), queried bare (اداة). The `_`-wildcard
     // tolerance intentionally over-matches short tokens, so the assertion
     // is rank-based: the exact product leads via the name-prefix rank.
-    let hits = search.execute(&gerant, "اداة", 20).expect("search");
+    let hits = search.execute(&gerant, "اداة", 20, false).expect("search");
     let skus = skus_of(&hits);
     assert!(
         skus.contains(&"ADAT-01".to_string()),
@@ -237,7 +243,7 @@ fn arabic_multi_token_variant_tolerance() {
     let search = SearchCatalogUseCase::new(&harness.repo);
     // Stored with hamza (إنجليزي), queried bare.
     let hits = search
-        .execute(&gerant, "مفتاح انجليزي", 20)
+        .execute(&gerant, "مفتاح انجليزي", 20, false)
         .expect("search");
     assert_eq!(skus_of(&hits), vec!["MIFT-01".to_string()]);
 }
@@ -249,13 +255,15 @@ fn empty_query_pagination_and_limits_preserved() {
     seed_catalog(&harness, &gerant);
     let search = SearchCatalogUseCase::new(&harness.repo);
     for query in ["", "   "] {
-        let found = search.execute(&gerant, query, 20).expect("discovery");
+        let found = search
+            .execute(&gerant, query, 20, false)
+            .expect("discovery");
         assert_eq!(found.len(), 6, "query {query:?}");
     }
-    let capped = search.execute(&gerant, "", 2).expect("limit");
+    let capped = search.execute(&gerant, "", 2, false).expect("limit");
     assert_eq!(capped.len(), 2);
     let miss = search
-        .execute(&gerant, "zzzinox-introuvable", 20)
+        .execute(&gerant, "zzzinox-introuvable", 20, false)
         .expect("miss");
     assert!(miss.is_empty());
 }

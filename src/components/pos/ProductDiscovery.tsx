@@ -14,6 +14,8 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { useCatalogSearch } from "@/hooks/use-catalog-search";
 import { QuickProductPalette } from "@/features/pos/QuickProductPalette";
+import { QuickProductsConfigModal } from "@/features/pos/QuickProductsConfigModal";
+import { useQuickProductsStore } from "@/stores/quick-products-store";
 import { ipcGetStock } from "@/lib/ipc";
 import { t } from "@/lib/i18n";
 import { formatMoney, formatQty } from "@/lib/money";
@@ -59,6 +61,8 @@ export function ProductDiscovery(): ReactElement {
   const session = useSessionStore((state) => state.session);
   const addProduct = useCartStore((state) => state.addProduct);
   const { results, loading, error, scanFlash } = useCatalogSearch();
+  const quickEnabled = useQuickProductsStore((state) => state.enabled);
+  const toggleQuick = useQuickProductsStore((state) => state.toggleEnabled);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   /** Base-micro stock per visible product (`undefined` = not loaded yet). */
   const [stockById, setStockById] = useState<Record<string, string>>({});
@@ -190,7 +194,7 @@ export function ProductDiscovery(): ReactElement {
         </div>
       )}
 
-      <div className="flex shrink-0 gap-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-1">
         {searchQuery.trim() === "" && visible.length > 0 && (
           <span className="self-center text-xs font-medium text-slate-500 dark:text-slate-400">
             {t(locale, "search.discoveryTitle")}
@@ -212,9 +216,28 @@ export function ProductDiscovery(): ReactElement {
             {chip.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={toggleQuick}
+          aria-pressed={quickEnabled}
+          title={t(locale, quickEnabled ? "pos.hideQuickProducts" : "pos.showQuickProducts")}
+          aria-label={t(locale, "pos.quickProductsToggle")}
+          className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-600/50 ${
+            quickEnabled
+              ? "border-amber-500 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200"
+              : "border-slate-300 bg-white text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+          }`}
+        >
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 shrink-0 rounded-full ${quickEnabled ? "bg-amber-500" : "bg-slate-400"}`}
+          />
+          {t(locale, "pos.quickProductsToggle")}
+        </button>
       </div>
 
       <QuickProductPalette />
+      <QuickProductsConfigModal />
 
       <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
         {warehouse === null && (

@@ -1,0 +1,110 @@
+{
+  "at": "2026-10-20T14:53:34.414Z",
+  "results": [
+    {
+      "name": "T1 KPI cards show database aggregates 8/5/2/1",
+      "ok": true,
+      "detail": "kpi=8,5,2,1 badge=8 produits"
+    },
+    {
+      "name": "T2 zero horizontal overflow at 1280x800",
+      "ok": true,
+      "detail": "{\"tableSw\":1246,\"tableCw\":1246,\"docSw\":1280,\"docCw\":1280}"
+    },
+    {
+      "name": "T2 delete buttons fully visible (8 rows)",
+      "ok": true,
+      "detail": "8 buttons, 0 clipped"
+    },
+    {
+      "name": "T2 screenshot catalog",
+      "ok": true,
+      "detail": "catalog-1280x800.png (153998 bytes)"
+    },
+    {
+      "name": "T3 create product via catalog_create_product",
+      "ok": true,
+      "detail": "created p-new-100, total=9"
+    },
+    {
+      "name": "T3 deactivate via UI status toggle",
+      "ok": true,
+      "detail": "inactifs=2, hub search passes include_inactive=true"
+    },
+    {
+      "name": "T4 discovery grid hides inactive rows",
+      "ok": true,
+      "detail": "grid clean"
+    },
+    {
+      "name": "T4 inactive search yields no results",
+      "ok": true,
+      "detail": "no-results shown"
+    },
+    {
+      "name": "T4 active barcode scans to cart, inactive barcode ignored",
+      "ok": true,
+      "detail": "scan gating holds"
+    },
+    {
+      "name": "T5 toggle off hides palette and persists",
+      "ok": true,
+      "detail": "flag=false, grid 460px -> 528px"
+    },
+    {
+      "name": "T5 Alt+1 suppressed while disabled",
+      "ok": true,
+      "detail": "zero cart mutation"
+    },
+    {
+      "name": "T5 toggle on restores palette and Alt+1 dispatches",
+      "ok": true,
+      "detail": "flag=true, Alt+1 dispatched"
+    },
+    {
+      "name": "T5 totals footer intact inside viewport",
+      "ok": true,
+      "detail": "{\"x\":750,\"w\":522,\"inside\":true}"
+    },
+    {
+      "name": "T5 screenshot pos palette",
+      "ok": true,
+      "detail": "pos-palette-1280x800.png (142261 bytes)"
+    },
+    {
+      "name": "T6 clear + assign slot through active-only search",
+      "ok": true,
+      "detail": "slot 7 := CIM-050"
+    },
+    {
+      "name": "T6 Alt+N dispatches the assigned slot",
+      "ok": true,
+      "detail": "Alt+7 dispatched"
+    },
+    {
+      "name": "T6 screenshot config modal",
+      "ok": true,
+      "detail": "pos-config-1280x800.png (151117 bytes)"
+    },
+    {
+      "name": "T2 zero overflow + delete visible at 1024x600",
+      "ok": true,
+      "detail": "{\"tableSw\":975,\"tableCw\":975,\"docSw\":1024,\"docCw\":1024} deletes=9"
+    },
+    {
+      "name": "T7 dark theme keeps layout clean",
+      "ok": true,
+      "detail": "catalog-dark-1280x800.png (114966 bytes)"
+    },
+    {
+      "name": "T7 arabic RTL keeps layout clean",
+      "ok": true,
+      "detail": "dir=rtl, catalog-ar-1280x800.png (95953 bytes)"
+    },
+    {
+      "name": "no unmocked IPC commands",
+      "ok": true,
+      "detail": "console errors: 0"
+    }
+  ]
+}

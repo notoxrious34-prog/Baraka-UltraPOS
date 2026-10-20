@@ -240,7 +240,7 @@ fn seed_product(harness: &Harness, sku: &str, sale: i64, purchase: i64) -> (Prod
         )
         .expect("create product");
     let created = SearchCatalogUseCase::new(&harness.catalog)
-        .execute(&session, sku, 10)
+        .execute(&session, sku, 10, false)
         .expect("search");
     let (product, units) = created
         .into_iter()
@@ -339,7 +339,7 @@ fn pillar_01_caisse_pos_sale_pipeline() {
 
     // Catalog search reaches the seeded row.
     let found = SearchCatalogUseCase::new(&harness.catalog)
-        .execute(&caissier(), "FOR-001", 10)
+        .execute(&caissier(), "FOR-001", 10, false)
         .expect("search");
     assert_eq!(found.len(), 1, "POS search finds the product");
 
@@ -856,13 +856,13 @@ fn pillar_07_catalogue_import() {
     // Both products resolve through the POS search path.
     for sku in ["FOR-IMP-01", "FOR-IMP-02"] {
         let found = SearchCatalogUseCase::new(&harness.catalog)
-            .execute(&vendeur(), sku, 10)
+            .execute(&vendeur(), sku, 10, false)
             .expect("search");
         assert_eq!(found.len(), 1, "{sku} visible after import");
     }
     // Opening stock provisioned on DEP-01 for the first row only.
     let (product, _) = SearchCatalogUseCase::new(&harness.catalog)
-        .execute(&gerant(), "FOR-IMP-01", 10)
+        .execute(&gerant(), "FOR-IMP-01", 10, false)
         .expect("search")
         .into_iter()
         .map(|(p, u)| (p.id, u))

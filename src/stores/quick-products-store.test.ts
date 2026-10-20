@@ -131,6 +131,75 @@ describe("quick-products store (TASK-DSN-069)", () => {
   });
 });
 
+describe("quick-products optionality (TASK-DSN-076)", () => {
+  function inactive(id: string): CatalogProduct {
+    return { ...product(id, `Dead ${id}`), is_active: false };
+  }
+
+  it("enabled defaults true and toggle persists the flag", async () => {
+    const values = installStorage(null);
+    const { useQuickProductsStore } = await freshStore();
+    useQuickProductsStore.getState().hydrate([]);
+    expect(useQuickProductsStore.getState().enabled).toBe(true);
+    useQuickProductsStore.getState().toggleEnabled();
+    expect(useQuickProductsStore.getState().enabled).toBe(false);
+    expect(values.get("baraka-quick-products-enabled")).toBe("false");
+    useQuickProductsStore.getState().toggleEnabled();
+    expect(useQuickProductsStore.getState().enabled).toBe(true);
+    expect(values.get("baraka-quick-products-enabled")).toBe("true");
+  });
+
+  it("hydrate restores a stored disabled flag", async () => {
+    const values = installStorage(null);
+    values.set("baraka-quick-products-enabled", "false");
+    const { useQuickProductsStore } = await freshStore();
+    useQuickProductsStore.getState().hydrate([]);
+    expect(useQuickProductsStore.getState().enabled).toBe(false);
+  });
+
+  it("assignSlot rejects inactive products without touching slots", async () => {
+    installStorage(null);
+    const { useQuickProductsStore } = await freshStore();
+    useQuickProductsStore.getState().hydrate([]);
+    useQuickProductsStore.getState().assignSlot(2, inactive("ghost"));
+    expect(useQuickProductsStore.getState().slots[2]).toBe(null);
+    useQuickProductsStore.getState().assignSlot(2, product("live", "Clou"));
+    expect(useQuickProductsStore.getState().slots[2]?.product_id).toBe("live");
+  });
+
+  it("dispatchSlot refuses stale inactive slots without cart mutation", async () => {
+    const seed = JSON.stringify([inactive("ghost"), null, null, null, null, null, null, null]);
+    installStorage(seed);
+    const { useQuickProductsStore } = await freshStore();
+    const { useCartStore } = await import("@/stores/cart-store");
+    useCartStore.getState().clearCart();
+    useQuickProductsStore.getState().hydrate([]);
+    expect(useQuickProductsStore.getState().dispatchSlot(0)).toBe(false);
+    expect(useCartStore.getState().lines).toHaveLength(0);
+    useCartStore.getState().clearCart();
+  });
+
+  it("resetDefaults re-seeds only active products", async () => {
+    installStorage(null);
+    const { useQuickProductsStore } = await freshStore();
+    useQuickProductsStore.getState().hydrate([]);
+    useQuickProductsStore.getState().resetDefaults([inactive("ghost"), product("live", "Clou")]);
+    const slots = useQuickProductsStore.getState().slots;
+    expect(slots[0]).toBe(null);
+    expect(slots[1]?.product_id).toBe("live");
+  });
+
+  it("config dialog state toggles session-only", async () => {
+    installStorage(null);
+    const { useQuickProductsStore } = await freshStore();
+    expect(useQuickProductsStore.getState().isConfigOpen).toBe(false);
+    useQuickProductsStore.getState().setConfigOpen(true);
+    expect(useQuickProductsStore.getState().isConfigOpen).toBe(true);
+    useQuickProductsStore.getState().setConfigOpen(false);
+    expect(useQuickProductsStore.getState().isConfigOpen).toBe(false);
+  });
+});
+
 describe("Alt+Digit slot mapping (TASK-DSN-069)", () => {
   it("maps Digit1..8 / Numpad1..8 to slots 0..7, rejects the rest", () => {
     const base = { altKey: true, ctrlKey: false, metaKey: false };

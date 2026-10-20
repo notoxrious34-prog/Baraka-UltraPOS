@@ -13,7 +13,8 @@ import { t, translateBackendError } from "@/lib/i18n";
 import type { Category, Locale } from "@/types/pos";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
-import { ipcGetStock, ipcListCategories, ipcSearchCatalog, listWarehouses } from "@/lib/ipc";
+import { ipcGetCatalogMetrics, ipcGetStock, ipcListCategories, ipcSearchCatalog, listWarehouses } from "@/lib/ipc";
+import type { CatalogMetricsDto } from "@/lib/ipc";
 import { ipcDeleteProduct, type DeleteEntityResult } from "@/lib/ipc";
 import { SafeDeleteModal } from "@/components/common/SafeDeleteModal";
 import { formatMoney, formatQty } from "@/lib/money";
@@ -247,7 +248,7 @@ function isManagerRole(role: string): boolean {
   return role === "GERANT" || role === "ADMIN";
 }
 
-const SEARCH_LIMIT = 100;
+const SEARCH_LIMIT = 500;
 const SEARCH_DEBOUNCE_MS = 150;
 
 export interface CatalogHubViewProps {
@@ -260,6 +261,8 @@ export interface CatalogHubViewProps {
   togglingId: string | null;
   filter: CatalogFilter;
   kpis: CatalogKpis;
+  /** Real database product total (absent/null = fall back to loaded-row count). */
+  totalCount?: number | null;
   sort: CatalogSort | null;
   onQuery: (value: string) => void;
   onClear: () => void;
@@ -321,7 +324,7 @@ function stockCell(
 
 /** Pure presentational hub (SSR-safe for tests; the container owns IPC). */
 export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
-  const { locale, products, stockLevels, loading, error, query, filter, kpis, sort } = props;
+  const { locale, products, stockLevels, loading, error, query, filter, kpis, totalCount, sort } = props;
   const categories = props.categories ?? [];
   const selectedCategoryId = props.selectedCategoryId ?? null;
 
@@ -393,7 +396,7 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <h2 className="text-lg font-black">{t(locale, "cat.masterTitle")}</h2>
         <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-black dark:bg-slate-700">
-          {products.length} {t(locale, "cat.productsCount")}
+          {totalCount ?? products.length} {t(locale, "cat.productsCount")}
         </span>
         <div className="flex min-w-52 flex-1 items-center gap-1">
           <input
@@ -480,20 +483,20 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
         />
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
         <table className="w-full table-fixed border-collapse text-xs">
           <colgroup>
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "20%" }} />
-            <col style={{ width: "12%" }} />
             <col style={{ width: "7%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "9%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "4%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "21%" }} />
+            <col style={{ width: "10%" }} />
             <col style={{ width: "6%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "12%" }} />
           </colgroup>
           <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800">
             <tr>
@@ -626,7 +629,7 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                     )}
                   </td>
                   <td className="px-3 py-1.5">
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center justify-end gap-1.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -634,7 +637,7 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                         }}
                         aria-label={t(locale, "cat.printLabel")}
                         title={t(locale, "cat.printLabel")}
-                        className="rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+                        className="shrink-0 rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
                       >
                         🏷️
                       </button>
@@ -645,7 +648,7 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                         }}
                         aria-label={t(locale, "cat.editProduct")}
                         title={t(locale, "cat.editProduct")}
-                        className="rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+                        className="shrink-0 rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
                       >
                         ✏️
                       </button>
@@ -656,7 +659,7 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                         }}
                         aria-label={t(locale, "del.delete")}
                         title={t(locale, "del.delete")}
-                        className="rounded-md bg-red-50 px-2 py-1 text-xs font-black text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50"
+                        className="shrink-0 rounded-md bg-red-50 px-2 py-1 text-xs font-black text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50"
                       >
                         <svg
                           width="14"
@@ -710,6 +713,8 @@ export function CatalogModule(): ReactElement {
   const [sort, setSort] = useState<CatalogSort | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  /** Real database aggregates for the KPI cards + header badge (null = not loaded yet). */
+  const [metrics, setMetrics] = useState<CatalogMetricsDto | null>(null);
   const depotRef = useRef<string | null | undefined>(undefined);
   const skipFirstDebounce = useRef(true);
   const authed = session !== null && isManagerRole(session.role);
@@ -737,11 +742,15 @@ export function CatalogModule(): ReactElement {
   const loadCatalog = async (tok: string, term: string, alive: () => boolean): Promise<void> => {
     setLoading(true);
     try {
-      const rows = await ipcSearchCatalog(tok, term, SEARCH_LIMIT);
+      const [rows, dbMetrics] = await Promise.all([
+        ipcSearchCatalog(tok, term, SEARCH_LIMIT, true),
+        ipcGetCatalogMetrics(tok),
+      ]);
       if (!alive()) {
         return;
       }
       setProducts(rows);
+      setMetrics(dbMetrics);
       setError(null);
       const depot = await ensureDepot(tok, alive);
       if (!alive() || depot === null) {
@@ -867,7 +876,18 @@ export function CatalogModule(): ReactElement {
     void loadCatalog(activeToken, query.trim(), () => !cancelled);
   };
 
-  const kpis = computeKpis(products, stockLevels);
+  const searching = query.trim() !== "";
+  const kpis: CatalogKpis =
+    !searching && metrics !== null
+      ? {
+          total: metrics.total_products,
+          inStock: metrics.in_stock,
+          outOfStock: metrics.out_of_stock,
+          inactive: metrics.inactive,
+        }
+      : computeKpis(products, stockLevels);
+  /** Header badge: real database total on the unfiltered hub, row count while searching. */
+  const totalCount: number | null = !searching && metrics !== null ? metrics.total_products : null;
   const visible = sortProducts(
     filterByCategory(filterProducts(products, stockLevels, filter), selectedCategoryId),
     stockLevels,
@@ -912,6 +932,8 @@ export function CatalogModule(): ReactElement {
         setProducts((prev) =>
           prev.map((row) => (row.product_id === updated.product_id ? updated : row)),
         );
+        // Refresh rows + real database metrics (active/inactive counts shift).
+        refresh();
       })
       .catch((failure: unknown) => {
         setError(typeof failure === "string" ? failure : "INTERNAL_ERROR");
@@ -933,6 +955,7 @@ export function CatalogModule(): ReactElement {
         togglingId={togglingId}
         filter={filter}
         kpis={kpis}
+        totalCount={totalCount}
         sort={sort}
         onQuery={setQuery}
         onClear={() => {

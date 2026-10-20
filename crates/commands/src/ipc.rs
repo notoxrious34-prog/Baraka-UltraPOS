@@ -28,10 +28,11 @@ use baraka_application::use_cases::cash::{
 use baraka_application::use_cases::catalog::CreateProductUseCase;
 use baraka_application::use_cases::catalog::{
     CreateCategoryInput, CreateCategoryUseCase, CreateProductInput, DefineKitUseCase,
-    GetProductWithUnitsUseCase, ImportBatchInput, ImportDuplicatePolicy, ImportProductRow,
-    ImportProductsUseCase, ListCategoriesUseCase, NewKitItemInput, NewUnitInput, ProductDetail,
-    ProductImportRepository, SearchCatalogUseCase, SeedStarterCategoriesUseCase, UnitUpsert,
-    UpdateCategoryInput, UpdateCategoryUseCase, UpdateProductInput, UpdateProductUseCase,
+    GetCatalogMetricsUseCase, GetProductWithUnitsUseCase, ImportBatchInput, ImportDuplicatePolicy,
+    ImportProductRow, ImportProductsUseCase, ListCategoriesUseCase, NewKitItemInput, NewUnitInput,
+    ProductDetail, ProductImportRepository, SearchCatalogUseCase, SeedStarterCategoriesUseCase,
+    UnitUpsert, UpdateCategoryInput, UpdateCategoryUseCase, UpdateProductInput,
+    UpdateProductUseCase,
 };
 use baraka_application::use_cases::customers::{
     CreateCustomerUseCase, GetCustomerStatementUseCase, GetCustomerUseCase, ListCustomersUseCase,
@@ -97,20 +98,21 @@ use crate::dto::{
     BootstrapFirstAdminRequest, BootstrapFirstAdminResponse, CartLineItemDto,
     CashClosingCommandDto, CashMovementDto, CashMovementTotalDto, CashSessionDto,
     CashSessionHistoryRowDto, CashSessionReportDto, CashSessionsHistoryRequestDto,
-    CatalogSearchRequestDto, CategoryResponseDto, CheckFirstRunStatusResponse, CheckoutSaleRequest,
-    CheckoutSaleResponse, CommandErrorDto, ConfirmClosingRequestDto, ConvertBlToFactureRequest,
-    ConvertBlToFactureResponse, ConvertDevisToBlRequest, ConvertDevisToBlResponse,
-    CreateBackupRequestDto, CreateCategoryRequestDto, CreateDraftSaleRequest, CreateProductDto,
-    CreatePurchaseOrderRequestDto, CreateSupplierRequestDto, CreateUserRequestDto,
-    CreateWarehouseRequestDto, CreditOutstandingRowDto, CustomerDetailDto, CustomerSummaryDto,
-    DailySalesSummaryDto, DecodeSummaryDto, DefineKitDto, DeleteEntityRequestDto,
-    DeleteEntityResultDto, DocumentDto, DocumentItemDto, DocumentSearchRequest,
-    DocumentSearchResponse, DocumentSummaryDto, DocumentsProcessReturnRequestDto,
-    DocumentsProcessReturnResponseDto, DraftSaleResponse, FiscalSettingsDto, GetCustomerRequestDto,
-    GetProductDto, GetSaleResponse, GetSessionReportRequestDto, GetStatementRequest,
-    GetStatementResponse, GetStockLevelRequestDto, GetStockLevelResponseDto, GrossMarginRowDto,
-    HealthDto, ImportProductsRequestDto, ImportProductsResponseDto, ImportRowErrorDto, KitItemDto,
-    LineMarginDto, ListWarehousesResponseDto, LoginRequestDto, LoginResponseDto, LogoutRequestDto,
+    CatalogMetricsDto, CatalogSearchRequestDto, CategoryResponseDto, CheckFirstRunStatusResponse,
+    CheckoutSaleRequest, CheckoutSaleResponse, CommandErrorDto, ConfirmClosingRequestDto,
+    ConvertBlToFactureRequest, ConvertBlToFactureResponse, ConvertDevisToBlRequest,
+    ConvertDevisToBlResponse, CreateBackupRequestDto, CreateCategoryRequestDto,
+    CreateDraftSaleRequest, CreateProductDto, CreatePurchaseOrderRequestDto,
+    CreateSupplierRequestDto, CreateUserRequestDto, CreateWarehouseRequestDto,
+    CreditOutstandingRowDto, CustomerDetailDto, CustomerSummaryDto, DailySalesSummaryDto,
+    DecodeSummaryDto, DefineKitDto, DeleteEntityRequestDto, DeleteEntityResultDto, DocumentDto,
+    DocumentItemDto, DocumentSearchRequest, DocumentSearchResponse, DocumentSummaryDto,
+    DocumentsProcessReturnRequestDto, DocumentsProcessReturnResponseDto, DraftSaleResponse,
+    FiscalSettingsDto, GetCustomerRequestDto, GetProductDto, GetSaleResponse,
+    GetSessionReportRequestDto, GetStatementRequest, GetStatementResponse, GetStockLevelRequestDto,
+    GetStockLevelResponseDto, GrossMarginRowDto, HealthDto, ImportProductsRequestDto,
+    ImportProductsResponseDto, ImportRowErrorDto, KitItemDto, LineMarginDto,
+    ListWarehousesResponseDto, LoginRequestDto, LoginResponseDto, LogoutRequestDto,
     LowStockRequestDto, LowStockRowDto, NewCustomerRequest, NewProductUnitDto,
     OpenCashSessionRequestDto, PaymentDto, PaymentLineDto, PreRestoreChecksDto,
     PreRestoreReportDto, PreRestoreRequestDto, PreviewLineDto, PreviewTotalsRequest,
@@ -922,6 +924,8 @@ pub fn catalog_get_product(
 }
 
 /// `catalog_search` command: barcode-exact and multilingual prefix search.
+/// `include_inactive` admits `is_active = 0` rows (management views);
+/// omitted or `false` excludes them (POS and sale paths).
 #[tauri::command(rename_all = "snake_case")]
 pub fn catalog_search(
     state: tauri::State<'_, AppState>,
@@ -929,8 +933,9 @@ pub fn catalog_search(
 ) -> Result<Vec<ProductResponseDto>, String> {
     let session = require_session(&state, &request.session_token)?;
     let limit = request.limit.unwrap_or(20) as usize;
+    let include_inactive = request.include_inactive.unwrap_or(false);
     let results = SearchCatalogUseCase::new(state.catalog.as_ref())
-        .execute(&session, &request.query, limit)
+        .execute(&session, &request.query, limit, include_inactive)
         .map_err(|error| error_code(&error))?;
     let mut out = Vec::with_capacity(results.len());
     for (product, units) in results {
@@ -949,6 +954,25 @@ pub fn catalog_search(
         }));
     }
     Ok(out)
+}
+
+/// `catalog_get_metrics` command: database-level catalog aggregates
+/// (total / in-stock / out-of-stock / inactive) for the management hub.
+#[tauri::command(rename_all = "snake_case")]
+pub fn catalog_get_metrics(
+    state: tauri::State<'_, AppState>,
+    session_token: String,
+) -> Result<CatalogMetricsDto, String> {
+    let session = require_session(&state, &session_token)?;
+    let metrics = GetCatalogMetricsUseCase::new(state.catalog.as_ref())
+        .execute(&session)
+        .map_err(|error| error_code(&error))?;
+    Ok(CatalogMetricsDto {
+        total_products: metrics.total_products,
+        in_stock: metrics.in_stock,
+        out_of_stock: metrics.out_of_stock,
+        inactive: metrics.inactive,
+    })
 }
 
 /// `catalog_define_kit` command: replace a kit's component graph.

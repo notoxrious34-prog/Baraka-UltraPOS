@@ -53,8 +53,8 @@ describe("use-catalog-search blank-query wiring", () => {
     expect(HOOK_SRC).not.toContain('if (query === "")');
   });
 
-  it("still passes the (possibly empty) query to ipcSearchCatalog", () => {
-    expect(HOOK_SRC).toContain("ipcSearchCatalog(session.token, query, 20)");
+  it("fetches the first 100 active-only rows for discovery", () => {
+    expect(HOOK_SRC).toContain("ipcSearchCatalog(session.token, query, 100, false)");
   });
 });
 

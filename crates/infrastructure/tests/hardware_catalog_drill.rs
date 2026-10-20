@@ -737,19 +737,22 @@ fn drill_search_ranking_and_arabic_tolerance() {
     // Exact product barcode is Rank 0.
     let hits = db
         .catalog
-        .search(&db.anchors.vis_barcode, 20)
+        .search(&db.anchors.vis_barcode, 20, false)
         .expect("barcode");
     assert_eq!(hits.first().map(|(p, _)| p.id), Some(vis_id));
 
     // Exact secondary unit barcode is Rank 0.
     let hits = db
         .catalog
-        .search(&db.anchors.cle.2, 20)
+        .search(&db.anchors.cle.2, 20, false)
         .expect("unit barcode");
     assert_eq!(hits.first().map(|(p, _)| p.id), Some(cle_id));
 
     // Multi-token AND: only the 4x35 box matches every token.
-    let hits = db.catalog.search("vis agglo 4x35", 20).expect("multi");
+    let hits = db
+        .catalog
+        .search("vis agglo 4x35", 20, false)
+        .expect("multi");
     assert_eq!(hits.first().map(|(p, _)| p.id), Some(vis_id));
     assert!(
         hits.iter().all(|(p, _)| p.id == vis_id),
@@ -759,10 +762,13 @@ fn drill_search_ranking_and_arabic_tolerance() {
 
     // Infix French queries hit inside names.
     for query in ["douchette", "agglo", "disque", "coude", "teflon"] {
-        let hits = db.catalog.search(query, 20).expect("infix");
+        let hits = db.catalog.search(query, 20, false).expect("infix");
         assert!(!hits.is_empty(), "infix {query:?} must hit");
     }
-    let hits = db.catalog.search("douchette", 20).expect("douchette");
+    let hits = db
+        .catalog
+        .search("douchette", 20, false)
+        .expect("douchette");
     assert!(
         hits.iter().any(|(p, _)| p.name_fr.contains("douchette")),
         "mid-name infix expected: {:?}",
@@ -770,7 +776,7 @@ fn drill_search_ranking_and_arabic_tolerance() {
     );
 
     // Name prefix outranks mid-name infix for a shared token.
-    let hits = db.catalog.search("vis", 20).expect("prefix");
+    let hits = db.catalog.search("vis", 20, false).expect("prefix");
     let first = hits
         .first()
         .map(|(p, _)| p.name_fr.clone())
@@ -781,9 +787,12 @@ fn drill_search_ranking_and_arabic_tolerance() {
     );
 
     // Multi-token French with accents folded.
-    let hits = db.catalog.search("cle a molette", 20).expect("cle");
+    let hits = db.catalog.search("cle a molette", 20, false).expect("cle");
     assert!(hits.iter().any(|(p, _)| p.id == cle_id));
-    let hits = db.catalog.search("peinture blanche", 20).expect("peinture");
+    let hits = db
+        .catalog
+        .search("peinture blanche", 20, false)
+        .expect("peinture");
     assert_eq!(hits.len(), 2);
     assert!(hits
         .first()
@@ -794,14 +803,14 @@ fn drill_search_ranking_and_arabic_tolerance() {
     // ("انبوب" is the true single-char tolerance case for stored "أنبوب";
     // "انابيب" carries an extra alif plus yaa/waw swap — two edits, beyond
     // single-character wildcard tolerance, so the engine rejects it.)
-    let hits = db.catalog.search("مفتاح", 20).expect("ar");
+    let hits = db.catalog.search("مفتاح", 20, false).expect("ar");
     assert!(hits.iter().any(|(p, _)| p.id == cle_id));
-    let hits = db.catalog.search("انبوب", 20).expect("pipes");
+    let hits = db.catalog.search("انبوب", 20, false).expect("pipes");
     assert!(
         hits.iter().any(|(p, _)| p.id == db.anchors.tube),
         "bare-alef tolerance expected"
     );
-    let hits = db.catalog.search("شريط", 20).expect("tape");
+    let hits = db.catalog.search("شريط", 20, false).expect("tape");
     assert_eq!(hits.first().map(|(p, _)| p.id), Some(db.anchors.ruban));
 }
 
@@ -838,14 +847,14 @@ fn drill_search_latency_p95_under_budget() {
         "VIS-005",
     ];
     for warmup in &queries {
-        let _ = db.catalog.search(warmup, 20).expect("warmup");
+        let _ = db.catalog.search(warmup, 20, false).expect("warmup");
     }
     let mut samples = Vec::with_capacity(100);
     let mut per_query: Vec<Vec<u128>> = queries.iter().map(|_| Vec::new()).collect();
     for iteration in 0..100 {
         let slot = iteration % queries.len();
         let start = Instant::now();
-        let _ = db.catalog.search(queries[slot], 20).expect("bench");
+        let _ = db.catalog.search(queries[slot], 20, false).expect("bench");
         let elapsed = start.elapsed().as_micros();
         samples.push(elapsed);
         per_query[slot].push(elapsed);

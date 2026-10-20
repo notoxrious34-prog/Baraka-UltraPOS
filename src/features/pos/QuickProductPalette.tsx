@@ -1,10 +1,13 @@
 /**
- * Quick-products palette (TASK-DSN-069).
+ * Quick-products palette (TASK-DSN-069, extended TASK-DSN-076).
  *
  * Up to 8 single-click / Alt+1..8 chips for barcode-less bulk items, mounted
  * inside the discovery column (CartPanel structurally unreachable). Bounded
  * height, no layout shift: `shrink-0`, two compact rows max, inner scroll only
  * on overflow. Empty slots render dashed; the last dispatched chip flashes.
+ * When the palette is disabled the component renders nothing (the discovery
+ * grid reclaims the vertical space); the gear button opens the slot
+ * customization dialog.
  */
 
 import { useEffect, useRef, type ReactElement } from "react";
@@ -15,11 +18,13 @@ import {
   useQuickProductsStore,
 } from "@/stores/quick-products-store";
 import { ipcSearchCatalog } from "@/lib/ipc";
+import { t } from "@/lib/i18n";
 
 const FLASH_MS = 600;
 
-export function QuickProductPalette(): ReactElement {
+export function QuickProductPalette(): ReactElement | null {
   const locale = usePosUiStore((state) => state.locale);
+  const enabled = useQuickProductsStore((state) => state.enabled);
   const slots = useQuickProductsStore((state) => state.slots);
   const hydrated = useQuickProductsStore((state) => state.hydrated);
   const lastFiredSlot = useQuickProductsStore((state) => state.lastFiredSlot);
@@ -70,6 +75,12 @@ export function QuickProductPalette(): ReactElement {
     };
   }, [lastFiredSlot]);
 
+  // Disabled palette renders nothing: the discovery grid below reclaims the
+  // vertical space (no layout shift, no reserved height).
+  if (!enabled) {
+    return null;
+  }
+
   return (
     <div
       role="toolbar"
@@ -109,6 +120,18 @@ export function QuickProductPalette(): ReactElement {
           </button>
         );
       })}
+      <button
+        key="quick-config"
+        type="button"
+        onClick={() => {
+          useQuickProductsStore.getState().setConfigOpen(true);
+        }}
+        title={t(locale, "pos.customizeQuickProducts")}
+        aria-label={t(locale, "pos.customizeQuickProducts")}
+        className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 text-[11px] font-bold text-slate-700 outline-none transition-colors hover:border-primary-600 hover:bg-sky-50 focus-visible:ring-2 focus-visible:ring-primary-600/50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-sky-950/40"
+      >
+        <span aria-hidden="true">⚙️</span>
+      </button>
     </div>
   );
 }

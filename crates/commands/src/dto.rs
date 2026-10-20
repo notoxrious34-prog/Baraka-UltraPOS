@@ -352,10 +352,26 @@ pub struct UpdateProductDto {
 pub struct CatalogSearchRequestDto {
     /// Authorizing session token.
     pub session_token: String,
-    /// Prefix/multilingual query (blank returns no rows).
+    /// Prefix/multilingual query (blank returns discovery rows).
     pub query: String,
-    /// Max products (clamped to 1..=100 server-side).
+    /// Max products (clamped to 1..=500 server-side).
     pub limit: Option<u32>,
+    /// Admit `is_active = 0` rows (management views). Omitted or
+    /// `false` excludes inactive products (POS and sale paths).
+    pub include_inactive: Option<bool>,
+}
+
+/// Database-level catalog aggregates for the management hub KPIs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CatalogMetricsDto {
+    /// Every stored product row, active or not.
+    pub total_products: i64,
+    /// Active products with a strictly positive summed stock level.
+    pub in_stock: i64,
+    /// Active products with zero/negative summed level (or no level row).
+    pub out_of_stock: i64,
+    /// Products with `is_active = 0`.
+    pub inactive: i64,
 }
 
 /// Stored category view.

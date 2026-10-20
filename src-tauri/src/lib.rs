@@ -217,6 +217,7 @@ pub fn run() {
             baraka_commands::ipc::catalog_delete_product,
             baraka_commands::ipc::catalog_get_product,
             baraka_commands::ipc::catalog_search,
+            baraka_commands::ipc::catalog_get_metrics,
             baraka_commands::ipc::catalog_define_kit,
             baraka_commands::ipc::catalog_import_products,
             baraka_commands::ipc::category_list,

@@ -503,10 +503,17 @@ describe("container wiring (source pins)", () => {
     expect(hubSrc).toContain('void loadCatalog(activeToken, "", alive)');
   });
 
-  it("debounces search at 150ms and searches with limit 100", () => {
+  it("debounces search at 150ms and searches with limit 500 including inactive", () => {
     expect(hubSrc).toContain("SEARCH_DEBOUNCE_MS = 150");
-    expect(hubSrc).toContain("SEARCH_LIMIT = 100");
+    expect(hubSrc).toContain("SEARCH_LIMIT = 500");
+    expect(hubSrc).toContain("ipcSearchCatalog(tok, term, SEARCH_LIMIT, true)");
     expect(hubSrc).toContain("void loadCatalog(activeToken, query.trim(), alive)");
+  });
+
+  it("fetches real database metrics alongside rows for the KPI cards", () => {
+    expect(hubSrc).toContain("ipcGetCatalogMetrics(tok)");
+    expect(hubSrc).toContain("setMetrics(dbMetrics)");
+    expect(hubSrc).toContain("metrics.total_products");
   });
 
   it("never blanks rows on empty input and fetches DEP-01 stock per row", () => {

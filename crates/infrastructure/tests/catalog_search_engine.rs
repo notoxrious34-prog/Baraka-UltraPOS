@@ -131,7 +131,7 @@ fn disordered_multi_token_search_matches() {
     seed_hardware(&harness, &gerant);
     let search = SearchCatalogUseCase::new(&harness.repo);
     for query in ["25 vis", "vis 25", "3.5 placo vis"] {
-        let hits = search.execute(&gerant, query, 20).expect("search");
+        let hits = search.execute(&gerant, query, 20, false).expect("search");
         assert_eq!(
             skus_of(&hits),
             vec!["VIS-PLA-25".to_string()],
@@ -147,12 +147,12 @@ fn arabic_phonetic_search_finds_french_titles() {
     seed_hardware(&harness, &gerant);
     let search = SearchCatalogUseCase::new(&harness.repo);
     let vis = search
-        .execute(&gerant, "فيس بلاكو", 20)
+        .execute(&gerant, "فيس بلاكو", 20, false)
         .expect("phonetic vis");
     println!("DEMO search \"فيس بلاكو\" -> {:?}", skus_of(&vis));
     assert_eq!(skus_of(&vis), vec!["VIS-PLA-25".to_string()]);
     let coude = search
-        .execute(&gerant, "كود 32", 20)
+        .execute(&gerant, "كود 32", 20, false)
         .expect("phonetic coude");
     println!("DEMO search \"كود 32\" -> {:?}", skus_of(&coude));
     assert_eq!(skus_of(&coude), vec!["COU-PVC-32".to_string()]);
@@ -165,7 +165,7 @@ fn accent_and_case_variants_match() {
     seed_hardware(&harness, &gerant);
     let search = SearchCatalogUseCase::new(&harness.repo);
     for query in ["cable", "CÂBLE", "câble 2.5"] {
-        let hits = search.execute(&gerant, query, 20).expect("search");
+        let hits = search.execute(&gerant, query, 20, false).expect("search");
         assert_eq!(
             skus_of(&hits),
             vec!["CAB-2.5".to_string()],
@@ -180,7 +180,9 @@ fn exact_sku_ranks_first() {
     let gerant = session_with(Role::Gerant);
     seed_hardware(&harness, &gerant);
     let search = SearchCatalogUseCase::new(&harness.repo);
-    let hits = search.execute(&gerant, "VIS-PLA-25", 20).expect("search");
+    let hits = search
+        .execute(&gerant, "VIS-PLA-25", 20, false)
+        .expect("search");
     assert_eq!(
         hits.first().map(|(p, _)| p.sku.as_str()),
         Some("VIS-PLA-25")
@@ -194,15 +196,17 @@ fn barcode_fast_path_and_discovery_preserved() {
     seed_hardware(&harness, &gerant);
     let search = SearchCatalogUseCase::new(&harness.repo);
     let scanned = search
-        .execute(&gerant, "6111250090011", 20)
+        .execute(&gerant, "6111250090011", 20, false)
         .expect("barcode");
     assert_eq!(skus_of(&scanned), vec!["VIS-PLA-25".to_string()]);
     assert!(search
-        .execute(&gerant, "0000000000000", 20)
+        .execute(&gerant, "0000000000000", 20, false)
         .expect("miss")
         .is_empty());
     for query in ["", "   "] {
-        let found = search.execute(&gerant, query, 20).expect("discovery");
+        let found = search
+            .execute(&gerant, query, 20, false)
+            .expect("discovery");
         assert_eq!(found.len(), 3);
     }
 }
@@ -223,7 +227,9 @@ fn hundred_product_search_returns_promptly() {
     }
     let search = SearchCatalogUseCase::new(&harness.repo);
     let started = Instant::now();
-    let hits = search.execute(&gerant, "فيس 25", 100).expect("search");
+    let hits = search
+        .execute(&gerant, "فيس 25", 100, false)
+        .expect("search");
     let elapsed = started.elapsed();
     println!("PERF 100-product hybrid search took {:?}", elapsed);
     assert!(!hits.is_empty());

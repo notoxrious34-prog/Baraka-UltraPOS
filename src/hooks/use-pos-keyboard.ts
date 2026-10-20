@@ -152,10 +152,15 @@ export function usePosKeyboard(): void {
         return;
       }
 
-      // Quick-products palette (TASK-DSN-069): Alt+1..8 always intercepted
-      // outside modals, never typed into inputs, never seen by the wedge.
+      // Quick-products palette (TASK-DSN-069, gated TASK-DSN-076): Alt+1..8
+      // dispatch only while the palette is enabled. When disabled the
+      // keystroke is bypassed entirely — never intercepted, never prevented,
+      // zero cart mutation — so the browser keeps its native behavior.
       const quickSlot = altDigitSlotIndex(event);
       if (quickSlot !== null && !modalOpen) {
+        if (!useQuickProductsStore.getState().enabled) {
+          return;
+        }
         event.preventDefault();
         useQuickProductsStore.getState().dispatchSlot(quickSlot);
         return;

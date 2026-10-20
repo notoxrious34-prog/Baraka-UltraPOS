@@ -47,7 +47,10 @@ export function useCatalogSearch(): CatalogSearch {
         setError("UNAUTHORIZED");
         return;
       }
-      ipcSearchCatalog(session.token, query, 20)
+      // Discovery fetches the first 100 active rows; inactive products are
+      // excluded server-side (includeInactive=false) so disabled items never
+      // render as purchasable POS cards.
+      ipcSearchCatalog(session.token, query, 100, false)
         .then((products) => {
           setResults(products);
           setError(null);

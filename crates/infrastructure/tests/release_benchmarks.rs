@@ -275,7 +275,7 @@ fn bench_m1_product_search() {
     // Sanity outside the timed loop: both paths hit the seeded data.
     assert!(
         !catalog
-            .search("Produit Benchmark 42", 20)
+            .search("Produit Benchmark 42", 20, false)
             .expect("search")
             .is_empty(),
         "prefix search must hit seeded catalog"
@@ -295,7 +295,7 @@ fn bench_m1_product_search() {
         if iteration % 2 == 0 {
             // True prefix query against the real LIKE-prefix path.
             let _ = catalog
-                .search(&format!("Produit Benchmark {slot}"), 20)
+                .search(&format!("Produit Benchmark {slot}"), 20, false)
                 .expect("search");
         } else {
             let code = Barcode::new(&stack.barcodes[slot]).expect("barcode");

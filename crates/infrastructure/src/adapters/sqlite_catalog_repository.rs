@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    CategoryRepository, KitComponentRow, ProductRepository, SessionContext,
+    CatalogMetrics, CategoryRepository, KitComponentRow, ProductRepository, SessionContext,
 };
 use baraka_application::use_cases::catalog::{
     ImportBatchReport, ImportDuplicatePolicy, ImportRowError, ProductImportRepository,
@@ -615,12 +615,18 @@ impl ProductRepository for SqliteCatalogRepository {
         &self,
         query: &str,
         limit: usize,
+        include_inactive: bool,
     ) -> Result<Vec<(Product, Vec<ProductUnit>)>, ApplicationError> {
         let guard = self.lock()?;
-        let capped = (limit.clamp(1, 100)) as i64;
+        let capped = (limit.clamp(1, 500)) as i64;
         if query.trim().is_empty() {
+            let sql = if include_inactive {
+                "SELECT DISTINCT p.id FROM products p ORDER BY p.sku LIMIT ?1"
+            } else {
+                "SELECT DISTINCT p.id FROM products p WHERE p.is_active = 1 ORDER BY p.sku LIMIT ?1"
+            };
             let ids = guard
-                .prepare("SELECT DISTINCT p.id FROM products p ORDER BY p.sku LIMIT ?1")
+                .prepare(sql)
                 .map_err(|_| store_failure())?
                 .query_map([capped], |row| row.get::<_, String>(0))
                 .map_err(|_| store_failure())?
@@ -637,13 +643,16 @@ impl ProductRepository for SqliteCatalogRepository {
         let trimmed = query.trim();
         // Exact-barcode fast path for single-token queries (scanners).
         if !trimmed.chars().any(char::is_whitespace) && trimmed.chars().count() >= 3 {
-            let mut statement = guard
-                .prepare(
-                    "SELECT DISTINCT p.id FROM products p
+            let sql = if include_inactive {
+                "SELECT DISTINCT p.id FROM products p
                      LEFT JOIN product_units u ON u.product_id = p.id
-                     WHERE p.barcode = ?1 OR u.barcode = ?1 LIMIT ?2",
-                )
-                .map_err(|_| store_failure())?;
+                     WHERE p.barcode = ?1 OR u.barcode = ?1 LIMIT ?2"
+            } else {
+                "SELECT DISTINCT p.id FROM products p
+                     LEFT JOIN product_units u ON u.product_id = p.id
+                     WHERE (p.barcode = ?1 OR u.barcode = ?1) AND p.is_active = 1 LIMIT ?2"
+            };
+            let mut statement = guard.prepare(sql).map_err(|_| store_failure())?;
             let ids = statement
                 .query_map(rusqlite::params![trimmed, capped], |row| {
                     row.get::<_, String>(0)
@@ -699,7 +708,11 @@ impl ProductRepository for SqliteCatalogRepository {
             }
             sql.push(')');
         }
-        sql.push_str(" AND p.is_active = 1");
+        sql.push_str(if include_inactive {
+            ""
+        } else {
+            " AND p.is_active = 1"
+        });
         // Relevance ranking: exact barcode (product or unit) first,
         // then name prefix, then first-token name infix, then SKU and
         // any other match. Tie-break on SKU for determinism.
@@ -740,6 +753,33 @@ impl ProductRepository for SqliteCatalogRepository {
             }
         }
         Ok(out)
+    }
+
+    fn get_metrics(&self) -> Result<CatalogMetrics, ApplicationError> {
+        let guard = self.lock()?;
+        let (total_products, inactive, in_stock, out_of_stock): (i64, i64, i64, i64) = guard
+            .query_row(
+                "SELECT
+                    COUNT(p.id),
+                    COALESCE(SUM(CASE WHEN p.is_active = 0 THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN p.is_active = 1 AND COALESCE(s.qty, 0) > 0 THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN p.is_active = 1 AND COALESCE(s.qty, 0) <= 0 THEN 1 ELSE 0 END), 0)
+                 FROM products p
+                 LEFT JOIN (
+                     SELECT product_id, SUM(quantity_base_micro) AS qty
+                     FROM stock_levels
+                     GROUP BY product_id
+                 ) s ON s.product_id = p.id",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .map_err(|_| store_failure())?;
+        Ok(CatalogMetrics {
+            total_products,
+            in_stock,
+            out_of_stock,
+            inactive,
+        })
     }
 
     fn count_product_references(&self, id: ProductId) -> Result<u64, ApplicationError> {

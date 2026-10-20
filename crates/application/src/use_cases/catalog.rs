@@ -12,7 +12,7 @@ use baraka_domain::primitives::{FactorMicro, Money, QtyMicro};
 use baraka_domain::role::Permission;
 
 use crate::errors::ApplicationError;
-use crate::ports::{CategoryRepository, ProductRepository, SessionContext};
+use crate::ports::{CatalogMetrics, CategoryRepository, ProductRepository, SessionContext};
 
 /// Roles allowed to mutate the catalog.
 pub(crate) const MANAGE_PERMISSIONS: [Permission; 2] = [
@@ -450,15 +450,44 @@ where
     }
 
     /// Search the catalog (blank queries return default discovery rows).
+    /// `include_inactive` admits `is_active = 0` rows for management
+    /// views; POS and sale paths pass `false`.
     pub fn execute(
         &self,
         session: &SessionContext,
         query: &str,
         limit: usize,
+        include_inactive: bool,
     ) -> Result<Vec<(Product, Vec<ProductUnit>)>, ApplicationError> {
         require(session, Permission::PosSell)?;
         let trimmed = query.trim();
-        self.products.search(trimmed, limit.clamp(1, 100))
+        self.products
+            .search(trimmed, limit.clamp(1, 500), include_inactive)
+    }
+}
+
+/// Database-level catalog aggregates for the management hub KPIs.
+/// Reads require `PosSell` (all roles); computed in one SQL statement.
+pub struct GetCatalogMetricsUseCase<'a, P>
+where
+    P: ?Sized,
+{
+    products: &'a P,
+}
+
+impl<'a, P> GetCatalogMetricsUseCase<'a, P>
+where
+    P: ProductRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(products: &'a P) -> Self {
+        Self { products }
+    }
+
+    /// Return total / in-stock / out-of-stock / inactive counts.
+    pub fn execute(&self, session: &SessionContext) -> Result<CatalogMetrics, ApplicationError> {
+        require(session, Permission::PosSell)?;
+        self.products.get_metrics()
     }
 }
 
@@ -1068,9 +1097,13 @@ mod tests {
             &self,
             query: &str,
             limit: usize,
+            include_inactive: bool,
         ) -> Result<Vec<(Product, Vec<ProductUnit>)>, ApplicationError> {
             let mut out = Vec::new();
             for (product, units) in self.products.lock().expect("products").values() {
+                if !include_inactive && !product.is_active {
+                    continue;
+                }
                 if product.sku.as_str().contains(query) {
                     out.push((product.clone(), units.clone()));
                 }
@@ -1079,6 +1112,23 @@ mod tests {
                 }
             }
             Ok(out)
+        }
+
+        fn get_metrics(&self) -> Result<CatalogMetrics, ApplicationError> {
+            let products = self.products.lock().expect("products");
+            let total_products = products.len() as i64;
+            let inactive = products
+                .values()
+                .filter(|(product, _)| !product.is_active)
+                .count() as i64;
+            // The fake carries no stock levels: every active row counts as
+            // out-of-stock (mirrors the LEFT JOIN NULL branch of the SQL).
+            Ok(CatalogMetrics {
+                total_products,
+                in_stock: 0,
+                out_of_stock: total_products - inactive,
+                inactive,
+            })
         }
 
         fn get_direct_kit_items(

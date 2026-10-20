@@ -251,17 +251,20 @@ fn search_and_update_behave() {
         .execute(&gerant, product_input("VIS-8X40", false), TEST_TERMINAL)
         .expect("create");
     let search = SearchCatalogUseCase::new(&harness.repo);
-    let hits = search.execute(&gerant, "VIS-8", 20).expect("search");
+    let hits = search.execute(&gerant, "VIS-8", 20, false).expect("search");
     assert_eq!(hits.len(), 1);
     assert_eq!(hits[0].0.id, id);
-    let blank = search.execute(&gerant, "   ", 20).expect("blank");
+    let blank = search.execute(&gerant, "   ", 20, false).expect("blank");
     assert_eq!(blank.len(), 1);
     assert_eq!(blank[0].0.id, id);
-    assert!(search.execute(&gerant, "ZZZ", 20).expect("miss").is_empty());
+    assert!(search
+        .execute(&gerant, "ZZZ", 20, false)
+        .expect("miss")
+        .is_empty());
 
     // Barcode-exact search resolves through the unit mapping.
     let scanned = search
-        .execute(&gerant, "6111250000020", 20)
+        .execute(&gerant, "6111250000020", 20, false)
         .expect("barcode search");
     assert_eq!(scanned.len(), 1);
 
@@ -348,30 +351,36 @@ fn catalog_search_infix_and_empty_discovery() {
     let search = SearchCatalogUseCase::new(&harness.repo);
 
     // Infix FR: middle word matches.
-    let fr = search.execute(&gerant, "douchette", 20).expect("infix fr");
+    let fr = search
+        .execute(&gerant, "douchette", 20, false)
+        .expect("infix fr");
     assert_eq!(fr.len(), 1);
     assert_eq!(fr[0].0.id, id);
 
     // Infix AR: middle word matches.
-    let ar = search.execute(&gerant, "دوش", 20).expect("infix ar");
+    let ar = search.execute(&gerant, "دوش", 20, false).expect("infix ar");
     assert_eq!(ar.len(), 1);
     assert_eq!(ar[0].0.id, id);
 
     // SKU infix: middle of the code matches.
-    let sku = search.execute(&gerant, "LOMB", 20).expect("infix sku");
+    let sku = search
+        .execute(&gerant, "LOMB", 20, false)
+        .expect("infix sku");
     assert_eq!(sku.len(), 1);
     assert_eq!(sku[0].0.id, id);
 
     // Barcode stays exact-only.
     let scanned = search
-        .execute(&gerant, "6111250000999", 20)
+        .execute(&gerant, "6111250000999", 20, false)
         .expect("barcode exact");
     assert_eq!(scanned.len(), 1);
     assert_eq!(scanned[0].0.id, id);
 
     // Empty and blank queries discover (not empty) up to the limit.
     for query in ["", " "] {
-        let found = search.execute(&gerant, query, 20).expect("discovery");
+        let found = search
+            .execute(&gerant, query, 20, false)
+            .expect("discovery");
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].0.id, id);
     }

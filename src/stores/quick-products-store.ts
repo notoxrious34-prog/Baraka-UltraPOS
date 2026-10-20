@@ -6,6 +6,11 @@
  * guarded `localStorage` key (precedent: theme store, starter-pack flag);
  * there is no generic settings IPC. Financial math stays in the cart store:
  * dispatch only calls `addProduct` (default-unit resolution included).
+ *
+ * DSN-076: palette enablement (`baraka-quick-products-enabled`, default
+ * true), config-dialog control state, and an `is_active` invariant — only
+ * active products may be assigned or dispatched; inactive attempts fail
+ * safely without state or cart mutation.
  */
 
 import { create } from "zustand";
@@ -14,17 +19,26 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 import type { CatalogProduct } from "@/types/pos";
 
 export const QUICK_PRODUCTS_STORAGE_KEY = "baraka-quick-products";
+export const QUICK_PRODUCTS_ENABLED_KEY = "baraka-quick-products-enabled";
 
 export const QUICK_SLOT_COUNT = 8;
 
 interface QuickProductsState {
   slots: Array<CatalogProduct | null>;
   hydrated: boolean;
+  /** Palette visibility + Alt+1..8 dispatch switch (persisted, default true). */
+  enabled: boolean;
+  /** Config-dialog visibility (session-only, never persisted). */
+  isConfigOpen: boolean;
   lastFiredSlot: number | null;
   hydrate: (defaults: CatalogProduct[]) => void;
+  setConfigOpen: (open: boolean) => void;
+  toggleEnabled: () => void;
   assignSlot: (slotIndex: number, product: CatalogProduct) => void;
   clearSlot: (index: number) => void;
-  /** Add the slot's product to the cart; false when the slot is empty. */
+  /** Re-seed all slots from the provided active products (persisted). */
+  resetDefaults: (defaults: CatalogProduct[]) => void;
+  /** Add the slot's product to the cart; false when empty or inactive. */
   dispatchSlot: (slotIndex: number) => boolean;
   clearFired: () => void;
 }
@@ -64,6 +78,27 @@ function readStoredSlots(): Array<CatalogProduct | null> | null {
   }
 }
 
+function readStoredEnabled(): boolean {
+  try {
+    if (typeof localStorage === "undefined") {
+      return true;
+    }
+    return localStorage.getItem(QUICK_PRODUCTS_ENABLED_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function persistEnabled(enabled: boolean): void {
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(QUICK_PRODUCTS_ENABLED_KEY, enabled ? "true" : "false");
+    }
+  } catch {
+    // Private-mode / quota failure: in-memory flag still applies this session.
+  }
+}
+
 function persistSlots(slots: Array<CatalogProduct | null>): void {
   try {
     if (typeof localStorage !== "undefined") {
@@ -78,31 +113,52 @@ function validIndex(slotIndex: number): boolean {
   return Number.isInteger(slotIndex) && slotIndex >= 0 && slotIndex < QUICK_SLOT_COUNT;
 }
 
+/** Seed helper: only structurally valid AND active products occupy slots. */
+function seedFrom(defaults: CatalogProduct[]): Array<CatalogProduct | null> {
+  const seeded = emptySlots();
+  for (let i = 0; i < QUICK_SLOT_COUNT && i < defaults.length; i++) {
+    const candidate = defaults[i];
+    if (candidate !== undefined && isValidSlotProduct(candidate) && candidate.is_active === true) {
+      seeded[i] = candidate;
+    }
+  }
+  return seeded;
+}
+
 export const useQuickProductsStore = create<QuickProductsState>()((set, get) => ({
   slots: emptySlots(),
   hydrated: false,
+  enabled: true,
+  isConfigOpen: false,
   lastFiredSlot: null,
   hydrate: (defaults) => {
     if (get().hydrated) {
       return;
     }
+    const enabled = readStoredEnabled();
     const stored = readStoredSlots();
     if (stored !== null) {
-      set({ slots: stored, hydrated: true });
+      set({ slots: stored, enabled, hydrated: true });
       return;
     }
-    const seeded = emptySlots();
-    for (let i = 0; i < QUICK_SLOT_COUNT && i < defaults.length; i++) {
-      const candidate = defaults[i];
-      if (candidate !== undefined && isValidSlotProduct(candidate)) {
-        seeded[i] = candidate;
-      }
-    }
+    const seeded = seedFrom(defaults);
     persistSlots(seeded);
-    set({ slots: seeded, hydrated: true });
+    set({ slots: seeded, enabled, hydrated: true });
+  },
+  setConfigOpen: (open) => {
+    set({ isConfigOpen: open });
+  },
+  toggleEnabled: () => {
+    const next = !get().enabled;
+    persistEnabled(next);
+    set({ enabled: next });
   },
   assignSlot: (slotIndex, product) => {
     if (!validIndex(slotIndex) || !isValidSlotProduct(product)) {
+      return;
+    }
+    // Invariant: inactive products never occupy a slot.
+    if (product.is_active !== true) {
       return;
     }
     const slots = get().slots.slice();
@@ -119,12 +175,21 @@ export const useQuickProductsStore = create<QuickProductsState>()((set, get) => 
     persistSlots(slots);
     set({ slots });
   },
+  resetDefaults: (defaults) => {
+    const seeded = seedFrom(defaults);
+    persistSlots(seeded);
+    set({ slots: seeded, hydrated: true });
+  },
   dispatchSlot: (slotIndex) => {
     if (!validIndex(slotIndex)) {
       return false;
     }
     const product = get().slots[slotIndex];
     if (product === null || product === undefined) {
+      return false;
+    }
+    // Invariant: inactive products never reach the cart (stale stored slot).
+    if (product.is_active !== true) {
       return false;
     }
     useCartStore.getState().addProduct(product);

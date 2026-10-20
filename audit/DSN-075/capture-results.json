@@ -1,0 +1,65 @@
+{
+  "at": "2026-10-20T13:12:18.296Z",
+  "results": [
+    {
+      "name": "KPI cards show database metrics @1280x800",
+      "ok": true,
+      "detail": "8,5,2,1"
+    },
+    {
+      "name": "header badge shows database total @1280x800",
+      "ok": true,
+      "detail": "8 produits"
+    },
+    {
+      "name": "zero horizontal overflow @1280x800",
+      "ok": true,
+      "detail": "{\"tableSw\":1246,\"tableCw\":1246,\"docSw\":1280,\"docCw\":1280}"
+    },
+    {
+      "name": "delete buttons fully visible @1280x800",
+      "ok": true,
+      "detail": "8/8 inside viewport"
+    },
+    {
+      "name": "inactive row renders Inactif badge",
+      "ok": true,
+      "detail": "BAT-002 badge present"
+    },
+    {
+      "name": "hub passes includeInactive=true to search",
+      "ok": true,
+      "detail": "{\"session_token\":\"stub-admin\",\"query\":\"\",\"limit\":500,\"include_inactive\":true}"
+    },
+    {
+      "name": "screenshot captured",
+      "ok": true,
+      "detail": "D:\\Dev\\Baraka UltraPOS\\audit\\DSN-075\\catalog-desktop-1280x800.png (154573 bytes)"
+    },
+    {
+      "name": "KPI cards show database metrics @1024x600",
+      "ok": true,
+      "detail": "8,5,2,1"
+    },
+    {
+      "name": "header badge shows database total @1024x600",
+      "ok": true,
+      "detail": "8 produits"
+    },
+    {
+      "name": "zero horizontal overflow @1024x600",
+      "ok": true,
+      "detail": "{\"tableSw\":975,\"tableCw\":975,\"docSw\":1024,\"docCw\":1024}"
+    },
+    {
+      "name": "delete buttons fully visible @1024x600",
+      "ok": true,
+      "detail": "8/8 inside viewport"
+    },
+    {
+      "name": "no unmocked IPC commands",
+      "ok": true,
+      "detail": "console errors: 0"
+    }
+  ]
+}

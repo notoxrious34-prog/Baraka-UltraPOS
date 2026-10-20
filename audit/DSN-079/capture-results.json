@@ -1,0 +1,31 @@
+{
+  "failed": 0,
+  "total": 5,
+  "results": [
+    {
+      "name": "C1 fiscal tab shows disabled switch with guidance (fr/light)",
+      "ok": true,
+      "detail": "disabled=true title=\"Réservé — Gestion système.\" 1280x800 dpr=1 noPageScroll=true"
+    },
+    {
+      "name": "C2 backups tab shows note + disabled create with guidance (ar/dark)",
+      "ok": true,
+      "detail": "disabled=true title=\"مقيّد — إدارة النظام.\" 1280x800 dpr=1 noPageScroll=true"
+    },
+    {
+      "name": "C-nav 1024x600-fr-light: lock badges on restricted tabs, no page scroll",
+      "ok": true,
+      "detail": "tabs=8 badges=4 1024x600 dpr=1 noPageScroll=true"
+    },
+    {
+      "name": "C-nav 1024x600-ar-dark: lock badges on restricted tabs, no page scroll",
+      "ok": true,
+      "detail": "tabs=8 badges=4 1024x600 dpr=1 noPageScroll=true"
+    },
+    {
+      "name": "zero console errors across captures",
+      "ok": true,
+      "detail": "0 console errors, all stubbed commands responded"
+    }
+  ]
+}

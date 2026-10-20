@@ -1,13 +1,15 @@
 /**
- * Settings command center (DSN-053): two-tier sidebar with 4 logical groups
- * and 8 configuration tabs. Manager-gated in `App.tsx`; ADMIN-only writes
- * stay server-enforced with client-side lock badges.
+ * Settings command center (DSN-053, realigned TASK-DSN-079): two-tier
+ * sidebar with 4 logical groups and 8 configuration tabs. Route-gated in
+ * `App.tsx`; per-tab writes follow granular `hasPermission` gates with
+ * Disabled-with-Guidance (visible + disabled + tooltip), never hidden.
+ * Engine use cases stay authoritative for every write.
  */
 
 import { useState, type ReactElement } from "react";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
-import { t, type I18nKey } from "@/lib/i18n";
+import { t, translateBackendError, type I18nKey } from "@/lib/i18n";
 import { StoreIdentityTab } from "./StoreIdentityTab";
 import { CategorySettingsTab } from "./CategorySettingsTab";
 import { StarterPackSettingsTab } from "./StarterPackSettingsTab";
@@ -31,7 +33,12 @@ interface TabEntry {
   id: SettingsTab;
   labelKey: I18nKey;
   icon: ReactElement;
-  lockedForNonAdmin: boolean;
+  /**
+   * Write permissions guarding this tab (TASK-DSN-079). Empty = read-only
+   * tab, never locked. Non-empty = lock badge + disabled writes unless the
+   * operator holds ANY listed permission (mirrors the engine guards).
+   */
+  managePermissions: readonly string[];
 }
 
 interface TabGroup {
@@ -122,29 +129,29 @@ const GROUPS: TabGroup[] = [
   {
     headerKey: "settings.groupShop",
     tabs: [
-      { id: "identity", labelKey: "settings.tabIdentity", icon: ICON_IDENTITY, lockedForNonAdmin: false },
-      { id: "categories", labelKey: "settings.tabCategories", icon: ICON_CATEGORIES, lockedForNonAdmin: false },
+      { id: "identity", labelKey: "settings.tabIdentity", icon: ICON_IDENTITY, managePermissions: ["SYSTEM_SETTINGS_MANAGE"] },
+      { id: "categories", labelKey: "settings.tabCategories", icon: ICON_CATEGORIES, managePermissions: ["STOCK_ADJUSTMENT", "SYSTEM_SETTINGS_MANAGE"] },
     ],
   },
   {
     headerKey: "settings.groupData",
     tabs: [
-      { id: "pack", labelKey: "settings.tabPack", icon: ICON_PACK, lockedForNonAdmin: false },
-      { id: "exchange", labelKey: "settings.tabExchange", icon: ICON_EXCHANGE, lockedForNonAdmin: false },
+      { id: "pack", labelKey: "settings.tabPack", icon: ICON_PACK, managePermissions: ["STOCK_ADJUSTMENT", "SYSTEM_SETTINGS_MANAGE"] },
+      { id: "exchange", labelKey: "settings.tabExchange", icon: ICON_EXCHANGE, managePermissions: ["STOCK_ADJUSTMENT", "SYSTEM_SETTINGS_MANAGE"] },
     ],
   },
   {
     headerKey: "settings.groupSales",
     tabs: [
-      { id: "printer", labelKey: "settings.tabPrinter", icon: ICON_PRINTER, lockedForNonAdmin: false },
-      { id: "fiscal", labelKey: "settings.tabFiscal", icon: ICON_FISCAL, lockedForNonAdmin: true },
+      { id: "printer", labelKey: "settings.tabPrinter", icon: ICON_PRINTER, managePermissions: ["MANAGE_PRINTER_SETTINGS"] },
+      { id: "fiscal", labelKey: "settings.tabFiscal", icon: ICON_FISCAL, managePermissions: ["SYSTEM_SETTINGS_MANAGE"] },
     ],
   },
   {
     headerKey: "settings.groupSystem",
     tabs: [
-      { id: "backups", labelKey: "settings.tabBackups", icon: ICON_BACKUPS, lockedForNonAdmin: true },
-      { id: "about", labelKey: "settings.tabAbout", icon: ICON_ABOUT, lockedForNonAdmin: false },
+      { id: "backups", labelKey: "settings.tabBackups", icon: ICON_BACKUPS, managePermissions: ["SYSTEM_SETTINGS_MANAGE"] },
+      { id: "about", labelKey: "settings.tabAbout", icon: ICON_ABOUT, managePermissions: [] },
     ],
   },
 ];
@@ -152,13 +159,24 @@ const GROUPS: TabGroup[] = [
 export function SettingsModule(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const session = useSessionStore((state) => state.session);
+  const hasPermission = useSessionStore((state) => state.hasPermission);
   const [tab, setTab] = useState<SettingsTab>("identity");
   const [categoryTick, setCategoryTick] = useState(0);
-  const isAdmin = session?.role === "ADMIN";
+  // Granular tab-write gate (TASK-DSN-079): the operator may write through
+  // a tab when holding ANY of its managePermissions. Rust use cases stay
+  // authoritative for every write.
+  const canWriteTab = (entry: TabEntry): boolean =>
+    session !== null &&
+    (entry.managePermissions.length === 0 ||
+      entry.managePermissions.some((permission) => hasPermission(permission)));
 
   const renderTab = (): ReactElement | null => {
     if (session === null) {
-      return null;
+      return (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
+          {translateBackendError("UNAUTHORIZED", locale)}
+        </p>
+      );
     }
     const token = session.token;
     switch (tab) {
@@ -180,9 +198,9 @@ export function SettingsModule(): ReactElement {
       case "printer":
         return <PrinterSettingsTab locale={locale} sessionToken={token} />;
       case "fiscal":
-        return <FiscalSettingsTab locale={locale} sessionToken={token} isAdmin={isAdmin} />;
+        return <FiscalSettingsTab locale={locale} sessionToken={token} />;
       case "backups":
-        return <BackupSettingsTab locale={locale} sessionToken={token} isAdmin={isAdmin} />;
+        return <BackupSettingsTab locale={locale} sessionToken={token} />;
       case "about":
         return <AboutTab locale={locale} />;
     }
@@ -221,7 +239,7 @@ export function SettingsModule(): ReactElement {
                     <span className="min-w-0 flex-1 truncate">
                       {t(locale, entry.labelKey)}
                     </span>
-                    {entry.lockedForNonAdmin && !isAdmin ? lockBadge() : null}
+                    {entry.managePermissions.length > 0 && !canWriteTab(entry) ? lockBadge() : null}
                   </button>
                 );
               })}

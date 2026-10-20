@@ -1,26 +1,28 @@
 /**
- * Fiscal stamp tab (DSN-051, ADR-092): reads `fiscal.timbre_enabled` via
- * `ipcGetFiscalSettings(token)`, persists via
- * `ipcUpdateFiscalSettings(token, { timbreEnabled })` (ADMIN-only
- * server-side; the switch disables itself for lesser roles).
+ * Fiscal stamp tab (DSN-051, ADR-092, realigned TASK-DSN-079): reads
+ * `fiscal.timbre_enabled` via `ipcGetFiscalSettings(token)`, persists via
+ * `ipcUpdateFiscalSettings(token, { timbreEnabled })` (SYSTEM_SETTINGS_MANAGE
+ * server-side, sales.rs:1395). The switch renders visible but disabled with
+ * bilingual guidance unless the operator holds SYSTEM_SETTINGS_MANAGE.
  */
 
 import { useEffect, useState, type ReactElement } from "react";
 import { t } from "@/lib/i18n";
+import { useSessionStore } from "@/stores/session-store";
 import type { Locale } from "@/types/pos";
 import { ipcGetFiscalSettings, ipcUpdateFiscalSettings } from "@/lib/ipc";
 
 interface FiscalSettingsTabProps {
   locale: Locale;
   sessionToken: string;
-  isAdmin: boolean;
 }
 
 export function FiscalSettingsTab({
   locale,
   sessionToken,
-  isAdmin,
 }: FiscalSettingsTabProps): ReactElement {
+  const hasPermission = useSessionStore((state) => state.hasPermission);
+  const canWrite = hasPermission("SYSTEM_SETTINGS_MANAGE");
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,7 +52,7 @@ export function FiscalSettingsTab({
   }, [sessionToken]);
 
   async function handleToggle(): Promise<void> {
-    if (loading || saving || !isAdmin) {
+    if (loading || saving || !canWrite) {
       return;
     }
     const next = !enabled;
@@ -83,7 +85,8 @@ export function FiscalSettingsTab({
           role="switch"
           aria-checked={enabled}
           aria-label={t(locale, "fiscal.timbreLabel")}
-          disabled={saving || !isAdmin}
+          disabled={saving || !canWrite}
+          title={canWrite ? undefined : t(locale, "settings.fiscalWriteReservedGuidance")}
           onClick={() => {
             void handleToggle();
           }}

@@ -1,11 +1,15 @@
 /**
- * Backup snapshots tab (DSN-031): admin-only creation via
- * `createBackup(token, "MANUAL")` and history via `listBackups(token)`.
- * Non-admins see an informational restriction note.
+ * Backup snapshots tab (DSN-031, realigned TASK-DSN-079): creation via
+ * `createBackup(token, "MANUAL")` and history via `listBackups(token)`
+ * (both SYSTEM_SETTINGS_MANAGE server-side, ipc.rs:2128-2136 — list fails
+ * for unauthorized operators too). Operators without the grant see the
+ * informational restriction note plus a visible-but-disabled create button
+ * with bilingual guidance; the tab itself is never hidden.
  */
 
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { t } from "@/lib/i18n";
+import { useSessionStore } from "@/stores/session-store";
 import type { Locale } from "@/types/pos";
 import { createBackup, listBackups, type BackupMetadata } from "@/lib/ipc";
 import { checksumPrefix, formatBytes, triggerBadgeClass } from "./settings-helpers";
@@ -13,20 +17,24 @@ import { checksumPrefix, formatBytes, triggerBadgeClass } from "./settings-helpe
 interface BackupSettingsTabProps {
   locale: Locale;
   sessionToken: string;
-  isAdmin: boolean;
 }
 
 export function BackupSettingsTab({
   locale,
   sessionToken,
-  isAdmin,
 }: BackupSettingsTabProps): ReactElement {
+  const hasPermission = useSessionStore((state) => state.hasPermission);
+  const canManage = hasPermission("SYSTEM_SETTINGS_MANAGE");
   const [rows, setRows] = useState<BackupMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   const refresh = useCallback(async () => {
+    if (!canManage) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       setRows(await listBackups(sessionToken));
@@ -35,14 +43,14 @@ export function BackupSettingsTab({
     } finally {
       setLoading(false);
     }
-  }, [sessionToken]);
+  }, [sessionToken, canManage]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
   async function handleCreate(): Promise<void> {
-    if (creating) {
+    if (creating || !canManage) {
       return;
     }
     setCreating(true);
@@ -58,12 +66,20 @@ export function BackupSettingsTab({
     }
   }
 
-  if (!isAdmin) {
+  if (!canManage) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center p-8">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8">
         <p className="max-w-md text-center text-sm text-slate-500 dark:text-slate-400">
           {t(locale, "settings.backupRestricted")}
         </p>
+        <button
+          type="button"
+          disabled
+          title={t(locale, "settings.backupCreateReservedGuidance")}
+          className="cursor-not-allowed rounded bg-accent-500 px-3 py-1.5 text-sm font-bold text-slate-950 opacity-50"
+        >
+          {t(locale, "settings.createBackup")}
+        </button>
       </div>
     );
   }

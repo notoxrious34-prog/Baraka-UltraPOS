@@ -30,10 +30,13 @@ describe("fiscal settings tab registration", () => {
     expect(TAB_SRC).toContain("ipcUpdateFiscalSettings");
   });
 
-  it("exposes an accessible switch gated to ADMIN writes", () => {
+  it("exposes an accessible switch gated to SYSTEM_SETTINGS_MANAGE with guidance", () => {
     expect(TAB_SRC).toContain('role="switch"');
     expect(TAB_SRC).toContain("aria-checked={enabled}");
-    expect(TAB_SRC).toContain("disabled={saving || !isAdmin}");
+    expect(TAB_SRC).toContain("disabled={saving || !canWrite}");
+    expect(TAB_SRC).toContain('hasPermission("SYSTEM_SETTINGS_MANAGE")');
+    expect(TAB_SRC).toContain("settings.fiscalWriteReservedGuidance");
+    expect(TAB_SRC).not.toContain("isAdmin");
   });
 });
 

@@ -47,7 +47,9 @@ describe("two-tier sidebar", () => {
       expect(MODULE_SRC).toContain(group);
     }
     expect(MODULE_SRC).toContain('strokeWidth="1.75"');
-    expect(MODULE_SRC).toContain("lockedForNonAdmin");
+    expect(MODULE_SRC).toContain("managePermissions");
+    expect(MODULE_SRC).toContain("canWriteTab");
+    expect(MODULE_SRC).not.toContain("lockedForNonAdmin");
     expect(MODULE_SRC).toContain('aria-current={selected ? "page" : undefined}');
     expect(MODULE_SRC).toContain("border-e");
     expect(MODULE_SRC).toContain("w-56");

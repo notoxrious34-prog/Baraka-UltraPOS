@@ -71,9 +71,20 @@ describe("settings tabs", () => {
     expect(BACKUP_SRC).toContain("flex-1 overflow-auto");
   });
 
-  it("restricts the backups tab to ADMIN with an informational note", () => {
+  it("gates restricted tabs by write permission with a lock badge, never a role check", () => {
     expect(BACKUP_SRC).toContain("settings.backupRestricted");
-    expect(MODULE_SRC).toContain('session?.role === "ADMIN"');
+    expect(MODULE_SRC).toContain("managePermissions");
+    expect(MODULE_SRC).toContain("canWriteTab");
+    expect(MODULE_SRC).not.toContain("lockedForNonAdmin");
+    expect(MODULE_SRC).not.toContain('session?.role === "ADMIN"');
+    expect(MODULE_SRC).not.toContain("session.role");
+  });
+
+  it("maps each tab to its engine write permission", () => {
+    expect(MODULE_SRC).toContain('managePermissions: ["SYSTEM_SETTINGS_MANAGE"]');
+    expect(MODULE_SRC).toContain('managePermissions: ["STOCK_ADJUSTMENT", "SYSTEM_SETTINGS_MANAGE"]');
+    expect(MODULE_SRC).toContain('managePermissions: ["MANAGE_PRINTER_SETTINGS"]');
+    expect(MODULE_SRC).toContain("managePermissions: []");
   });
 });
 
@@ -221,5 +232,38 @@ describe("settings i18n (FR/AR symmetric)", () => {
     ]) {
       expect(I18N_SRC).toContain(term);
     }
+  });
+});
+
+describe("settings write gating with guidance (TASK-DSN-079)", () => {
+  const FISCAL_SRC: string = readSrc("src", "features", "settings", "FiscalSettingsTab.tsx");
+
+  it("gates the fiscal switch by SYSTEM_SETTINGS_MANAGE with guidance, no isAdmin prop", () => {
+    expect(FISCAL_SRC).toContain('hasPermission("SYSTEM_SETTINGS_MANAGE")');
+    expect(FISCAL_SRC).toContain("disabled={saving || !canWrite}");
+    expect(FISCAL_SRC).toContain("settings.fiscalWriteReservedGuidance");
+    expect(FISCAL_SRC).not.toContain("isAdmin");
+  });
+
+  it("gates backup creation by SYSTEM_SETTINGS_MANAGE with a disabled button, no hide", () => {
+    expect(BACKUP_SRC).toContain('hasPermission("SYSTEM_SETTINGS_MANAGE")');
+    expect(BACKUP_SRC).toContain("settings.backupCreateReservedGuidance");
+    expect(BACKUP_SRC).toContain("disabled");
+    expect(BACKUP_SRC).not.toContain("isAdmin");
+    expect(BACKUP_SRC).toContain("settings.backupRestricted");
+  });
+
+  it("declares all five guidance keys in both locales", () => {
+    for (const key of [
+      "settings.identityWriteReservedGuidance",
+      "settings.catalogManageReservedGuidance",
+      "settings.printerManageReservedGuidance",
+      "settings.fiscalWriteReservedGuidance",
+      "settings.backupCreateReservedGuidance",
+    ]) {
+      expect(I18N_SRC).toContain(`"${key}"`);
+    }
+    expect(I18N_SRC).toContain('"settings.fiscalWriteReservedGuidance": "Réservé — Gestion système."');
+    expect(I18N_SRC).toContain('"settings.backupCreateReservedGuidance": "مقيّد — إدارة النظام."');
   });
 });

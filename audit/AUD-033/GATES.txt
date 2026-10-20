@@ -1,0 +1,21 @@
+TASK-AUD-033 — GATE STATUS (read-only audit; gates NOT RUN in this task)
+
+Per SCOPE-OUT, cargo test/clippy, vitest, and npm build are FORBIDDEN in
+TASK-AUD-033. No gate was executed here. Last-known results, all captured
+in-session on 2026-10-20 during TASK-DSN-077-C1 verification (no persisted
+report file exists; source is the session tool-output transcript):
+
+- G1 (cargo fmt --check): PASS, exit 0, no output.
+- G2 (cargo clippy --all-targets --all-features -- -D warnings): PASS,
+  "Finished dev profile in 1.21s", 0 warnings.
+- G3 (cargo test --workspace -j 2): PASS, exit 0,
+  TOTAL passed=469 failed=0 ignored=0 (aggregated over ^test result lines).
+- G4 (npm run lint): PASS, eslint clean, exit 0 (re-verified post-fix).
+- G5 (npm run typecheck): PASS, tsc --noEmit clean, exit 0 (re-verified).
+- G6 (npm run build): PASS, "built in 5.41s",
+  index-D5MUam6j.js 739.05 kB / gzip 190.15 kB.
+- G7 (npx vitest run, FULL suite): PASS,
+  Test Files 72 passed (72) / Tests 701 passed (701),
+  confirmed across two consecutive full runs after a Law-of-Regression fix
+  (stale `session.role === "ADMIN"` pin in stock-module.test.ts updated to
+  the specified MANAGE_WAREHOUSES disabled-with-guidance behavior).

@@ -1,0 +1,31 @@
+{
+  "failed": 0,
+  "total": 5,
+  "results": [
+    {
+      "name": "documents-1280x800-fr-light.png: layout assertions",
+      "ok": true,
+      "detail": "viewport=1280x800 dpr=1 rows=6 noPageScroll=true tabular=true"
+    },
+    {
+      "name": "documents-1280x800-ar-dark.png: layout assertions",
+      "ok": true,
+      "detail": "viewport=1280x800 dpr=1 rows=6 noPageScroll=true tabular=true"
+    },
+    {
+      "name": "documents-1024x600-fr-light.png: layout assertions",
+      "ok": true,
+      "detail": "viewport=1024x600 dpr=1 rows=6 noPageScroll=true tabular=true"
+    },
+    {
+      "name": "documents-1024x600-ar-dark.png: layout assertions",
+      "ok": true,
+      "detail": "viewport=1024x600 dpr=1 rows=6 noPageScroll=true tabular=true"
+    },
+    {
+      "name": "zero console errors across captures",
+      "ok": true,
+      "detail": "0 console errors, 0 unmocked IPC (all stubbed commands responded)"
+    }
+  ]
+}

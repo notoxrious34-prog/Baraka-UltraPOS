@@ -1,0 +1,44 @@
+### isAdminRole|isManagerRole (src, excl. tests)
+src/components/pos/modals/WarehouseTransferModal.tsx:17:  isAdminRole,
+src/components/pos/modals/WarehouseTransferModal.tsx:18:  isManagerRole,
+src/components/pos/modals/WarehouseTransferModal.tsx:292:  const manager = isManagerRole(role);
+src/components/pos/modals/WarehouseTransferModal.tsx:293:  const admin = isAdminRole(role);
+src/features/documents/DocumentsModule.tsx:19:/** Same manager rule as App.tsx isManagerRole (ADMIN or GERANT). */
+src/features/documents/DocumentsModule.tsx:20:function isManagerRole(role: string): boolean {
+src/features/documents/DocumentsModule.tsx:39:  const authorized = session !== null && isManagerRole(session.role);
+src/stores/warehouse-transfer-store.ts:63:export function isAdminRole(role: string): boolean {
+src/stores/warehouse-transfer-store.ts:67:export function isManagerRole(role: string): boolean {
+
+### warehouse-transfer-store importers
+src/components/common/safe-delete-modal.test.ts
+src/components/pos/modals/warehouse-transfer-modal.test.ts
+src/components/pos/modals/WarehouseTransferModal.tsx
+src/components/pos/OperationsMenu.tsx
+src/features/stock/StockModule.tsx
+
+### App.tsx documents/settings gates
+95:  const canAccessDocuments = hasPermission("CREATE_SALE");
+97:  const canAccessReports = hasPermission("REPORTS_VIEW") || hasPermission("CASH_REPORT_VIEW");
+98:  const canAccessSettings =
+130:      {canAccessDocuments && entry("documents", t(locale, "nav.documents"))}
+132:      {canAccessReports && entry("reports", t(locale, "nav.reports"))}
+133:      {canAccessSettings && entry("settings", t(locale, "nav.settings"))}
+211:  const canAccessDocuments = hasPermission("CREATE_SALE");
+213:  const canAccessReports = hasPermission("REPORTS_VIEW") || hasPermission("CASH_REPORT_VIEW");
+214:  const canAccessSettings =
+250:              canAccessDocuments ? (
+262:              canAccessReports ? (
+274:              canAccessSettings ? (
+
+### documents_search auth
+1307:    pub fn execute(
+1308-        &self,
+1309-        session: &SessionContext,
+1310-        filter: DocumentSearchFilter,
+1311-    ) -> Result<Vec<DocumentSummary>, ApplicationError> {
+1312-        if !session.role.has_permission(Permission::CreateSale)
+1313-            && !session.role.has_permission(Permission::ReportsView)
+200:        if !session.role.has_permission(Permission::CreateSale) {
+502:        if !session.role.has_permission(Permission::CreateSale) {
+707:        if !session.role.has_permission(Permission::CreateSale) {
+890:        if !session.role.has_permission(Permission::CreateSale) {

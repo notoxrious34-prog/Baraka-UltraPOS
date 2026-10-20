@@ -1,7 +1,9 @@
 /**
- * Documents & Billing module root (TASK-DSN-028): filter bar, dense table,
- * and detail side pane bound to searchDocuments. Manager-only with
- * defense-in-depth role gating (same rule as App.tsx). Queries are
+ * Documents & Billing module root (TASK-DSN-028, realigned TASK-DSN-078):
+ * filter bar, dense table, and detail side pane bound to searchDocuments.
+ * View access follows CREATE_SALE — the exact shell rule (App.tsx
+ * canAccessDocuments) — so every role the nav admits reaches the journal;
+ * the engine (sales.rs:1312-1313) remains the final authority. Queries are
  * debounced client-side (250ms); type/status narrow server-side via
  * the searchDocuments wire params.
  */
@@ -16,16 +18,12 @@ import { DocumentTable } from "@/features/documents/DocumentTable";
 import { DocumentDetailDrawer } from "@/features/documents/DocumentDetailDrawer";
 import type { DocumentStatusFilter, DocumentTypeFilter } from "@/features/documents/document-helpers";
 
-/** Same manager rule as App.tsx isManagerRole (ADMIN or GERANT). */
-function isManagerRole(role: string): boolean {
-  return role === "GERANT" || role === "ADMIN";
-}
-
 const SEARCH_LIMIT = 100;
 
 export function DocumentsModule(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const session = useSessionStore((state) => state.session);
+  const hasPermission = useSessionStore((state) => state.hasPermission);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [docType, setDocType] = useState<DocumentTypeFilter>("ALL");
@@ -36,7 +34,10 @@ export function DocumentsModule(): ReactElement {
   const [listError, setListError] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
-  const authorized = session !== null && isManagerRole(session.role);
+  // Permission gate (TASK-DSN-078): view access follows CREATE_SALE — the
+  // exact shell rule (App.tsx canAccessDocuments). Rust use cases remain
+  // the final authority (sales.rs:1312-1313).
+  const authorized = session !== null && hasPermission("CREATE_SALE");
   const token = authorized && session !== null ? session.token : null;
 
   useEffect(() => {

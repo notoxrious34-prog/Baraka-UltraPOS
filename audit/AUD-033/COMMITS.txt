@@ -1,0 +1,30 @@
+0104e4b feat(permissions): align Customers/Stock/Catalog root gates to granular hasPermission and gate sensitive actions with bilingual guidance (TASK-DSN-077)
+5dd891f feat(pos,catalog): resolve inactive leak, catalog metrics, table overflow, and quick-products customization (TASK-BRK-074, TASK-DSN-075, TASK-DSN-076)
+15a1270 docs: record opening CTP-SESSION-ARC-023 and compile BOOT-SESSION-ARC-023
+cf9d39c docs: record CTP-SESSION-ARC-022
+e615e76 feat(auth,ui): granular permission gating, tokenized users module, session reactivity, and customers UX
+f374165 feat(tooling): upgrade boot generator to bundle 3-session historical CTPs [TASK-REL-003]
+c5e8ea9 docs(architecture): generate CTP and BOOT package for session 022 [TASK-REL-002]
+5f2bc3a docs(audit): retrieve and consolidate CTP history ARC-017 through ARC-021 [TASK-AUD-026]
+7541248 docs(architecture): generate CTP and BOOT package for session 022 [TASK-REL-002]
+3d955cb docs(architecture): save context transfer package for session 021 [TASK-DSN-069-C1]
+5c11a2e feat(pos): implement configurable quick-products palette with Alt+1..8 shortcuts [TASK-DSN-069]
+359fdd0 docs(audit): exploratory pre-verification of quick-product palette and catalog kpi ribbon [TASK-AUD-025]
+5f8fb86 fix(contrast): remediate final 5 Family-2 dark-mode contrast targets [TASK-DSN-068]
+1b56684 feat(search): complete universal instant search on transfer, purchase, and return pickers [TASK-DSN-067]
+586042d docs(audit): inventory of secondary search inputs and AUD-023 contrast targets [TASK-AUD-024]
+ea9712f fix(theme): eliminate pos topbar dark-mode desync with persistent global store [TASK-DSN-065]
+897198d fix(stock): resolve row adjustment submission blocker and enable instant search [TASK-DSN-064]
+145dcef docs(audit): theme architecture, toggle desync, and AUD-015 defect status [TASK-AUD-023]
+93b0d09 fix(dark-mode): migrate Tier-1 Batch 1 contrast defects — CatalogModule, SettingsModule, StockModule [TASK-DSN-063]
+99ce5b6 docs(architecture): rewrite BOOT-SESSION-ARC-021 as fully self-contained constitution-compliant boot package [TASK-CTP-065]
+ad5d50e docs(architecture): persist CTP-SESSION-ARC-021 and boot package [TASK-CTP-064]
+16c3084 docs(architecture): persist CTP-SESSION-ARC-020 and boot package [TASK-REL-062]
+6b06f93 feat(ui): dark-mode semantic design tokens, ink-muted refinement, and empty-state remediation for suppliers and customers [TASK-DSN-055/ADR-094, TASK-DSN-056/ADR-095, TASK-DSN-054-C2, TASK-AUD-058]
+37b4191 feat(engine): suppliers_list read capability mirroring customers_list [TASK-BRK-057]
+ecc1b4d docs(architecture): persist CTP-SESSION-ARC-019, generate boot package, record ADR-093 [TASK-REL-061-C1]
+0812169 feat(ui): settings command center consolidation and catalog purification [TASK-DSN-053]
+a7f538c docs(release): publish v1.0.0-rc.10 offline handbook and release notes [TASK-REL-060]
+591dc0d feat(catalog): starter pack lifecycle with dynamic detection and safe dual-track uninstall [TASK-DSN-052]
+e81d80c feat(ui): safe deletion modals across entities and configurable fiscal stamp toggle [TASK-DSN-051]
+a9e66bc feat(engine): dual-track safe deletion, warehouse update, and configurable fiscal stamp [TASK-BRK-074]

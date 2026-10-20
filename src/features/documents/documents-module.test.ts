@@ -142,3 +142,27 @@ describe("document helpers", async () => {
     expect(statusBadges.size).toBe(4);
   });
 });
+
+describe("module root gate (TASK-DSN-078)", () => {
+  // NOTE: the module root subscribes to the zustand session store, whose
+  // seeded state is invisible to renderToStaticMarkup (SSR server snapshot).
+  // Per repo convention, container wiring is pinned via source-text
+  // assertions (see catalog-hub.test.tsx header, DSN-077).
+  it("authorizes the root view via CREATE_SALE, not a manager role check", () => {
+    expect(MODULE_SRC).toContain('hasPermission("CREATE_SALE")');
+    expect(MODULE_SRC).toContain("useSessionStore((state) => state.hasPermission)");
+    expect(MODULE_SRC).not.toContain("isManagerRole");
+    expect(MODULE_SRC).not.toContain("session.role");
+  });
+
+  it("renders the access-denied fallback when unauthorized, never blank", () => {
+    expect(MODULE_SRC).toContain("if (!authorized || token === null)");
+    expect(MODULE_SRC).toContain('translateBackendError("UNAUTHORIZED"');
+  });
+
+  it("keeps the journal surface (filter bar, table, drawer) past the gate", () => {
+    expect(MODULE_SRC).toContain("<DocumentFilterBar");
+    expect(MODULE_SRC).toContain("<DocumentTable");
+    expect(MODULE_SRC).toContain("<DocumentDetailDrawer");
+  });
+});

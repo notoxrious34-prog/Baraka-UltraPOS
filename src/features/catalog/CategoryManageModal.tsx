@@ -11,6 +11,7 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
+import { useSessionStore } from "@/stores/session-store";
 import {
   ipcCreateCategory,
   ipcListCategories,
@@ -64,6 +65,13 @@ export function CategoryManagePanel({
   onChanged,
 }: CategoryManagePanelProps): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
+  const hasPermission = useSessionStore((state) => state.hasPermission);
+  // Category writes (create/update/toggle/seed) require StockAdjustment
+  // (Gerant) or SystemSettingsManage (Admin) server-side (catalog.rs
+  // MANAGE_PERMISSIONS); unauthorized controls render disabled with
+  // bilingual guidance and no IPC is attempted.
+  const canManage =
+    hasPermission("STOCK_ADJUSTMENT") || hasPermission("SYSTEM_SETTINGS_MANAGE");
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -134,7 +142,7 @@ export function CategoryManagePanel({
   };
 
   const submit = (): void => {
-    if (busy) {
+    if (busy || !canManage) {
       return;
     }
     // The backend keeps codes immutable: edits carry names + flag only.
@@ -192,7 +200,7 @@ export function CategoryManagePanel({
   };
 
   const toggleActive = (category: Category): void => {
-    if (busy || seeding) {
+    if (busy || seeding || !canManage) {
       return;
     }
     setBusy(true);
@@ -216,7 +224,7 @@ export function CategoryManagePanel({
   };
 
   const seedStarter = (): void => {
-    if (seeding || busy) {
+    if (seeding || busy || !canManage) {
       return;
     }
     setSeeding(true);
@@ -271,7 +279,8 @@ export function CategoryManagePanel({
             <button
               type="button"
               onClick={seedStarter}
-              disabled={seeding || busy}
+              disabled={seeding || busy || !canManage}
+              title={canManage ? undefined : t(locale, "settings.catalogManageReservedGuidance")}
               className="mt-2 h-10 rounded-lg bg-accent-500 px-4 text-sm font-black text-slate-950 hover:bg-amber-400 disabled:opacity-50"
             >
               {seeding ? t(locale, "cat.seeding") : t(locale, "cat.installStarter")}
@@ -346,7 +355,8 @@ export function CategoryManagePanel({
             <button
               type="button"
               onClick={submit}
-              disabled={busy}
+              disabled={busy || !canManage}
+              title={canManage ? undefined : t(locale, "settings.catalogManageReservedGuidance")}
               className="h-10 flex-1 rounded-lg bg-primary-600 text-sm font-black text-white hover:bg-primary-900 disabled:opacity-50"
             >
               {busy ? t(locale, "cat.saving") : t(locale, "cat.save")}
@@ -389,7 +399,8 @@ export function CategoryManagePanel({
                       <td className="px-3 py-1.5">
                         <button
                           type="button"
-                          disabled={busy || seeding}
+                          disabled={busy || seeding || !canManage}
+                          title={canManage ? undefined : t(locale, "settings.catalogManageReservedGuidance")}
                           onClick={() => {
                             toggleActive(category);
                           }}
@@ -406,7 +417,8 @@ export function CategoryManagePanel({
                       <td className="px-3 py-1.5">
                         <button
                           type="button"
-                          disabled={busy || seeding}
+                          disabled={busy || seeding || !canManage}
+                          title={canManage ? undefined : t(locale, "settings.catalogManageReservedGuidance")}
                           onClick={() => {
                             startEdit(category);
                           }}

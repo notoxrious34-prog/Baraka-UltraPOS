@@ -8,6 +8,7 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import { t } from "@/lib/i18n";
+import { useSessionStore } from "@/stores/session-store";
 import type { Locale } from "@/types/pos";
 import {
   ipcGetPrinterSettings,
@@ -23,6 +24,9 @@ interface PrinterSettingsTabProps {
 }
 
 export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabProps): ReactElement {
+  const hasPermission = useSessionStore((state) => state.hasPermission);
+  const canSaveSettings = hasPermission("MANAGE_PRINTER_SETTINGS");
+  const canTestPrint = hasPermission("SYSTEM_SETTINGS_MANAGE");
   const [serialPort, setSerialPort] = useState("");
   const [serialBaud, setSerialBaud] = useState<number>(9600);
   const [paperWidthMm, setPaperWidthMm] = useState<number>(80);
@@ -54,7 +58,7 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   }, [sessionToken]);
 
   async function handleSave(): Promise<void> {
-    if (loading || saving) {
+    if (loading || saving || !canSaveSettings) {
       return;
     }
     setSaving(true);
@@ -78,6 +82,9 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   }
 
   async function handleTestPrint(language: TestPrintLanguage): Promise<void> {
+    if (!canTestPrint) {
+      return;
+    }
     setTesting(language);
     setNotice(null);
     try {
@@ -152,7 +159,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           onClick={() => {
             void handleSave();
           }}
-          disabled={saving}
+          disabled={saving || !canSaveSettings}
+          title={canSaveSettings ? undefined : t(locale, "settings.printerManageReservedGuidance")}
           className="rounded bg-accent-500 px-3 py-1.5 text-sm font-bold text-slate-950 disabled:opacity-50"
         >
           {saving ? t(locale, "settings.saving") : t(locale, "settings.save")}
@@ -165,7 +173,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={testing !== null}
+            disabled={testing !== null || !canTestPrint}
+            title={canTestPrint ? undefined : t(locale, "settings.printerManageReservedGuidance")}
             onClick={() => {
               void handleTestPrint("fr");
             }}
@@ -175,7 +184,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           </button>
           <button
             type="button"
-            disabled={testing !== null}
+            disabled={testing !== null || !canTestPrint}
+            title={canTestPrint ? undefined : t(locale, "settings.printerManageReservedGuidance")}
             onClick={() => {
               void handleTestPrint("ar");
             }}

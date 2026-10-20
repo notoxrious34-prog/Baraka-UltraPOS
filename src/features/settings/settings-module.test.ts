@@ -267,3 +267,22 @@ describe("settings write gating with guidance (TASK-DSN-079)", () => {
     expect(I18N_SRC).toContain('"settings.backupCreateReservedGuidance": "مقيّد — إدارة النظام."');
   });
 });
+
+describe("residual write gates (TASK-DSN-081)", () => {
+  it("gates identity save by SYSTEM_SETTINGS_MANAGE with guidance", () => {
+    expect(IDENTITY_SRC).toContain('hasPermission("SYSTEM_SETTINGS_MANAGE")');
+    expect(IDENTITY_SRC).toContain("settings.identityWriteReservedGuidance");
+    expect(IDENTITY_SRC).toContain("!canWrite");
+    expect(IDENTITY_SRC).toContain("await saveStoreIdentity(identity, deviceKind)");
+  });
+
+  it("gates printer save by MANAGE_PRINTER_SETTINGS and test-print by SYSTEM_SETTINGS_MANAGE", () => {
+    expect(PRINTER_SRC).toContain('hasPermission("MANAGE_PRINTER_SETTINGS")');
+    expect(PRINTER_SRC).toContain('hasPermission("SYSTEM_SETTINGS_MANAGE")');
+    expect(PRINTER_SRC).toContain("settings.printerManageReservedGuidance");
+    expect(PRINTER_SRC).toContain("!canSaveSettings");
+    expect(PRINTER_SRC).toContain("!canTestPrint");
+    expect(PRINTER_SRC).toContain("ipcUpdatePrinterSettings(");
+    expect(PRINTER_SRC).toContain('handleTestPrint("fr")');
+  });
+});

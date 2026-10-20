@@ -1,0 +1,14 @@
+===SWEEP-1 role-string patterns, production (excl tests) @e625bc1===
+(no output above = CLEAN)
+
+===SWEEP-2 same patterns incl tests===
+src/features/settings/fiscal-settings-tab.test.ts:39:    expect(TAB_SRC).not.toContain("isAdmin");
+src/features/settings/settings-module.test.ts:79:    expect(MODULE_SRC).not.toContain('session?.role === "ADMIN"');
+src/features/settings/settings-module.test.ts:80:    expect(MODULE_SRC).not.toContain("session.role");
+src/features/settings/settings-module.test.ts:241:  it("gates the fiscal switch by SYSTEM_SETTINGS_MANAGE with guidance, no isAdmin prop", () => {
+src/features/settings/settings-module.test.ts:245:    expect(FISCAL_SRC).not.toContain("isAdmin");
+src/features/settings/settings-module.test.ts:252:    expect(BACKUP_SRC).not.toContain("isAdmin");
+(pins only)
+
+===SWEEP-3 uppercase role literals in production===
+(no output above = CLEAN)

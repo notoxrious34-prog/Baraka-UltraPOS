@@ -6,6 +6,7 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import { t, type I18nKey } from "@/lib/i18n";
+import { useSessionStore } from "@/stores/session-store";
 import type { Locale } from "@/types/pos";
 import {
   getStoreIdentity,
@@ -31,6 +32,8 @@ const EMPTY: StoreIdentity = {
 };
 
 export function StoreIdentityTab({ locale }: StoreIdentityTabProps): ReactElement {
+  const hasPermission = useSessionStore((state) => state.hasPermission);
+  const canWrite = hasPermission("SYSTEM_SETTINGS_MANAGE");
   const [identity, setIdentity] = useState<StoreIdentity>(EMPTY);
   const [deviceKind, setDeviceKind] = useState<DeviceKind>("physical");
   const [loading, setLoading] = useState(true);
@@ -69,10 +72,10 @@ export function StoreIdentityTab({ locale }: StoreIdentityTabProps): ReactElemen
     validateFiscalField(identity.nif) &&
     validateFiscalField(identity.nis) &&
     validateFiscalField(identity.ai);
-  const canSave = !loading && !saving && nameOk && phoneOk && fiscalOk;
+  const canSave = !loading && !saving && nameOk && phoneOk && fiscalOk && canWrite;
 
   async function handleSave(): Promise<void> {
-    if (!canSave) {
+    if (!canSave || !canWrite) {
       return;
     }
     setSaving(true);
@@ -210,6 +213,7 @@ export function StoreIdentityTab({ locale }: StoreIdentityTabProps): ReactElemen
             void handleSave();
           }}
           disabled={!canSave}
+          title={canWrite ? undefined : t(locale, "settings.identityWriteReservedGuidance")}
           className="rounded bg-accent-500 px-3 py-1.5 text-sm font-bold text-slate-950 disabled:opacity-50"
         >
           {saving ? t(locale, "settings.saving") : t(locale, "settings.save")}

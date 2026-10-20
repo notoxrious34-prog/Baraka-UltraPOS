@@ -1,0 +1,31 @@
+{
+  "failed": 0,
+  "total": 5,
+  "results": [
+    {
+      "name": "C1 identity save disabled with FR guidance (fr/light LIMITED)",
+      "ok": true,
+      "detail": "disabled=true title=\"Réservé — Gestion système.\" 1280x800 dpr=1 noPageScroll=true"
+    },
+    {
+      "name": "C2 printer save disabled with AR guidance (ar/dark LIMITED)",
+      "ok": true,
+      "detail": "disabled=true title=\"مقيّد — إدارة النظام.\" 1280x800 noPageScroll=true"
+    },
+    {
+      "name": "C3 category submit enabled without guidance (fr/light ADMIN)",
+      "ok": true,
+      "detail": "enabled title=null 1280x800 noPageScroll=true"
+    },
+    {
+      "name": "C4 nav badges ar/dark 1024 (LIMITED)",
+      "ok": true,
+      "detail": "tabs=8 badges=4 1024x600 dpr=1 noPageScroll=true"
+    },
+    {
+      "name": "zero console errors across captures",
+      "ok": true,
+      "detail": "0 console errors, all stubbed commands responded"
+    }
+  ]
+}

@@ -795,3 +795,20 @@ describe("catalog root gate and action gating (TASK-DSN-077)", () => {
     );
   });
 });
+
+describe("category manage panel gates (TASK-DSN-081)", () => {
+  const PANEL_SRC: string = readFileSync(
+    join(process.cwd(), "src", "features", "catalog", "CategoryManageModal.tsx"),
+    "utf8",
+  );
+
+  it("gates create/update/toggle/seed by STOCK_ADJUSTMENT or SYSTEM_SETTINGS_MANAGE", () => {
+    expect(PANEL_SRC).toContain('hasPermission("STOCK_ADJUSTMENT")');
+    expect(PANEL_SRC).toContain('hasPermission("SYSTEM_SETTINGS_MANAGE")');
+    expect(PANEL_SRC).toContain("!canManage");
+    expect(PANEL_SRC).toContain("settings.catalogManageReservedGuidance");
+    expect(PANEL_SRC).toContain("ipcCreateCategory(");
+    expect(PANEL_SRC).toContain("ipcUpdateCategory(");
+    expect(PANEL_SRC).toContain("ipcSeedStarterCategories(");
+  });
+});

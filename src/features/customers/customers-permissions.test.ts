@@ -291,3 +291,31 @@ describe("customers action wiring (source pins)", () => {
     expect(FORM_SRC).toContain('dir="ltr"');
   });
 });
+
+describe("module root gate (TASK-DSN-077)", () => {
+  const MODULE_SRC: string = readFileSync(
+    join(ROOT, "src", "features", "customers", "CustomersModule.tsx"),
+    "utf8",
+  );
+
+  it("authorizes the root view via VIEW_CUSTOMERS, not a manager role check", () => {
+    expect(MODULE_SRC).toContain('hasPermission("VIEW_CUSTOMERS")');
+    expect(MODULE_SRC).not.toContain("isManagerRole");
+  });
+
+  // NOTE: module roots subscribe to the zustand session store, whose
+  // seeded state is invisible to renderToStaticMarkup (SSR server
+  // snapshot). Per repo convention (catalog-hub.test.tsx header),
+  // container wiring is pinned via source-text assertions; store-driven
+  // rendering is covered by the prop-level view tests below and in DSN-073.
+  it("keeps the UNAUTHORIZED fallback for sessions without VIEW_CUSTOMERS", () => {
+    expect(MODULE_SRC).toContain('translateBackendError("UNAUTHORIZED"');
+    expect(MODULE_SRC).toContain("if (!authorized || token === null)");
+  });
+
+  it("still renders the directory chrome (title + panes) past the gate", () => {
+    expect(MODULE_SRC).toContain('"customers.title"');
+    expect(MODULE_SRC).toContain("<CustomerListPane");
+    expect(MODULE_SRC).toContain("<CustomerDossierPane");
+  });
+});

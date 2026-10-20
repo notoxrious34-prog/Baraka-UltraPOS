@@ -30,6 +30,8 @@ interface StockOverviewPaneProps {
   warehouseCount: number;
   rows: LowStockRow[];
   loading: boolean;
+  /** ADJUST_STOCK grant; row buttons render disabled with guidance when false. */
+  canAdjust: boolean;
   onAdjust: (row: LowStockRow) => void;
 }
 
@@ -134,10 +136,12 @@ export function StockOverviewPane(props: StockOverviewPaneProps): ReactElement {
                   <td className="whitespace-nowrap px-2 py-2 text-end">
                     <button
                       type="button"
+                      disabled={!props.canAdjust}
+                      title={props.canAdjust ? undefined : t(locale, "stock.adjustReservedGuidance")}
                       onClick={() => {
                         props.onAdjust(row);
                       }}
-                      className="rounded-md bg-primary-900 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-primary-800 dark:bg-primary-700"
+                      className="rounded-md bg-primary-900 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-primary-700"
                     >
                       {t(locale, "stock.colAdjust")}
                     </button>

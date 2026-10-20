@@ -366,6 +366,7 @@ describe("CatalogHubView markup", () => {
         onDelete={noopEdit}
         onToggleActive={noopEdit}
         togglingId={null}
+        canManage={true}
         filter="all"
         kpis={testKpis}
         sort={null}
@@ -407,6 +408,7 @@ describe("CatalogHubView markup", () => {
         onDelete={noopEdit}
         onToggleActive={noopEdit}
         togglingId={null}
+        canManage={true}
         filter="all"
         kpis={testKpis}
         sort={null}
@@ -433,6 +435,7 @@ describe("CatalogHubView markup", () => {
         onDelete={noopEdit}
         onToggleActive={noopEdit}
         togglingId={null}
+        canManage={true}
         filter="all"
         kpis={testKpis}
         sort={null}
@@ -463,6 +466,7 @@ describe("CatalogHubView markup", () => {
         onDelete={noopEdit}
         onToggleActive={noopEdit}
         togglingId={null}
+        canManage={true}
         filter="all"
         kpis={testKpis}
         sort={null}
@@ -673,6 +677,7 @@ describe("KPI strip and export markup", () => {
         error={null}
         query=""
         togglingId={null}
+        canManage={true}
         filter={extra.filter ?? "all"}
         kpis={{ total: 3, inStock: 1, outOfStock: 1, inactive: 1 }}
         sort={extra.sort ?? null}
@@ -717,5 +722,76 @@ describe("KPI strip and export markup", () => {
     expect(t("ar-DZ", "cat.kpiInStock")).toBe("متوفر في المخزون");
     expect(t("fr-DZ", "cat.exportCsv")).toBe("Exporter CSV");
     expect(t("ar-DZ", "cat.exportCsv")).toBe("تصدير CSV");
+  });
+});
+
+describe("catalog root gate and action gating (TASK-DSN-077)", () => {
+  const MODULE_SRC: string = readFileSync(
+    join(process.cwd(), "src", "features", "catalog", "CatalogModule.tsx"),
+    "utf8",
+  );
+
+  const noopLocal = (): void => undefined;
+
+  const viewAs = (canManage: boolean) =>
+    renderToStaticMarkup(
+      <CatalogHubView
+        locale="fr-DZ"
+        products={[product({})]}
+        stockLevels={{ "p-1": "150000" }}
+        loading={false}
+        error={null}
+        query=""
+        togglingId={null}
+        canManage={canManage}
+        filter="all"
+        kpis={{ total: 1, inStock: 1, outOfStock: 0, inactive: 0 }}
+        sort={null}
+        onQuery={noopLocal}
+        onClear={noopLocal}
+        onRefresh={noopLocal}
+        onNew={noopLocal}
+        onPrintLabel={noopLocal}
+        onEdit={noopLocal}
+        onDelete={noopLocal}
+        onToggleActive={noopLocal}
+        onFilter={noopLocal}
+        onSort={noopLocal}
+      />,
+    );
+
+  it("authorizes the root view via POS_SELL, not a manager role check", () => {
+    expect(MODULE_SRC).toContain('hasPermission("POS_SELL")');
+    expect(MODULE_SRC).not.toContain("isManagerRole");
+  });
+
+  it("derives management rights from STOCK_ADJUSTMENT or SYSTEM_SETTINGS_MANAGE", () => {
+    expect(MODULE_SRC).toContain('hasPermission("STOCK_ADJUSTMENT")');
+    expect(MODULE_SRC).toContain('hasPermission("SYSTEM_SETTINGS_MANAGE")');
+    expect(MODULE_SRC).toContain("canManage={canManageCatalog}");
+  });
+
+  it("disables new/edit/delete/toggle with guidance when unauthorized, print stays enabled", () => {
+    const html = viewAs(false);
+    expect(html.split('disabled=""').length - 1).toBe(4);
+    expect(html).toContain(
+      "La gestion et la modification des produits sont réservées aux gérants et administrateurs.",
+    );
+    expect(html).not.toContain("Non autorisé pour votre rôle");
+  });
+
+  it("enables new/edit/delete/toggle when authorized", () => {
+    const html = viewAs(true);
+    expect(html.split('disabled=""').length - 1).toBe(0);
+    expect(html).not.toContain("gestion et la modification des produits");
+  });
+
+  it("declares the guidance string in both locales", () => {
+    expect(t("fr-DZ", "cat.manageReservedGuidance")).toBe(
+      "La gestion et la modification des produits sont réservées aux gérants et administrateurs.",
+    );
+    expect(t("ar-DZ", "cat.manageReservedGuidance")).toBe(
+      "إدارة وتعديل المنتجات مخصصة للمديرين والمسؤولين فقط.",
+    );
   });
 });

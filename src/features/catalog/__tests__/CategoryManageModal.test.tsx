@@ -227,6 +227,7 @@ describe("CatalogHubView category column", () => {
         onDelete={noopEdit}
         onToggleActive={noopEdit}
         togglingId={null}
+        canManage={true}
         filter="all"
         kpis={{ total: 2, inStock: 0, outOfStock: 0, inactive: 0 }}
         sort={null}

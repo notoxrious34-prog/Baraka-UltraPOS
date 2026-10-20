@@ -1,8 +1,10 @@
 /**
- * Stock & Warehouses module root (TASK-DSN-029): warehouse selector,
- * alerts/history tabs, action bar, and warehouse creation. Manager-only
- * with defense-in-depth role gating; warehouse creation additionally
- * requires ADMIN (backend ManageWarehouses). Existing StockAdjustModal /
+ * Stock & Warehouses module root (TASK-DSN-029, realigned TASK-DSN-077):
+ * warehouse selector, alerts/history tabs, action bar, and warehouse
+ * creation. View access follows the VIEW_STOCK permission; mutating
+ * actions render disabled with guidance unless the operator holds
+ * ADJUST_STOCK / TRANSFER_STOCK / MANAGE_WAREHOUSES (Rust use cases
+ * remain the final authority). Existing StockAdjustModal /
  * WarehouseTransferModal are driven through their sovereign stores and
  * mounted here exactly like PosShell (views are exclusive — no
  * double-mount). Refreshes lists when those modals close.
@@ -31,16 +33,12 @@ import type { MovementGroup } from "@/features/stock/stock-helpers";
 
 type StockTab = "alerts" | "history";
 
-/** Same manager rule as App.tsx isManagerRole (ADMIN or GERANT). */
-function isManagerRole(role: string): boolean {
-  return role === "GERANT" || role === "ADMIN";
-}
-
 export function StockModule(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const activeModal = usePosUiStore((state) => state.activeModal);
   const openPosModal = usePosUiStore((state) => state.openModal);
   const session = useSessionStore((state) => state.session);
+  const hasPermission = useSessionStore((state) => state.hasPermission);
   const openAdjustStore = useStockAdjustModalStore((state) => state.openModal);
   const openTransferStore = useWarehouseTransferStore((state) => state.openModal);
 
@@ -55,9 +53,11 @@ export function StockModule(): ReactElement {
   const [createOpen, setCreateOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
-  const authorized = session !== null && isManagerRole(session.role);
+  const authorized = session !== null && hasPermission("VIEW_STOCK");
   const token = authorized && session !== null ? session.token : null;
-  const isAdmin = session !== null && session.role === "ADMIN";
+  const canAdjust = session !== null && hasPermission("ADJUST_STOCK");
+  const canTransfer = session !== null && hasPermission("TRANSFER_STOCK");
+  const canManageWarehouses = session !== null && hasPermission("MANAGE_WAREHOUSES");
 
   useEffect(() => {
     if (token === null) {
@@ -195,31 +195,35 @@ export function StockModule(): ReactElement {
         <div className="ms-auto flex flex-wrap gap-1">
           <button
             type="button"
+            disabled={!canAdjust}
+            title={canAdjust ? undefined : t(locale, "stock.adjustReservedGuidance")}
             onClick={() => {
               openAdjust();
             }}
-            className="h-10 rounded-lg bg-slate-200 px-3 text-xs font-bold dark:bg-slate-700"
+            className="h-10 rounded-lg bg-slate-200 px-3 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-700"
           >
             {t(locale, "stock.adjust")}
           </button>
           <button
             type="button"
+            disabled={!canTransfer}
+            title={canTransfer ? undefined : t(locale, "stock.transferReservedGuidance")}
             onClick={openTransfer}
-            className="h-10 rounded-lg bg-slate-200 px-3 text-xs font-bold dark:bg-slate-700"
+            className="h-10 rounded-lg bg-slate-200 px-3 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-700"
           >
             {t(locale, "stock.transfer")}
           </button>
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => {
-                setCreateOpen(true);
-              }}
-              className="h-10 rounded-lg bg-accent-500 px-3 text-xs font-black text-slate-950"
-            >
-              {t(locale, "stock.newWarehouse")}
-            </button>
-          )}
+          <button
+            type="button"
+            disabled={!canManageWarehouses}
+            title={canManageWarehouses ? undefined : t(locale, "stock.warehouseCreateReservedGuidance")}
+            onClick={() => {
+              setCreateOpen(true);
+            }}
+            className="h-10 rounded-lg bg-accent-500 px-3 text-xs font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t(locale, "stock.newWarehouse")}
+          </button>
         </div>
       </div>
       {listError !== null && (
@@ -233,6 +237,7 @@ export function StockModule(): ReactElement {
           warehouseCount={warehouses.length}
           rows={lowRows}
           loading={loading}
+          canAdjust={canAdjust}
           onAdjust={openAdjust}
         />
       ) : (

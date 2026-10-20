@@ -243,11 +243,6 @@ export function nextSort(current: CatalogSort | null, field: SortField): Catalog
   return { field, direction: "asc" };
 }
 
-/** Same manager rule as App.tsx isManagerRole (ADMIN or GERANT). */
-function isManagerRole(role: string): boolean {
-  return role === "GERANT" || role === "ADMIN";
-}
-
 const SEARCH_LIMIT = 500;
 const SEARCH_DEBOUNCE_MS = 150;
 
@@ -263,6 +258,8 @@ export interface CatalogHubViewProps {
   kpis: CatalogKpis;
   /** Real database product total (absent/null = fall back to loaded-row count). */
   totalCount?: number | null;
+  /** Catalog management grant; mutating actions render disabled with guidance when false. */
+  canManage: boolean;
   sort: CatalogSort | null;
   onQuery: (value: string) => void;
   onClear: () => void;
@@ -324,7 +321,7 @@ function stockCell(
 
 /** Pure presentational hub (SSR-safe for tests; the container owns IPC). */
 export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
-  const { locale, products, stockLevels, loading, error, query, filter, kpis, totalCount, sort } = props;
+  const { locale, products, stockLevels, loading, error, query, filter, kpis, totalCount, canManage, sort } = props;
   const categories = props.categories ?? [];
   const selectedCategoryId = props.selectedCategoryId ?? null;
 
@@ -431,8 +428,10 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
         </button>
         <button
           type="button"
+          disabled={!canManage}
+          title={canManage ? undefined : t(locale, "cat.manageReservedGuidance")}
           onClick={props.onNew}
-          className="h-10 rounded-lg bg-accent-500 px-4 text-sm font-black text-slate-950 hover:bg-amber-400"
+          className="h-10 rounded-lg bg-accent-500 px-4 text-sm font-black text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {"➕ "}
           {t(locale, "cat.newProduct")}
@@ -603,26 +602,26 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                     {product.is_active ? (
                       <button
                         type="button"
-                        disabled={props.togglingId === product.product_id}
+                        disabled={props.togglingId === product.product_id || !canManage}
                         onClick={() => {
                           props.onToggleActive(product);
                         }}
-                        title={t(locale, "cat.productActiveLabel")}
+                        title={canManage ? t(locale, "cat.productActiveLabel") : t(locale, "cat.manageReservedGuidance")}
                         aria-label={t(locale, "cat.productActiveLabel")}
-                        className="rounded-md bg-green-100 px-2 py-0.5 font-black text-green-700 hover:bg-green-200 disabled:opacity-50 dark:bg-green-900/40 dark:text-green-200 dark:hover:bg-green-900/60"
+                        className="rounded-md bg-green-100 px-2 py-0.5 font-black text-green-700 hover:bg-green-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-green-900/40 dark:text-green-200 dark:hover:bg-green-900/60"
                       >
                         {t(locale, "cat.active")}
                       </button>
                     ) : (
                       <button
                         type="button"
-                        disabled={props.togglingId === product.product_id}
+                        disabled={props.togglingId === product.product_id || !canManage}
                         onClick={() => {
                           props.onToggleActive(product);
                         }}
-                        title={t(locale, "cat.productActiveLabel")}
+                        title={canManage ? t(locale, "cat.productActiveLabel") : t(locale, "cat.manageReservedGuidance")}
                         aria-label={t(locale, "cat.productActiveLabel")}
-                        className="rounded-md bg-slate-200 px-2 py-0.5 font-black text-slate-500 hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                        className="rounded-md bg-slate-200 px-2 py-0.5 font-black text-slate-500 hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
                       >
                         {t(locale, "cat.inactive")}
                       </button>
@@ -643,23 +642,25 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                       </button>
                       <button
                         type="button"
+                        disabled={!canManage}
                         onClick={() => {
                           props.onEdit(product);
                         }}
                         aria-label={t(locale, "cat.editProduct")}
-                        title={t(locale, "cat.editProduct")}
-                        className="shrink-0 rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+                        title={canManage ? t(locale, "cat.editProduct") : t(locale, "cat.manageReservedGuidance")}
+                        className="shrink-0 rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-700 dark:hover:bg-slate-600"
                       >
                         ✏️
                       </button>
                       <button
                         type="button"
+                        disabled={!canManage}
                         onClick={() => {
                           props.onDelete(product);
                         }}
                         aria-label={t(locale, "del.delete")}
-                        title={t(locale, "del.delete")}
-                        className="shrink-0 rounded-md bg-red-50 px-2 py-1 text-xs font-black text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50"
+                        title={canManage ? t(locale, "del.delete") : t(locale, "cat.manageReservedGuidance")}
+                        className="shrink-0 rounded-md bg-red-50 px-2 py-1 text-xs font-black text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50"
                       >
                         <svg
                           width="14"
@@ -697,6 +698,7 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
 export function CatalogModule(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const session = useSessionStore((state) => state.session);
+  const hasPermission = useSessionStore((state) => state.hasPermission);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [stockLevels, setStockLevels] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -717,7 +719,14 @@ export function CatalogModule(): ReactElement {
   const [metrics, setMetrics] = useState<CatalogMetricsDto | null>(null);
   const depotRef = useRef<string | null | undefined>(undefined);
   const skipFirstDebounce = useRef(true);
-  const authed = session !== null && isManagerRole(session.role);
+  // Permission gate (TASK-DSN-077): view access follows POS_SELL so all
+  // authenticated store personnel browse products and pricing; mutating
+  // actions below render disabled with guidance unless the operator holds
+  // catalog management rights. Rust use cases remain the final authority.
+  const authed = session !== null && hasPermission("POS_SELL");
+  const canManageCatalog =
+    session !== null &&
+    (hasPermission("STOCK_ADJUSTMENT") || hasPermission("SYSTEM_SETTINGS_MANAGE"));
   const token: string | null = authed && session !== null ? session.token : null;
 
   const ensureDepot = async (tok: string, alive: () => boolean): Promise<string | null> => {
@@ -956,6 +965,7 @@ export function CatalogModule(): ReactElement {
         filter={filter}
         kpis={kpis}
         totalCount={totalCount}
+        canManage={canManageCatalog}
         sort={sort}
         onQuery={setQuery}
         onClear={() => {

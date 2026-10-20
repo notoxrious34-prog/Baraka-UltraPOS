@@ -1,9 +1,12 @@
 /**
- * Customers & Credit module root (TASK-DSN-027): desktop master-detail
- * layout binding the directory pane, dossier pane, and create/edit modal.
- * Manager-only with defense-in-depth role gating (same rule as App.tsx).
- * Balances come from per-customer detail enrichment (list rows carry no
- * balance); debtor/inactive pills filter on the enriched details.
+ * Customers & Credit module root (TASK-DSN-027, realigned TASK-DSN-077):
+ * desktop master-detail layout binding the directory pane, dossier pane,
+ * and create/edit modal. View access follows the VIEW_CUSTOMERS permission
+ * (all authenticated store roles); inner mutating actions stay guarded by
+ * CREATE_CUSTOMER, RECORD_CREDIT_PAYMENT, and MANAGE_CUSTOMER_CREDIT
+ * (TASK-DSN-073). Balances come from per-customer detail enrichment
+ * (list rows carry no balance); debtor/inactive pills filter on the
+ * enriched details.
  */
 
 import { useEffect, useState, type ReactElement } from "react";
@@ -20,11 +23,6 @@ import { CustomerListPane, type DirectoryRow } from "@/features/customers/Custom
 import { CustomerDossierPane } from "@/features/customers/CustomerDossierPane";
 import { CustomerFormModal, type CustomerFormMode } from "@/features/customers/CustomerFormModal";
 import { filterCustomers, type CustomerFilter } from "@/features/customers/customer-helpers";
-
-/** Same manager rule as App.tsx isManagerRole (ADMIN or GERANT). */
-function isManagerRole(role: string): boolean {
-  return role === "GERANT" || role === "ADMIN";
-}
 
 /** Non-zero canonical balance (either sign) blocks deletion (ADR-092). Pure. */
 export function hasOpenBalance(balanceCentimes: string): boolean {
@@ -49,6 +47,7 @@ export function blockedBalanceReason(balanceCentimes: string, locale: Locale): s
 export function CustomersModule(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const session = useSessionStore((state) => state.session);
+  const hasPermission = useSessionStore((state) => state.hasPermission);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<CustomerFilter>("all");
   const [details, setDetails] = useState<CustomerDetail[]>([]);
@@ -61,9 +60,11 @@ export function CustomersModule(): ReactElement {
   /** Inline confirmation after a safe deletion (mode-aware copy). */
   const [deleteNote, setDeleteNote] = useState<string | null>(null);
 
-  // Defense in depth: the screen verifies the role itself, independent of
-  // NavRail visibility.
-  const authorized = session !== null && isManagerRole(session.role);
+  // Permission gate (TASK-DSN-077): view access follows VIEW_CUSTOMERS so
+  // Caissier and Vendeur reach the directory; mutating actions stay
+  // permission-guarded inside the panes (TASK-DSN-073). Rust use cases
+  // remain the final authority.
+  const authorized = session !== null && hasPermission("VIEW_CUSTOMERS");
   const token = authorized && session !== null ? session.token : null;
 
   useEffect(() => {

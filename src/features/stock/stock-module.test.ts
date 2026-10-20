@@ -92,8 +92,13 @@ describe("module surface", () => {
     expect(MODULE_SRC).toContain("stock.allWarehouses");
   });
 
-  it("admin gate guards warehouse creation; modals reuse sovereign stores", () => {
-    expect(MODULE_SRC).toContain('session.role === "ADMIN"');
+  it("warehouse creation renders disabled with guidance unless MANAGE_WAREHOUSES; modals reuse sovereign stores", () => {
+    // TASK-DSN-077 realignment: the old `{isAdmin && (...)}` hide violated
+    // "visible but disabled" — creation is universal with a guidance gate.
+    expect(MODULE_SRC).toContain('hasPermission("MANAGE_WAREHOUSES")');
+    expect(MODULE_SRC).toContain("disabled={!canManageWarehouses}");
+    expect(MODULE_SRC).toContain("stock.warehouseCreateReservedGuidance");
+    expect(MODULE_SRC).not.toContain('session.role === "ADMIN"');
     expect(MODULE_SRC).toContain("<WarehouseCreateModal");
     expect(MODULE_SRC).toContain('openPosModal("stock-adjust")');
     expect(MODULE_SRC).toContain('openPosModal("warehouse-transfer")');

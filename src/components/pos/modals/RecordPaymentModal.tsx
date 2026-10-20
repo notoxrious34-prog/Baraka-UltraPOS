@@ -52,16 +52,6 @@ export function buildPaymentReference(
   return trimmed === "" ? tag : `${tag}:${trimmed}`;
 }
 
-/** VENDEUR holds no RecordCreditPayment permission (backend: Unauthorized). */
-export function isVendeur(role: string): boolean {
-  return role === "VENDEUR";
-}
-
-/** Overpayment (negative balance) needs ManageCustomerCredit: GERANT/ADMIN. */
-export function canUseOverpayment(role: string): boolean {
-  return role === "GERANT" || role === "ADMIN";
-}
-
 /**
  * State 3 UX guard predicate (Prototype 05, TASK-DSN-022): true when the
  * entered canonical amount strictly exceeds the backend-sourced balance
@@ -88,11 +78,16 @@ export type AmountValidation =
   | { readonly ok: true; readonly centimes: string }
   | { readonly ok: false; readonly key: "payment.invalidAmount" | "payment.vendeurRestricted" };
 
+/**
+ * Amount validation (DSN-073): the record gate arrives as a permission
+ * boolean from `hasPermission("RECORD_CREDIT_PAYMENT")` — VENDEUR holds no
+ * such permission (backend: Unauthorized), hence the restricted key.
+ */
 export function validatePaymentAmount(
   amountText: string,
-  role: string,
+  canRecordPayment: boolean,
 ): AmountValidation {
-  if (isVendeur(role)) {
+  if (!canRecordPayment) {
     return { ok: false, key: "payment.vendeurRestricted" };
   }
   let centimes = "0";
@@ -122,7 +117,7 @@ export function buildRecordPaymentWire(args: {
   note: string;
   allowOverpayment: boolean;
 }): RecordPaymentWire {
-  const checked = validatePaymentAmount(args.amountText, "CAISSIER");
+  const checked = validatePaymentAmount(args.amountText, true);
   if (!checked.ok) {
     throw new Error(checked.key);
   }
@@ -157,7 +152,12 @@ export function RecordPaymentModal({
   onSuccess,
 }: RecordPaymentModalProps): ReactElement | null {
   const locale = usePosUiStore((state) => state.locale);
-  const session = useSessionStore((state) => state.session);
+  const getSessionToken = useSessionStore((state) => state.getSessionToken);
+  // Live permission reads (DSN-073): stable closures over `get()`, so the
+  // gates stay observable under SSR/static markup. No role strings here.
+  const hasPermission = useSessionStore((state) => state.hasPermission);
+  const canRecordPayment = hasPermission("RECORD_CREDIT_PAYMENT");
+  const overpaymentAllowed = hasPermission("MANAGE_CUSTOMER_CREDIT");
   const setBanner = usePosUiStore((state) => state.setBanner);
   const [amountText, setAmountText] = useState("");
   const [method, setMethod] = useState<PaymentMethodOption>("CASH");
@@ -189,12 +189,10 @@ export function RecordPaymentModal({
     return null;
   }
 
-  const role = session !== null ? session.role : "";
-  const token = session !== null ? session.token : null;
-  const vendeurBlocked = isVendeur(role);
-  const overpaymentAllowed = canUseOverpayment(role);
+  const token = getSessionToken();
+  const recordBlocked = !canRecordPayment;
 
-  const validation = validatePaymentAmount(amountText, role);
+  const validation = validatePaymentAmount(amountText, canRecordPayment);
   // State 3 guard: a non-privileged role may never submit an amount that
   // strictly exceeds the backend-sourced outstanding balance.
   const isExceedingBalance =
@@ -213,7 +211,7 @@ export function RecordPaymentModal({
   const canSubmit =
     token !== null &&
     !busy &&
-    !vendeurBlocked &&
+    !recordBlocked &&
     validation.ok &&
     !isExceedingBalance &&
     (overpaymentAllowed || !allowOverpayment);
@@ -222,10 +220,10 @@ export function RecordPaymentModal({
     if (busyRef.current) {
       return;
     }
-    if (token === null || vendeurBlocked) {
+    if (token === null || !canRecordPayment) {
       return;
     }
-    const checked = validatePaymentAmount(amountText, role);
+    const checked = validatePaymentAmount(amountText, canRecordPayment);
     if (!checked.ok) {
       setErrorCode(checked.key);
       return;
@@ -365,7 +363,7 @@ export function RecordPaymentModal({
             inputMode="decimal"
             autoComplete="off"
             dir="ltr"
-            disabled={busy || vendeurBlocked}
+            disabled={busy || recordBlocked}
             className="h-11 rounded-lg border border-slate-300 bg-white px-3 font-mono text-base font-black outline-none focus:border-primary-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
           />
         </label>
@@ -379,7 +377,7 @@ export function RecordPaymentModal({
               <button
                 key={option}
                 type="button"
-                disabled={busy || vendeurBlocked}
+                disabled={busy || recordBlocked}
                 onClick={() => {
                   setMethod(option);
                 }}
@@ -413,7 +411,7 @@ export function RecordPaymentModal({
             }}
             autoComplete="off"
             dir="ltr"
-            disabled={busy || vendeurBlocked}
+            disabled={busy || recordBlocked}
             className="h-11 rounded-lg border border-slate-300 bg-white px-3 font-mono text-sm font-bold outline-none focus:border-primary-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
           />
         </label>
@@ -422,7 +420,7 @@ export function RecordPaymentModal({
           <input
             type="checkbox"
             checked={allowOverpayment}
-            disabled={busy || vendeurBlocked || !overpaymentAllowed}
+            disabled={busy || recordBlocked || !overpaymentAllowed}
             onChange={(event) => {
               setAllowOverpayment(event.target.checked);
             }}
@@ -431,17 +429,17 @@ export function RecordPaymentModal({
             {t(locale, "payment.allowOverpayment")}
           </span>
         </label>
-        {!overpaymentAllowed && !vendeurBlocked && (
+        {!overpaymentAllowed && !recordBlocked && (
           <p className="text-[11px] font-bold text-slate-500">
             {t(locale, "payment.overpaymentRestricted")}
           </p>
         )}
-        {vendeurBlocked && (
+        {recordBlocked && (
           <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
             {t(locale, "payment.vendeurRestricted")}
           </p>
         )}
-        {!validation.ok && !vendeurBlocked && amountText.trim() !== "" && (
+        {!validation.ok && !recordBlocked && amountText.trim() !== "" && (
           <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
             {t(locale, validation.key)}
           </p>
@@ -472,6 +470,7 @@ export function RecordPaymentModal({
               void submit();
             }}
             disabled={!canSubmit}
+            title={!canRecordPayment ? t(locale, "customers.paymentReservedGuidance") : undefined}
             className="h-11 flex-[2] rounded-lg bg-accent-500 text-sm font-black text-slate-950 hover:bg-amber-400 disabled:opacity-40"
           >
             {busy ? t(locale, "payment.submitting") : t(locale, "payment.submit")}

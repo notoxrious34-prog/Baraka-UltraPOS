@@ -8,6 +8,7 @@ import type { ReactElement } from "react";
 import { t } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import type { Locale } from "@/types/pos";
+import { useSessionStore } from "@/stores/session-store";
 import { isDebtor, type CustomerFilter } from "@/features/customers/customer-helpers";
 
 export interface DirectoryRow {
@@ -52,6 +53,11 @@ function fmtAmount(centimes: string, locale: Locale): string {
 
 export function CustomerListPane(props: CustomerListPaneProps): ReactElement {
   const { locale } = props;
+  // Disabled-with-guidance (DSN-073): the entry point stays visible for
+  // every role; sessions lacking CREATE_CUSTOMER get a disabled button
+  // naming the missing habilitation instead of a silent hide.
+  const hasPermission = useSessionStore((state) => state.hasPermission);
+  const canCreateCustomer = hasPermission("CREATE_CUSTOMER");
   const pills: Array<{ id: CustomerFilter; label: string }> = [
     { id: "all", label: t(locale, "customers.filterAll") },
     { id: "debtors", label: t(locale, "customers.filterDebtors") },
@@ -72,7 +78,9 @@ export function CustomerListPane(props: CustomerListPaneProps): ReactElement {
         <button
           type="button"
           onClick={props.onNew}
-          className="h-10 rounded-lg bg-accent-500 text-sm font-black text-slate-950 hover:bg-accent-400"
+          disabled={!canCreateCustomer}
+          title={canCreateCustomer ? undefined : t(locale, "customers.createCustomerReservedGuidance")}
+          className="h-10 rounded-lg bg-accent-500 text-sm font-black text-slate-950 hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t(locale, "customers.newCustomer")}
         </button>

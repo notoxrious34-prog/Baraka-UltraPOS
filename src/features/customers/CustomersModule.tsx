@@ -193,7 +193,6 @@ export function CustomersModule(): ReactElement {
         <CustomerFormModal
           locale={locale}
           token={token}
-          role={session.role}
           mode={formMode}
           onClose={() => {
             setFormMode(null);

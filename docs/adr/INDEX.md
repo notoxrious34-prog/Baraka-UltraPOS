@@ -99,4 +99,11 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-095 | Ink-Muted Token Tier Refinement | ACCEPTED |
 
-Next free id: ADR-096.
+| ADR-096 | Law of Exploratory Pre-Verification (definition document pending; enacted per BOOT-SESSION-ARC-022) | ACCEPTED |
+| ADR-097 | Persistent Global Theme Architecture (definition document pending; enacted per BOOT-SESSION-ARC-022) | ACCEPTED |
+| ADR-098 | Universal Monotonic-Ticket Debounced Search Pattern (definition document pending; enacted per BOOT-SESSION-ARC-022) | ACCEPTED |
+| ADR-099 | POS Quick-Products Palette Architecture & Alt+1..8 Shortcut Mapping (definition document pending; enacted per BOOT-SESSION-ARC-022) | ACCEPTED |
+
+| ADR-100 | Effective Permission Set in Session Contract & Granular UI Gating | ACCEPTED |
+
+Next free id: ADR-101.

@@ -11,6 +11,8 @@ import { useCashSessionStore } from "@/stores/cash-session-store";
 
 interface SessionState {
   session: SessionInfo | null;
+  /** Effective permission set of the active session (ADR-100). */
+  permissions: string[];
   warehouses: WarehouseInfo[];
   warehouse: WarehouseInfo | null;
   authBusy: boolean;
@@ -22,10 +24,13 @@ interface SessionState {
   selectWarehouse: (id: string) => void;
   /** Synchronously read the active session token, if any (IPC edge source). */
   getSessionToken: () => string | null;
+  /** Granular capability check against the stored permission set. */
+  hasPermission: (permission: string) => boolean;
 }
 
 export const useSessionStore = create<SessionState>()((set, get) => ({
   session: null,
+  permissions: [],
   warehouses: [],
   warehouse: null,
   authBusy: false,
@@ -37,7 +42,8 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
       // The token lands in the store HERE, before any subsequent IPC call,
       // so the wrapper's automatic injection is already sourced correctly
       // for loadWarehouses() and the cash refresh below (ordering matters).
-      set({ session, authBusy: false });
+      // The effective permission set lands alongside the session (ADR-100).
+      set({ session, permissions: session.permissions, authBusy: false });
       await get().loadWarehouses();
       await useCashSessionStore.getState().refresh();
     } catch (error: unknown) {
@@ -45,7 +51,7 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
       // Any post-login failure (including IPC_NO_ACTIVE_SESSION) surfaces
       // visibly via authError and always releases the loading flag — no
       // indefinite loading hang is constructible on this path.
-      set({ authBusy: false, authError: code, session: null });
+      set({ authBusy: false, authError: code, session: null, permissions: [] });
       throw error;
     }
   },
@@ -58,7 +64,7 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
       await get().login(username, password);
     } catch (error: unknown) {
       const code = typeof error === "string" ? error : "INTERNAL_ERROR";
-      set({ authBusy: false, authError: code, session: null });
+      set({ authBusy: false, authError: code, session: null, permissions: [] });
       throw error;
     }
   },
@@ -73,7 +79,7 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
       }
     }
     useCashSessionStore.getState().clear();
-    set({ session: null, warehouse: null, warehouses: [], authError: null });
+    set({ session: null, permissions: [], warehouse: null, warehouses: [], authError: null });
   },
   loadWarehouses: async () => {
     const { session } = get();
@@ -95,4 +101,5 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
       warehouse: state.warehouses.find((warehouse) => warehouse.id === id) ?? state.warehouse,
     })),
   getSessionToken: () => get().session?.token ?? null,
+  hasPermission: (permission) => get().permissions.includes(permission),
 }));

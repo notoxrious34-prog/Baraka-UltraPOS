@@ -50,16 +50,18 @@ const ROW = (overrides: Partial<UserInfo> = {}): UserInfo => ({
   ...overrides,
 });
 
-describe("users nav gating (strict Admin)", () => {
+describe("users nav gating (USER_MANAGE permission)", () => {
   it("extends AppView with users", () => {
     expect(VIEW_SRC).toContain('"users"');
   });
 
-  it("renders the Users nav item only for ADMIN", () => {
-    expect(APP_SRC).toContain('role === "ADMIN" && entry("users"');
+  it("renders the Users nav item behind the USER_MANAGE permission", () => {
+    expect(APP_SRC).toContain('hasPermission("USER_MANAGE")');
+    expect(APP_SRC).toContain("canManageUsers");
+    expect(APP_SRC).not.toContain('role === "ADMIN" && entry("users"');
   });
 
-  it("routes view users behind the ADMIN gate with an unauthorized card", () => {
+  it("routes view users behind the permission gate with an unauthorized card", () => {
     expect(APP_SRC).toContain('view === "users"');
     expect(APP_SRC).toContain("users.unauthorized");
     expect(APP_SRC).toContain("<UsersModule />");
@@ -139,27 +141,34 @@ describe("users i18n (FR/AR symmetric)", () => {
 });
 
 describe("role badges and labels", () => {
-  it("assigns a distinctive palette per role", () => {
-    expect(roleBadgeClass("ADMIN")).toContain("violet");
-    expect(roleBadgeClass("GERANT")).toContain("sky");
-    expect(roleBadgeClass("CAISSIER")).toContain("amber");
-    expect(roleBadgeClass("VENDEUR")).toContain("emerald");
+  it("covers every canonical role code with a semantic token palette", () => {
+    expect(roleLabel("ADMIN", "fr-DZ")).toBe("Administrateur");
+    expect(roleLabel("GERANT", "ar-DZ")).toBe("مسيّر");
+    expect(roleBadgeClass("ADMIN")).toContain("surface-sunken");
+    expect(roleBadgeClass("GERANT")).toContain("info-");
+    expect(roleBadgeClass("CAISSIER")).toContain("warning-");
+    expect(roleBadgeClass("VENDEUR")).toContain("success-");
   });
 
   it("localizes all four roles in FR and AR", () => {
-    expect(roleLabel("ADMIN", "fr-DZ")).toBe("Administrateur");
     expect(roleLabel("GERANT", "fr-DZ")).toBe("Gérant");
     expect(roleLabel("CAISSIER", "fr-DZ")).toBe("Caissier");
     expect(roleLabel("VENDEUR", "fr-DZ")).toBe("Vendeur");
     expect(roleLabel("ADMIN", "ar-DZ")).toBe("مدير عام");
-    expect(roleLabel("GERANT", "ar-DZ")).toBe("مسيّر");
     expect(roleLabel("CAISSIER", "ar-DZ")).toBe("أمين صندوق");
     expect(roleLabel("VENDEUR", "ar-DZ")).toBe("بائع");
   });
 
-  it("styles the active/inactive status pill with green/red semantics", () => {
-    expect(statusBadgeClass(true)).toContain("green");
-    expect(statusBadgeClass(false)).toContain("red");
+  it("falls back to the raw code for unknown roles", () => {
+    expect(roleLabel("SUPERADMIN", "fr-DZ")).toBe("SUPERADMIN");
+    expect(roleBadgeClass("SUPERADMIN")).toContain("surface-sunken");
+  });
+
+  it("labels active/inactive status with status tokens", () => {
+    expect(statusBadgeClass(true)).toContain("success-");
+    // Inactive uses secondary-on-sunken (9.20:1); muted-on-sunken fails AA.
+    expect(statusBadgeClass(false)).toContain("surface-sunken");
+    expect(statusBadgeClass(false)).toContain("ink-secondary");
   });
 });
 
@@ -250,6 +259,62 @@ describe("backend conflict codes surface localized messages", () => {
 
   it("falls back to the raw code for unknown errors", () => {
     expect(userErrorMessage("SOME_FUTURE_CODE", "fr-DZ")).toBe("SOME_FUTURE_CODE");
+  });
+});
+
+describe("users permission gating (ADR-100 / DSN-071)", () => {
+  it("gates the Users nav entry on hasPermission('USER_MANAGE')", () => {
+    expect(APP_SRC).toContain('hasPermission("USER_MANAGE")');
+    expect(APP_SRC).not.toContain('role === "ADMIN" && entry("users"');
+  });
+
+  it("routes the users view behind the granular check with the unauthorized fallback", () => {
+    expect(APP_SRC).toContain("canManageUsers");
+    expect(APP_SRC).toContain("users.unauthorized");
+  });
+});
+
+describe("semantic design tokens (DSN-071)", () => {
+  it("uses token classes and zero raw slate/gray in the Users module", () => {
+    const sources: Array<[string, string]> = [
+      ["UsersModule", MODULE_SRC],
+      ["UserListTable", TABLE_SRC],
+      ["UserFormModal", FORM_SRC],
+      ["CredentialResetModal", RESET_SRC],
+      ["user-helpers", HELPER_SRC],
+    ];
+    for (const [name, src] of sources) {
+      expect(`${name}: ${src.includes("slate-")}`).toBe(`${name}: false`);
+      expect(`${name}: ${src.includes("gray-")}`).toBe(`${name}: false`);
+    }
+    expect(MODULE_SRC).toContain("bg-surface-canvas");
+    expect(TABLE_SRC).toContain("text-ink-");
+    expect(FORM_SRC).toContain("border-line-default");
+  });
+
+  it("badges use status tokens with light/dark pairing", () => {
+    expect(roleBadgeClass("ADMIN")).toContain("surface-sunken");
+    expect(roleBadgeClass("GERANT")).toContain("info-");
+    expect(roleBadgeClass("CAISSIER")).toContain("warning-");
+    expect(roleBadgeClass("VENDEUR")).toContain("success-");
+    expect(statusBadgeClass(true)).toContain("success-");
+    expect(statusBadgeClass(false)).toContain("surface-sunken");
+  });
+});
+
+describe("last-admin proactive protection (DSN-071)", () => {
+  it("counts the sole active admin and disables its deactivation path with guidance", () => {
+    expect(TABLE_SRC).toContain("activeAdminCount");
+    expect(TABLE_SRC).toContain("users.lastAdminTitle");
+    expect(TABLE_SRC).toContain("users.lastAdminBadge");
+    expect(FORM_SRC).toContain("isProtected");
+  });
+});
+
+describe("rtl bidi isolation (DSN-071)", () => {
+  it("wraps the reset-modal username in a bidi guard", () => {
+    expect(RESET_SRC).toContain("<bdi");
+    expect(RESET_SRC).toContain('dir="ltr"');
   });
 });
 

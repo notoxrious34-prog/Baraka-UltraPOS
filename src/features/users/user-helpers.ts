@@ -41,29 +41,33 @@ export function roleLabel(role: string, locale: Locale): string {
 }
 
 /**
- * Tailwind badge classes for a role. Distinctive semantic palette:
- * ADMIN violet, GERANT sky, CAISSIER amber, VENDEUR emerald.
+ * Tailwind badge classes for a role (DSN-071: semantic status tokens,
+ * WCAG AA in both themes — ADMIN neutral-strong, others status-mirrored).
  */
 export function roleBadgeClass(role: string): string {
   switch (role) {
     case "ADMIN":
-      return "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200";
+      return "border border-line-strong bg-surface-sunken font-semibold text-ink-primary";
     case "GERANT":
-      return "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200";
+      return "border border-info-fg/20 bg-info-bg font-semibold text-info-fg";
     case "CAISSIER":
-      return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200";
+      return "border border-warning-fg/20 bg-warning-bg font-semibold text-warning-fg";
     case "VENDEUR":
-      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";
+      return "border border-success-fg/20 bg-success-bg font-semibold text-success-fg";
     default:
-      return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200";
+      return "border border-line-default bg-surface-sunken text-ink-muted";
   }
 }
 
-/** Tailwind badge classes for the active/inactive status pill. */
+/**
+ * Tailwind badge classes for the active/inactive status pill. Inactive uses
+ * secondary (not muted) text: muted-on-sunken measures 4.23:1 in light mode
+ * (AA fail); secondary-on-sunken measures 9.20:1.
+ */
 export function statusBadgeClass(isActive: boolean): string {
   return isActive
-    ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
-    : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200";
+    ? "bg-success-bg font-semibold text-success-fg"
+    : "border border-line-default bg-surface-sunken text-ink-secondary";
 }
 
 /** Username rule (mirrors `is_valid_username`): 3–30 ASCII letters/digits/underscore. */

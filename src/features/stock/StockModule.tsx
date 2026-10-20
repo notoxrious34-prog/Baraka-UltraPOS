@@ -160,7 +160,7 @@ export function StockModule(): ReactElement {
           <option value="">{t(locale, "stock.allWarehouses")}</option>
           {warehouses.map((warehouse) => (
             <option key={warehouse.id} value={warehouse.id}>
-              <bdi dir="ltr">{warehouse.code}</bdi> · {warehouse.name}
+              {warehouse.code} · {warehouse.name}
             </option>
           ))}
         </select>

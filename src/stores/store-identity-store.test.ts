@@ -42,6 +42,7 @@ function primeSession(role: "ADMIN" | "GERANT"): void {
     username: role === "ADMIN" ? "admin1" : "gerant1",
     role,
     expiresAt: "2026-01-01T00:00:00Z",
+    permissions: [],
   };
   useSessionStore.setState({ session });
 }

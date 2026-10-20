@@ -55,6 +55,7 @@ function primeSession(role = "ADMIN"): void {
     username: "admin1",
     role,
     expiresAt: "2026-01-01T00:00:00Z",
+    permissions: [],
   };
   useSessionStore.setState({ session });
   useBackupModalStore.getState().reset();

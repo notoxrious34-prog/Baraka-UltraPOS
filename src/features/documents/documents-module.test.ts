@@ -64,9 +64,10 @@ describe("navigation and IPC wiring", () => {
     expect(VIEW_SRC).toContain('"documents"');
   });
 
-  it("routes the documents view in App.tsx behind the manager gate", () => {
+  it("routes the documents view in App.tsx behind the permission gate", () => {
     expect(APP_SRC).toContain('entry("documents"');
-    expect(APP_SRC).toContain('view === "documents" && manager');
+    expect(APP_SRC).toContain("canAccessDocuments");
+    expect(APP_SRC).toContain('hasPermission("CREATE_SALE")');
     expect(APP_SRC).toContain("<DocumentsModule />");
   });
 

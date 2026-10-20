@@ -40,6 +40,7 @@ function primeSession(role: SessionInfo["role"] = "GERANT"): void {
     username: "gerant1",
     role,
     expiresAt: "2026-01-01T00:00:00Z",
+    permissions: [],
   };
   useSessionStore.setState({ session });
   useWarehouseTransferStore.getState().reset();

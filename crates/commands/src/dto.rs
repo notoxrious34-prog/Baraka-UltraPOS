@@ -79,6 +79,9 @@ pub struct LoginResponseDto {
     pub username: String,
     /// Role code (`VENDEUR`, `CAISSIER`, `GERANT`, `ADMIN`).
     pub role: String,
+    /// Effective permission set for the role (ADR-100): sorted
+    /// SCREAMING_SNAKE_CASE codes from `Role::permissions()` (serde form).
+    pub permissions: Vec<String>,
     /// Fixed session expiry (RFC3339).
     pub expires_at: String,
 }
@@ -90,6 +93,7 @@ impl std::fmt::Debug for LoginResponseDto {
             .field("user_id", &self.user_id)
             .field("username", &self.username)
             .field("role", &self.role)
+            .field("permissions", &self.permissions)
             .field("expires_at", &self.expires_at)
             .finish()
     }

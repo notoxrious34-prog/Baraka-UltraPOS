@@ -24,6 +24,11 @@ interface UserFormModalProps {
   sessionToken: string;
   /** `null` = create mode; a user = edit mode. */
   target: UserInfo | null;
+  /**
+   * True when `target` is the sole active Admin: role select and active flag
+   * lock (title explains why). Backend LAST_ADMIN_PROTECTED stays authoritative.
+   */
+  isProtected?: boolean;
   onClose: () => void;
   onSaved: () => void;
   createUser: (
@@ -40,6 +45,7 @@ export function UserFormModal({
   locale,
   sessionToken,
   target,
+  isProtected = false,
   onClose,
   onSaved,
   createUser,
@@ -88,7 +94,7 @@ export function UserFormModal({
   }
 
   const inputClass =
-    "w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800";
+    "w-full rounded border border-line-default bg-surface-raised px-2 py-1.5 text-sm text-ink-primary placeholder:text-ink-muted focus:border-line-strong focus:ring-1 focus:ring-line-strong";
   return (
     <ModalShell
       title={t(locale, target === null ? "users.formCreate" : "users.formEdit")}
@@ -113,12 +119,13 @@ export function UserFormModal({
             <bdi dir="ltr">{target.username}</bdi>
           </p>
         )}
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1 text-sm text-ink-primary">
           <span className="font-bold">{t(locale, "users.formRole")}</span>
           <select
             className={inputClass}
             value={target === null ? role : (isRoleCode(role) ? role : target.role)}
-            disabled={busy}
+            disabled={busy || isProtected}
+            title={isProtected ? t(locale, "users.lastAdminTitle") : undefined}
             onChange={(event) => {
               setRole(event.target.value);
             }}
@@ -161,20 +168,26 @@ export function UserFormModal({
             </label>
           </>
         ) : (
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm text-ink-primary">
             <input
               type="checkbox"
               checked={isActive}
-              disabled={busy}
+              disabled={busy || isProtected}
+              title={isProtected ? t(locale, "users.lastAdminTitle") : undefined}
               onChange={(event) => {
                 setIsActive(event.target.checked);
               }}
             />
             <span className="font-bold">{t(locale, "users.formActive")}</span>
+            {isProtected && (
+              <span className="rounded-full border border-warning-fg/20 bg-warning-bg px-2 py-0.5 text-xs font-bold text-warning-fg">
+                {t(locale, "users.lastAdminBadge")}
+              </span>
+            )}
           </label>
         )}
         {error !== null && (
-          <p className="rounded bg-red-50 px-2 py-1.5 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
+          <p className="rounded border border-danger-fg/30 bg-danger-bg px-2 py-1.5 text-sm font-bold text-danger-fg">
             {error}
           </p>
         )}
@@ -183,7 +196,7 @@ export function UserFormModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="rounded bg-slate-200 px-3 py-1.5 text-sm font-bold hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+            className="rounded border border-line-default bg-surface-sunken px-3 py-1.5 text-sm font-bold text-ink-primary hover:bg-surface-raised disabled:opacity-50"
           >
             {t(locale, "users.formCancel")}
           </button>
@@ -193,7 +206,7 @@ export function UserFormModal({
               void handleSave();
             }}
             disabled={!canSave}
-            className="rounded bg-accent-500 px-3 py-1.5 text-sm font-bold text-slate-950 disabled:opacity-50"
+            className="rounded bg-ink-primary px-3 py-1.5 text-sm font-bold text-ink-inverse disabled:opacity-50"
           >
             {busy ? t(locale, "users.formSaving") : t(locale, "users.formSave")}
           </button>

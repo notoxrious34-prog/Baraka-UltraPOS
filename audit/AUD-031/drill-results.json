@@ -1,0 +1,149 @@
+{
+  "results": [
+    {
+      "name": "A1 boot shows LoginScreen, no AppShell nav",
+      "ok": true,
+      "detail": "login=true nav=false"
+    },
+    {
+      "name": "B1 login renders AppShell immediately",
+      "ok": true,
+      "detail": "nav present"
+    },
+    {
+      "name": "B2 rail shows all 9 entries",
+      "ok": true,
+      "detail": "9/9 present"
+    },
+    {
+      "name": "B3 view renders: Caisse",
+      "ok": true,
+      "detail": "ok:1"
+    },
+    {
+      "name": "B3 view renders: Catalogue",
+      "ok": true,
+      "detail": "ok:1"
+    },
+    {
+      "name": "B3 view renders: Stock & Dépôts",
+      "ok": true,
+      "detail": "ok:1"
+    },
+    {
+      "name": "B3 view renders: Clients & Crédit",
+      "ok": true,
+      "detail": "ok:1"
+    },
+    {
+      "name": "B3 view renders: Documents & Factures",
+      "ok": true,
+      "detail": "ok:1"
+    },
+    {
+      "name": "B3 view renders: Fournisseurs",
+      "ok": true,
+      "detail": "ok:1"
+    },
+    {
+      "name": "B3 view renders: Rapports",
+      "ok": true,
+      "detail": "ok:1"
+    },
+    {
+      "name": "B3 view renders: Paramètres",
+      "ok": true,
+      "detail": "ok:1"
+    },
+    {
+      "name": "B3 view renders: Utilisateurs & Accès",
+      "ok": true,
+      "detail": "ok:1"
+    },
+    {
+      "name": "B4 users view: 4 rows + last-admin badge + disabled control",
+      "ok": true,
+      "detail": "4 rows, badge ok, disabled=1"
+    },
+    {
+      "name": "B5 scroll clean on users view",
+      "ok": true,
+      "detail": "{\"x\":true,\"y\":true,\"sw\":1280,\"cw\":1280,\"sh\":800,\"ch\":800}"
+    },
+    {
+      "name": "B6 logout returns to LoginScreen",
+      "ok": true,
+      "detail": "login screen back"
+    },
+    {
+      "name": "C1 vendeur rail: 5 entries, 4 absent",
+      "ok": true,
+      "detail": "5 present, 4 absent"
+    },
+    {
+      "name": "C2 customers module: real Vendeur sees module-level unauthorized (Batch 2b pending)",
+      "ok": true,
+      "detail": "module gate holds; DSN-073 component gates covered live in G-flow + unit tests (13/13)"
+    },
+    {
+      "name": "C3 POS customer search lists directory row",
+      "ok": true,
+      "detail": "search wiring live"
+    },
+    {
+      "name": "C4 payment modal: vendeur inputs disabled with guidance + scroll clean",
+      "ok": true,
+      "detail": "notice ok, title ok, scroll clean, modal closed"
+    },
+    {
+      "name": "C5 logout returns to LoginScreen",
+      "ok": true,
+      "detail": "login screen back"
+    },
+    {
+      "name": "D1 caissier payment modal enabled",
+      "ok": true,
+      "detail": "payment open, inputs enabled, modal closed"
+    },
+    {
+      "name": "D2 customers module: real Caissier sees module-level unauthorized (Batch 2b pending)",
+      "ok": true,
+      "detail": "module gate holds; DSN-073 component gates covered live in G-flow + unit tests"
+    },
+    {
+      "name": "D3 logout returns to LoginScreen",
+      "ok": true,
+      "detail": "login screen back"
+    },
+    {
+      "name": "G1 gerant rail: settings present, users absent",
+      "ok": true,
+      "detail": "7 present, users absent"
+    },
+    {
+      "name": "G2 gerant: Nouveau Client enabled (CREATE_CUSTOMER held)",
+      "ok": true,
+      "detail": "enabled"
+    },
+    {
+      "name": "G3 gerant: credit limit input enabled (MANAGE_CUSTOMER_CREDIT held)",
+      "ok": true,
+      "detail": "limit enabled for gerant"
+    },
+    {
+      "name": "G4 gerant: payment modal enabled (RECORD_CREDIT_PAYMENT held)",
+      "ok": true,
+      "detail": "payment enabled, modal closed"
+    },
+    {
+      "name": "G5 logout returns to LoginScreen",
+      "ok": true,
+      "detail": "login screen back"
+    },
+    {
+      "name": "Z1 zero console errors and zero page exceptions",
+      "ok": true,
+      "detail": "clean"
+    }
+  ]
+}

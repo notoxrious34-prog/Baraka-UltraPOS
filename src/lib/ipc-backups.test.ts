@@ -36,6 +36,7 @@ function primeSession(token: string): void {
     username: "admin1",
     role: "ADMIN",
     expiresAt: "2026-01-01T00:00:00Z",
+    permissions: [],
   };
   useSessionStore.setState({ session });
 }

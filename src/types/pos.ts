@@ -123,6 +123,8 @@ export interface SessionInfo {
   userId: string;
   username: string;
   role: string;
+  /** Effective permission set (ADR-100): sorted SCREAMING_SNAKE_CASE codes. */
+  permissions: string[];
   expiresAt: string;
 }
 

@@ -1,7 +1,8 @@
 /**
- * Admin-only staff directory + access control (DSN-030). Loads operators via
- * `ipcListUsers`, shows HUD counts, and opens the create/edit and credential
- * reset modals. Mounted strictly behind the ADMIN gate in `App.tsx`.
+ * Staff directory + access control (DSN-030, tokenized DSN-071). Loads
+ * operators via `ipcListUsers`, shows HUD counts, and opens the create/edit
+ * and credential reset modals. Mounted strictly behind the
+ * `hasPermission("USER_MANAGE")` gate in `App.tsx`.
  */
 
 import { useCallback, useEffect, useState, type ReactElement } from "react";
@@ -57,21 +58,21 @@ export function UsersModule(): ReactElement {
     { label: t(locale, "users.inactive"), value: metrics.inactive },
   ];
 
+  const activeAdminTotal = users.filter((user) => user.role === "ADMIN" && user.is_active).length;
+
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 dark:bg-slate-900">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-surface-canvas">
       <header className="flex shrink-0 flex-wrap items-center gap-3 p-4 pb-2">
-        <div className="mr-auto">
-          <h1 className="text-lg font-extrabold">{t(locale, "users.title")}</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {t(locale, "users.subtitle")}
-          </p>
+        <div className="me-auto">
+          <h1 className="text-lg font-extrabold text-ink-primary">{t(locale, "users.title")}</h1>
+          <p className="text-xs text-ink-muted">{t(locale, "users.subtitle")}</p>
         </div>
         <button
           type="button"
           onClick={() => {
             setDialog({ kind: "form", target: null });
           }}
-          className="rounded bg-accent-500 px-3 py-1.5 text-sm font-bold text-slate-950"
+          className="rounded bg-ink-primary px-3 py-1.5 text-sm font-bold text-ink-inverse"
         >
           {t(locale, "users.newUser")}
         </button>
@@ -80,20 +81,20 @@ export function UsersModule(): ReactElement {
         {cards.map((card) => (
           <div
             key={card.label}
-            className="rounded-md bg-white px-3 py-2 shadow-sm dark:bg-slate-800"
+            className="rounded-md border border-line-default bg-surface-raised px-3 py-2"
           >
-            <p className="text-xs text-slate-500 dark:text-slate-400">{card.label}</p>
-            <p className="text-xl font-extrabold tabular-nums">{card.value}</p>
+            <p className="text-xs text-ink-muted">{card.label}</p>
+            <p className="text-xl font-extrabold tabular-nums text-ink-primary">{card.value}</p>
           </div>
         ))}
       </div>
       {loading ? (
         <div className="flex min-h-0 flex-1 items-center justify-center">
-          <p className="text-sm text-slate-500">{t(locale, "users.loading")}</p>
+          <p className="text-sm text-ink-muted">{t(locale, "users.loading")}</p>
         </div>
       ) : loadError !== null ? (
         <div className="flex min-h-0 flex-1 items-center justify-center p-8">
-          <p className="rounded bg-red-50 px-4 py-3 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
+          <p className="rounded border border-danger-fg/30 bg-danger-bg px-4 py-3 text-sm font-bold text-danger-fg">
             {loadError}
           </p>
         </div>
@@ -114,6 +115,12 @@ export function UsersModule(): ReactElement {
           locale={locale}
           sessionToken={session.token}
           target={dialog.target}
+          isProtected={
+            dialog.target !== null &&
+            dialog.target.role === "ADMIN" &&
+            dialog.target.is_active &&
+            activeAdminTotal <= 1
+          }
           onClose={() => {
             setDialog(null);
           }}

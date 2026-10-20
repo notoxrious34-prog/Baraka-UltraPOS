@@ -1,0 +1,522 @@
+{
+  "light": {
+    "shot": "users-module-light.png",
+    "measures": [
+      {
+        "key": "title-h1",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(248, 250, 252)"
+      },
+      {
+        "key": "subtitle",
+        "found": true,
+        "fg": "rgb(100, 116, 139)",
+        "bg": "rgb(248, 250, 252)"
+      },
+      {
+        "key": "table-th",
+        "found": true,
+        "fg": "rgb(51, 65, 85)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "username-cell",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(248, 250, 252)"
+      },
+      {
+        "key": "badge-admin",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "badge-gerant",
+        "found": true,
+        "fg": "rgb(29, 78, 216)",
+        "bg": "rgb(219, 234, 254)"
+      },
+      {
+        "key": "badge-caissier",
+        "found": true,
+        "fg": "rgb(180, 83, 9)",
+        "bg": "rgb(254, 243, 199)"
+      },
+      {
+        "key": "badge-vendeur",
+        "found": true,
+        "fg": "rgb(22, 128, 60)",
+        "bg": "rgb(220, 252, 231)"
+      },
+      {
+        "key": "badge-lastadmin",
+        "found": true,
+        "fg": "rgb(180, 83, 9)",
+        "bg": "rgb(254, 243, 199)"
+      },
+      {
+        "key": "pill-active",
+        "found": true,
+        "fg": "rgb(22, 128, 60)",
+        "bg": "rgb(220, 252, 231)"
+      },
+      {
+        "key": "pill-inactive",
+        "found": true,
+        "fg": "rgb(51, 65, 85)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "pin-pill",
+        "found": true,
+        "fg": "rgb(51, 65, 85)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "created-cell",
+        "found": true,
+        "fg": "rgb(100, 116, 139)",
+        "bg": "rgb(248, 250, 252)"
+      },
+      {
+        "key": "hud-value",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(255, 255, 255)"
+      },
+      {
+        "key": "btn-primary-new",
+        "found": true,
+        "fg": "rgb(248, 250, 252)",
+        "bg": "rgb(15, 23, 42)"
+      },
+      {
+        "key": "btn-edit",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "btn-credentials",
+        "found": true,
+        "fg": "rgb(180, 83, 9)",
+        "bg": "rgb(254, 243, 199)"
+      },
+      {
+        "key": "input-first",
+        "found": false
+      },
+      {
+        "key": "modal-save",
+        "found": false
+      },
+      {
+        "key": "modal-cancel",
+        "found": false
+      },
+      {
+        "key": "__dims",
+        "scrollW": 1280,
+        "clientW": 1280,
+        "scrollH": 800,
+        "clientH": 800,
+        "dark": false
+      }
+    ]
+  },
+  "dark": {
+    "shot": "users-module-dark.png",
+    "measures": [
+      {
+        "key": "title-h1",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)"
+      },
+      {
+        "key": "subtitle",
+        "found": true,
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(11, 17, 32)"
+      },
+      {
+        "key": "table-th",
+        "found": true,
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "username-cell",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)"
+      },
+      {
+        "key": "badge-admin",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "badge-gerant",
+        "found": true,
+        "fg": "rgb(96, 165, 250)",
+        "bg": "rgb(15, 39, 68)"
+      },
+      {
+        "key": "badge-caissier",
+        "found": true,
+        "fg": "rgb(251, 191, 36)",
+        "bg": "rgb(58, 42, 10)"
+      },
+      {
+        "key": "badge-vendeur",
+        "found": true,
+        "fg": "rgb(74, 222, 128)",
+        "bg": "rgb(20, 50, 31)"
+      },
+      {
+        "key": "badge-lastadmin",
+        "found": true,
+        "fg": "rgb(251, 191, 36)",
+        "bg": "rgb(58, 42, 10)"
+      },
+      {
+        "key": "pill-active",
+        "found": true,
+        "fg": "rgb(74, 222, 128)",
+        "bg": "rgb(20, 50, 31)"
+      },
+      {
+        "key": "pill-inactive",
+        "found": true,
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "pin-pill",
+        "found": true,
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "created-cell",
+        "found": true,
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(11, 17, 32)"
+      },
+      {
+        "key": "hud-value",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(17, 24, 39)"
+      },
+      {
+        "key": "btn-primary-new",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(241, 245, 249)"
+      },
+      {
+        "key": "btn-edit",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "btn-credentials",
+        "found": true,
+        "fg": "rgb(251, 191, 36)",
+        "bg": "rgb(58, 42, 10)"
+      },
+      {
+        "key": "input-first",
+        "found": false
+      },
+      {
+        "key": "modal-save",
+        "found": false
+      },
+      {
+        "key": "modal-cancel",
+        "found": false
+      },
+      {
+        "key": "__dims",
+        "scrollW": 1280,
+        "clientW": 1280,
+        "scrollH": 800,
+        "clientH": 800,
+        "dark": true
+      }
+    ]
+  },
+  "createDark": {
+    "shot": "users-modal-create-dark.png",
+    "measures": [
+      {
+        "key": "title-h1",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)"
+      },
+      {
+        "key": "subtitle",
+        "found": true,
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(11, 17, 32)"
+      },
+      {
+        "key": "table-th",
+        "found": true,
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "username-cell",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(11, 17, 32)"
+      },
+      {
+        "key": "badge-admin",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "badge-gerant",
+        "found": true,
+        "fg": "rgb(96, 165, 250)",
+        "bg": "rgb(15, 39, 68)"
+      },
+      {
+        "key": "badge-caissier",
+        "found": true,
+        "fg": "rgb(251, 191, 36)",
+        "bg": "rgb(58, 42, 10)"
+      },
+      {
+        "key": "badge-vendeur",
+        "found": true,
+        "fg": "rgb(74, 222, 128)",
+        "bg": "rgb(20, 50, 31)"
+      },
+      {
+        "key": "badge-lastadmin",
+        "found": true,
+        "fg": "rgb(251, 191, 36)",
+        "bg": "rgb(58, 42, 10)"
+      },
+      {
+        "key": "pill-active",
+        "found": true,
+        "fg": "rgb(74, 222, 128)",
+        "bg": "rgb(20, 50, 31)"
+      },
+      {
+        "key": "pill-inactive",
+        "found": true,
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "pin-pill",
+        "found": true,
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "created-cell",
+        "found": true,
+        "fg": "rgb(148, 163, 184)",
+        "bg": "rgb(11, 17, 32)"
+      },
+      {
+        "key": "hud-value",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(17, 24, 39)"
+      },
+      {
+        "key": "btn-primary-new",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(241, 245, 249)"
+      },
+      {
+        "key": "btn-edit",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "btn-credentials",
+        "found": true,
+        "fg": "rgb(251, 191, 36)",
+        "bg": "rgb(58, 42, 10)"
+      },
+      {
+        "key": "input-first",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(17, 24, 39)"
+      },
+      {
+        "key": "modal-save",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(241, 245, 249)"
+      },
+      {
+        "key": "modal-cancel",
+        "found": true,
+        "fg": "rgb(241, 245, 249)",
+        "bg": "rgb(10, 15, 26)"
+      },
+      {
+        "key": "__dims",
+        "scrollW": 1280,
+        "clientW": 1280,
+        "scrollH": 800,
+        "clientH": 800,
+        "dark": true
+      }
+    ]
+  },
+  "resetLight": {
+    "shot": "users-modal-reset-light.png",
+    "measures": [
+      {
+        "key": "title-h1",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(248, 250, 252)"
+      },
+      {
+        "key": "subtitle",
+        "found": true,
+        "fg": "rgb(100, 116, 139)",
+        "bg": "rgb(248, 250, 252)"
+      },
+      {
+        "key": "table-th",
+        "found": true,
+        "fg": "rgb(51, 65, 85)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "username-cell",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(248, 250, 252)"
+      },
+      {
+        "key": "badge-admin",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "badge-gerant",
+        "found": true,
+        "fg": "rgb(29, 78, 216)",
+        "bg": "rgb(219, 234, 254)"
+      },
+      {
+        "key": "badge-caissier",
+        "found": true,
+        "fg": "rgb(180, 83, 9)",
+        "bg": "rgb(254, 243, 199)"
+      },
+      {
+        "key": "badge-vendeur",
+        "found": true,
+        "fg": "rgb(22, 128, 60)",
+        "bg": "rgb(220, 252, 231)"
+      },
+      {
+        "key": "badge-lastadmin",
+        "found": true,
+        "fg": "rgb(180, 83, 9)",
+        "bg": "rgb(254, 243, 199)"
+      },
+      {
+        "key": "pill-active",
+        "found": true,
+        "fg": "rgb(22, 128, 60)",
+        "bg": "rgb(220, 252, 231)"
+      },
+      {
+        "key": "pill-inactive",
+        "found": true,
+        "fg": "rgb(51, 65, 85)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "pin-pill",
+        "found": true,
+        "fg": "rgb(51, 65, 85)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "created-cell",
+        "found": true,
+        "fg": "rgb(100, 116, 139)",
+        "bg": "rgb(248, 250, 252)"
+      },
+      {
+        "key": "hud-value",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(255, 255, 255)"
+      },
+      {
+        "key": "btn-primary-new",
+        "found": true,
+        "fg": "rgb(248, 250, 252)",
+        "bg": "rgb(15, 23, 42)"
+      },
+      {
+        "key": "btn-edit",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "btn-credentials",
+        "found": true,
+        "fg": "rgb(180, 83, 9)",
+        "bg": "rgb(254, 243, 199)"
+      },
+      {
+        "key": "input-first",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(255, 255, 255)"
+      },
+      {
+        "key": "modal-save",
+        "found": true,
+        "fg": "rgb(248, 250, 252)",
+        "bg": "rgb(15, 23, 42)"
+      },
+      {
+        "key": "modal-cancel",
+        "found": true,
+        "fg": "rgb(15, 23, 42)",
+        "bg": "rgb(238, 242, 246)"
+      },
+      {
+        "key": "__dims",
+        "scrollW": 1280,
+        "clientW": 1280,
+        "scrollH": 800,
+        "clientH": 800,
+        "dark": false
+      }
+    ]
+  }
+}

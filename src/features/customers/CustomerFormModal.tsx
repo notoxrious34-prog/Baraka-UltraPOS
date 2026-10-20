@@ -10,6 +10,7 @@ import { ipcCreateCustomer, ipcGetCustomer, ipcUpdateCustomer } from "@/lib/ipc"
 import { parseMoneyToCentimes } from "@/lib/money";
 import { ModalShell } from "@/components/pos/modals/ModalShell";
 import type { CustomerDetail, CustomerTier, Locale } from "@/types/pos";
+import { useSessionStore } from "@/stores/session-store";
 import { isValidCustomerName } from "@/features/customers/customer-helpers";
 
 type CreditPolicy = "DISABLED" | "LIMITED" | "UNLIMITED";
@@ -21,14 +22,9 @@ export type CustomerFormMode =
 interface CustomerFormModalProps {
   locale: Locale;
   token: string;
-  role: string;
   mode: CustomerFormMode;
   onClose: () => void;
   onSaved: (detail: CustomerDetail) => void;
-}
-
-function canManageCredit(role: string): boolean {
-  return role === "GERANT" || role === "ADMIN";
 }
 
 const inputClass =
@@ -47,6 +43,12 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
   const [active, setActive] = useState(editing?.is_active ?? true);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Disabled-with-guidance (DSN-073): the credit surface stays visible for
+  // every role; sessions lacking MANAGE_CUSTOMER_CREDIT get a disabled,
+  // explained input instead of a silent hide. Submit re-checks (defense in
+  // depth — the engine remains authoritative).
+  const hasPermission = useSessionStore((state) => state.hasPermission);
+  const canManageCredit = hasPermission("MANAGE_CUSTOMER_CREDIT");
 
   const submit = (): void => {
     if (saving) {
@@ -58,7 +60,7 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
     }
     let limit: string | null = null;
     if (policy === "LIMITED") {
-      if (!canManageCredit(props.role)) {
+      if (!canManageCredit) {
         setFormError(translateBackendError("UNAUTHORIZED", locale));
         return;
       }
@@ -160,10 +162,17 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
             <input
               value={limitText}
               onChange={(e) => setLimitText(e.target.value)}
-              className={inputClass}
+              disabled={!canManageCredit}
+              title={canManageCredit ? undefined : t(locale, "customers.creditLimitReservedGuidance")}
+              className={`${inputClass} disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-muted`}
               inputMode="decimal"
               dir="ltr"
             />
+            {!canManageCredit && (
+              <p className="mt-1 text-xs text-ink-muted">
+                {t(locale, "customers.creditLimitReservedGuidance")}
+              </p>
+            )}
           </label>
         )}
         <div className="flex flex-col gap-1">

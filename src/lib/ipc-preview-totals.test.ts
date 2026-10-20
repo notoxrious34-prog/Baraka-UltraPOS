@@ -40,6 +40,7 @@ function primeSession(token: string): void {
     username: "caissier1",
     role: "CAISSIER",
     expiresAt: "2026-01-01T00:00:00Z",
+    permissions: [],
   };
   useSessionStore.setState({ session });
 }

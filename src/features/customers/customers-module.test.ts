@@ -62,9 +62,10 @@ describe("navigation and IPC wiring", () => {
     expect(VIEW_SRC).toContain('"customers"');
   });
 
-  it("routes the customers view in App.tsx behind the manager gate", () => {
+  it("routes the customers view in App.tsx behind the permission gate", () => {
     expect(APP_SRC).toContain('entry("customers"');
-    expect(APP_SRC).toContain('view === "customers" && manager');
+    expect(APP_SRC).toContain("canAccessCustomers");
+    expect(APP_SRC).toContain('hasPermission("VIEW_CUSTOMERS")');
     expect(APP_SRC).toContain("<CustomersModule />");
   });
 

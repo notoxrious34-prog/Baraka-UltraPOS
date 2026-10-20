@@ -599,6 +599,27 @@ fn to_response(detail: ProductDetail) -> ProductResponseDto {
     }
 }
 
+/// Sorted effective permission codes for `role` (ADR-100).
+///
+/// Codes are the serde `SCREAMING_SNAKE_CASE` form of `Permission`
+/// (e.g. `USER_MANAGE`), sorted lexicographically for deterministic
+/// serialization. Serialization of a unit variant is infallible; the
+/// `Debug` fallback keeps this total without panicking.
+fn sorted_permission_codes(role: Role) -> Vec<String> {
+    let mut codes: Vec<String> = role
+        .permissions()
+        .iter()
+        .map(|permission| {
+            serde_json::to_value(permission)
+                .ok()
+                .and_then(|value| value.as_str().map(str::to_owned))
+                .unwrap_or_else(|| format!("{permission:?}"))
+        })
+        .collect();
+    codes.sort();
+    codes
+}
+
 /// `auth_login` command: username + password authentication.
 #[tauri::command(rename_all = "snake_case")]
 pub fn auth_login(
@@ -617,6 +638,7 @@ pub fn auth_login(
             user_id: session.user_id.to_string(),
             username: session.username,
             role: session.role.code().to_string(),
+            permissions: sorted_permission_codes(session.role),
             expires_at: session.expires_at.to_rfc3339(),
         }),
         Err(error) => Err(error_code(&error)),
@@ -3963,5 +3985,30 @@ mod tests {
         for (variant, code) in cases {
             assert_eq!(error_code(&ApplicationError::Validation(variant)), code);
         }
+    }
+
+    #[test]
+    fn login_response_carries_sorted_effective_permissions() {
+        // ADR-100: the login wire contract exposes the role's full effective
+        // permission set as sorted SCREAMING_SNAKE_CASE codes (serde form).
+        let admin = sorted_permission_codes(Role::Admin);
+        assert_eq!(admin.len(), 34);
+        assert!(admin.contains(&"USER_MANAGE".to_string()));
+        assert!(admin.contains(&"CREATE_SALE".to_string()));
+        assert!(admin.windows(2).all(|pair| pair[0] <= pair[1]));
+        let vendeur = sorted_permission_codes(Role::Vendeur);
+        assert_eq!(vendeur.len(), 5);
+        assert!(vendeur.contains(&"CREATE_SALE".to_string()));
+        assert!(!vendeur.contains(&"USER_MANAGE".to_string()));
+        // The DTO itself carries the vector (field asserted by construction).
+        let dto = LoginResponseDto {
+            session_token: "tok".to_string(),
+            user_id: "uid".to_string(),
+            username: "admin".to_string(),
+            role: Role::Admin.code().to_string(),
+            permissions: admin.clone(),
+            expires_at: "2026-01-01T00:00:00Z".to_string(),
+        };
+        assert_eq!(dto.permissions, admin);
     }
 }

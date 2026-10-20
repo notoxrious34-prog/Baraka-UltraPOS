@@ -12,9 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildPaymentReference,
   buildRecordPaymentWire,
-  canUseOverpayment,
   isPaymentExceedingBalance,
-  isVendeur,
   methodTag,
   validatePaymentAmount,
 } from "@/components/pos/modals/RecordPaymentModal";
@@ -42,51 +40,40 @@ describe("buildPaymentReference", () => {
 
 describe("validatePaymentAmount", () => {
   it("accepts positive decimal input as canonical centimes", () => {
-    expect(validatePaymentAmount("150", "CAISSIER")).toEqual({
+    expect(validatePaymentAmount("150", true)).toEqual({
       ok: true,
       centimes: "15000",
     });
-    expect(validatePaymentAmount("150,50", "GERANT")).toEqual({
+    expect(validatePaymentAmount("150,50", true)).toEqual({
       ok: true,
       centimes: "15050",
     });
   });
 
   it("rejects zero, negative, and unparsable input", () => {
-    expect(validatePaymentAmount("0", "CAISSIER")).toEqual({
+    expect(validatePaymentAmount("0", true)).toEqual({
       ok: false,
       key: "payment.invalidAmount",
     });
-    expect(validatePaymentAmount("-5", "CAISSIER")).toEqual({
+    expect(validatePaymentAmount("-5", true)).toEqual({
       ok: false,
       key: "payment.invalidAmount",
     });
-    expect(validatePaymentAmount("abc", "CAISSIER")).toEqual({
+    expect(validatePaymentAmount("abc", true)).toEqual({
       ok: false,
       key: "payment.invalidAmount",
     });
-    expect(validatePaymentAmount("", "CAISSIER")).toEqual({
+    expect(validatePaymentAmount("", true)).toEqual({
       ok: false,
       key: "payment.invalidAmount",
     });
   });
 
-  it("blocks VENDEUR for any amount (mirrors backend Unauthorized)", () => {
-    expect(isVendeur("VENDEUR")).toBe(true);
-    expect(isVendeur("CAISSIER")).toBe(false);
-    expect(validatePaymentAmount("1000", "VENDEUR")).toEqual({
+  it("blocks sessions lacking RECORD_CREDIT_PAYMENT (backend Unauthorized)", () => {
+    expect(validatePaymentAmount("1000", false)).toEqual({
       ok: false,
       key: "payment.vendeurRestricted",
     });
-  });
-});
-
-describe("canUseOverpayment", () => {
-  it("reserves negative-balance payments to GERANT/ADMIN", () => {
-    expect(canUseOverpayment("GERANT")).toBe(true);
-    expect(canUseOverpayment("ADMIN")).toBe(true);
-    expect(canUseOverpayment("CAISSIER")).toBe(false);
-    expect(canUseOverpayment("VENDEUR")).toBe(false);
   });
 });
 

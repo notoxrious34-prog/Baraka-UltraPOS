@@ -8,6 +8,7 @@ import type { ReactElement } from "react";
 import { t } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import type { CustomerDetail, Locale } from "@/types/pos";
+import { useSessionStore } from "@/stores/session-store";
 import { CustomerStatementTable } from "@/features/customers/CustomerStatementTable";
 import { availableCredit, isDebtor } from "@/features/customers/customer-helpers";
 
@@ -50,6 +51,10 @@ function HudCard(props: {
 
 export function CustomerDossierPane(props: CustomerDossierPaneProps): ReactElement {
   const { locale, detail } = props;
+  // Same creation gate as the directory pane (DSN-073): the empty-state CTA
+  // opens the identical create flow, so it carries the identical gate.
+  const hasPermission = useSessionStore((state) => state.hasPermission);
+  const canCreateCustomer = hasPermission("CREATE_CUSTOMER");
   if (detail === null) {
     // Teaching default panel (TASK-DSN-054): an unresolvable selection
     // (selectedId null, deactivated/deleted record) lands here, never blank.
@@ -81,7 +86,9 @@ export function CustomerDossierPane(props: CustomerDossierPaneProps): ReactEleme
         <button
           type="button"
           onClick={props.onNew}
-          className="h-10 rounded-lg bg-accent-500 px-4 text-sm font-bold text-slate-950 hover:bg-accent-400"
+          disabled={!canCreateCustomer}
+          title={canCreateCustomer ? undefined : t(locale, "customers.createCustomerReservedGuidance")}
+          className="h-10 rounded-lg bg-accent-500 px-4 text-sm font-bold text-slate-950 hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t(locale, "customers.emptyCta")}
         </button>

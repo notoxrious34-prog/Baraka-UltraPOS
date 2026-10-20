@@ -63,9 +63,10 @@ describe("navigation and IPC wiring", () => {
     expect(VIEW_SRC).toContain('"pos" | "stock" | "customers"');
   });
 
-  it("routes the stock view in App.tsx behind the manager gate", () => {
+  it("routes the stock view in App.tsx behind the permission gate", () => {
     expect(APP_SRC).toContain('entry("stock"');
-    expect(APP_SRC).toContain('view === "stock" && manager');
+    expect(APP_SRC).toContain("canAccessStock");
+    expect(APP_SRC).toContain('hasPermission("VIEW_STOCK")');
     expect(APP_SRC).toContain("<StockModule />");
   });
 

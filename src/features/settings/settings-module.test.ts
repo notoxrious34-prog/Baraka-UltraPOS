@@ -47,8 +47,9 @@ describe("settings nav gating (manager)", () => {
     expect(navBlock).not.toMatch(/ADMIN.*entry\("settings"|settings.*ADMIN/);
   });
 
-  it("routes view settings behind the manager gate", () => {
-    expect(APP_SRC).toContain('view === "settings" && manager');
+  it("routes view settings behind the permission gate", () => {
+    expect(APP_SRC).toContain("canAccessSettings");
+    expect(APP_SRC).toContain('hasPermission("SYSTEM_SETTINGS_MANAGE")');
     expect(APP_SRC).toContain("<SettingsModule />");
   });
 });

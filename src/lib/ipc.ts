@@ -93,6 +93,7 @@ interface LoginWire {
   user_id: string;
   username: string;
   role: string;
+  permissions: string[];
   expires_at: string;
 }
 
@@ -106,6 +107,7 @@ export async function ipcLogin(username: string, password: string): Promise<Sess
     userId: wire.user_id,
     username: wire.username,
     role: wire.role,
+    permissions: wire.permissions,
     expiresAt: wire.expires_at,
   };
 }

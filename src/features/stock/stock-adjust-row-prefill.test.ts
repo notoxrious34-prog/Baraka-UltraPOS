@@ -45,6 +45,7 @@ function primeSession(): void {
     username: "gerant1",
     role: "GERANT",
     expiresAt: "2026-01-01T00:00:00Z",
+    permissions: [],
   };
   useSessionStore.setState({ session });
   useStockAdjustModalStore.getState().reset();

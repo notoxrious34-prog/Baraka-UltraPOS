@@ -1,4 +1,4 @@
-//! TASK-REL-054 drill: migration replay & data preservation 0001 -> 0015.
+//! TASK-REL-054 drill: migration replay & data preservation 0001 -> 0016.
 //!
 //! A merchant upgrading Baraka UltraPOS must never lose a centime, a stock
 //! unit, or a ledger entry. This suite proves the zero-data-loss invariant
@@ -9,26 +9,31 @@
 //!   admin user, categories, products, indebted customer, append-only
 //!   ledger entry, stock level, one finalized BL with item + payment) and
 //!   capture baseline aggregates.
-//! * Stage 2 — run the official [`run_migrations`] upgrade path to 0015.
-//! * Stage 3 — assert byte-level parity: all 15 bookkeeping rows present
+//! * Stage 2 — run the official [`run_migrations`] upgrade path to 0016
+//!   (0016 adds the FTS5 `products_fts` index with in-transaction backfill).
+//! * Stage 3 — assert byte-level parity: all 16 bookkeeping rows present
 //!   with valid checksums, debt balance exactly 450,000 centimes, stock
 //!   untouched, documents/ledger untouched, 0014 nullability + 0015 tier
-//!   columns in their canonical shapes.
+//!   columns in their canonical shapes, plus FTS existence, consistency,
+//!   and legacy-row backfill proof.
 //! * Stage 4 — downgrade-guard probe: inject a fake future migration row
 //!   (version 9999) and prove the runner handles it deterministically
 //!   without wiping or corrupting data.
 //!
 //! Documented deviations from the task text (code is the truth):
 //! * Migration 0014 is `0014_make_print_jobs_document_id_nullable.sql`,
-//!   not an FTS5 catalog search migration — no `products_fts` table exists
-//!   anywhere in the tree. The FTS assertion is replaced by catalog
-//!   readability + 0014 nullability assertions.
+//!   not an FTS5 catalog search migration.
 //! * Migration 0015 defaults `customers.customer_tier` to lowercase
 //!   `'retail'` (domain canonical form, see `CustomerTier::as_str`), not
 //!   `'RETAIL'`. Assertions use the canonical lowercase value.
+//! * Migration 0016 is the FTS5 catalog search migration: it creates the
+//!   `products_fts` table and backfills it. The FTS assertions below are
+//!   written against this truth (TASK-BRK-082).
 
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
+use baraka_infrastructure::adapters::sqlite_catalog_repository::SqliteCatalogRepository;
 use baraka_infrastructure::persistence::connection::open_connection;
 use baraka_infrastructure::persistence::migration::{checksum_of, run_migrations, MIGRATIONS};
 use rusqlite::Connection;
@@ -298,7 +303,7 @@ fn capture_baseline(conn: &Connection) -> Baseline {
     }
 }
 
-/// Build a legacy v13 database, seed it, and upgrade it to 0015 via the
+/// Build a legacy v13 database, seed it, and upgrade it to 0016 via the
 /// official runner. Shared by the replay test and the downgrade probe so
 /// each test owns an isolated scratch file.
 fn build_upgraded_db(name: &str) -> (ScratchDb, Baseline) {
@@ -308,22 +313,22 @@ fn build_upgraded_db(name: &str) -> (ScratchDb, Baseline) {
     let baseline = capture_baseline(&db.conn);
     assert_eq!(baseline.documents, 1, "exactly one seeded document");
     assert_eq!(baseline.customers, 2, "exactly two seeded customers");
-    run_migrations(&mut db.conn).expect("official upgrade 0013 -> 0015");
+    run_migrations(&mut db.conn).expect("official upgrade 0013 -> 0016");
     (db, baseline)
 }
 
 fn assert_parity(conn: &Connection, baseline: &Baseline) {
-    // All 15 migrations recorded, checksums non-empty and byte-identical to
+    // All 16 migrations recorded, checksums non-empty and byte-identical to
     // the embedded SQL (a changed byte would abort the runner on real DBs).
     let (count, max_version): (i64, i64) = conn
         .query_row(
-            "SELECT COUNT(*), MAX(version) FROM schema_migrations WHERE version BETWEEN 1 AND 15",
+            "SELECT COUNT(*), MAX(version) FROM schema_migrations WHERE version BETWEEN 1 AND 16",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .expect("migration bookkeeping readable");
-    assert_eq!(count, 15, "all 15 migrations recorded");
-    assert_eq!(max_version, 15, "schema at version 15");
+    assert_eq!(count, 16, "all 16 migrations recorded");
+    assert_eq!(max_version, 16, "schema at version 16");
     for migration in MIGRATIONS.iter() {
         let recorded: String = conn
             .query_row(
@@ -450,8 +455,8 @@ fn assert_parity(conn: &Connection, baseline: &Baseline) {
         .expect("print_jobs pragma");
     assert_eq!(notnull, 0, "0014 made print_jobs.document_id nullable");
 
-    // Catalog readability over the seeded products (no FTS table exists;
-    // see module docs — readability is asserted against the base tables).
+    // Migration 0016 shape: the FTS5 index exists, is consistent with the
+    // base tables, and legacy rows were backfilled with non-empty norms.
     let fts: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'products_fts'",
@@ -459,7 +464,22 @@ fn assert_parity(conn: &Connection, baseline: &Baseline) {
             |row| row.get(0),
         )
         .expect("fts presence check");
-    assert_eq!(fts, 0, "no products_fts table exists in this schema line");
+    assert_eq!(fts, 1, "0016 created the products_fts table");
+    let mar_norm: (String, String) = conn
+        .query_row(
+            "SELECT search_norm_fr, search_norm_ar FROM products WHERE sku = 'MAR-001'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("legacy product norms readable");
+    assert!(
+        !mar_norm.0.is_empty(),
+        "legacy MAR-001 backfilled with non-empty search_norm_fr"
+    );
+    assert!(
+        !mar_norm.1.is_empty(),
+        "legacy MAR-001 backfilled with non-empty search_norm_ar"
+    );
     let by_sku: String = conn
         .query_row(
             "SELECT name_fr FROM products WHERE sku = 'MAR-001'",
@@ -487,6 +507,13 @@ fn migration_replay_preserves_legacy_business_data() {
     // (WAL checkpoint + pragma path), proving the artifact is durable.
     let reopened = open_connection(&db.path).expect("reopen upgraded db");
     assert_parity(&reopened, &baseline);
+
+    // The FTS index is consistent on the UPGRADED drill DB (legacy-seeded
+    // rows included): row counts match and sampled norms recompute.
+    let consistency_conn = open_connection(&db.path).expect("consistency connection");
+    let repo = SqliteCatalogRepository::new(Arc::new(Mutex::new(consistency_conn)));
+    repo.verify_fts_consistency()
+        .expect("fts consistent on upgraded drill db");
 }
 
 #[test]
@@ -527,11 +554,11 @@ fn downgrade_guard_probe_future_version_is_deterministic() {
     assert_eq!(future_name, "9999_future_schema.sql");
 
     // Data is byte-intact after the probe: full parity still holds
-    // (assert_parity scopes the bookkeeping check to versions 1..=15,
+    // (assert_parity scopes the bookkeeping check to versions 1..=16,
     // so the synthetic future row coexists without tripping it).
     assert_parity(&db.conn, &baseline);
 
-    // Re-running is idempotent: still Ok, still 16 rows (15 known + future).
+    // Re-running is idempotent: still Ok, still 17 rows (16 known + future).
     run_migrations(&mut db.conn).expect("second run after probe");
     let total: i64 = db
         .conn
@@ -539,5 +566,5 @@ fn downgrade_guard_probe_future_version_is_deterministic() {
             row.get(0)
         })
         .expect("total rows");
-    assert_eq!(total, 16, "15 known + 1 future row, no duplication");
+    assert_eq!(total, 17, "16 known + 1 future row, no duplication");
 }

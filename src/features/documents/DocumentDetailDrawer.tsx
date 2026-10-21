@@ -9,6 +9,7 @@ import { useEffect, useState, type ReactElement } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
 import {
   getDocumentDetails,
+  getStoreIdentity,
   ipcReprint,
   type DocumentDetailsWireResponse,
   type DocumentSummaryWireDto,
@@ -16,6 +17,7 @@ import {
 import { formatMoney, formatQty } from "@/lib/money";
 import { PrintStatusIndicator } from "@/components/pos/PrintStatusIndicator";
 import type { Locale } from "@/types/pos";
+import "./document-print.css";
 import {
   documentStatusBadge,
   documentStatusKey,
@@ -48,6 +50,136 @@ function fmtQty(micro: string): string {
 
 /** Full document view (re-exported wire shape from sales_get). */
 export type DocumentDetailsWire = DocumentDetailsWireResponse;
+
+/**
+ * A4 print eligibility (TASK-DSN-085): delivery notes and invoices print on
+ * A4; tickets stay on the fiscal thermal path (existing DUPLICATA reprint),
+ * quotes and credit notes have no A4 layout in this task.
+ */
+export function canPrintA4(documentType: string): boolean {
+  return documentType === "BL" || documentType === "FACTURE";
+}
+
+/** Store-identity subset stamped on the A4 header (empty strings omitted). */
+export interface A4Identity {
+  storeName: string;
+  storeAddress: string;
+  storePhone: string;
+  nif: string;
+  nis: string;
+  rc: string;
+  ai: string;
+}
+
+/**
+ * Pure A4 invoice/delivery-note sheet. Renders engine values verbatim;
+ * sections without wire backing are omitted, never fabricated:
+ * no per-line discount, no per-rate TVA breakdown, no totals-in-words,
+ * no customer fiscal identifiers.
+ */
+export function DocumentA4Sheet(props: {
+  locale: Locale;
+  details: DocumentDetailsWire;
+  identity: A4Identity;
+  /** Display date from the summary row (the details wire carries no date). */
+  createdAt: string;
+}): ReactElement {
+  const { locale, details, identity, createdAt } = props;
+  const doc = details.document;
+  const fiscal = [
+    identity.nif !== "" ? `NIF ${identity.nif}` : null,
+    identity.nis !== "" ? `NIS ${identity.nis}` : null,
+    identity.rc !== "" ? `RC ${identity.rc}` : null,
+    identity.ai !== "" ? `AI ${identity.ai}` : null,
+  ].filter((part): part is string => part !== null);
+  return (
+    <div className="a4-sheet" data-testid="a4-sheet">
+      <header>
+        {identity.storeName !== "" && <h1>{identity.storeName}</h1>}
+        {identity.storeAddress !== "" && <p>{identity.storeAddress}</p>}
+        {identity.storePhone !== "" && (
+          <p>
+            <bdi dir="ltr">{identity.storePhone}</bdi>
+          </p>
+        )}
+        {fiscal.length > 0 && (
+          <p>
+            <bdi dir="ltr">{fiscal.join(" · ")}</bdi>
+          </p>
+        )}
+        <h2>
+          {t(locale, documentTypeKey(doc.doc_type))} <bdi dir="ltr">{doc.number}</bdi>
+        </h2>
+        <p>
+          {t(locale, "documents.colDate")}: <bdi dir="ltr">{createdAt}</bdi>
+        </p>
+      </header>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">{t(locale, "documents.colProduct")}</th>
+            <th scope="col">{t(locale, "documents.colQty")}</th>
+            <th scope="col">{t(locale, "documents.colUnitPrice")}</th>
+            <th scope="col">{t(locale, "documents.colLineTva")}</th>
+            <th scope="col">{t(locale, "documents.colLineTotal")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {details.items.map((item, index) => (
+            <tr key={`${item.product_id}-${item.unit_id}-${index}`} data-testid="a4-line">
+              <td>
+                <bdi dir="ltr" className="a4-num">
+                  {item.product_id}
+                </bdi>
+              </td>
+              <td>
+                <bdi dir="ltr" className="a4-num">
+                  {fmtQty(item.quantity_micro)}
+                </bdi>
+              </td>
+              <td>
+                <bdi dir="ltr" className="a4-num">
+                  {fmtAmount(item.unit_price_centimes, locale)}
+                </bdi>
+              </td>
+              <td>
+                <bdi dir="ltr" className="a4-num">
+                  {fmtAmount(item.line_tva_centimes, locale)}
+                </bdi>
+              </td>
+              <td>
+                <bdi dir="ltr" className="a4-num">
+                  {fmtAmount(item.line_ttc_centimes, locale)}
+                </bdi>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <footer>
+        <p>
+          {t(locale, "documents.detailsSubtotal")}:{" "}
+          <bdi dir="ltr" className="a4-num">
+            {fmtAmount(doc.subtotal_ht_centimes, locale)}
+          </bdi>
+        </p>
+        <p>
+          {t(locale, "documents.detailsTaxTotal")}:{" "}
+          <bdi dir="ltr" className="a4-num">
+            {fmtAmount(doc.tva_total_centimes, locale)}
+          </bdi>
+        </p>
+        <p>
+          {t(locale, "documents.total")}:{" "}
+          <bdi dir="ltr" className="a4-num">
+            {fmtAmount(doc.total_ttc_centimes, locale)}
+          </bdi>
+        </p>
+        <p>{t(locale, "documents.printFooter")}</p>
+      </footer>
+    </div>
+  );
+}
 
 /**
  * Pure full-document render (lines, payments, tax, totals) — no fetching.
@@ -200,6 +332,8 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
   const [detailsLoading, setDetailsLoading] = useState<boolean>(true);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [detailsTick, setDetailsTick] = useState<number>(0);
+  const [identity, setIdentity] = useState<A4Identity | null>(null);
+  const [printing, setPrinting] = useState<boolean>(false);
 
   useEffect(() => {
     setReprintState("idle");
@@ -207,6 +341,8 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
     setDetails(null);
     setDetailsError(null);
     setDetailsLoading(true);
+    setIdentity(null);
+    setPrinting(false);
     let cancelled = false;
     getDocumentDetails(document.id)
       .then((full) => {
@@ -237,6 +373,61 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
       window.removeEventListener("keydown", onKey);
     };
   }, [props]);
+
+  useEffect(() => {
+    const done = (): void => {
+      globalThis.document.body.classList.remove("printing-a4");
+      setPrinting(false);
+    };
+    window.addEventListener("afterprint", done);
+    return () => {
+      window.removeEventListener("afterprint", done);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!printing || details === null || identity === null) {
+      return;
+    }
+    globalThis.document.body.classList.add("printing-a4");
+    const frame = window.requestAnimationFrame(() => {
+      window.print();
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [printing, details, identity]);
+
+  const printA4 = (): void => {
+    if (details === null || printing || !canPrintA4(document.document_type)) {
+      return;
+    }
+    setPrinting(true);
+    getStoreIdentity()
+      .then((state) => {
+        const found = state.identity;
+        setIdentity({
+          storeName: found.storeName,
+          storeAddress: found.storeAddress,
+          storePhone: found.storePhone,
+          nif: found.nif,
+          nis: found.nis,
+          rc: found.rc,
+          ai: found.ai,
+        });
+      })
+      .catch(() => {
+        setIdentity({
+          storeName: "",
+          storeAddress: "",
+          storePhone: "",
+          nif: "",
+          nis: "",
+          rc: "",
+          ai: "",
+        });
+      });
+  };
 
   const reprint = (): void => {
     if (reprintState === "sending") {
@@ -336,6 +527,36 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
       ) : null}
 
       <PrintStatusIndicator documentId={document.id} />
+
+      {details !== null && canPrintA4(document.document_type) && (
+        <button
+          type="button"
+          onClick={printA4}
+          disabled={printing}
+          data-testid="print-a4"
+          className="h-11 shrink-0 rounded-lg border border-slate-300 text-sm font-black dark:border-slate-600"
+        >
+          {t(locale, "documents.printA4")}
+        </button>
+      )}
+      {details !== null && (
+        <DocumentA4Sheet
+          locale={locale}
+          details={details}
+          identity={
+            identity ?? {
+              storeName: "",
+              storeAddress: "",
+              storePhone: "",
+              nif: "",
+              nis: "",
+              rc: "",
+              ai: "",
+            }
+          }
+          createdAt={document.created_at}
+        />
+      )}
 
       <button
         type="button"

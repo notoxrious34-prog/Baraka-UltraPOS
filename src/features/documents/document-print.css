@@ -1,0 +1,55 @@
+/**
+ * A4 print stylesheet (TASK-DSN-085). The `.a4-sheet` block is screen-hidden;
+ * under print media the app chrome is neutralized and only the sheet prints.
+ * The drawer toggles `printing-a4` on <body> around window.print().
+ */
+
+.a4-sheet {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body.printing-a4 {
+    visibility: hidden;
+    background: #fff;
+  }
+
+  body.printing-a4 .a4-sheet {
+    visibility: visible;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 186mm;
+    max-width: 100%;
+    background: #fff;
+    color: #000;
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
+  }
+
+  body.printing-a4 .a4-sheet table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  body.printing-a4 .a4-sheet thead {
+    display: table-header-group;
+  }
+
+  body.printing-a4 .a4-sheet th,
+  body.printing-a4 .a4-sheet td {
+    border: 1px solid #000;
+    padding: 3px 6px;
+    text-align: start;
+  }
+
+  body.printing-a4 .a4-sheet .a4-num {
+    font-family: "Courier New", monospace;
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "results": [
+    {
+      "name": "shot a4-facture-1280x800-fr-light",
+      "ok": true,
+      "detail": "FACTURE A4 fr, no clip sheetW=703"
+    },
+    {
+      "name": "shot a4-bl-1280x800-ar-dark",
+      "ok": true,
+      "detail": "BL A4 ar/dark, no clip sheetW=703"
+    },
+    {
+      "name": "shot drawer-ticket-noa4-1280x800-fr-light",
+      "ok": true,
+      "detail": "TICKET drawer, thermal-only"
+    },
+    {
+      "name": "zero console errors across captures",
+      "ok": true,
+      "detail": "0 console errors"
+    }
+  ],
+  "errors": []
+}

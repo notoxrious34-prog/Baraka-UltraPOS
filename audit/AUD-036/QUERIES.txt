@@ -1,0 +1,50 @@
+# QUERIES.txt — exact SQL texts, catalog search path
+# Source: crates/infrastructure/src/adapters/sqlite_catalog_repository.rs
+# (fn search, :614-756). `?` binds listed after each statement.
+
+## Q1 blank discovery (active only)
+SELECT DISTINCT p.id FROM products p WHERE p.is_active = 1 ORDER BY p.sku LIMIT ?1
+-- binds: [capped(limit.clamp 1..500)]
+-- include_inactive=true variant: no WHERE clause.
+
+## Q2 barcode-exact fast path (active only; single token, >=3 chars, no whitespace)
+SELECT DISTINCT p.id FROM products p
+     LEFT JOIN product_units u ON u.product_id = p.id
+     WHERE (p.barcode = ?1 OR u.barcode = ?1) AND p.is_active = 1 LIMIT ?2
+-- binds: [trimmed_raw, capped]
+-- include_inactive=true variant: WHERE p.barcode = ?1 OR u.barcode = ?1 (no join parens/is_active).
+-- Falls through to Q3 when zero ids.
+
+## Q3 hybrid infix (template; one 5-column OR-group per token variant, AND across tokens)
+SELECT DISTINCT p.id FROM products p WHERE
+  ((baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\'
+   OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\'
+   OR baraka_search_norm(p.sku) LIKE ? ESCAPE '\'
+   OR baraka_search_norm(p.barcode) LIKE ? ESCAPE '\'
+   OR EXISTS (SELECT 1 FROM product_units pu WHERE pu.product_id = p.id AND baraka_search_norm(pu.barcode) LIKE ? ESCAPE '\'))
+   [OR <next variant group>] ...)
+  [AND (<next token> ...)]
+  [AND p.is_active = 1]
+ ORDER BY CASE
+  WHEN (p.barcode = ? OR EXISTS (SELECT 1 FROM product_units pu WHERE pu.product_id = p.id AND pu.barcode = ?)) THEN 0
+  WHEN baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\'
+    OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\' THEN 1
+  WHEN baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\'
+    OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\' THEN 2
+  ELSE 3 END, p.sku LIMIT ?
+-- per-variant binds (x5, same value): %<arabic_tolerant_like_pattern(escape_like_pattern(variant))>%
+--   where variant = normalize_for_search(token) + dictionary expansions
+-- ranking binds: [trimmed_raw, trimmed_raw, <norm>% , <norm>%, %<first_token_infix>%, %<first_token_infix>%, capped]
+-- norm = normalize_for_search(whole query); first_token_infix = tolerant(escape(groups[0][0]))
+-- NOTE: ORDER BY tier-0 compares RAW p.barcode/pu.barcode to RAW trimmed query (exact scan match, not normalized).
+
+## Normalization (Rust, applied to pattern side; column side via baraka_search_norm scalar)
+-- lowercase -> FR accents to ASCII (incl. oe/ae/c/n) -> strip tashkeel U+064B-0652 + U+0670
+-- -> alef forms to ا, ة to ه, ى to ي, ک to ك, ی to ي -> single-space collapse
+-- residual tolerant wildcards: ا|ه|ي become LIKE `_` in patterns only.
+
+## Indexes available to these queries (migrations 0005/0007/0008/0009/0011/0012)
+-- idx_products_sku, idx_products_barcode, idx_product_units_product_id,
+-- idx_product_units_barcode, idx_products_category_id, idx_products_is_active
+-- NONE on name_fr / name_ar / normalized expressions. Q3 LIKE '%...%' predicates -> full scan.
+-- FTS5 / CREATE VIRTUAL TABLE: zero hits in crates/** and migrations/**.

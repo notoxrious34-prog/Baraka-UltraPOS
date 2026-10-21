@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    CustomerRepository, CustomerSummary, CustomerUpdate, LedgerEntryRow, PaymentRecord,
+    CustomerRepository, CustomerSummary, CustomerUpdate, DeleteAudit, LedgerEntryRow, PaymentRecord,
 };
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
@@ -17,6 +17,7 @@ use chrono::{SecondsFormat, Utc};
 use rusqlite::Connection;
 use uuid::Uuid;
 
+use crate::adapters::sqlite_audit_log::insert_delete_audit_row;
 use crate::persistence::transaction::run_transaction;
 
 /// Parse a stored tier code; unknown or NULL values fall back to `Retail`
@@ -679,36 +680,58 @@ impl CustomerRepository for SqliteCustomerRepository {
         Ok(documents.max(0) as u64 + ledger.max(0) as u64)
     }
 
-    fn hard_delete_customer(&self, customer_id: CustomerId) -> Result<(), ApplicationError> {
-        let guard = self.lock()?;
-        let removed = guard
-            .execute(
+    fn hard_delete_customer(
+        &self,
+        customer_id: CustomerId,
+        audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        run_transaction(&mut guard, |tx| {
+            let removed = tx.execute(
                 "DELETE FROM customers WHERE id = ?1",
                 [customer_id.to_string()],
+            )?;
+            if removed == 0 {
+                return Err(rusqlite::Error::QueryReturnedNoRows.into());
+            }
+            insert_delete_audit_row(
+                tx,
+                "PURGE",
+                "customers",
+                &customer_id.to_string(),
+                audit,
+                &stamp,
             )
-            .map_err(|_| store_failure())?;
-        if removed == 0 {
-            return Err(ApplicationError::NotFound("customer".to_string()));
-        }
-        Ok(())
+        })
+        .map_err(|_| store_failure())
     }
 
     fn set_customer_active(
         &self,
         customer_id: CustomerId,
         active: bool,
+        audit: &DeleteAudit,
     ) -> Result<(), ApplicationError> {
-        let guard = self.lock()?;
+        let mut guard = self.lock()?;
         let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        let removed = guard
-            .execute(
+        run_transaction(&mut guard, |tx| {
+            let removed = tx.execute(
                 "UPDATE customers SET is_active = ?1, updated_at = ?2 WHERE id = ?3",
                 rusqlite::params![i64::from(active), stamp, customer_id.to_string()],
+            )?;
+            if removed == 0 {
+                return Err(rusqlite::Error::QueryReturnedNoRows.into());
+            }
+            insert_delete_audit_row(
+                tx,
+                "DISABLE",
+                "customers",
+                &customer_id.to_string(),
+                audit,
+                &stamp,
             )
-            .map_err(|_| store_failure())?;
-        if removed == 0 {
-            return Err(ApplicationError::NotFound("customer".to_string()));
-        }
-        Ok(())
+        })
+        .map_err(|_| store_failure())
     }
 }

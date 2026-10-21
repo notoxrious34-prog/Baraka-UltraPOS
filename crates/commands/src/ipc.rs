@@ -899,7 +899,7 @@ pub fn catalog_delete_product(
     let session = require_session(&state, &request.session_token)?;
     let id = parse_wire_id(&request.id, "id").map_err(|error| error_code(&error))?;
     let outcome = DeleteProductUseCase::new(state.catalog.as_ref())
-        .execute(&session, ProductId::from(id))
+        .execute(&session, ProductId::from(id), &request.reason)
         .map_err(|error| error_code(&error))?;
     Ok(DeleteEntityResultDto {
         id: outcome.id,
@@ -1251,7 +1251,7 @@ pub fn warehouses_delete(
     let session = require_session(&state, &request.session_token)?;
     let id = parse_wire_id(&request.id, "id").map_err(|error| error_code(&error))?;
     let outcome = DeleteWarehouseUseCase::new(state.warehouses.as_ref())
-        .execute(&session, WarehouseId::from(id))
+        .execute(&session, WarehouseId::from(id), &request.reason)
         .map_err(|error| error_code(&error))?;
     Ok(DeleteEntityResultDto {
         id: outcome.id,
@@ -2648,7 +2648,7 @@ pub fn customers_delete(
         .map(CustomerId::from)
         .map_err(|error| error_code(&error))?;
     let outcome = DeleteCustomerUseCase::new(state.customers.as_ref())
-        .execute(&session, id)
+        .execute(&session, id, &request.reason)
         .map_err(|error| error_code(&error))?;
     Ok(DeleteEntityResultDto {
         id: outcome.id,
@@ -3350,7 +3350,7 @@ pub fn suppliers_delete(
     let session = require_session(&state, &request.session_token)?;
     let supplier_id = parse_supplier_id(&request.id)?;
     let outcome = DeleteSupplierUseCase::new(state.suppliers.as_ref())
-        .execute(&session, &supplier_id)
+        .execute(&session, &supplier_id, &request.reason)
         .map_err(|error| error_code(&error))?;
     Ok(DeleteEntityResultDto {
         id: outcome.id,

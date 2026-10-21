@@ -13,7 +13,8 @@ use baraka_domain::sales::CustomerId;
 
 use crate::errors::ApplicationError;
 use crate::ports::{
-    CustomerRepository, ProductRepository, SessionContext, SupplierRepository, WarehouseRepository,
+    CustomerRepository, DeleteAudit, ProductRepository, SessionContext, SupplierRepository,
+    WarehouseRepository,
 };
 use crate::use_cases::catalog::{require_any, MANAGE_PERMISSIONS};
 
@@ -31,6 +32,34 @@ fn require(session: &SessionContext, permission: Permission) -> Result<(), Appli
     } else {
         Err(ApplicationError::Unauthorized)
     }
+}
+
+/// Purge paths are irreversible: require a non-empty operator reason
+/// (min 3 chars). NOTE: there is no `DomainError::ValidationError` variant
+/// in this tree — the live convention for empty input is
+/// `InvalidCanonicalString("{field} must …")` (`ipc.rs:434`), which the
+/// command layer maps to `INVALID_INPUT`.
+fn check_purge_reason(reason: &str) -> Result<(), ApplicationError> {
+    if reason.trim().len() < 3 {
+        return Err(ApplicationError::Validation(
+            baraka_domain::errors::DomainError::InvalidCanonicalString(
+                "reason must be at least 3 characters".to_string(),
+            ),
+        ));
+    }
+    Ok(())
+}
+
+fn audit_ctx(session: &SessionContext, reason: &str, old_json: String) -> DeleteAudit {
+    DeleteAudit {
+        actor: session.user_id.to_string(),
+        reason: reason.to_string(),
+        old_json,
+    }
+}
+
+fn json_escape(raw: &str) -> String {
+    raw.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 /// Dual-track deletion outcome (mirrors `DeleteEntityResultDto`).
@@ -69,6 +98,7 @@ where
         &self,
         session: &SessionContext,
         id: ProductId,
+        reason: &str,
     ) -> Result<DeleteEntityOutcome, ApplicationError> {
         require_any(session, &MANAGE_PERMISSIONS)?;
         if self.products.find_by_id(id)?.is_none() {
@@ -82,6 +112,11 @@ where
                 message: "PRODUCT_DEACTIVATED_HISTORY",
             });
         }
+        // Purge is irreversible: reason required even though the product
+        // adapter cannot yet persist the audit row in-tx (BRK-076 owns
+        // `sqlite_catalog_repository.rs` uncommitted; audit emission for
+        // products is REMAINING work after it lands).
+        check_purge_reason(reason)?;
         self.products.hard_delete_product(id)?;
         Ok(DeleteEntityOutcome {
             id: id.to_string(),
@@ -113,6 +148,7 @@ where
         &self,
         session: &SessionContext,
         id: CustomerId,
+        reason: &str,
     ) -> Result<DeleteEntityOutcome, ApplicationError> {
         require(session, Permission::ManageCustomerCredit)?;
         let profile = self
@@ -122,15 +158,18 @@ where
         if profile.current_balance_centimes != 0 {
             return Err(coded("CUSTOMER_BALANCE_NONZERO"));
         }
+        let old_json = format!("{{\"id\":\"{}\"}}", json_escape(&id.to_string()));
+        let audit = audit_ctx(session, reason, old_json);
         if self.customers.count_customer_references(id)? > 0 {
-            self.customers.set_customer_active(id, false)?;
+            self.customers.set_customer_active(id, false, &audit)?;
             return Ok(DeleteEntityOutcome {
                 id: id.to_string(),
                 mode: "deactivated",
                 message: "CUSTOMER_DEACTIVATED_HISTORY",
             });
         }
-        self.customers.hard_delete_customer(id)?;
+        check_purge_reason(reason)?;
+        self.customers.hard_delete_customer(id, &audit)?;
         Ok(DeleteEntityOutcome {
             id: id.to_string(),
             mode: "hard_deleted",
@@ -161,20 +200,32 @@ where
         &self,
         session: &SessionContext,
         id: &str,
+        reason: &str,
     ) -> Result<DeleteEntityOutcome, ApplicationError> {
         require(session, Permission::SupplierManage)?;
-        if self.suppliers.get_supplier(id)?.is_none() {
-            return Err(ApplicationError::NotFound("supplier".to_string()));
+        let supplier = self
+            .suppliers
+            .get_supplier(id)?
+            .ok_or_else(|| ApplicationError::NotFound("supplier".to_string()))?;
+        if supplier.current_balance_centimes != 0 {
+            return Err(coded("SUPPLIER_BALANCE_NONZERO"));
         }
+        let old_json = format!(
+            "{{\"id\":\"{}\",\"name\":\"{}\"}}",
+            json_escape(&supplier.id),
+            json_escape(&supplier.name)
+        );
+        let audit = audit_ctx(session, reason, old_json);
         if self.suppliers.count_supplier_references(id)? > 0 {
-            self.suppliers.set_supplier_active(id, false)?;
+            self.suppliers.set_supplier_active(id, false, &audit)?;
             return Ok(DeleteEntityOutcome {
                 id: id.to_string(),
                 mode: "deactivated",
                 message: "SUPPLIER_DEACTIVATED_HISTORY",
             });
         }
-        self.suppliers.hard_delete_supplier(id)?;
+        check_purge_reason(reason)?;
+        self.suppliers.hard_delete_supplier(id, &audit)?;
         Ok(DeleteEntityOutcome {
             id: id.to_string(),
             mode: "hard_deleted",
@@ -206,6 +257,7 @@ where
         &self,
         session: &SessionContext,
         id: WarehouseId,
+        reason: &str,
     ) -> Result<DeleteEntityOutcome, ApplicationError> {
         require(session, Permission::ManageWarehouses)?;
         let warehouse = self
@@ -218,15 +270,22 @@ where
         if self.warehouses.count_warehouse_nonzero_levels(id)? > 0 {
             return Err(coded("WAREHOUSE_HAS_STOCK"));
         }
+        let old_json = format!(
+            "{{\"id\":\"{}\",\"name\":\"{}\"}}",
+            json_escape(&id.to_string()),
+            json_escape(&warehouse.name)
+        );
+        let audit = audit_ctx(session, reason, old_json);
         if self.warehouses.count_warehouse_references(id)? > 0 {
-            self.warehouses.set_warehouse_active(id, false)?;
+            self.warehouses.set_warehouse_active(id, false, &audit)?;
             return Ok(DeleteEntityOutcome {
                 id: id.to_string(),
                 mode: "deactivated",
                 message: "WAREHOUSE_DEACTIVATED_HISTORY",
             });
         }
-        self.warehouses.hard_delete_warehouse(id)?;
+        check_purge_reason(reason)?;
+        self.warehouses.hard_delete_warehouse(id, &audit)?;
         Ok(DeleteEntityOutcome {
             id: id.to_string(),
             mode: "hard_deleted",

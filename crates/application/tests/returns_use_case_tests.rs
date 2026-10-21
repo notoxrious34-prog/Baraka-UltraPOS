@@ -11,7 +11,7 @@ use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
     CashMovementView, CashSessionReport, CashSessionRepository, CashSessionView,
     ConvertBlToFactureCommand, ConvertBlToFactureResult, ConvertDevisToBlCommand,
-    ConvertDevisToBlResult, CustomerRepository, CustomerSummary, CustomerUpdate,
+    ConvertDevisToBlResult, CustomerRepository, CustomerSummary, CustomerUpdate, DeleteAudit,
     DocumentRepository, DocumentSearchFilter, DocumentSummary, LedgerEntryRow, PaymentRecord,
     PersistReturnOrder, PersistReturnReceipt, ReturnRepository,
 };
@@ -352,7 +352,11 @@ impl CustomerRepository for FakeCustomers {
         panic!("out of scope for return tests");
     }
 
-    fn hard_delete_customer(&self, _customer_id: CustomerId) -> Result<(), ApplicationError> {
+    fn hard_delete_customer(
+        &self,
+        _customer_id: CustomerId,
+        _audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError> {
         panic!("out of scope for return tests");
     }
 
@@ -360,6 +364,7 @@ impl CustomerRepository for FakeCustomers {
         &self,
         _customer_id: CustomerId,
         _active: bool,
+        _audit: &DeleteAudit,
     ) -> Result<(), ApplicationError> {
         panic!("out of scope for return tests");
     }

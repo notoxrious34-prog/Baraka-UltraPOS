@@ -2484,6 +2484,9 @@ pub struct DeleteEntityRequestDto {
     pub session_token: String,
     /// Target entity id (UUID string).
     pub id: String,
+    /// Operator reason (mandatory, min 3 chars, on irreversible purges;
+    /// recorded best-effort on deactivations).
+    pub reason: String,
 }
 
 /// Dual-track deletion outcome (mirrors `DeleteEntityOutcome`).

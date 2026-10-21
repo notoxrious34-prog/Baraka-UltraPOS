@@ -365,11 +365,20 @@ pub trait WarehouseRepository: Send + Sync {
     /// Count stock level rows holding non-zero quantity in the warehouse.
     fn count_warehouse_nonzero_levels(&self, id: WarehouseId) -> Result<u64, ApplicationError>;
 
-    /// Permanently purge an unreferenced, empty warehouse.
-    fn hard_delete_warehouse(&self, id: WarehouseId) -> Result<(), ApplicationError>;
+    /// Permanently purge an unreferenced, empty warehouse (audited in-tx).
+    fn hard_delete_warehouse(
+        &self,
+        id: WarehouseId,
+        audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError>;
 
-    /// Soft-deactivate a historically referenced warehouse.
-    fn set_warehouse_active(&self, id: WarehouseId, active: bool) -> Result<(), ApplicationError>;
+    /// Soft-deactivate a historically referenced warehouse (audited in-tx).
+    fn set_warehouse_active(
+        &self,
+        id: WarehouseId,
+        active: bool,
+        audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError>;
 }
 
 /// Atomic stock-movement command (single ledger line + level update).
@@ -1060,6 +1069,19 @@ pub struct StoredCommand {
     pub response_payload: String,
 }
 
+/// Audit context for a dual-track delete/deactivate (TASK-BRK-080).
+/// The adapter persists the audit row in the SAME transaction as the
+/// mutation via the hash-chained `audit_log` table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeleteAudit {
+    /// Acting operator id (session user id string).
+    pub actor: String,
+    /// Operator reason; non-empty (min 3 chars) on PURGE paths, best-effort on DISABLE.
+    pub reason: String,
+    /// Before-state snapshot JSON (`{"id":…[, "name":…]}`).
+    pub old_json: String,
+}
+
 /// Customer credit port (SQLite repository in infrastructure).
 ///
 /// The three TASK-BRK-006 methods (`get_credit_profile`,
@@ -1141,14 +1163,19 @@ pub trait CustomerRepository: Send + Sync {
     /// Count historical references: sale documents (party) + ledger rows.
     fn count_customer_references(&self, customer_id: CustomerId) -> Result<u64, ApplicationError>;
 
-    /// Permanently purge an unreferenced, zero-balance customer.
-    fn hard_delete_customer(&self, customer_id: CustomerId) -> Result<(), ApplicationError>;
+    /// Permanently purge an unreferenced, zero-balance customer (audited in-tx).
+    fn hard_delete_customer(
+        &self,
+        customer_id: CustomerId,
+        audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError>;
 
-    /// Soft-deactivate a historically referenced customer.
+    /// Soft-deactivate a historically referenced customer (audited in-tx).
     fn set_customer_active(
         &self,
         customer_id: CustomerId,
         active: bool,
+        audit: &DeleteAudit,
     ) -> Result<(), ApplicationError>;
 }
 
@@ -1754,11 +1781,20 @@ pub trait SupplierRepository: Send + Sync {
     /// Count historical references: purchase documents (party) + ledger rows.
     fn count_supplier_references(&self, supplier_id: &str) -> Result<u64, ApplicationError>;
 
-    /// Permanently purge an unreferenced supplier.
-    fn hard_delete_supplier(&self, supplier_id: &str) -> Result<(), ApplicationError>;
+    /// Permanently purge an unreferenced supplier (audited in-tx).
+    fn hard_delete_supplier(
+        &self,
+        supplier_id: &str,
+        audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError>;
 
-    /// Soft-deactivate a historically referenced supplier.
-    fn set_supplier_active(&self, supplier_id: &str, active: bool) -> Result<(), ApplicationError>;
+    /// Soft-deactivate a historically referenced supplier (audited in-tx).
+    fn set_supplier_active(
+        &self,
+        supplier_id: &str,
+        active: bool,
+        audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError>;
 }
 
 /// One purchase document line (input to create/receive/invoice).

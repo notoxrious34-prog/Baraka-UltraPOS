@@ -9,14 +9,15 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    NewSupplier, SupplierLedgerRow, SupplierRepository, SupplierStatement, SupplierUpdate,
-    SupplierView,
+    DeleteAudit, NewSupplier, SupplierLedgerRow, SupplierRepository, SupplierStatement,
+    SupplierUpdate, SupplierView,
 };
 use baraka_domain::errors::DomainError;
 use chrono::{SecondsFormat, Utc};
 use rusqlite::Connection;
 use uuid::Uuid;
 
+use crate::adapters::sqlite_audit_log::insert_delete_audit_row;
 use crate::persistence::transaction::run_transaction;
 use crate::persistence::InfrastructureError;
 
@@ -347,29 +348,41 @@ impl SupplierRepository for SqliteSupplierRepository {
         Ok(documents.max(0) as u64 + ledger.max(0) as u64)
     }
 
-    fn hard_delete_supplier(&self, supplier_id: &str) -> Result<(), ApplicationError> {
-        let guard = self.lock()?;
-        let removed = guard
-            .execute("DELETE FROM suppliers WHERE id = ?1", [supplier_id])
-            .map_err(|_| store_failure())?;
-        if removed == 0 {
-            return Err(ApplicationError::NotFound("supplier".to_string()));
-        }
-        Ok(())
+    fn hard_delete_supplier(
+        &self,
+        supplier_id: &str,
+        audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        run_transaction(&mut guard, |tx| {
+            let removed = tx.execute("DELETE FROM suppliers WHERE id = ?1", [supplier_id])?;
+            if removed == 0 {
+                return Err(rusqlite::Error::QueryReturnedNoRows.into());
+            }
+            insert_delete_audit_row(tx, "PURGE", "suppliers", supplier_id, audit, &stamp)
+        })
+        .map_err(|_| store_failure())
     }
 
-    fn set_supplier_active(&self, supplier_id: &str, active: bool) -> Result<(), ApplicationError> {
-        let guard = self.lock()?;
+    fn set_supplier_active(
+        &self,
+        supplier_id: &str,
+        active: bool,
+        audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
         let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        let removed = guard
-            .execute(
+        run_transaction(&mut guard, |tx| {
+            let removed = tx.execute(
                 "UPDATE suppliers SET is_active = ?1, updated_at = ?2 WHERE id = ?3",
                 rusqlite::params![i64::from(active), stamp, supplier_id],
-            )
-            .map_err(|_| store_failure())?;
-        if removed == 0 {
-            return Err(ApplicationError::NotFound("supplier".to_string()));
-        }
-        Ok(())
+            )?;
+            if removed == 0 {
+                return Err(rusqlite::Error::QueryReturnedNoRows.into());
+            }
+            insert_delete_audit_row(tx, "DISABLE", "suppliers", supplier_id, audit, &stamp)
+        })
+        .map_err(|_| store_failure())
     }
 }

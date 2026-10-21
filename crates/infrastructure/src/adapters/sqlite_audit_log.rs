@@ -76,6 +76,51 @@ pub fn insert_audit_row(
     Ok(())
 }
 
+/// Append one dual-track delete/deactivate event inside the CALLER's
+/// transaction (TASK-BRK-080). Same hash chain as the other writers.
+/// `action` is `DISABLE` or `PURGE`; for `PURGE` the newest prior `DISABLE`
+/// row for the entity is linked via `prior_disable_seq` (null when the
+/// entity purged without a prior disable, e.g. never referenced).
+pub fn insert_delete_audit_row(
+    tx: &Transaction,
+    action: &str,
+    entity_type: &str,
+    entity_id: &str,
+    audit: &baraka_application::ports::DeleteAudit,
+    stamp: &str,
+) -> Result<(), crate::persistence::InfrastructureError> {
+    let prior_disable_seq: Option<i64> = if action == "PURGE" {
+        tx.query_row(
+            "SELECT MAX(sequence_no) FROM audit_log
+             WHERE action = 'DISABLE' AND entity_type = ?1 AND entity_id = ?2",
+            rusqlite::params![entity_type, entity_id],
+            |row| row.get(0),
+        )?
+    } else {
+        None
+    };
+    let new_json = match prior_disable_seq {
+        Some(seq) => format!(
+            "{{\"reason\":\"{}\",\"prior_disable_seq\":{seq}}}",
+            audit.reason.replace('\\', "\\\\").replace('"', "\\\"")
+        ),
+        None => format!(
+            "{{\"reason\":\"{}\",\"prior_disable_seq\":null}}",
+            audit.reason.replace('\\', "\\\\").replace('"', "\\\"")
+        ),
+    };
+    insert_cash_audit_row(
+        tx,
+        action,
+        entity_type,
+        entity_id,
+        Some(&audit.old_json),
+        &new_json,
+        &audit.actor,
+        stamp,
+    )
+}
+
 /// Append one generic cash audit event inside the CALLER's transaction.
 ///
 /// Same hash chain as [`insert_audit_row`]; variance and other business

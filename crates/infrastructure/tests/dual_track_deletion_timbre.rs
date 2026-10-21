@@ -208,7 +208,7 @@ fn test_hard_delete_unreferenced_product() {
     let harness = setup();
     let (product, _unit) = seed_product(&harness, "DUAL-001");
     let outcome = DeleteProductUseCase::new(&harness.catalog)
-        .execute(&admin(), product)
+        .execute(&admin(), product, "test cleanup")
         .expect("delete");
     assert_eq!(outcome.mode, "hard_deleted");
     assert!(harness
@@ -256,7 +256,7 @@ fn test_soft_deactivate_referenced_product() {
         )
         .expect("adjust");
     let outcome = DeleteProductUseCase::new(&harness.catalog)
-        .execute(&admin(), product)
+        .execute(&admin(), product, "test cleanup")
         .expect("delete");
     assert_eq!(outcome.mode, "deactivated");
     assert!(row_exists("products", &harness, &product.to_string()));
@@ -272,7 +272,7 @@ fn test_hard_delete_unreferenced_customer() {
     let harness = setup();
     let id = seed_customer(&harness, "Client Inactif");
     let outcome = DeleteCustomerUseCase::new(&harness.customers)
-        .execute(&admin(), id)
+        .execute(&admin(), id, "test cleanup")
         .expect("delete");
     assert_eq!(outcome.mode, "hard_deleted");
     assert!(!row_exists("customers", &harness, &id.to_string()));
@@ -305,7 +305,7 @@ fn test_soft_deactivate_referenced_customer() {
         )
         .expect("seed document");
     let outcome = DeleteCustomerUseCase::new(&harness.customers)
-        .execute(&admin(), id)
+        .execute(&admin(), id, "test cleanup")
         .expect("delete");
     assert_eq!(outcome.mode, "deactivated");
     assert!(row_exists("customers", &harness, &id.to_string()));
@@ -326,7 +326,8 @@ fn test_reject_customer_deletion_with_non_zero_balance() {
             [id.to_string()],
         )
         .expect("set balance");
-    let rejected = DeleteCustomerUseCase::new(&harness.customers).execute(&admin(), id);
+    let rejected =
+        DeleteCustomerUseCase::new(&harness.customers).execute(&admin(), id, "test cleanup");
     assert!(
         matches!(rejected, Err(ApplicationError::Validation(_))),
         "unexpected: {rejected:?}"
@@ -345,7 +346,8 @@ fn test_reject_dep01_deletion_and_deactivation() {
         .expect("lookup")
         .expect("DEP-01 seeded by migration 0012");
     assert_eq!(warehouse.code.as_str(), "DEP-01");
-    let deleted = DeleteWarehouseUseCase::new(&harness.warehouses).execute(&admin(), dep01());
+    let deleted =
+        DeleteWarehouseUseCase::new(&harness.warehouses).execute(&admin(), dep01(), "test cleanup");
     assert!(
         matches!(deleted, Err(ApplicationError::Validation(_))),
         "unexpected: {deleted:?}"
@@ -386,7 +388,11 @@ fn test_warehouse_deletion_and_stock_guard() {
             },
         )
         .expect("adjust");
-    let blocked = DeleteWarehouseUseCase::new(&harness.warehouses).execute(&admin(), stocked_id);
+    let blocked = DeleteWarehouseUseCase::new(&harness.warehouses).execute(
+        &admin(),
+        stocked_id,
+        "test cleanup",
+    );
     assert!(
         matches!(blocked, Err(ApplicationError::Validation(_))),
         "unexpected: {blocked:?}"
@@ -417,7 +423,7 @@ fn test_warehouse_deletion_and_stock_guard() {
         .execute(&admin(), "WH-04", "Dépôt Éphémère", TERMINAL)
         .expect("create fresh");
     let outcome = DeleteWarehouseUseCase::new(&harness.warehouses)
-        .execute(&admin(), fresh_id)
+        .execute(&admin(), fresh_id, "test cleanup")
         .expect("delete");
     assert_eq!(outcome.mode, "hard_deleted");
     assert!(!row_exists("warehouses", &harness, &fresh_id.to_string()));

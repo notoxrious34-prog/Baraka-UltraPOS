@@ -3,11 +3,12 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
-use baraka_application::ports::WarehouseRepository;
+use baraka_application::ports::{DeleteAudit, WarehouseRepository};
 use baraka_domain::inventory::{Warehouse, WarehouseCode, WarehouseId};
 use rusqlite::Connection;
 use uuid::Uuid;
 
+use crate::adapters::sqlite_audit_log::insert_delete_audit_row;
 use crate::persistence::transaction::run_transaction;
 
 /// Static, non-leaking mapping for unexpected storage failures.
@@ -203,32 +204,43 @@ impl WarehouseRepository for SqliteWarehouseRepository {
         Ok(count.max(0) as u64)
     }
 
-    fn hard_delete_warehouse(&self, id: WarehouseId) -> Result<(), ApplicationError> {
+    fn hard_delete_warehouse(
+        &self,
+        id: WarehouseId,
+        audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError> {
         let mut guard = self.lock()?;
         let key = id.to_string();
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         run_transaction(&mut guard, |tx| {
             tx.execute("DELETE FROM stock_levels WHERE warehouse_id = ?1", [&key])?;
             let removed = tx.execute("DELETE FROM warehouses WHERE id = ?1", [&key])?;
             if removed == 0 {
                 return Err(rusqlite::Error::QueryReturnedNoRows.into());
             }
-            Ok(())
+            insert_delete_audit_row(tx, "PURGE", "warehouses", &key, audit, &stamp)
         })
         .map_err(|_| store_failure())
     }
 
-    fn set_warehouse_active(&self, id: WarehouseId, active: bool) -> Result<(), ApplicationError> {
-        let guard = self.lock()?;
+    fn set_warehouse_active(
+        &self,
+        id: WarehouseId,
+        active: bool,
+        audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
         let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        let removed = guard
-            .execute(
+        run_transaction(&mut guard, |tx| {
+            let removed = tx.execute(
                 "UPDATE warehouses SET is_active = ?1, updated_at = ?2 WHERE id = ?3",
                 rusqlite::params![i64::from(active), stamp, id.to_string()],
-            )
-            .map_err(|_| store_failure())?;
-        if removed == 0 {
-            return Err(ApplicationError::NotFound("warehouse".to_string()));
-        }
-        Ok(())
+            )?;
+            if removed == 0 {
+                return Err(rusqlite::Error::QueryReturnedNoRows.into());
+            }
+            insert_delete_audit_row(tx, "DISABLE", "warehouses", &id.to_string(), audit, &stamp)
+        })
+        .map_err(|_| store_failure())
     }
 }

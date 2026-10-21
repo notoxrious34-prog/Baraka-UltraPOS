@@ -99,7 +99,7 @@ export function PrintStatusIndicator({ documentId }: PrintStatusIndicatorProps):
         : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200";
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1" aria-live="polite">
       <div className="flex items-center justify-between gap-2">
         <span className={`rounded-full px-2 py-1 text-[11px] font-black ${tone}`}>{label}</span>
         <button
@@ -111,6 +111,14 @@ export function PrintStatusIndicator({ documentId }: PrintStatusIndicatorProps):
           {reprinting ? t(locale, "print.reprinting") : t(locale, "print.reprint")}
         </button>
       </div>
+      {status !== null && status.status === "FAILED" && (
+        <p
+          role="alert"
+          className="rounded-md bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200"
+        >
+          {t(locale, "print.failedGuidance")}
+        </p>
+      )}
       {error !== null && (
         <p className="rounded-md bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
           {error}

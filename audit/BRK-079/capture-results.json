@@ -1,0 +1,55 @@
+{
+  "results": [
+    {
+      "name": "pos-failed-1280x800-fr-light.png: tender inputs",
+      "ok": true,
+      "detail": "Scanner un code-barres ou rechercher (F1)...|text|text|text|text"
+    },
+    {
+      "name": "pos-failed-1280x800-fr-light.png: post-confirm diag",
+      "ok": true,
+      "detail": "CALLS={\"auth_login\":1,\"warehouses_list\":1,\"cash_get_active_session\":4,\"documents_search\":5,\"catalog_search\":4,\"cash_get_session_report\":1,\"stock_get\":2,\"sales_preview_totals\":5,\"sales_checkout\":1,\"documents_get_print_status\":2} UNMOCKED=none MODAL=ez un code-barres ou cliquez sur un produit pour commencer.\n\n[F1] Recherche\n[F2] Client\n[F12] Encaisser\nSous-total HT\n0,00 DZD\nRemise globale\n−0,00 DZD\nTVA\n0,00 DZD\nTOTAL TTC\n0,00 DZD\nF1\nRecherche\nF2\nClient\nF3\nUnité\nF4\nQuantité\nF5\nRemise\nF6\nF6 Reprendre\nF8\nParquer\nF10\nDocument\nF12\nEncaisser\nEsc\nFermer\nSuppr\nSuppr. ligne\n↑↓\nNaviguer\nEncaissement (F12)\n✕\n\nVente validée — TIC-2026-0455\n\nÉchec d'impression\nRéimprimer\n\nVérifiez l'imprimante et les paramètres, puis réimprimez.\n\nVente suivante (Entrée)"
+    },
+    {
+      "name": "pos-failed-1280x800-fr-light.png: failed banner + chip + reprint",
+      "ok": true,
+      "detail": "banner=\"Vérifiez l'imprimante et les paramètres, puis réimprimez.\" chip=true reprint=true live=true noPageScroll=true"
+    },
+    {
+      "name": "pos-failed-1280x800-ar-dark.png: tender inputs",
+      "ok": true,
+      "detail": "امسح الباركود أو ابحث (F1)...|text|text|text|text"
+    },
+    {
+      "name": "pos-failed-1280x800-ar-dark.png: post-confirm diag",
+      "ok": true,
+      "detail": "CALLS={\"auth_login\":1,\"warehouses_list\":1,\"cash_get_active_session\":4,\"documents_search\":5,\"catalog_search\":4,\"cash_get_session_report\":1,\"stock_get\":2,\"sales_preview_totals\":5,\"sales_checkout\":1,\"documents_get_print_status\":2} UNMOCKED=none MODAL=00 د.ج\nتذكرة صندوق\nفاتورة قانونية\nوصل تسليم\nزبون نقدي\nF2\n\nالسلة فارغة — امسح أو ابحث عن منتج\n\nامسح رمز شريط أو انقر على منتج للبدء.\n\n[F1] بحث\n[F2] زبون\n[F12] الدفع\nالمجموع HT\n0,00 د.ج\nالتخفيض العام\n−0,00 د.ج\nالضريبة TVA\n0,00 د.ج\nالمجموع TTC\n0,00 د.ج\nF1\nبحث\nF2\nزبون\nF3\nوحدة\nF4\nكمية\nF5\nتخفيض\nF6\nF6 استرجاع\nF8\nتعليق\nF10\nمستند\nF12\nدفع\nEsc\nإغلاق\nSuppr\nحذف سطر\n↑↓\nتنقل\nالدفع (F12)\n✕\n\nتم البيع بنجاح — TIC-2026-0455\n\nفشلت الطباعة\nإعادة الطباعة\n\nتحقق من الطابعة والإعدادات، ثم أعد الطباعة.\n\nبيع جديد (Entrée)"
+    },
+    {
+      "name": "pos-failed-1280x800-ar-dark.png: failed banner + chip + reprint",
+      "ok": true,
+      "detail": "banner=\"تحقق من الطابعة والإعدادات، ثم أعد الطباعة.\" chip=true reprint=true live=true noPageScroll=true"
+    },
+    {
+      "name": "pos-failed-1024x600-fr-light.png: tender inputs",
+      "ok": true,
+      "detail": "Scanner un code-barres ou rechercher (F1)...|text|text|text|text"
+    },
+    {
+      "name": "pos-failed-1024x600-fr-light.png: post-confirm diag",
+      "ok": true,
+      "detail": "CALLS={\"auth_login\":1,\"warehouses_list\":1,\"cash_get_active_session\":4,\"documents_search\":5,\"catalog_search\":4,\"cash_get_session_report\":1,\"stock_get\":2,\"sales_preview_totals\":5,\"sales_checkout\":1,\"documents_get_print_status\":2} UNMOCKED=none MODAL=ez un code-barres ou cliquez sur un produit pour commencer.\n\n[F1] Recherche\n[F2] Client\n[F12] Encaisser\nSous-total HT\n0,00 DZD\nRemise globale\n−0,00 DZD\nTVA\n0,00 DZD\nTOTAL TTC\n0,00 DZD\nF1\nRecherche\nF2\nClient\nF3\nUnité\nF4\nQuantité\nF5\nRemise\nF6\nF6 Reprendre\nF8\nParquer\nF10\nDocument\nF12\nEncaisser\nEsc\nFermer\nSuppr\nSuppr. ligne\n↑↓\nNaviguer\nEncaissement (F12)\n✕\n\nVente validée — TIC-2026-0455\n\nÉchec d'impression\nRéimprimer\n\nVérifiez l'imprimante et les paramètres, puis réimprimez.\n\nVente suivante (Entrée)"
+    },
+    {
+      "name": "pos-failed-1024x600-fr-light.png: failed banner + chip + reprint",
+      "ok": true,
+      "detail": "banner=\"Vérifiez l'imprimante et les paramètres, puis réimprimez.\" chip=true reprint=true live=true noPageScroll=true"
+    },
+    {
+      "name": "zero console errors across captures",
+      "ok": true,
+      "detail": "0 console errors"
+    }
+  ],
+  "errors": []
+}

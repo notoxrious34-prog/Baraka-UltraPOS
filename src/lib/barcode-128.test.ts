@@ -15,7 +15,9 @@ import {
   code128ModuleCount,
   code128Pattern,
   encodeCode128B,
+  fitModuleWidth,
   generateCode128Svg,
+  labelBarcodeBudgetPx,
 } from "@/lib/barcode-128";
 
 describe("encodeCode128B", () => {
@@ -73,5 +75,35 @@ describe("generateCode128Svg", () => {
   it("rejects non-positive geometry", () => {
     expect(() => generateCode128Svg("AB", { moduleWidth: 0 })).toThrowError();
     expect(() => generateCode128Svg("AB", { height: -5 })).toThrowError();
+  });
+});
+
+describe("labelBarcodeBudgetPx", () => {
+  it("publishes the printable CSS-px budget per preset", () => {
+    expect(labelBarcodeBudgetPx("50x30")).toBe(174);
+    expect(labelBarcodeBudgetPx("40x25")).toBe(136);
+    expect(labelBarcodeBudgetPx("100x50")).toBe(362);
+    expect(labelBarcodeBudgetPx("39x20")).toBe(132);
+  });
+});
+
+describe("fitModuleWidth", () => {
+  it("fits a 13-char code into the 39x20 budget without clipping", () => {
+    const mw = fitModuleWidth(13, labelBarcodeBudgetPx("39x20"), 1);
+    expect(mw).toBeLessThanOrEqual(1);
+    expect(mw).toBeGreaterThan(0);
+    expect((code128ModuleCount(13) + 2 * CODE128_QUIET_MODULES) * mw).toBeLessThanOrEqual(132);
+  });
+
+  it("keeps the preferred width for short payloads", () => {
+    expect(fitModuleWidth(5, labelBarcodeBudgetPx("39x20"), 1)).toBe(1);
+  });
+
+  it("never grows beyond the preferred width", () => {
+    expect(fitModuleWidth(2, 10000, 1)).toBe(1);
+  });
+
+  it("falls back to preferred on degenerate input", () => {
+    expect(fitModuleWidth(3, 0, 2)).toBe(2);
   });
 });

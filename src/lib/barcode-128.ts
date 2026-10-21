@@ -184,6 +184,50 @@ export interface Code128SvgOptions {
   includeText?: boolean;
 }
 
+/**
+ * Printable-width budget per label stock, in CSS px at 96 CSS px/in.
+ * 203 DPI hardware maps 1 CSS px to ~2.115 dots; 2 mm side margins assumed.
+ *
+ * | preset | mm      | full-bleed dots | printable px | barcode budget |
+ * |--------|---------|-----------------|--------------|----------------|
+ * | 50x30  | 50 x 30 | 400 x 240       | ~174         | 174            |
+ * | 40x25  | 40 x 25 | 320 x 200       | ~136         | 136            |
+ * | 100x50 | 100x 50 | 800 x 400       | ~362         | 362            |
+ * | 39x20  | 39 x 20 | 312 x 160       | ~132         | 132            |
+ *
+ * A 13-character Subset-B payload carries 11*13+55 = 198 modules, i.e.
+ * 396 px at moduleWidth 2 — over every budget except 100x50. The 39x20
+ * path therefore shrinks the module width to fit (see fitModuleWidth);
+ * legacy presets keep their historical fixed width of 2 (byte-identical).
+ */
+
+/** Printable barcode width budget (CSS px) for a label preset. */
+export function labelBarcodeBudgetPx(preset: "50x30" | "40x25" | "100x50" | "39x20"): number {
+  switch (preset) {
+    case "50x30":
+      return 174;
+    case "40x25":
+      return 136;
+    case "100x50":
+      return 362;
+    case "39x20":
+      return 132;
+  }
+}
+
+/**
+ * Shrink a preferred module width so `charCount` characters fit `budgetPx`.
+ * Never grows (returns at most `preferred`); may return a fractional width —
+ * scanability at sub-1.0 widths is an owner-gated hardware question.
+ */
+export function fitModuleWidth(charCount: number, budgetPx: number, preferred: number): number {
+  const modules = code128ModuleCount(charCount) + 2 * CODE128_QUIET_MODULES;
+  if (modules <= 0 || budgetPx <= 0) {
+    return preferred;
+  }
+  return Math.min(preferred, budgetPx / modules);
+}
+
 function escapeXml(text: string): string {
   return text
     .replace(/&/g, "&amp;")

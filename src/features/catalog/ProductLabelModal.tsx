@@ -12,20 +12,21 @@ import { t } from "@/lib/i18n";
 import type { Locale } from "@/types/pos";
 import type { CatalogProduct } from "@/types/pos";
 import { formatMoney } from "@/lib/money";
-import { generateCode128Svg } from "@/lib/barcode-128";
+import { generateCode128Svg, fitModuleWidth, labelBarcodeBudgetPx } from "@/lib/barcode-128";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useStoreIdentityStore } from "@/stores/store-identity-store";
 
 /** Supported thermal label presets. */
-export type LabelFormat = "50x30" | "40x25" | "100x50";
+export type LabelFormat = "39x20" | "50x30" | "40x25" | "100x50";
 
 export const LABEL_FORMATS: Record<LabelFormat, { widthMm: number; heightMm: number }> = {
+  "39x20": { widthMm: 39, heightMm: 20 },
   "50x30": { widthMm: 50, heightMm: 30 },
   "40x25": { widthMm: 40, heightMm: 25 },
   "100x50": { widthMm: 100, heightMm: 50 },
 };
 
-export const LABEL_FORMAT_ORDER: LabelFormat[] = ["50x30", "40x25", "100x50"];
+export const LABEL_FORMAT_ORDER: LabelFormat[] = ["39x20", "50x30", "40x25", "100x50"];
 
 /** Clamp a raw quantity into the 1..500 print range (default 1). */
 export function clampLabelQuantity(raw: number): number {
@@ -55,6 +56,24 @@ function formatDisplayName(product: CatalogProduct, locale: Locale): string {
   return locale === "ar-DZ" ? product.name_ar : product.name_fr;
 }
 
+/** Barcode geometry for a format: fixed moduleWidth 2 + 56px bars on legacy
+ * presets (byte-identical history); 39x20 shrinks the module to fit the
+ * 132px printable budget (never clips) with 36px bars and no SVG caption
+ * (the code travels in the `.code` div with ellipsis + title instead). */
+export function resolveLabelBarcode(
+  source: string,
+  format: LabelFormat,
+): { svg: string; moduleWidth: number } {
+  if (format !== "39x20") {
+    return { svg: generateCode128Svg(source, { moduleWidth: 2, height: 56 }), moduleWidth: 2 };
+  }
+  const moduleWidth = fitModuleWidth(source.length, labelBarcodeBudgetPx("39x20"), 1);
+  return {
+    svg: generateCode128Svg(source, { moduleWidth, height: 36, includeText: false }),
+    moduleWidth,
+  };
+}
+
 /** Sale price + unit display name for the label (base unit preferred). */
 export function labelPriceUnit(product: CatalogProduct): { priceCentimes: string; unitFr: string } {
   const unit =
@@ -78,11 +97,20 @@ export function buildLabelPrintHtml(args: LabelPrintArgs): string {
   const { widthMm, heightMm } = LABEL_FORMATS[args.format];
   const copies = clampLabelQuantity(args.quantity);
   const source = labelBarcodeSource(args.product);
-  const svg = generateCode128Svg(source, { moduleWidth: 2, height: 56 });
+  const { svg } = resolveLabelBarcode(source, args.format);
   const { priceCentimes, unitFr } = labelPriceUnit(args.product);
-  const sticker = `<div class="sticker"><div class="shop">${escapePrint(args.storeName)}</div><div class="name">${escapePrint(formatDisplayName(args.product, args.locale))}</div><div class="price">${escapePrint(formatMoney(priceCentimes, args.locale))}${unitFr === "" ? "" : ` <span class="unit">/${escapePrint(unitFr)}</span>`}</div><div class="bars">${svg}</div><div class="code">${escapePrint(source)}</div></div>`;
-  const pages = Array.from({ length: copies }, () => sticker).join("");
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>labels</title><style>@page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }html,body { margin: 0; padding: 0; }.sticker { width: ${widthMm}mm; height: ${heightMm}mm; page-break-after: always; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; overflow: hidden; }.shop { font-size: 8pt; font-weight: bold; }.name { font-size: 9pt; font-weight: bold; }.price { font-size: 12pt; font-weight: bold; }.unit { font-size: 8pt; }.code { font-size: 8pt; font-family: monospace; }</style></head><body>${pages}</body></html>`;
+  const price = `<div class="price">${escapePrint(formatMoney(priceCentimes, args.locale))}${unitFr === "" ? "" : ` <span class="unit">/${escapePrint(unitFr)}</span>`}</div>`;
+  const name = `<div class="name">${escapePrint(formatDisplayName(args.product, args.locale))}</div>`;
+  const pages = Array.from({ length: copies }, () =>
+    args.format === "39x20"
+      ? `<div class="sticker compact">${name}${price}<div class="bars">${svg}</div><div class="code" title="${escapePrint(source)}">${escapePrint(source)}</div></div>`
+      : `<div class="sticker"><div class="shop">${escapePrint(args.storeName)}</div>${name}${price}<div class="bars">${svg}</div><div class="code">${escapePrint(source)}</div></div>`,
+  ).join("");
+  const style =
+    args.format === "39x20"
+      ? `@page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }html,body { margin: 0; padding: 0; }.sticker { width: ${widthMm}mm; height: ${heightMm}mm; page-break-after: always; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; overflow: hidden; }.compact .name { font-size: 8pt; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }.compact .price { font-size: 10pt; font-weight: bold; }.compact .bars { width: 100%; display: flex; justify-content: center; }.compact .bars svg { max-width: 100%; height: auto; }.compact .code { font-size: 7pt; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }`
+      : `@page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }html,body { margin: 0; padding: 0; }.sticker { width: ${widthMm}mm; height: ${heightMm}mm; page-break-after: always; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; overflow: hidden; }.shop { font-size: 8pt; font-weight: bold; }.name { font-size: 9pt; font-weight: bold; }.price { font-size: 12pt; font-weight: bold; }.unit { font-size: 8pt; }.code { font-size: 8pt; font-family: monospace; }`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>labels</title><style>${style}</style></head><body>${pages}</body></html>`;
 }
 
 function escapePrint(text: string): string {
@@ -130,6 +158,8 @@ export function printLabelDocument(docHtml: string): void {
 
 function presetLabel(format: LabelFormat, locale: Locale): string {
   switch (format) {
+    case "39x20":
+      return locale === "ar-DZ" ? "39 × 20 مم (مصغّر)" : "39 × 20 mm (Mini Étiquette)";
     case "50x30":
       return locale === "ar-DZ" ? "50 × 30 مم (قياسي)" : "50 × 30 mm (Standard Rayon)";
     case "40x25":
@@ -155,9 +185,10 @@ export interface ProductLabelModalViewProps {
 export function ProductLabelModalView(props: ProductLabelModalViewProps): ReactElement {
   const { product, locale, storeName, format, quantity } = props;
   const source = labelBarcodeSource(product);
-  const svg = generateCode128Svg(source, { moduleWidth: 2, height: 56 });
+  const { svg } = resolveLabelBarcode(source, format);
   const { priceCentimes, unitFr } = labelPriceUnit(product);
   const dims = LABEL_FORMATS[format];
+  const compact = format === "39x20";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
       <div className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-slate-900">
@@ -229,19 +260,36 @@ export function ProductLabelModalView(props: ProductLabelModalViewProps): ReactE
                 className="flex flex-col items-center justify-center gap-0.5 overflow-hidden border border-slate-400 bg-white px-2 py-1 text-slate-900"
                 style={{ aspectRatio: `${dims.widthMm} / ${dims.heightMm}`, maxWidth: "100%" }}
               >
-                <p className="text-[10px] font-bold">{storeName}</p>
-                <p className="max-w-full truncate text-xs font-extrabold">
+                {compact ? null : <p className="text-[10px] font-bold">{storeName}</p>}
+                <p
+                  className={
+                    compact
+                      ? "max-w-full truncate text-[11px] font-extrabold"
+                      : "max-w-full truncate text-xs font-extrabold"
+                  }
+                >
                   {formatDisplayName(product, locale)}
                 </p>
-                <p className="text-sm font-black">
+                <p className={compact ? "text-[13px] font-black" : "text-sm font-black"}>
                   {formatMoney(priceCentimes, locale)}
                   {unitFr === "" ? "" : ` / ${unitFr}`}
                 </p>
                 <div
                   className="w-full"
+                  style={compact ? { maxWidth: 132 } : undefined}
                   dangerouslySetInnerHTML={{ __html: svg }}
                 />
-                <p className="font-mono text-[10px]">{source}</p>
+                <p
+                  className="max-w-full font-mono text-[10px]"
+                  style={
+                    compact
+                      ? { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }
+                      : undefined
+                  }
+                  title={compact ? source : undefined}
+                >
+                  {source}
+                </p>
               </div>
             </div>
           </div>

@@ -1,0 +1,25 @@
+{
+  "results": [
+    {
+      "name": "shot label-39x20-1280x800-fr-light",
+      "ok": true,
+      "detail": "39x20 fr/light, no overflow"
+    },
+    {
+      "name": "shot label-39x20-1280x800-ar-dark",
+      "ok": true,
+      "detail": "39x20 ar/dark, no overflow"
+    },
+    {
+      "name": "shot label-50x30-1024x600-fr-light",
+      "ok": true,
+      "detail": "legacy 50x30, no overflow"
+    },
+    {
+      "name": "zero console errors across captures",
+      "ok": true,
+      "detail": "0 console errors"
+    }
+  ],
+  "errors": []
+}

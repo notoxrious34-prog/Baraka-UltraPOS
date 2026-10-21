@@ -8,12 +8,15 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+// @ts-expect-error — @types/node is not installed (no new deps authorized); node runtime guaranteed under vitest.
+import { createHash } from "node:crypto";
 import {
   buildLabelPrintHtml,
   clampLabelQuantity,
   labelBarcodeSource,
   labelPriceUnit,
   ProductLabelModalView,
+  resolveLabelBarcode,
   type LabelFormat,
 } from "@/features/catalog/ProductLabelModal";
 import type { CatalogProduct } from "@/types/pos";
@@ -72,8 +75,9 @@ describe("label helpers", () => {
 
 describe("buildLabelPrintHtml", () => {
   it("sizes the page per preset and repeats the sticker per copy", () => {
-    const formats: LabelFormat[] = ["50x30", "40x25", "100x50"];
+    const formats: LabelFormat[] = ["39x20", "50x30", "40x25", "100x50"];
     const sizes: Record<LabelFormat, string> = {
+      "39x20": "39mm 20mm",
       "50x30": "50mm 30mm",
       "40x25": "40mm 25mm",
       "100x50": "100mm 50mm",
@@ -88,7 +92,7 @@ describe("buildLabelPrintHtml", () => {
       });
       expect(html).toContain(`@page { size: ${sizes[format]}; margin: 0; }`);
       expect(html).toContain("<svg");
-      expect(html.match(/class="sticker"/g)?.length).toBe(2);
+      expect(html.match(/class="sticker("| )/g)?.length).toBe(2);
     }
   });
 });
@@ -125,5 +129,67 @@ describe("ProductLabelModalView rendering", () => {
     const html = markup();
     expect(html).toContain(">3<");
     expect(html).toContain("Imprimer les étiquettes");
+  });
+});
+
+describe("legacy preset golden identity (DSN-083)", () => {
+  const sha = (text: string): string =>
+    createHash("sha256").update(text).digest("hex").slice(0, 16);
+
+  it("emits byte-identical documents for every pre-39x20 preset", () => {
+    const goldens: Record<Exclude<LabelFormat, "39x20">, string> = {
+      "50x30": "ec3b5b6684062da3",
+      "40x25": "2044553e7a6e1987",
+      "100x50": "9d3cf3867e14c09a",
+    };
+    for (const format of ["50x30", "40x25", "100x50"] as const) {
+      const html = buildLabelPrintHtml({
+        product: fixture(),
+        locale: "fr-DZ",
+        storeName: "Baraka",
+        format,
+        quantity: 1,
+      });
+      expect(sha(html)).toBe(goldens[format]);
+    }
+  });
+});
+
+describe("39x20 compact preset (DSN-083)", () => {
+  const args39 = {
+    product: fixture(),
+    locale: "fr-DZ" as const,
+    storeName: "Baraka",
+    format: "39x20" as const,
+    quantity: 1,
+  };
+
+  it("sizes the page 39x20 and drops the shop line", () => {
+    const html = buildLabelPrintHtml(args39);
+    expect(html).toContain("@page { size: 39mm 20mm; margin: 0; }");
+    expect(html).not.toContain('class="shop"');
+    expect(html).toContain('class="sticker compact"');
+  });
+
+  it("fits a 13-char barcode inside the 132px budget (no clip)", () => {
+    const html = buildLabelPrintHtml(args39);
+    const width = Number(/<svg[^>]*width="([\d.]+)"/.exec(html)?.[1]);
+    expect(width).toBeGreaterThan(0);
+    expect(width).toBeLessThanOrEqual(132);
+  });
+
+  it("ellipsizes the human-readable code with a full-text title tooltip", () => {
+    const html = buildLabelPrintHtml(args39);
+    expect(html).toContain("text-overflow: ellipsis");
+    expect(html).toContain('title="6111250000013"');
+  });
+
+  it("resolves moduleWidth 2 on legacy presets and a fitted width on 39x20", () => {
+    expect(resolveLabelBarcode("6111250000013", "50x30").moduleWidth).toBe(2);
+    const compact = resolveLabelBarcode("6111250000013", "39x20");
+    expect(compact.moduleWidth).toBeLessThanOrEqual(1);
+    expect(compact.moduleWidth).toBeGreaterThan(0);
+    const short = resolveLabelBarcode("P-001", "39x20");
+    expect(short.moduleWidth).toBe(1);
   });
 });

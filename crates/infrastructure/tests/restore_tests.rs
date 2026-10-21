@@ -741,6 +741,37 @@ fn restore_older_schema_backup_is_migrated() {
             )
             .expect("drop v15 unit column");
         }
+        if app_version >= 16 {
+            // Genuine v15 backups predate migration 0016, so all of its
+            // artifacts must go: DROP TRIGGER first (DROP COLUMN errors
+            // while a trigger references the table), then the FTS tables,
+            // then the norm columns. The unconditional DROPs mirror the v15
+            // block above: the harness DB is built at the current version,
+            // so `app_version >= 16` already implies every artifact below is
+            // present; a genuine older backup would never carry them.
+            // Trigger names verified live in 0016 (8 total).
+            for trigger in [
+                "trg_products_fts_ai",
+                "trg_products_fts_ad",
+                "trg_products_fts_au",
+                "trg_units_fts_ai",
+                "trg_units_fts_au",
+                "trg_units_fts_ad",
+                "trg_aliases_fts_ai",
+                "trg_aliases_fts_ad",
+            ] {
+                conn.execute(&format!("DROP TRIGGER IF EXISTS {trigger};"), [])
+                    .expect("drop v16 fts trigger");
+            }
+            conn.execute("DROP TABLE IF EXISTS products_fts;", [])
+                .expect("drop v16 fts table");
+            conn.execute("DROP TABLE IF EXISTS product_aliases;", [])
+                .expect("drop v16 aliases table");
+            conn.execute("ALTER TABLE products DROP COLUMN search_norm_fr;", [])
+                .expect("drop v16 norm column fr");
+            conn.execute("ALTER TABLE products DROP COLUMN search_norm_ar;", [])
+                .expect("drop v16 norm column ar");
+        }
     }
     repoint_logged_hash(
         &harness,

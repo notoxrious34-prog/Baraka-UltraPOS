@@ -124,6 +124,164 @@ impl SqliteCatalogRepository {
             .lock()
             .map_err(|_| ApplicationError::Port("database lock poisoned".to_string()))
     }
+
+    /// Verify the FTS5 mirror against relational truth (TASK-BRK-076, ADR-101).
+    ///
+    /// O(1)-ish by design: one row-count comparison plus a fixed-stride
+    /// content sample (every 64th product row). Each sampled product's FTS
+    /// row is compared against relational truth re-derived with the SAME
+    /// domain normalization (raw names, SKU, product + unit barcodes, alias
+    /// rows); any divergence (missing row, stale norms, lost aliases) is a
+    /// `Port` error naming the product. Expected values are recomputed from
+    /// raw columns — never from the stored norm columns — so the check stays
+    /// valid for rows written before the BRK-077 repository norm writes.
+    /// The query path is untouched — this is a structural health check for
+    /// tests and (later) the backup/restore verification path. Token sets
+    /// compare sorted because `group_concat` order is not contractual.
+    pub fn verify_fts_consistency(&self) -> Result<(), ApplicationError> {
+        use std::hash::{Hash, Hasher};
+        let guard = self.lock()?;
+        let product_count: i64 = guard
+            .query_row("SELECT COUNT(*) FROM products", [], |row| row.get(0))
+            .map_err(|_| store_failure())?;
+        let fts_count: i64 = guard
+            .query_row("SELECT COUNT(*) FROM products_fts", [], |row| row.get(0))
+            .map_err(|_| store_failure())?;
+        if product_count != fts_count {
+            return Err(ApplicationError::Port(format!(
+                "fts row-count mismatch: products={product_count} fts={fts_count}"
+            )));
+        }
+        let mut sample = guard
+            .prepare(
+                "SELECT id, name_fr, name_ar, sku, barcode
+                 FROM products WHERE rowid % 64 = 0 ORDER BY rowid",
+            )
+            .map_err(|_| store_failure())?;
+        let rows = sample
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                ))
+            })
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?;
+        for (id, name_fr, name_ar, sku, barcode) in &rows {
+            let expected_barcode: String = guard
+                .query_row(
+                    "SELECT COALESCE(group_concat(baraka_search_norm(b), ' '), '')
+                     FROM (SELECT barcode AS b FROM products WHERE id = ?1
+                           UNION SELECT barcode FROM product_units WHERE product_id = ?1)
+                     WHERE b IS NOT NULL",
+                    rusqlite::params![id, id],
+                    |row| row.get(0),
+                )
+                .map_err(|_| store_failure())?;
+            let expected_aliases: String = guard
+                .query_row(
+                    "SELECT COALESCE(group_concat(alias_norm, ' '), '')
+                     FROM product_aliases WHERE product_id = ?1",
+                    [id],
+                    |row| row.get(0),
+                )
+                .map_err(|_| store_failure())?;
+            let expected_sku = normalize_for_search(sku);
+            let expected_barcode_norm = {
+                let mut parts = vec![normalize_for_search(barcode.as_deref().unwrap_or(""))];
+                let mut units = guard
+                    .prepare("SELECT barcode FROM product_units WHERE product_id = ?1")
+                    .map_err(|_| store_failure())?;
+                let unit_codes = units
+                    .query_map([id], |row| row.get::<_, Option<String>>(0))
+                    .map_err(|_| store_failure())?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|_| store_failure())?;
+                for code in &unit_codes {
+                    parts.push(normalize_for_search(code.as_deref().unwrap_or("")));
+                }
+                parts.retain(|part| !part.is_empty());
+                parts.join(" ")
+            };
+            let (fts_fr, fts_ar, fts_sku, fts_barcode, fts_aliases): (
+                String,
+                String,
+                String,
+                String,
+                String,
+            ) = guard
+                .query_row(
+                    "SELECT norm_fr, norm_ar, norm_sku, norm_barcode, norm_aliases
+                     FROM products_fts WHERE product_id = ?1",
+                    [id],
+                    |row| {
+                        Ok((
+                            row.get(0)?,
+                            row.get(1)?,
+                            row.get(2)?,
+                            row.get(3)?,
+                            row.get(4)?,
+                        ))
+                    },
+                )
+                .map_err(|_| ApplicationError::Port(format!("fts row missing for product {id}")))?;
+            // group_concat order is not contractual: compare as sorted token sets.
+            let mut expected = (
+                normalize_for_search(name_fr),
+                normalize_for_search(name_ar),
+                expected_sku,
+                expected_barcode_norm,
+                expected_aliases,
+            );
+            let mut actual = (fts_fr, fts_ar, fts_sku, fts_barcode, fts_aliases);
+            let mut hash_expected = std::collections::hash_map::DefaultHasher::new();
+            let mut hash_actual = std::collections::hash_map::DefaultHasher::new();
+            for field in [
+                &mut expected.0,
+                &mut expected.1,
+                &mut expected.2,
+                &mut expected.3,
+                &mut expected.4,
+            ] {
+                let mut tokens: Vec<&str> = field.split_whitespace().collect();
+                tokens.sort_unstable();
+                tokens.join(" ").hash(&mut hash_expected);
+            }
+            for field in [
+                &mut actual.0,
+                &mut actual.1,
+                &mut actual.2,
+                &mut actual.3,
+                &mut actual.4,
+            ] {
+                let mut tokens: Vec<&str> = field.split_whitespace().collect();
+                tokens.sort_unstable();
+                tokens.join(" ").hash(&mut hash_actual);
+            }
+            // Cross-check the barcode aggregate against SQL's own computation too.
+            let mut sql_tokens: Vec<&str> = expected_barcode.split_whitespace().collect();
+            sql_tokens.sort_unstable();
+            let mut sql_hash = std::collections::hash_map::DefaultHasher::new();
+            sql_tokens.join(" ").hash(&mut sql_hash);
+            let mut rust_tokens: Vec<&str> = expected.3.split_whitespace().collect();
+            rust_tokens.sort_unstable();
+            let mut rust_hash = std::collections::hash_map::DefaultHasher::new();
+            rust_tokens.join(" ").hash(&mut rust_hash);
+            if hash_expected.finish() != hash_actual.finish()
+                || sql_hash.finish() != rust_hash.finish()
+            {
+                return Err(ApplicationError::Port(format!(
+                    "fts content mismatch for product {id}"
+                )));
+            }
+            let _ = barcode;
+        }
+        Ok(())
+    }
 }
 
 fn parse_product_id(text: &str) -> Result<ProductId, rusqlite::Error> {

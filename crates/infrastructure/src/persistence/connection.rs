@@ -5,6 +5,8 @@ use std::time::Duration;
 
 use rusqlite::Connection;
 
+use baraka_domain::catalog::search_normalization::normalize_for_search;
+
 use super::InfrastructureError;
 
 /// PRAGMAs applied to every connection at open time (offline-first law).
@@ -65,5 +67,30 @@ pub fn open_in_memory() -> Result<Connection, InfrastructureError> {
 fn apply_pragmas(conn: &Connection) -> Result<(), InfrastructureError> {
     conn.busy_timeout(Duration::from_millis(5_000))?;
     conn.execute_batch(OPEN_PRAGMAS)?;
+    register_search_norm(conn)?;
+    Ok(())
+}
+
+/// Register the deterministic `baraka_search_norm(text)` scalar on every
+/// connection (TASK-BRK-076): migration-0016 triggers normalize names and
+/// barcodes in SQL, so the function must exist wherever writes happen —
+/// not only on the repository search path (where re-registration stays
+/// idempotent). Pure domain logic; zero query-path change.
+fn register_search_norm(conn: &Connection) -> Result<(), InfrastructureError> {
+    conn.create_scalar_function(
+        "baraka_search_norm",
+        1,
+        rusqlite::functions::FunctionFlags::SQLITE_UTF8
+            | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC,
+        |ctx| {
+            use rusqlite::types::ValueRef;
+            let value = ctx.get_raw(0);
+            if value == ValueRef::Null {
+                return Ok(String::new());
+            }
+            let text = value.as_str()?;
+            Ok(normalize_for_search(text))
+        },
+    )?;
     Ok(())
 }

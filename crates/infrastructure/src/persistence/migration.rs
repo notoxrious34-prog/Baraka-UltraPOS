@@ -5,7 +5,9 @@
 //! in `schema_migrations` with a SHA-256 checksum; a checksum mismatch on an
 //! already-applied version aborts with an integrity error.
 
-use rusqlite::Connection;
+use rusqlite::{Connection, Transaction};
+
+use baraka_domain::catalog::search_normalization::expand_token_variants;
 
 use super::transaction::run_transaction;
 use super::InfrastructureError;
@@ -97,6 +99,11 @@ pub const MIGRATIONS: &[EmbeddedMigration] = &[
         name: "0015_pricing_tiers.sql",
         sql: include_str!("../../migrations/0015_pricing_tiers.sql"),
     },
+    EmbeddedMigration {
+        version: 16,
+        name: "0016_fts_search_index.sql",
+        sql: include_str!("../../migrations/0016_fts_search_index.sql"),
+    },
 ];
 
 /// SHA-256 hex digest of `input` (pure Rust, no extra dependency).
@@ -144,6 +151,9 @@ pub fn run_migrations(conn: &mut Connection) -> Result<(), InfrastructureError> 
         let applied_at = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         run_transaction(conn, |tx| {
             tx.execute_batch(migration.sql)?;
+            if migration.version == 16 {
+                seed_fts_aliases(tx)?;
+            }
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum, applied_at)
                  VALUES (?1, ?2, ?3, ?4)",
@@ -151,6 +161,44 @@ pub fn run_migrations(conn: &mut Connection) -> Result<(), InfrastructureError> 
             )?;
             Ok(())
         })?;
+    }
+    Ok(())
+}
+
+/// Seed `product_aliases` from the domain hardware dictionary (BRK-076).
+///
+/// Runs inside the migration-16 transaction, right after the SQL body (which
+/// backfills the norm columns and lets the FTS triggers mirror them). For
+/// every product, each whitespace token of its normalized FR/AR names is
+/// expanded through [`expand_token_variants`]; every variant that is NOT the
+/// token itself becomes an alias row (`INSERT OR IGNORE` over the UNIQUE key).
+/// Each alias INSERT fires `trg_aliases_fts_ai`, refreshing that product's
+/// FTS row with the alias aggregate — relational truth and the FTS mirror
+/// converge in the same commit. Query-time expansion uses the identical
+/// domain function, so seed and search agree by construction.
+fn seed_fts_aliases(tx: &Transaction) -> Result<(), InfrastructureError> {
+    let mut fetch = tx.prepare("SELECT id, search_norm_fr, search_norm_ar FROM products")?;
+    let rows = fetch
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(fetch);
+    for (product_id, norm_fr, norm_ar) in &rows {
+        let mut stmt = tx.prepare_cached(
+            "INSERT OR IGNORE INTO product_aliases (product_id, alias_norm) VALUES (?1, ?2)",
+        )?;
+        for token in norm_fr.split_whitespace().chain(norm_ar.split_whitespace()) {
+            for variant in expand_token_variants(token) {
+                if variant != token {
+                    stmt.execute(rusqlite::params![product_id, variant])?;
+                }
+            }
+        }
     }
     Ok(())
 }

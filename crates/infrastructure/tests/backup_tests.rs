@@ -383,8 +383,9 @@ fn foreign_key_violations_mark_backup_corrupted() {
     // Break referential integrity inside the COPY: delete a product unit
     // still referenced by a document line (FK enforcement off), then
     // re-point the log hash at the doctored bytes so verification reaches
-    // the pragma stage instead of the checksum stage.
-    let conn = rusqlite::Connection::open(&meta.file_path).expect("open");
+    // the pragma stage instead of the checksum stage. Opened via the
+    // sanctioned opener so v16 FTS triggers (baraka_search_norm) can fire.
+    let conn = open_connection(std::path::Path::new(&meta.file_path)).expect("open");
     conn.execute_batch("PRAGMA foreign_keys=OFF;")
         .expect("pragma");
     conn.execute(

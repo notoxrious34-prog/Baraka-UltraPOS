@@ -1,0 +1,25 @@
+{
+  "results": [
+    {
+      "name": "shot doc-ticket-1280x800-fr-light",
+      "ok": true,
+      "detail": "TICKET fr/light, lines rendered"
+    },
+    {
+      "name": "shot doc-facture-1280x800-ar-dark",
+      "ok": true,
+      "detail": "FACTURE ar/dark, lines rendered"
+    },
+    {
+      "name": "shot doc-error-1024x600-fr-light",
+      "ok": true,
+      "detail": "error state + retry"
+    },
+    {
+      "name": "zero console errors across captures",
+      "ok": true,
+      "detail": "0 console errors"
+    }
+  ],
+  "errors": []
+}

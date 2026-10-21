@@ -395,7 +395,7 @@ export function SuppliersModule(): ReactElement {
             setDeleting(null);
             setOverlay("none");
           }}
-          onConfirm={() => ipcDeleteSupplier(token, deleting.id)}
+          onConfirm={(reason: string) => ipcDeleteSupplier(token, deleting.id, reason)}
           onSuccess={handleDeleted}
         />
       )}

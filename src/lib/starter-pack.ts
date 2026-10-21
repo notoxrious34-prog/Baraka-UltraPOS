@@ -74,7 +74,7 @@ export interface InstallDeps {
 
 /** Injected edge for uninstallation. */
 export interface UninstallDeps {
-  remove: (token: string, id: string) => Promise<DeleteEntityResult>;
+  remove: (token: string, id: string, reason: string) => Promise<DeleteEntityResult>;
 }
 
 export type ProgressCallback = (current: number, total: number) => void;
@@ -242,6 +242,7 @@ export async function uninstallStarterPack(
   catalogProducts: Array<{ id: string; sku: string }>,
   deps: UninstallDeps,
   onProgress?: ProgressCallback,
+  reason: string = "starter-pack uninstall",
 ): Promise<UninstallSummary> {
   const targets = catalogProducts.filter((row) => packCodes.has(row.sku));
   const summary: UninstallSummary = {
@@ -256,7 +257,7 @@ export async function uninstallStarterPack(
       continue;
     }
     try {
-      const result = await deps.remove(token, target.id);
+      const result = await deps.remove(token, target.id, reason);
       if (result.mode === "hard_deleted") {
         summary.hardDeleted += 1;
       } else {

@@ -128,3 +128,61 @@ describe("depot management binding", () => {
     expect(DEPOT_STORE_SRC).toContain("ipcDeleteWarehouse");
   });
 });
+
+describe("DSN-082 reason + typed-gate (FAIL-before: unimplemented)", () => {
+  it("collects a mandatory reason with a live counter and a 3-char minimum", () => {
+    expect(MODAL_SRC).toContain('"del.reasonLabel"');
+    expect(MODAL_SRC).toContain('"del.reasonHint"');
+    expect(MODAL_SRC).toContain("MIN_REASON_LENGTH");
+    expect(MODAL_SRC).toContain("reasonTooShort");
+  });
+
+  it("gates confirm on an exact case-sensitive typed match of the entity code", () => {
+    expect(MODAL_SRC).toContain('"del.typeToConfirm"');
+    expect(MODAL_SRC).toContain("typedInput === expectedToken");
+    expect(MODAL_SRC).not.toContain("toLowerCase");
+    expect(MODAL_SRC).not.toContain("toUpperCase");
+  });
+
+  it("passes the collected reason into onConfirm and every caller forwards it", () => {
+    expect(MODAL_SRC).toContain("onConfirm: (reason: string) => Promise<DeleteEntityResult>");
+    expect(CATALOG_SRC).toContain("onConfirm={(reason: string) =>");
+    expect(CUSTOMERS_SRC).toContain("onConfirm={(reason: string) =>");
+    expect(SUPPLIERS_SRC).toContain("onConfirm={(reason: string) =>");
+    expect(DEPOTS_SRC).toContain("onConfirm={(reason: string) =>");
+    expect(DEPOT_STORE_SRC).toContain("submitDeleteWarehouse: async (id, reason");
+  });
+
+  it("threads reason through all four IPC delete wrappers", () => {
+    const IPC_SRC = readSrc("src", "lib", "ipc.ts");
+    for (const fn of [
+      "ipcDeleteProduct",
+      "ipcDeleteCustomer",
+      "ipcDeleteSupplier",
+      "ipcDeleteWarehouse",
+    ]) {
+      expect(IPC_SRC).toContain(fn);
+    }
+    expect(IPC_SRC).toContain("reason: string");
+    expect(IPC_SRC).toContain("reason },");
+  });
+
+  it("maps engine delete codes to guidance in both locales", () => {
+    expect(I18N_SRC).toContain("CUSTOMER_BALANCE_NONZERO");
+    expect(I18N_SRC).toContain("SUPPLIER_BALANCE_NONZERO");
+    expect(I18N_SRC).toContain("WAREHOUSE_HAS_STOCK");
+    expect(I18N_SRC).toContain("DEPOT_PRINCIPAL_IMMUTABLE");
+    expect(I18N_SRC).toContain('"del.reasonTooShort"');
+  });
+
+  it("announces modal errors assertively and traps Tab across textarea inputs", () => {
+    const alerts = MODAL_SRC.match(/role="alert"/g) ?? [];
+    expect(alerts.length).toBeGreaterThanOrEqual(2);
+    expect(MODAL_SRC).toContain("textarea:not([disabled])");
+  });
+
+  it("never renders a delete affordance for the locked principal depot", () => {
+    expect(DEPOTS_SRC).toContain("{!locked");
+    expect(DEPOTS_SRC).toContain("isBlocked={deleting.code === PRINCIPAL_DEPOT_CODE}");
+  });
+});

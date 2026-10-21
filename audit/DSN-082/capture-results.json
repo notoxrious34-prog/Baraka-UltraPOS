@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "name": "typed-gate: counter + typed match enables confirm",
+      "ok": true,
+      "detail": "confirm enabled; tail=\"e code pour confirmer la suppression : VIS-8X40\nAnnuler\nConfirmer la suppression\""
+    },
+    {
+      "name": "shot del-typed-1280x800-fr-light",
+      "ok": true,
+      "detail": "typed gate fr/light"
+    },
+    {
+      "name": "shot del-blocked-1280x800-ar-dark",
+      "ok": true,
+      "detail": "blocked depot ar/dark"
+    },
+    {
+      "name": "shot del-typed-1024x600-fr-light",
+      "ok": true,
+      "detail": "typed gate 1024 fr/light"
+    },
+    {
+      "name": "zero console errors across captures",
+      "ok": true,
+      "detail": "0 console errors"
+    }
+  ],
+  "errors": []
+}

@@ -1025,7 +1025,7 @@ export function CatalogModule(): ReactElement {
           onClose={() => {
             setDeleteProduct(null);
           }}
-          onConfirm={() => ipcDeleteProduct(activeToken, deleteProduct.product_id)}
+          onConfirm={(reason: string) => ipcDeleteProduct(activeToken, deleteProduct.product_id, reason)}
           onSuccess={handleDeleted}
         />
       )}

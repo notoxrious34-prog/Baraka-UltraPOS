@@ -160,9 +160,10 @@ export interface DeleteEntityResult {
 export async function ipcDeleteProduct(
   sessionToken: string,
   productId: string,
+  reason: string,
 ): Promise<DeleteEntityResult> {
   return call<DeleteEntityResult>("catalog_delete_product", {
-    request: { session_token: sessionToken, id: productId },
+    request: { session_token: sessionToken, id: productId, reason },
   });
 }
 
@@ -498,9 +499,10 @@ export async function ipcUpdateWarehouse(
 export async function ipcDeleteWarehouse(
   sessionToken: string,
   warehouseId: string,
+  reason: string,
 ): Promise<DeleteEntityResult> {
   return call<DeleteEntityResult>("warehouses_delete", {
-    request: { session_token: sessionToken, id: warehouseId },
+    request: { session_token: sessionToken, id: warehouseId, reason },
   });
 }
 
@@ -814,9 +816,10 @@ export async function ipcUpdateCustomer(
 export async function ipcDeleteCustomer(
   sessionToken: string,
   customerId: string,
+  reason: string,
 ): Promise<DeleteEntityResult> {
   return call<DeleteEntityResult>("customers_delete", {
-    request: { session_token: sessionToken, id: customerId },
+    request: { session_token: sessionToken, id: customerId, reason },
   });
 }
 
@@ -1920,9 +1923,10 @@ export async function ipcGetSupplier(
 export async function ipcDeleteSupplier(
   sessionToken: string,
   supplierId: string,
+  reason: string,
 ): Promise<DeleteEntityResult> {
   return call<DeleteEntityResult>("suppliers_delete", {
-    request: { session_token: sessionToken, id: supplierId },
+    request: { session_token: sessionToken, id: supplierId, reason },
   });
 }
 

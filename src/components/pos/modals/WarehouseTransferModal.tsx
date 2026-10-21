@@ -210,12 +210,12 @@ function ManageDepotsTab({ canManage }: { canManage: boolean }): ReactElement {
           titleKey="del.warehouseTitle"
           entityName={deleting.name}
           entityCode={deleting.code}
-          isBlocked={false}
+          isBlocked={deleting.code === PRINCIPAL_DEPOT_CODE}
           onClose={() => {
             setDeleting(null);
           }}
-          onConfirm={() =>
-            s.submitDeleteWarehouse(deleting.id).then((mode) => {
+          onConfirm={(reason: string) =>
+            s.submitDeleteWarehouse(deleting.id, reason).then((mode) => {
               if (mode === null) {
                 throw new Error(s.errorMessage ?? "INTERNAL_ERROR");
               }

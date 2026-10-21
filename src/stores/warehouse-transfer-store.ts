@@ -98,7 +98,7 @@ interface WarehouseTransferStoreState {
     input: { name?: string; isActive?: boolean },
   ) => Promise<boolean>;
   /** Dual-track delete; resolves the backend mode (null = rejected). */
-  submitDeleteWarehouse: (id: string) => Promise<"hard_deleted" | "deactivated" | null>;
+  submitDeleteWarehouse: (id: string, reason: string) => Promise<"hard_deleted" | "deactivated" | null>;
   reset: () => void;
 }
 
@@ -335,7 +335,7 @@ export const useWarehouseTransferStore = create<WarehouseTransferStoreState>()(
       }
     },
 
-    submitDeleteWarehouse: async (id) => {
+    submitDeleteWarehouse: async (id, reason) => {
       const session = useSessionStore.getState().session;
       if (session === null) {
         set({ errorMessage: "IPC_NO_ACTIVE_SESSION" });
@@ -346,7 +346,7 @@ export const useWarehouseTransferStore = create<WarehouseTransferStoreState>()(
       }
       set({ isSubmitting: true, errorMessage: null, successMessage: null });
       try {
-        const result = await ipcDeleteWarehouse(session.token, id);
+        const result = await ipcDeleteWarehouse(session.token, id, reason);
         await get().loadWarehouses();
         return result.mode;
       } catch (failure: unknown) {

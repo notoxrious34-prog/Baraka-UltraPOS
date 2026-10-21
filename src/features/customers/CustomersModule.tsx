@@ -218,7 +218,7 @@ export function CustomersModule(): ReactElement {
           onClose={() => {
             setDeleteTarget(null);
           }}
-          onConfirm={() => ipcDeleteCustomer(token, deleteTarget.id)}
+          onConfirm={(reason: string) => ipcDeleteCustomer(token, deleteTarget.id, reason)}
           onSuccess={handleDeleted}
         />
       )}

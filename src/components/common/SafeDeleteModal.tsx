@@ -16,7 +16,7 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 export interface SafeDeleteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => Promise<DeleteEntityResult>;
+  onConfirm: (reason: string) => Promise<DeleteEntityResult>;
   onSuccess: (result: DeleteEntityResult) => void;
   titleKey: I18nKey;
   entityName: string;
@@ -25,12 +25,17 @@ export interface SafeDeleteModalProps {
   blockedReason?: string | null;
 }
 
+/** Minimum operator-reason length (mirrors the engine purge rule). */
+const MIN_REASON_LENGTH = 3;
+
 export function SafeDeleteModal(props: SafeDeleteModalProps): ReactElement | null {
   const { isOpen, onClose, onConfirm, onSuccess } = props;
   const locale = usePosUiStore((state) => state.locale);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [typedInput, setTypedInput] = useState("");
 
   useEffect(() => {
     if (!isOpen) {
@@ -38,6 +43,8 @@ export function SafeDeleteModal(props: SafeDeleteModalProps): ReactElement | nul
     }
     setBusy(false);
     setError(null);
+    setReason("");
+    setTypedInput("");
   }, [isOpen]);
 
   useEffect(() => {
@@ -55,7 +62,7 @@ export function SafeDeleteModal(props: SafeDeleteModalProps): ReactElement | nul
         return;
       }
       const focusables = cardRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
       );
       if (focusables.length === 0) {
         return;
@@ -84,14 +91,18 @@ export function SafeDeleteModal(props: SafeDeleteModalProps): ReactElement | nul
   }
 
   const blocked = props.isBlocked === true;
+  const expectedToken =
+    props.entityCode !== undefined && props.entityCode !== "" ? props.entityCode : props.entityName;
+  const reasonOk = reason.trim().length >= MIN_REASON_LENGTH;
+  const typedOk = typedInput === expectedToken;
 
   const confirm = (): void => {
-    if (busy || blocked) {
+    if (busy || blocked || !reasonOk || !typedOk) {
       return;
     }
     setBusy(true);
     setError(null);
-    onConfirm()
+    onConfirm(reason.trim())
       .then((result) => {
         onSuccess(result);
       })
@@ -178,10 +189,63 @@ export function SafeDeleteModal(props: SafeDeleteModalProps): ReactElement | nul
             </div>
           )}
           {error !== null && (
-            <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
-              {translateBackendError(error, locale)}
+            <p
+              role="alert"
+              className="rounded-md bg-red-50 px-3 py-2 text-xs font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200"
+            >
+              {error === "INVALID_INPUT"
+                ? t(locale, "del.reasonTooShort")
+                : translateBackendError(error, locale)}
             </p>
           )}
+          <div>
+            <label
+              htmlFor="safe-delete-reason"
+              className="mb-1 flex items-baseline justify-between text-xs font-black text-slate-700 dark:text-slate-200"
+            >
+              <span>{t(locale, "del.reasonLabel")}</span>
+              <span className="font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                {reason.trim().length} / {MIN_REASON_LENGTH}
+              </span>
+            </label>
+            <textarea
+              id="safe-delete-reason"
+              value={reason}
+              disabled={busy || blocked}
+              onChange={(event) => {
+                setReason(event.target.value);
+              }}
+              rows={2}
+              autoComplete="off"
+              placeholder={t(locale, "del.reasonHint")}
+              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-semibold outline-none focus:border-red-400 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="safe-delete-typed"
+              className="mb-1 block text-xs font-black text-slate-700 dark:text-slate-200"
+            >
+              {t(locale, "del.typeToConfirm")}{" "}
+              <bdi
+                dir="ltr"
+                className="rounded bg-slate-100 px-1.5 py-0.5 font-mono tabular-nums dark:bg-slate-800"
+              >
+                {expectedToken}
+              </bdi>
+            </label>
+            <input
+              id="safe-delete-typed"
+              value={typedInput}
+              disabled={busy || blocked}
+              onChange={(event) => {
+                setTypedInput(event.target.value);
+              }}
+              autoComplete="off"
+              dir="ltr"
+              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 font-mono text-sm font-bold outline-none focus:border-red-400 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
+            />
+          </div>
         </div>
         <div className="flex shrink-0 gap-2 border-t border-slate-200 p-3 dark:border-slate-700">
           <button
@@ -195,7 +259,7 @@ export function SafeDeleteModal(props: SafeDeleteModalProps): ReactElement | nul
           <button
             type="button"
             onClick={confirm}
-            disabled={busy || blocked}
+            disabled={busy || blocked || !reasonOk || !typedOk}
             className="h-10 flex-1 rounded-lg bg-[#C62828] text-sm font-black text-white hover:bg-[#B71C1C] focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? t(locale, "del.deleting") : t(locale, "del.confirm")}

@@ -7,7 +7,7 @@
  * summary. Mounted at the top of `CatalogModule`.
  */
 
-import { useMemo, useState, type ReactElement } from "react";
+import { useMemo, useRef, useState, type ReactElement } from "react";
 import { t } from "@/lib/i18n";
 import type { Locale } from "@/types/pos";
 import type { CatalogProduct } from "@/types/pos";
@@ -60,6 +60,7 @@ export function StarterPackBanner(props: StarterPackBannerProps): ReactElement {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [depotId, setDepotId] = useState<string | null>(null);
   const [confirmUninstall, setConfirmUninstall] = useState(false);
+  const pendingReasonRef = useRef("");
   const [note, setNote] = useState<string | null>(null);
 
   const activeWarehouses = useMemo(
@@ -128,7 +129,7 @@ export function StarterPackBanner(props: StarterPackBannerProps): ReactElement {
     })();
   };
 
-  const startUninstall = (): void => {
+  const startUninstall = (reason: string): void => {
     const packCodes = new Set(status.items.map((item) => item.code));
     const rows = products.map((row) => ({ id: row.product_id, sku: row.sku }));
     setConfirmUninstall(false);
@@ -143,6 +144,7 @@ export function StarterPackBanner(props: StarterPackBannerProps): ReactElement {
           (current, total) => {
             setPhase({ kind: "uninstalling", current, total, name: "" });
           },
+          reason,
         );
         setPhase({ kind: "summary", summary });
         onChanged();
@@ -334,9 +336,12 @@ export function StarterPackBanner(props: StarterPackBannerProps): ReactElement {
           onClose={() => {
             setConfirmUninstall(false);
           }}
-          onConfirm={() => Promise.resolve({ id: "pack", mode: "deactivated", message: "pack" })}
+          onConfirm={(reason: string) => {
+            pendingReasonRef.current = reason;
+            return Promise.resolve({ id: "pack", mode: "deactivated", message: "pack" });
+          }}
           onSuccess={() => {
-            startUninstall();
+            startUninstall(pendingReasonRef.current);
           }}
         />
       )}

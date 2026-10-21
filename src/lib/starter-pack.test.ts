@@ -273,6 +273,25 @@ describe("uninstallStarterPack", () => {
     expect(readPackFlag()).toBe(false);
   });
 
+  it("threads the operator reason into every remove call", async () => {
+    const seen: string[] = [];
+    const summary = await uninstallStarterPack(
+      "tok",
+      new Set(["P-001"]),
+      [{ id: "id-r", sku: "P-001" }],
+      {
+        remove: (_token, _id, reason) => {
+          seen.push(reason);
+          return Promise.resolve({ id: "id-r", mode: "hard_deleted", message: "" });
+        },
+      },
+      undefined,
+      "pack cleanup",
+    );
+    expect(summary.hardDeleted).toBe(1);
+    expect(seen).toEqual(["pack cleanup"]);
+  });
+
   it("processes nothing when no catalog row matches the pack", async () => {
     let calls = 0;
     const summary = await uninstallStarterPack(

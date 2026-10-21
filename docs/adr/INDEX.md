@@ -106,4 +106,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-100 | Effective Permission Set in Session Contract & Granular UI Gating | ACCEPTED |
 
-Next free id: ADR-101.
+| ADR-101 | FTS5 search index with pre-normalized columns and alias table (BRK-075 gap: p95 seconds vs 50ms at 80k) | ACCEPTED |
+
+Next free id: ADR-102.

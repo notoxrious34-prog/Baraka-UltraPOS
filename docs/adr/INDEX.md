@@ -108,4 +108,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-101 | FTS5 search index with pre-normalized columns and alias table (BRK-075 gap: p95 seconds vs 50ms at 80k) | ACCEPTED |
 
-Next free id: ADR-102.
+| ADR-102 | Search performance bar restated in catalog-size tiers (S/M gated, 80k monitored; 0017 reverted) | ACCEPTED |
+
+Next free id: ADR-103.

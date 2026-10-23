@@ -63,29 +63,58 @@ fn bool_to_int(value: bool) -> i64 {
     i64::from(value)
 }
 
-/// Escape SQLite LIKE wildcards (`\`, `%`, `_`) with a backslash escape.
-fn escape_like_pattern(text: &str) -> String {
-    text.replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
+/// FTS5 mirror columns per product (migration 0016): French/Arabic norms,
+/// SKU norm, unit-aggregated barcode norm, alias norms.
+const FTS_TEXT_COLUMNS: [&str; 5] = [
+    "norm_fr",
+    "norm_ar",
+    "norm_sku",
+    "norm_barcode",
+    "norm_aliases",
+];
+
+/// Split a normalized token the way the `unicode61` tokenizer does: maximal
+/// runs of alphanumeric characters (punctuation such as `.`, `-`, `°` breaks
+/// tokens on both sides, so `2.5mm` matches as `2` + `5mm`).
+fn fts_token_parts(token: &str) -> impl Iterator<Item = &str> {
+    token
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|part| !part.is_empty())
 }
 
-/// Arabic-tolerant LIKE infix for one escaped token (TASK-BRK-073).
-///
-/// The token is already normalized ([`normalize_for_search`]) and
-/// LIKE-escaped. The remaining free orthographic variants — alef `ا`
-/// (all hamza forms fold here), `ه` (taa marbuta folds here) and `ي`
-/// (alef maqsura folds here) — become single-character `_` wildcards so
-/// cashier spelling variants match each other. Safe to compose with the
-/// backslash escape: neither the escape character nor `%` is affected.
-fn arabic_tolerant_like_pattern(escaped: &str) -> String {
-    escaped
-        .chars()
-        .map(|c| match c {
-            'ا' | 'ه' | 'ي' => '_',
-            other => other,
-        })
-        .collect()
+/// Build the FTS5 MATCH expression for one tokenized query (ADR-101): token
+/// groups ANDed, dictionary variants within a group ORed, every variant part
+/// matched as a prefix query across all five mirror columns. Returns `None`
+/// when no usable part exists (empty token, lone punctuation such as `"`).
+/// Safety: every emitted part is alphanumeric-only, so no `"`, `*` or `:`
+/// can ever reach the FTS parser — the expression travels as a bound
+/// parameter and cannot fail to parse or escape its MATCH.
+fn build_fts_match_query(groups: &[Vec<String>]) -> Option<String> {
+    let mut and_clauses: Vec<String> = Vec::new();
+    for group in groups {
+        let mut or_clauses: Vec<String> = Vec::new();
+        for variant in group {
+            let mut part_clauses: Vec<String> = Vec::new();
+            for part in fts_token_parts(variant) {
+                let columned: Vec<String> = FTS_TEXT_COLUMNS
+                    .iter()
+                    .map(|col| format!("{col}:\"{part}\"*"))
+                    .collect();
+                part_clauses.push(format!("({})", columned.join(" OR ")));
+            }
+            if !part_clauses.is_empty() {
+                or_clauses.push(format!("({})", part_clauses.join(" AND ")));
+            }
+        }
+        if or_clauses.is_empty() {
+            return None;
+        }
+        and_clauses.push(format!("({})", or_clauses.join(" OR ")));
+    }
+    if and_clauses.is_empty() {
+        return None;
+    }
+    Some(and_clauses.join(" AND "))
 }
 
 /// Register the deterministic `baraka_search_norm(text)` scalar function
@@ -424,6 +453,67 @@ fn fetch_product(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| store_failure())?;
     Ok(Some((product, units)))
+}
+
+/// Hydrate matched ids in rank order with two round-trips (BRK-077-C1):
+/// one `IN` query for products, one for their units — replacing the N+1
+/// per-id `fetch_product` loop that dominated 80k search latency.
+/// Chunked at 250 ids, far below the SQLite variable limit, so the 500-row
+/// discovery branch stays safe. Input order is preserved; ids with no
+/// product row are skipped, exactly like the retired loop.
+fn fetch_products_ordered(
+    conn: &Connection,
+    ids: &[String],
+) -> Result<Vec<(Product, Vec<ProductUnit>)>, ApplicationError> {
+    use std::collections::HashMap;
+    let mut products: HashMap<String, Product> = HashMap::new();
+    let mut units_by_product: HashMap<String, Vec<ProductUnit>> = HashMap::new();
+    for chunk in ids.chunks(250) {
+        let placeholders = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let product_sql =
+            format!("SELECT {PRODUCT_COLUMNS} FROM products WHERE id IN ({placeholders})");
+        let params: Vec<rusqlite::types::Value> = chunk
+            .iter()
+            .map(|id| rusqlite::types::Value::Text(id.clone()))
+            .collect();
+        let mut statement = conn.prepare(&product_sql).map_err(|_| store_failure())?;
+        let rows = statement
+            .query_map(rusqlite::params_from_iter(params), map_product)
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?;
+        for product in rows {
+            products.insert(product.id.to_string(), product);
+        }
+        let unit_sql = format!(
+            "SELECT {UNIT_COLUMNS} FROM product_units WHERE product_id IN ({placeholders}) \
+             ORDER BY product_id, is_base_unit DESC, id"
+        );
+        let params: Vec<rusqlite::types::Value> = chunk
+            .iter()
+            .map(|id| rusqlite::types::Value::Text(id.clone()))
+            .collect();
+        let mut statement = conn.prepare(&unit_sql).map_err(|_| store_failure())?;
+        let rows = statement
+            .query_map(rusqlite::params_from_iter(params), map_unit)
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?;
+        for unit in rows {
+            units_by_product
+                .entry(unit.product_id.to_string())
+                .or_default()
+                .push(unit);
+        }
+    }
+    let mut out = Vec::with_capacity(ids.len());
+    for id in ids {
+        if let Some(product) = products.remove(id) {
+            let units = units_by_product.remove(id).unwrap_or_default();
+            out.push((product, units));
+        }
+    }
+    Ok(out)
 }
 
 fn infra_to_app(error: crate::persistence::InfrastructureError) -> ApplicationError {
@@ -790,25 +880,23 @@ impl ProductRepository for SqliteCatalogRepository {
                 .map_err(|_| store_failure())?
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|_| store_failure())?;
-            let mut out = Vec::with_capacity(ids.len());
-            for id in ids {
-                if let Some(found) = fetch_product(&guard, &id)? {
-                    out.push(found);
-                }
-            }
-            return Ok(out);
+            return fetch_products_ordered(&guard, &ids);
         }
         let trimmed = query.trim();
-        // Exact-barcode fast path for single-token queries (scanners).
+        // Exact-barcode fast path for single-token queries (scanners):
+        // UNION of two indexed point-seeks (idx_products_barcode,
+        // idx_product_units_barcode). The retired OR-across-LEFT-JOIN shape
+        // degraded to a multi-second scan at 80k rows (BRK-077 probe).
         if !trimmed.chars().any(char::is_whitespace) && trimmed.chars().count() >= 3 {
             let sql = if include_inactive {
-                "SELECT DISTINCT p.id FROM products p
-                     LEFT JOIN product_units u ON u.product_id = p.id
-                     WHERE p.barcode = ?1 OR u.barcode = ?1 LIMIT ?2"
+                "SELECT p.id FROM products p WHERE p.barcode = ?1 \
+                 UNION \
+                 SELECT u.product_id FROM product_units u WHERE u.barcode = ?1 LIMIT ?2"
             } else {
-                "SELECT DISTINCT p.id FROM products p
-                     LEFT JOIN product_units u ON u.product_id = p.id
-                     WHERE (p.barcode = ?1 OR u.barcode = ?1) AND p.is_active = 1 LIMIT ?2"
+                "SELECT p.id FROM products p WHERE p.barcode = ?1 AND p.is_active = 1 \
+                 UNION \
+                 SELECT u.product_id FROM product_units u WHERE u.barcode = ?1 \
+                 AND EXISTS (SELECT 1 FROM products p2 WHERE p2.id = u.product_id AND p2.is_active = 1) LIMIT ?2"
             };
             let mut statement = guard.prepare(sql).map_err(|_| store_failure())?;
             let ids = statement
@@ -819,83 +907,61 @@ impl ProductRepository for SqliteCatalogRepository {
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|_| store_failure())?;
             if !ids.is_empty() {
-                let mut out = Vec::with_capacity(ids.len());
-                for id in ids {
-                    if let Some(found) = fetch_product(&guard, &id)? {
-                        out.push(found);
-                    }
-                }
-                return Ok(out);
+                return fetch_products_ordered(&guard, &ids);
             }
         }
-        // Multi-token hybrid search over normalized text with phonetic
-        // alias expansion: every token group must match (AND), variants
-        // within a group match alternatively (OR). Token conditions span
-        // both names, the SKU, the product barcode and unit barcodes, so
-        // infix fragments and scanned unit codes participate (TASK-BRK-073).
+        // ADR-101 query path (TASK-BRK-077): a single FTS5 prefix MATCH over
+        // the pre-normalized mirror. Token groups ANDed, dictionary variants
+        // within a group ORed — the same recall shape as the LIKE body it
+        // replaces, minus leading-infix fragments (accepted delta, pinned
+        // in catalog_search_fts_parity). Barcode-exact above now UNIONs two
+        // indexed seeks (same recall, no join scan).
         ensure_functions_registered(&guard).map_err(|_| store_failure())?;
         let groups = tokenize_query(trimmed);
         if groups.is_empty() {
             return Ok(Vec::new());
         }
-        let mut sql = String::from("SELECT DISTINCT p.id FROM products p WHERE ");
-        let mut patterns: Vec<rusqlite::types::Value> = Vec::new();
-        for (token_index, group) in groups.iter().enumerate() {
-            if token_index > 0 {
-                sql.push_str(" AND ");
-            }
-            sql.push('(');
-            for (variant_index, variant) in group.iter().enumerate() {
-                if variant_index > 0 {
-                    sql.push_str(" OR ");
-                }
-                sql.push_str(
-                    "(baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\\' \
-                     OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\\' \
-                     OR baraka_search_norm(p.sku) LIKE ? ESCAPE '\\' \
-                     OR baraka_search_norm(p.barcode) LIKE ? ESCAPE '\\' \
-                     OR EXISTS (SELECT 1 FROM product_units pu WHERE pu.product_id = p.id AND baraka_search_norm(pu.barcode) LIKE ? ESCAPE '\\'))",
-                );
-                let pattern = rusqlite::types::Value::Text(format!(
-                    "%{infix}%",
-                    infix = arabic_tolerant_like_pattern(&escape_like_pattern(variant))
-                ));
-                for _ in 0..5 {
-                    patterns.push(pattern.clone());
-                }
-            }
-            sql.push(')');
-        }
+        let Some(match_query) = build_fts_match_query(&groups) else {
+            return Ok(Vec::new());
+        };
+        // Rank-then-hydrate (TASK-BRK-084): MATCH + ranking runs first over
+        // NARROW rows only (fts product_id + bm25 rank + products sku), LIMIT
+        // applies before any full-row visit, and the outer query merely
+        // re-applies the subquery order via the materialized sequence — it
+        // never re-sorts. The retired C1 shape sorted the joined row set and
+        // let DISTINCT materialize thousands of rows the LIMIT discarded.
+        // Order contract (identical by construction): bm25 rank, then raw
+        // `products.sku` tie-break. sku lives in `products`, not in the FTS
+        // mirror, so the subquery joins it by PK point-lookup only. The UNION
+        // barcode fast path above is untouched. The mirror holds exactly one
+        // row per product (0016 DELETE+INSERT triggers), so no DISTINCT is
+        // needed; recall/order drift fails the parity + engine suites loudly.
+        let mut sql = String::from(
+            "SELECT ranked.product_id FROM ( \
+             SELECT inner_ranked.product_id AS product_id, \
+             ROW_NUMBER() OVER (ORDER BY inner_ranked.rank, inner_ranked.sku) AS seq \
+             FROM ( \
+             SELECT products_fts.product_id AS product_id, \
+             bm25(products_fts) AS rank, \
+             p0.sku AS sku \
+             FROM products_fts \
+             JOIN products p0 ON p0.id = products_fts.product_id \
+             WHERE products_fts MATCH ?1",
+        );
         sql.push_str(if include_inactive {
             ""
         } else {
-            " AND p.is_active = 1"
+            " AND p0.is_active = 1"
         });
-        // Relevance ranking: exact barcode (product or unit) first,
-        // then name prefix, then first-token name infix, then SKU and
-        // any other match. Tie-break on SKU for determinism.
-        let normalized_query = normalize_for_search(trimmed);
-        let name_prefix = format!("{e}%", e = escape_like_pattern(&normalized_query));
-        let first_token_infix = format!(
-            "%{i}%",
-            i = arabic_tolerant_like_pattern(&escape_like_pattern(&groups[0][0]))
-        );
         sql.push_str(
-            " ORDER BY CASE \
-             WHEN (p.barcode = ? OR EXISTS (SELECT 1 FROM product_units pu WHERE pu.product_id = p.id AND pu.barcode = ?)) THEN 0 \
-             WHEN baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\\' \
-               OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\\' THEN 1 \
-             WHEN baraka_search_norm(p.name_fr) LIKE ? ESCAPE '\\' \
-               OR baraka_search_norm(p.name_ar) LIKE ? ESCAPE '\\' THEN 2 \
-             ELSE 3 END, p.sku LIMIT ?",
+            " ORDER BY rank, sku LIMIT ?2 \
+             ) AS inner_ranked \
+             ) AS ranked ORDER BY ranked.seq",
         );
-        patterns.push(rusqlite::types::Value::Text(trimmed.to_string()));
-        patterns.push(rusqlite::types::Value::Text(trimmed.to_string()));
-        patterns.push(rusqlite::types::Value::Text(name_prefix.clone()));
-        patterns.push(rusqlite::types::Value::Text(name_prefix));
-        patterns.push(rusqlite::types::Value::Text(first_token_infix.clone()));
-        patterns.push(rusqlite::types::Value::Text(first_token_infix));
-        patterns.push(rusqlite::types::Value::Integer(capped));
+        let patterns: Vec<rusqlite::types::Value> = vec![
+            rusqlite::types::Value::Text(match_query),
+            rusqlite::types::Value::Integer(capped),
+        ];
         let mut statement = guard.prepare(&sql).map_err(|_| store_failure())?;
         let ids = statement
             .query_map(rusqlite::params_from_iter(patterns), |row| {
@@ -904,13 +970,7 @@ impl ProductRepository for SqliteCatalogRepository {
             .map_err(|_| store_failure())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| store_failure())?;
-        let mut out = Vec::with_capacity(ids.len());
-        for id in ids {
-            if let Some(found) = fetch_product(&guard, &id)? {
-                out.push(found);
-            }
-        }
-        Ok(out)
+        fetch_products_ordered(&guard, &ids)
     }
 
     fn get_metrics(&self) -> Result<CatalogMetrics, ApplicationError> {

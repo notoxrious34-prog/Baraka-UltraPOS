@@ -362,12 +362,13 @@ fn catalog_search_infix_and_empty_discovery() {
     assert_eq!(ar.len(), 1);
     assert_eq!(ar[0].0.id, id);
 
-    // SKU infix: middle of the code matches.
+    // SKU infix: middle of the code no longer matches (BRK-077 accepted
+    // delta — FTS5 prefix-MATCH has no leading-infix; pinned in
+    // catalog_search_fts_parity::infix_fragment_no_longer_matches).
     let sku = search
         .execute(&gerant, "LOMB", 20, false)
         .expect("infix sku");
-    assert_eq!(sku.len(), 1);
-    assert_eq!(sku[0].0.id, id);
+    assert!(sku.is_empty());
 
     // Barcode stays exact-only.
     let scanned = search

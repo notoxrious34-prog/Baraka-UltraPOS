@@ -236,6 +236,15 @@ fn search_80k_perf_probe() {
                 );
                 assert_eq!(probe[0].0.sku.as_str(), "PERF-42424");
             }
+            // Accepted ADR-101 delta: `oul` matches `Boulon Hex` only
+            // mid-token; FTS prefix semantics return nothing. Pinned here
+            // and in catalog_search_fts_parity (infix_fragment test).
+            "q4-infix" => {
+                assert!(
+                    probe.is_empty(),
+                    "prefix semantics: no token starts with `oul`"
+                );
+            }
             "q2-ar" => {
                 assert!(!probe.is_empty(), "فيس matches vis-token rows");
                 assert!(
@@ -273,15 +282,15 @@ fn search_80k_perf_probe() {
         );
     }
 
-    // EXPLAIN summary on the shape-equivalent LIKE plan (second connection;
-    // the norm scalar is private to the repo, shape identical: leading-% LIKE).
+    // EXPLAIN proof on the FTS query path (second connection; the executed
+    // shape is JOIN + MATCH + bm25, identical to the repository body).
     let explain_conn = open_connection(&db_path).expect("reopen for explain");
     let mut stmt = explain_conn
         .prepare(
-            "EXPLAIN QUERY PLAN SELECT DISTINCT p.id FROM products p WHERE \
-             (p.name_fr LIKE '%vis%' OR p.name_ar LIKE '%فيس%' OR p.sku LIKE '%vis%' \
-              OR EXISTS (SELECT 1 FROM product_units pu WHERE pu.product_id = p.id AND pu.barcode LIKE '%vis%')) \
-             ORDER BY p.sku LIMIT 100",
+            "EXPLAIN QUERY PLAN SELECT DISTINCT p.id FROM products p \
+             JOIN products_fts ON products_fts.product_id = p.id \
+             WHERE products_fts MATCH 'norm_fr:\"vis\"*' \
+             ORDER BY bm25(products_fts), p.sku LIMIT 100",
         )
         .expect("explain prepare");
     let plan: Vec<String> = stmt
@@ -302,8 +311,15 @@ fn search_80k_perf_probe() {
         println!("EXPLAIN {line}");
     }
     assert!(
-        plan.iter().any(|line| line.contains("SCAN")),
-        "expected at least one SCAN step (no usable index for leading-% LIKE)"
+        plan.iter().any(|line| line.contains("products_fts")),
+        "expected the FTS index in the plan (no leading-% SCAN)"
     );
-    println!("EXPLAIN verdict: SCAN-confirmed (index-less infix); FTS5 decision input ready.");
+    assert!(
+        !plan
+            .iter()
+            .map(|line| line.rsplit('|').next().unwrap_or(""))
+            .any(|d| d == "SCAN p" || d.starts_with("SCAN products ")),
+        "no base-table scan on the FTS path"
+    );
+    println!("EXPLAIN verdict: FTS-indexed (SCAN-free); BRK-077 cutover proven.");
 }

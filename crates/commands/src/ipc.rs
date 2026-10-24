@@ -2853,7 +2853,7 @@ pub fn documents_reprint(
     })
 }
 
-/// `printer_get_settings` command: read serial printer configuration.
+/// `printer_get_settings` command: read printer configuration (serial + spooler selection).
 #[tauri::command(rename_all = "snake_case")]
 pub fn printer_get_settings(
     state: tauri::State<'_, AppState>,
@@ -2868,10 +2868,12 @@ pub fn printer_get_settings(
         serial_baud: settings.serial_baud,
         paper_width_dots: settings.paper_width_dots,
         paper_width_mm: settings.paper_width_mm,
+        transport: settings.transport,
+        queue_name: settings.queue_name,
     })
 }
 
-/// `printer_update_settings` command (ADMIN only): persist COM port + baud.
+/// `printer_update_settings` command (ADMIN only): persist COM port + baud + transport selection.
 #[tauri::command(rename_all = "snake_case")]
 pub fn printer_update_settings(
     state: tauri::State<'_, AppState>,
@@ -2884,6 +2886,8 @@ pub fn printer_update_settings(
             &request.serial_port,
             request.serial_baud,
             request.paper_width_mm,
+            request.transport.as_deref(),
+            request.queue_name.as_deref(),
         )
         .map_err(|error| error_code(&error))?;
     Ok(PrinterSettingsDto {
@@ -2891,6 +2895,8 @@ pub fn printer_update_settings(
         serial_baud: settings.serial_baud,
         paper_width_dots: settings.paper_width_dots,
         paper_width_mm: settings.paper_width_mm,
+        transport: settings.transport,
+        queue_name: settings.queue_name,
     })
 }
 

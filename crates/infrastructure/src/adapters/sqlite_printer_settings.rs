@@ -63,6 +63,15 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
             serial_baud: baud,
             paper_width_dots: width.dot_width(),
             paper_width_mm: width.as_mm(),
+            transport: self
+                .read_key("printer.transport")
+                .map(|value| value.trim().to_string())
+                .filter(|value| {
+                    value == baraka_domain::printing::TRANSPORT_SERIAL
+                        || value == baraka_domain::printing::TRANSPORT_SPOOLER
+                })
+                .unwrap_or_else(|| baraka_domain::printing::TRANSPORT_SERIAL.to_string()),
+            queue_name: self.read_key("printer.queue_name").unwrap_or_default(),
         })
     }
 
@@ -71,6 +80,8 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         serial_port: &str,
         serial_baud: u32,
         paper_width_mm: Option<u32>,
+        transport: Option<&str>,
+        queue_name: Option<&str>,
     ) -> Result<(), ApplicationError> {
         let mut guard = self.lock()?;
         let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
@@ -84,6 +95,14 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
             let width = baraka_domain::printing::PaperWidth::from_mm(mm);
             pairs.push(("printer.paper_width_mm", width.as_mm().to_string()));
             pairs.push(("printer.paper_width_dots", width.dot_width().to_string()));
+        }
+        // Transport arm and queue name: `None` keeps the stored value.
+        // Both were validated upstream before any write.
+        if let Some(selection) = transport {
+            pairs.push(("printer.transport", selection.trim().to_string()));
+        }
+        if let Some(queue) = queue_name {
+            pairs.push(("printer.queue_name", queue.trim().to_string()));
         }
         run_transaction(&mut guard, |tx| {
             for (key, value) in &pairs {

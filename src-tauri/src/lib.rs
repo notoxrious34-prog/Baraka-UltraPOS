@@ -32,7 +32,7 @@ use baraka_infrastructure::persistence::migration::run_migrations;
 use baraka_infrastructure::persistence::terminal_context::resolve_device_id;
 use baraka_infrastructure::printing::capture::CaptureDevice;
 use baraka_infrastructure::printing::rasterizer::EscPosRasterizer;
-use baraka_infrastructure::printing::transport_serial::SerialPrinterTransport;
+use baraka_infrastructure::printing::transport_router::RoutingPrinterTransport;
 use baraka_infrastructure::printing::worker_thread::{spawn_print_worker, WorkerDeps};
 use tauri::Manager;
 
@@ -120,7 +120,7 @@ pub fn run() {
             let catalog = Arc::new(SqliteCatalogRepository::new(Arc::clone(&db)));
             let documents = Arc::new(SqliteDocumentRepository::new(Arc::clone(&db)));
             let print_jobs = Arc::new(SqlitePrintJobRepository::new(Arc::clone(&db)));
-            let transport = Arc::new(SerialPrinterTransport::new(Arc::clone(&db)));
+            let transport = Arc::new(RoutingPrinterTransport::new(Arc::clone(&db)));
             let renderer = Arc::new(EscPosRasterizer);
             let printer_settings = Arc::new(SqlitePrinterSettings::new(Arc::clone(&db)));
             let fiscal_settings = Arc::new(SqliteFiscalSettings::new(Arc::clone(&db)));

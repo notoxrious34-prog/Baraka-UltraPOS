@@ -1,0 +1,20 @@
+[package]
+name = "spooler-raw"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Baraka UltraPOS spooler RAW transport: minimal safe wrapper over Win32 spooler calls (ADR-103)"
+
+# ADR-103 authority: this crate is the ONLY unsafe site in the
+# workspace. It deliberately does NOT inherit `unsafe_code = "forbid"`
+# (the five existing manifests keep it — verified intact, never touched).
+# All Win32 FFI is confined here behind a safe API; every `unsafe` block
+# carries a SAFETY comment. Infrastructure and above use only the safe API.
+[target.'cfg(windows)'.dependencies]
+# Minimal surface: spooler RAW submit (+ foundation types). No other
+# Win32 API is linked from this workspace.
+windows = { workspace = true }
+
+[lints.rust]
+warnings = "deny"

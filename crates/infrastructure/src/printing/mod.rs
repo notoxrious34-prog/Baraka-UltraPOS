@@ -8,5 +8,7 @@ pub mod decode;
 pub mod font_cache;
 pub mod rasterizer;
 pub mod shaping;
+pub mod transport_router;
 pub mod transport_serial;
+pub mod transport_spooler;
 pub mod worker_thread;

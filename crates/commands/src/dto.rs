@@ -1020,6 +1020,10 @@ pub struct PrinterSettingsDto {
     pub paper_width_dots: u32,
     /// Configured paper width in millimeters (58 or 80).
     pub paper_width_mm: u32,
+    /// Active transport arm ("erial" default, "poolerol for USB RAW).
+    pub transport: String,
+    /// Exact Windows spooler queue name ("" when unconfigured).
+    pub queue_name: String,
 }
 
 /// Serial printer configuration update.
@@ -1034,6 +1038,12 @@ pub struct UpdatePrinterSettingsRequest {
     /// Paper width in millimeters (58 or 80; absent keeps stored width).
     #[serde(default)]
     pub paper_width_mm: Option<u32>,
+    /// Transport arm ("serialol or "poolerol; absent keeps stored arm).
+    #[serde(default)]
+    pub transport: Option<String>,
+    /// Spooler queue name (absent keeps stored queue).
+    #[serde(default)]
+    pub queue_name: Option<String>,
 }
 
 // Store identity + diagnostics wire types ---------------------------------

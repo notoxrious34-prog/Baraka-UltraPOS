@@ -409,10 +409,13 @@ where
     }
 }
 
-/// Persist the serial printer configuration (TASK-BRK-070, ADMIN only).
+/// Persist the printer configuration (TASK-BRK-070, extended BRK-089-C1).
 ///
 /// `paper_width_mm` of `None` keeps the stored width; `Some` must be
-/// exactly 58 or 80 or the update is rejected with zero writes.
+/// exactly 58 or 80. `transport` of `None` keeps the stored arm; `Some`
+/// must be `"serial"` or `"spooler"`. `queue_name` of `None` keeps the
+/// stored queue; `Some` must be non-empty and at most 220 characters.
+/// All rejected before any write.
 pub struct UpdatePrinterSettingsUseCase<'a, P>
 where
     P: ?Sized,
@@ -429,13 +432,16 @@ where
         Self { settings }
     }
 
-    /// Validate permission, width, and baud, then persist atomically.
+    /// Validate permission, width, baud, transport arm, and queue name,
+    /// then persist atomically.
     pub fn execute(
         &self,
         session: &SessionContext,
         serial_port: &str,
         serial_baud: u32,
         paper_width_mm: Option<u32>,
+        transport: Option<&str>,
+        queue_name: Option<&str>,
     ) -> Result<crate::ports::PrinterSettings, ApplicationError> {
         if !session
             .role
@@ -453,8 +459,19 @@ where
                 ),
             ));
         }
-        self.settings
-            .update_printer_settings(serial_port, serial_baud, paper_width_mm)?;
+        if let Some(selection) = transport {
+            baraka_domain::printing::validate_printer_transport(selection)?;
+        }
+        if let Some(queue) = queue_name {
+            baraka_domain::printing::validate_spooler_queue_name(queue)?;
+        }
+        self.settings.update_printer_settings(
+            serial_port,
+            serial_baud,
+            paper_width_mm,
+            transport,
+            queue_name,
+        )?;
         self.settings.get_printer_settings()
     }
 }

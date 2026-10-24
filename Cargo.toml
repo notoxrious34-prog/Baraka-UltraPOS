@@ -4,6 +4,7 @@ members = [
   "crates/application",
   "crates/infrastructure",
   "crates/commands",
+  "crates/spooler_raw",
   "src-tauri",
 ]
 resolver = "2"
@@ -33,3 +34,6 @@ ttf-parser = "0.24"
 unicode-bidi = "0.3"
 image = "0.25"
 serialport = "4"
+# TASK-BRK-089-C1 authorized (ADR-103): Win32 spooler RAW submit, used ONLY
+# by crates/spooler_raw (the single unsafe site). Minimal features.
+windows = { version = "0.62", features = ["Win32_Graphics_Printing", "Win32_Graphics_Gdi", "Win32_Foundation"] }

@@ -1368,6 +1368,10 @@ pub struct PrinterSettings {
     pub paper_width_dots: u32,
     /// Configured paper width in millimeters (58 or 80; default 80).
     pub paper_width_mm: u32,
+    /// Active transport arm: `"serial"` (default) or `"spooler"`.
+    pub transport: String,
+    /// Exact Windows spooler queue name (`""` when unconfigured).
+    pub queue_name: String,
 }
 
 /// Printer configuration port (`settings` table in infrastructure).
@@ -1375,13 +1379,15 @@ pub trait PrinterSettingsPort: Send + Sync {
     /// Read the current serial printer configuration (with safe defaults).
     fn get_printer_settings(&self) -> Result<PrinterSettings, ApplicationError>;
 
-    /// Persist the serial port, baud rate, and paper width (ADMIN-gated
-    /// upstream; `paper_width_mm` of `None` keeps the stored width).
+    /// Persist the serial port, baud rate, paper width, transport arm, and
+    /// spooler queue (ADMIN-gated upstream; `None` keeps the stored value).
     fn update_printer_settings(
         &self,
         serial_port: &str,
         serial_baud: u32,
         paper_width_mm: Option<u32>,
+        transport: Option<&str>,
+        queue_name: Option<&str>,
     ) -> Result<(), ApplicationError>;
 }
 

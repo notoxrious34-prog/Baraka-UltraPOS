@@ -398,6 +398,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serialport",
+ "spooler-raw",
  "tempfile",
  "thiserror 1.0.69",
  "ttf-parser 0.24.1",
@@ -4094,6 +4095,13 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
+]
+
+[[package]]
+name = "spooler-raw"
+version = "1.0.0"
+dependencies = [
+ "windows",
 ]
 
 [[package]]

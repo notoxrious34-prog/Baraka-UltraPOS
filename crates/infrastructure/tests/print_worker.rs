@@ -964,7 +964,7 @@ fn worker_honors_configured_58mm_paper_width() {
     // Merchant hardware: compact 58mm printer persisted in settings.
     let printer = SqlitePrinterSettings::new(Arc::clone(&harness.db));
     printer
-        .update_printer_settings("COM1", 9_600, Some(58))
+        .update_printer_settings("COM1", 9_600, Some(58), None, None)
         .expect("store 58mm");
 
     let transport = FakeTransport::working();

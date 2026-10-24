@@ -22,6 +22,8 @@ ttf-parser = { workspace = true }
 unicode-bidi = { workspace = true }
 image = { workspace = true }
 serialport = { workspace = true }
+# TASK-BRK-089-C1: safe Win32 spooler RAW API (only unsafe site is inside).
+spooler-raw = { path = "../spooler_raw" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

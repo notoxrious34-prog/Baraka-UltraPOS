@@ -1,0 +1,51 @@
+{
+  "green": true,
+  "results": [
+    {
+      "name": "fr-serial-default",
+      "ok": true,
+      "detail": "Série COM=true,USB direct=false com-visible queue-hidden"
+    },
+    {
+      "name": "fr-switch-spooler",
+      "ok": true,
+      "detail": "Série COM=false,USB direct=true queue-visible"
+    },
+    {
+      "name": "fr-empty-save-blocked",
+      "ok": true,
+      "detail": "blocked-ok no-ipc"
+    },
+    {
+      "name": "fr-fill-and-save",
+      "ok": true,
+      "detail": "payload-ok {\"session_token\":\"stub-admin\",\"serial_port\":\"COM1\",\"serial_baud\":9600,\"paper_width_mm\":80,\"transport\":\"spooler\",\"queue_name\":\"Xprinter XP-410B\"}"
+    },
+    {
+      "name": "fr-light-asserts",
+      "ok": true,
+      "detail": "RECT-OK:transport-group {\"l\":240,\"t\":56,\"r\":1264,\"b\":98} RECT-OK:queue-input {\"l\":240,\"t\":134,\"r\":1264,\"b\":168} noPageScroll"
+    },
+    {
+      "name": "shot-fr-light",
+      "ok": true,
+      "detail": "printer-1280x800-fr-light.png"
+    },
+    {
+      "name": "switch-ar-dark",
+      "ok": true,
+      "detail": "ar-dark-ok"
+    },
+    {
+      "name": "ar-serial-asserts",
+      "ok": true,
+      "detail": "سلسلة COM=true,USB مباشر=false rtl-ok noPageScroll RECT-OK:transport-group {\"l\":16,\"t\":56,\"r\":1040,\"b\":98}"
+    },
+    {
+      "name": "shot-ar-dark",
+      "ok": true,
+      "detail": "printer-1280x800-ar-dark.png"
+    }
+  ],
+  "consoleErrors": []
+}

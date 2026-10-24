@@ -1299,11 +1299,16 @@ export async function processSaleReturn(
   });
 }
 
+/** Active printer transport arm (mirrors printer.transport). */
+export type PrinterTransport = 'serial' | 'spooler';
+
 export interface PrinterSettings {
   serialPort: string;
   serialBaud: number;
   paperWidthDots: number;
   paperWidthMm: number;
+  transport: PrinterTransport;
+  queueName: string;
 }
 
 /** Read serial printer configuration. */
@@ -1313,6 +1318,8 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     serial_baud: number;
     paper_width_dots: number;
     paper_width_mm: number;
+    transport?: string;
+    queue_name?: string;
   }
   const wire = await call<SettingsWire>("printer_get_settings", {
     session_token: sessionToken,
@@ -1322,27 +1329,35 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     serialBaud: wire.serial_baud,
     paperWidthDots: wire.paper_width_dots,
     paperWidthMm: wire.paper_width_mm,
+    transport: wire.transport === 'spooler' ? 'spooler' : 'serial',
+    queueName: typeof wire.queue_name === 'string' ? wire.queue_name : '',
   };
 }
 
-/** Persist serial port + baud + paper width (ADMIN only server-side). */
+/** Persist serial port + baud + paper width + transport selection (ADMIN only server-side). */
 export async function ipcUpdatePrinterSettings(
   sessionToken: string,
   serialPort: string,
   serialBaud: number,
   paperWidthMm: number,
+  transport: PrinterTransport = 'serial',
+  queueName = '',
 ): Promise<PrinterSettings> {
   const wire = await call<{
     serial_port: string;
     serial_baud: number;
     paper_width_dots: number;
     paper_width_mm: number;
+    transport: string;
+    queue_name: string;
   }>("printer_update_settings", {
     request: {
       session_token: sessionToken,
       serial_port: serialPort,
       serial_baud: serialBaud,
       paper_width_mm: paperWidthMm,
+      transport,
+      queue_name: queueName,
     },
   });
   return {
@@ -1350,6 +1365,8 @@ export async function ipcUpdatePrinterSettings(
     serialBaud: wire.serial_baud,
     paperWidthDots: wire.paper_width_dots,
     paperWidthMm: wire.paper_width_mm,
+    transport: wire.transport === 'spooler' ? 'spooler' : 'serial',
+    queueName: typeof wire.queue_name === 'string' ? wire.queue_name : '',
   };
 }
 

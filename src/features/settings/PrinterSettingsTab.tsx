@@ -1,9 +1,13 @@
 /**
- * Printer & hardware tab (DSN-031, BAT-072): loads via
+ * Printer & hardware tab (DSN-031, BAT-072, DSN-091): loads via
  * `ipcGetPrinterSettings(token)`, persists via
- * `ipcUpdatePrinterSettings(token, serialPort, serialBaud, paperWidthMm)`
+ * `ipcUpdatePrinterSettings(token, serialPort, serialBaud, paperWidthMm, transport, queueName)`
  * (paper width 58 | 80), and fires bilingual test prints via
  * `printingTestPrint("fr" | "ar")`.
+ * Transport selection (serial COM vs USB spooler RAW) with conditional
+ * fields; saving on the spooler arm with an empty queue is blocked with
+ * an inline message (no IPC call). Both arms' stored values are kept
+ * independently — switching never clears the other field.
  */
 
 import { useEffect, useState, type ReactElement } from "react";
@@ -14,8 +18,10 @@ import {
   ipcGetPrinterSettings,
   ipcUpdatePrinterSettings,
   printingTestPrint,
+  type PrinterTransport,
   type TestPrintLanguage,
 } from "@/lib/ipc";
+import { PrinterIcon, SettingsIcon } from "@/components/icons";
 import { BAUD_OPTIONS } from "./settings-helpers";
 
 interface PrinterSettingsTabProps {
@@ -30,6 +36,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   const [serialPort, setSerialPort] = useState("");
   const [serialBaud, setSerialBaud] = useState<number>(9600);
   const [paperWidthMm, setPaperWidthMm] = useState<number>(80);
+  const [transport, setTransport] = useState<PrinterTransport>("serial");
+  const [queueName, setQueueName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<TestPrintLanguage | null>(null);
@@ -43,6 +51,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           setSerialPort(settings.serialPort);
           setSerialBaud(settings.serialBaud);
           setPaperWidthMm(settings.paperWidthMm);
+          setTransport(settings.transport);
+          setQueueName(settings.queueName);
           setLoading(false);
         }
       })
@@ -61,6 +71,11 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
     if (loading || saving || !canSaveSettings) {
       return;
     }
+    const trimmedQueue = queueName.trim();
+    if (transport === "spooler" && trimmedQueue === "") {
+      setNotice({ ok: false, text: t(locale, "settings.printerQueueRequired") });
+      return;
+    }
     setSaving(true);
     setNotice(null);
     try {
@@ -69,10 +84,14 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
         serialPort,
         serialBaud,
         paperWidthMm,
+        transport,
+        trimmedQueue,
       );
       setSerialPort(settings.serialPort);
       setSerialBaud(settings.serialBaud);
       setPaperWidthMm(settings.paperWidthMm);
+      setTransport(settings.transport);
+      setQueueName(settings.queueName);
       setNotice({ ok: true, text: t(locale, "settings.saved") });
     } catch (failure) {
       setNotice({ ok: false, text: String(failure) });
@@ -102,12 +121,47 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
 
   const inputClass =
     "w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800";
+  const transportButton = (active: boolean): string =>
+    `flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-bold ${
+      active
+        ? "bg-accent-500 text-slate-950"
+        : "text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700"
+    }`;
   if (loading) {
     return <p className="p-4 text-sm text-slate-500">{t(locale, "settings.loading")}</p>;
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div
+        role="group"
+        aria-label={t(locale, "settings.printerTransportTitle")}
+        className="flex gap-1 rounded border border-slate-300 p-1 dark:border-slate-600"
+      >
+        <button
+          type="button"
+          aria-pressed={transport === "serial"}
+          onClick={() => {
+            setTransport("serial");
+          }}
+          className={transportButton(transport === "serial")}
+        >
+          <SettingsIcon className="h-4 w-4" />
+          <span>{t(locale, "settings.printerTransportSerial")}</span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={transport === "spooler"}
+          onClick={() => {
+            setTransport("spooler");
+          }}
+          className={transportButton(transport === "spooler")}
+        >
+          <PrinterIcon className="h-4 w-4" />
+          <span>{t(locale, "settings.printerTransportSpooler")}</span>
+        </button>
+      </div>
+      {transport === "serial" ? (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-bold">{t(locale, "settings.serialPort")}</span>
           <bdi dir="ltr" className="contents">
@@ -138,6 +192,27 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
             ))}
           </select>
         </label>
+        </div>
+      ) : (
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-bold">{t(locale, "settings.printerQueueName")}</span>
+          <bdi dir="ltr" className="contents">
+            <input
+              className={`${inputClass} tabular-nums`}
+              value={queueName}
+              disabled={saving}
+              placeholder={t(locale, "settings.printerQueuePlaceholder")}
+              onChange={(event) => {
+                setQueueName(event.target.value);
+              }}
+            />
+          </bdi>
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            {t(locale, "settings.printerQueueHelp")}
+          </span>
+        </label>
+      )}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-bold">{t(locale, "settings.paperWidth")}</span>
           <select

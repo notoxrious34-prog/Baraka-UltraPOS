@@ -112,4 +112,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-103 | Confined unsafe exception for the Windows spooler FFI crate (spooler_raw only) | ACCEPTED |
 
-Next free id: ADR-104.
+| ADR-104 | Ticket rendering split: ESC/POS vs graphique for label-class USB printers | ACCEPTED |
+
+Next free id: ADR-105.

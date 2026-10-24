@@ -15,7 +15,7 @@ use baraka_domain::primitives::FactorMicro;
 use baraka_domain::role::Role;
 use baraka_domain::sales::{
     CreditPolicy, CreditProfile, Customer, CustomerId, CustomerTier, Document, DocumentId,
-    DocumentItem, DocumentLanguage,
+    DocumentItem, DocumentItemView, DocumentLanguage,
 };
 use baraka_domain::user::{User, UserId};
 use chrono::{DateTime, Utc};
@@ -723,6 +723,13 @@ pub trait DocumentRepository: Send + Sync {
 
     /// Fetch all item snapshots of a document in display order.
     fn get_items(&self, id: DocumentId) -> Result<Vec<DocumentItem>, ApplicationError>;
+
+    /// Fetch all item snapshots with live product designation for display
+    /// (single LEFT-JOIN query; orphaned lines degrade, never drop).
+    fn get_items_with_names(
+        &self,
+        id: DocumentId,
+    ) -> Result<Vec<DocumentItemView>, ApplicationError>;
 
     /// Fetch all payment rows of a document.
     fn get_payments(&self, id: DocumentId) -> Result<Vec<StoredPayment>, ApplicationError>;

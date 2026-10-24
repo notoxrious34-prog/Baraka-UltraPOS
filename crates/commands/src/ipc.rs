@@ -2516,15 +2516,21 @@ pub fn sales_get(
             .to_string(),
         },
         items: detail
-            .items
+            .items_view
             .iter()
-            .map(|item| DocumentItemDto {
-                product_id: item.product_id.to_string(),
-                unit_id: item.unit_id.to_string(),
-                quantity_micro: item.quantity_micro.to_string(),
-                unit_price_centimes: item.unit_price_centimes.to_string(),
-                line_tva_centimes: item.line_tva_centimes.to_string(),
-                line_ttc_centimes: item.line_ttc_centimes.to_string(),
+            .map(|view| DocumentItemDto {
+                product_id: view.item.product_id.to_string(),
+                unit_id: view.item.unit_id.to_string(),
+                quantity_micro: view.item.quantity_micro.to_string(),
+                unit_price_centimes: view.item.unit_price_centimes.to_string(),
+                line_tva_centimes: view.item.line_tva_centimes.to_string(),
+                line_ttc_centimes: view.item.line_ttc_centimes.to_string(),
+                product_name_fr: view.product_name_fr.clone(),
+                product_name_ar: view.product_name_ar.clone(),
+                sku: view.sku.clone(),
+                unit_name_fr: view.unit_name_fr.clone(),
+                unit_name_ar: view.unit_name_ar.clone(),
+                product_missing: view.product_missing,
             })
             .collect(),
         payments: detail

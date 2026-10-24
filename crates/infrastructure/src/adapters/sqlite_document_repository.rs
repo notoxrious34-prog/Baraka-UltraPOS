@@ -11,7 +11,8 @@ use baraka_application::ports::{
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::inventory::WarehouseId;
 use baraka_domain::sales::{
-    CustomerId, Document, DocumentId, DocumentItem, DocumentLanguage, DocumentStatus, DocumentType,
+    CustomerId, Document, DocumentId, DocumentItem, DocumentItemView, DocumentLanguage,
+    DocumentStatus, DocumentType,
 };
 use baraka_domain::user::UserId;
 use chrono::{SecondsFormat, Utc};
@@ -147,6 +148,24 @@ fn map_item(row: &rusqlite::Row) -> Result<DocumentItem, rusqlite::Error> {
         line_ttc_centimes: row.get(11)?,
         cost_price_centimes: row.get(12)?,
         sort_order: row.get(13)?,
+    })
+}
+
+/// Map one joined details row: frozen snapshot + live display designation.
+/// Indices 0-13 mirror [`ITEM_COLUMNS`] (same shape as [`map_item`]);
+/// indices 14-18 carry the LEFT-JOINed designation (all NULL when the row
+/// is missing).
+fn map_item_view(row: &rusqlite::Row) -> Result<DocumentItemView, rusqlite::Error> {
+    let item = map_item(row)?;
+    let product_name_fr: Option<String> = row.get(14)?;
+    Ok(DocumentItemView {
+        product_missing: product_name_fr.is_none(),
+        product_name_fr,
+        product_name_ar: row.get(15)?,
+        sku: row.get(16)?,
+        unit_name_fr: row.get(17)?,
+        unit_name_ar: row.get(18)?,
+        item,
     })
 }
 
@@ -330,6 +349,32 @@ impl DocumentRepository for SqliteDocumentRepository {
             .map_err(|_| store_failure())?;
         let items = statement
             .query_map([id.to_string()], map_item)
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?;
+        Ok(items)
+    }
+
+    fn get_items_with_names(
+        &self,
+        id: DocumentId,
+    ) -> Result<Vec<DocumentItemView>, ApplicationError> {
+        let guard = self.lock()?;
+        let mut statement = guard
+            .prepare(
+                "SELECT di.id, di.document_id, di.product_id, di.unit_id, di.quantity_micro, \
+                 di.quantity_base_micro, di.unit_price_centimes, di.discount_centimes, \
+                 di.tva_rate_micro, di.line_ht_centimes, di.line_tva_centimes, \
+                 di.line_ttc_centimes, di.cost_price_centimes, di.sort_order, \
+                 p.name_fr, p.name_ar, p.sku, u.unit_name_fr, u.unit_name_ar \
+                 FROM document_items di \
+                 LEFT JOIN products p ON p.id = di.product_id \
+                 LEFT JOIN product_units u ON u.id = di.unit_id \
+                 WHERE di.document_id = ?1 ORDER BY di.sort_order",
+            )
+            .map_err(|_| store_failure())?;
+        let items = statement
+            .query_map([id.to_string()], map_item_view)
             .map_err(|_| store_failure())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| store_failure())?;

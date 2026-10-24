@@ -11,7 +11,8 @@ pub use customer::{
     CustomerId, CustomerLedgerEntryType, CustomerTier,
 };
 pub use document::{
-    Document, DocumentId, DocumentItem, DocumentLanguage, DocumentStatus, DocumentType,
+    Document, DocumentId, DocumentItem, DocumentItemView, DocumentLanguage, DocumentStatus,
+    DocumentType,
 };
 pub use payment::{PaymentLine, PaymentMethod, PaymentStatus};
 pub use pricing::{

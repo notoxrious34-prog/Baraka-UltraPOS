@@ -25,7 +25,7 @@ use baraka_domain::primitives::{Money, QtyMicro};
 use baraka_domain::role::Role;
 use baraka_domain::sales::{
     CreditPolicy, CreditProfile, Customer, CustomerId, CustomerTier, Document, DocumentId,
-    DocumentItem, DocumentLanguage, DocumentStatus, DocumentType,
+    DocumentItem, DocumentItemView, DocumentLanguage, DocumentStatus, DocumentType,
 };
 use baraka_domain::user::UserId;
 use uuid::Uuid;
@@ -173,6 +173,13 @@ impl DocumentRepository for FakeDocuments {
 
     fn get_items(&self, _id: DocumentId) -> Result<Vec<DocumentItem>, ApplicationError> {
         Ok(self.items.lock().expect("items").clone())
+    }
+
+    fn get_items_with_names(
+        &self,
+        _id: DocumentId,
+    ) -> Result<Vec<DocumentItemView>, ApplicationError> {
+        Ok(Vec::new())
     }
 
     fn get_payments(

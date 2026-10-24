@@ -1092,6 +1092,18 @@ export interface DocumentDetailsWireResponse {
     unit_price_centimes: string;
     line_tva_centimes: string;
     line_ttc_centimes: string;
+    /** Commercial designation (FR); null when the product row is gone. */
+    product_name_fr: string | null;
+    /** Commercial designation (AR); null when the product row is gone. */
+    product_name_ar: string | null;
+    /** Stock-keeping reference; null when the product row is gone. */
+    sku: string | null;
+    /** Selling-unit label (FR); null when the unit row is gone. */
+    unit_name_fr: string | null;
+    /** Selling-unit label (AR); null when the unit row is gone. */
+    unit_name_ar: string | null;
+    /** True when the product row is missing (archived marker). */
+    product_missing: boolean;
   }>;
   payments: Array<{
     method_code: string;

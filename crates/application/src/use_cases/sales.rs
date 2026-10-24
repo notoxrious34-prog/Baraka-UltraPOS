@@ -11,8 +11,8 @@ use baraka_domain::inventory::WarehouseId;
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{
     price_document, CreditPolicy, CustomerId, CustomerTier, Document, DocumentId, DocumentItem,
-    DocumentLanguage, DocumentStatus, DocumentType, PaymentMethod, PaymentShare, PaymentStatus,
-    PricedDocument, PricedLineInput,
+    DocumentItemView, DocumentLanguage, DocumentStatus, DocumentType, PaymentMethod, PaymentShare,
+    PaymentStatus, PricedDocument, PricedLineInput,
 };
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -832,6 +832,8 @@ pub struct SaleDetail {
     pub document: Document,
     /// Item snapshots in display order.
     pub items: Vec<DocumentItem>,
+    /// Item snapshots with live product designation (same order as `items`).
+    pub items_view: Vec<DocumentItemView>,
     /// Payment rows.
     pub payments: Vec<StoredPayment>,
     /// Latest print-job status (`NONE` when absent).
@@ -1266,6 +1268,7 @@ where
             .get_by_id(id)?
             .ok_or_else(|| ApplicationError::NotFound("document".to_string()))?;
         let items = self.documents.get_items(id)?;
+        let items_view = self.documents.get_items_with_names(id)?;
         let payments = self.documents.get_payments(id)?;
         let print_status = self.documents.get_print_status(id)?;
         let paid: i128 = payments.iter().map(|p| i128::from(p.amount_centimes)).sum();
@@ -1274,6 +1277,7 @@ where
         Ok(SaleDetail {
             document: document.clone(),
             items,
+            items_view,
             payments,
             print_status,
             payment_status: PaymentStatus::derive(paid_capped, document.ttc_centimes, has_credit),

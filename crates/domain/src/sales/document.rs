@@ -287,6 +287,27 @@ pub struct DocumentItem {
     pub sort_order: i64,
 }
 
+/// One document line enriched with live product designation for display
+/// (TASK-BRK-088). The frozen [`DocumentItem`] stays ID-immutable; these
+/// extra fields are display-only and resolved with LEFT JOINs at read time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DocumentItemView {
+    /// Frozen line snapshot (ids, quantities, money).
+    pub item: DocumentItem,
+    /// Commercial designation (FR), absent when the product row is gone.
+    pub product_name_fr: Option<String>,
+    /// Commercial designation (AR), absent when the product row is gone.
+    pub product_name_ar: Option<String>,
+    /// Stock-keeping reference, absent when the product row is gone.
+    pub sku: Option<String>,
+    /// Selling-unit label (FR), absent when the unit row is gone.
+    pub unit_name_fr: Option<String>,
+    /// Selling-unit label (AR), absent when the unit row is gone.
+    pub unit_name_ar: Option<String>,
+    /// True when the product row is missing (orphaned line degrades).
+    pub product_missing: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

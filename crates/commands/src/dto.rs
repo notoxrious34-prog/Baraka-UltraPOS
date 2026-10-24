@@ -768,6 +768,19 @@ pub struct DocumentItemDto {
     pub line_tva_centimes: String,
     /// Line TTC.
     pub line_ttc_centimes: String,
+    /// Commercial designation (FR); absent when the product row is gone.
+    pub product_name_fr: Option<String>,
+    /// Commercial designation (AR); absent when the product row is gone.
+    pub product_name_ar: Option<String>,
+    /// Stock-keeping reference; absent when the product row is gone.
+    pub sku: Option<String>,
+    /// Selling-unit label (FR); absent when the unit row is gone.
+    pub unit_name_fr: Option<String>,
+    /// Selling-unit label (AR); absent when the unit row is gone.
+    pub unit_name_ar: Option<String>,
+    /// True when the product row is missing (frontend shows SKU-or-ID +
+    /// archived marker, key TBD by DSN).
+    pub product_missing: bool,
 }
 
 /// Stored payment row view.

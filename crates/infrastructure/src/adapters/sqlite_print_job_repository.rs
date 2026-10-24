@@ -118,6 +118,33 @@ impl PrintJobRepository for SqlitePrintJobRepository {
         self.transition(job_id, "DONE")
     }
 
+    fn mark_frontend_rendered(&self, job_id: &str) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
+        let stamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+        run_transaction(&mut guard, |tx| {
+            // Terminal graphique transition: no attempt consumed (zero
+            // bytes emitted), duplicata watermark untouched.
+            tx.execute(
+                "UPDATE print_jobs
+                 SET status = 'FRONTEND_RENDERED', updated_at = ?1
+                 WHERE id = ?2",
+                rusqlite::params![stamp, job_id],
+            )?;
+            crate::adapters::sqlite_audit_log::insert_cash_audit_row(
+                tx,
+                "TICKET_FRONTEND_RENDERED",
+                "print_jobs",
+                job_id,
+                None,
+                "{\"status\":\"FRONTEND_RENDERED\"}",
+                "print-worker",
+                &stamp,
+            )?;
+            Ok(())
+        })
+        .map_err(|_| store_failure())
+    }
+
     fn mark_failed(&self, job_id: &str, reason: &str) -> Result<(), ApplicationError> {
         let mut guard = self.lock()?;
         let stamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);

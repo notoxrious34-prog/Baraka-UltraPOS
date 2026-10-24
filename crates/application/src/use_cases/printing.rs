@@ -409,13 +409,15 @@ where
     }
 }
 
-/// Persist the printer configuration (TASK-BRK-070, extended BRK-089-C1).
+/// Persist the printer configuration (TASK-BRK-070, extended BRK-089-C1,
+/// BRK-090).
 ///
 /// `paper_width_mm` of `None` keeps the stored width; `Some` must be
 /// exactly 58 or 80. `transport` of `None` keeps the stored arm; `Some`
 /// must be `"serial"` or `"spooler"`. `queue_name` of `None` keeps the
 /// stored queue; `Some` must be non-empty and at most 220 characters.
-/// All rejected before any write.
+/// `ticket_render_mode` of `None` keeps the stored mode; `Some` must be
+/// `"escpos"` or `"graphique"`. All rejected before any write.
 pub struct UpdatePrinterSettingsUseCase<'a, P>
 where
     P: ?Sized,
@@ -432,8 +434,9 @@ where
         Self { settings }
     }
 
-    /// Validate permission, width, baud, transport arm, and queue name,
-    /// then persist atomically.
+    /// Validate permission, width, baud, transport arm, queue name, and
+    /// ticket render mode, then persist atomically.
+    #[allow(clippy::too_many_arguments)]
     pub fn execute(
         &self,
         session: &SessionContext,
@@ -442,6 +445,7 @@ where
         paper_width_mm: Option<u32>,
         transport: Option<&str>,
         queue_name: Option<&str>,
+        ticket_render_mode: Option<&str>,
     ) -> Result<crate::ports::PrinterSettings, ApplicationError> {
         if !session
             .role
@@ -465,12 +469,16 @@ where
         if let Some(queue) = queue_name {
             baraka_domain::printing::validate_spooler_queue_name(queue)?;
         }
+        if let Some(mode) = ticket_render_mode {
+            baraka_domain::printing::validate_ticket_render_mode(mode)?;
+        }
         self.settings.update_printer_settings(
             serial_port,
             serial_baud,
             paper_width_mm,
             transport,
             queue_name,
+            ticket_render_mode,
         )?;
         self.settings.get_printer_settings()
     }

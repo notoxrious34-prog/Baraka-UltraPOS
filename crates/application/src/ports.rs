@@ -1286,6 +1286,11 @@ pub trait PrintJobRepository: Send + Sync {
     /// Mark a job DONE after a successful physical send.
     fn mark_done(&self, job_id: &str) -> Result<(), ApplicationError>;
 
+    /// Mark a job FRONTEND_RENDERED (graphique mode, ADR-104): no bytes
+    /// were emitted; the frontend renders the ticket. Atomic with the
+    /// `TICKET_FRONTEND_RENDERED` audit row. Terminal like DONE.
+    fn mark_frontend_rendered(&self, job_id: &str) -> Result<(), ApplicationError>;
+
     /// Mark a job FAILED after exhausted retries, recording the reason.
     fn mark_failed(&self, job_id: &str, reason: &str) -> Result<(), ApplicationError>;
 
@@ -1347,7 +1352,8 @@ pub struct PrintJobRecord {
 pub struct PrintJobStatusRow {
     /// Stored row id.
     pub job_id: String,
-    /// Status code (`PENDING`, `PROCESSING`, `DONE`, `FAILED`).
+    /// Status code (`PENDING`, `PROCESSING`, `DONE`, `FRONTEND_RENDERED`,
+    /// `FAILED`).
     pub status_code: String,
     /// Physical send attempts so far.
     pub attempt_count: i64,
@@ -1372,6 +1378,8 @@ pub struct PrinterSettings {
     pub transport: String,
     /// Exact Windows spooler queue name (`""` when unconfigured).
     pub queue_name: String,
+    /// Ticket render mode: `"escpos"` (default) or `"graphique"` (ADR-104).
+    pub ticket_render_mode: String,
 }
 
 /// Printer configuration port (`settings` table in infrastructure).
@@ -1379,8 +1387,9 @@ pub trait PrinterSettingsPort: Send + Sync {
     /// Read the current serial printer configuration (with safe defaults).
     fn get_printer_settings(&self) -> Result<PrinterSettings, ApplicationError>;
 
-    /// Persist the serial port, baud rate, paper width, transport arm, and
-    /// spooler queue (ADMIN-gated upstream; `None` keeps the stored value).
+    /// Persist the serial port, baud rate, paper width, transport arm,
+    /// spooler queue, and ticket render mode (ADMIN-gated upstream; `None`
+    /// keeps the stored value).
     fn update_printer_settings(
         &self,
         serial_port: &str,
@@ -1388,6 +1397,7 @@ pub trait PrinterSettingsPort: Send + Sync {
         paper_width_mm: Option<u32>,
         transport: Option<&str>,
         queue_name: Option<&str>,
+        ticket_render_mode: Option<&str>,
     ) -> Result<(), ApplicationError>;
 }
 

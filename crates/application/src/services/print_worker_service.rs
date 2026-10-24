@@ -37,6 +37,12 @@ pub enum JobOutcome {
         /// Completed job id.
         job_id: String,
     },
+    /// Graphique mode (ADR-104): no bytes emitted; the frontend renders
+    /// the ticket. Terminal like Done.
+    FrontendRendered {
+        /// Completed job id.
+        job_id: String,
+    },
     /// Send failed; sleep, then poll again.
     RetryAfter {
         /// Retried job id.
@@ -153,6 +159,14 @@ where
         .get_printer_settings()
         .map(|settings| baraka_domain::printing::PaperWidth::from_mm(settings.paper_width_mm))
         .unwrap_or(baraka_domain::printing::PaperWidth::Width80mm);
+    // TASK-BRK-090: resolve the ticket render mode per job; any settings
+    // failure falls back to the escpos default (never fell the job).
+    let graphique = printer
+        .get_printer_settings()
+        .map(|settings| {
+            settings.ticket_render_mode.trim() == baraka_domain::printing::TICKET_RENDER_GRAPHIQUE
+        })
+        .unwrap_or(false);
     let outcome = process_claimed(
         documents,
         jobs,
@@ -163,6 +177,7 @@ where
         store_identity,
         footer_message,
         paper,
+        graphique,
     );
     match outcome {
         Ok(done) => Ok(done),
@@ -211,6 +226,8 @@ where
         String::new(),
         // Legacy entry: no settings port available; 80mm default surface.
         baraka_domain::printing::PaperWidth::Width80mm,
+        // Legacy entry: no settings port available; escpos default path.
+        false,
     );
     match outcome {
         Ok(done) => Ok(done),
@@ -334,6 +351,7 @@ fn process_claimed<D, J, P, T, R>(
     store_identity: baraka_domain::printing::StoreIdentity,
     footer_message: String,
     paper: baraka_domain::printing::PaperWidth,
+    graphique: bool,
 ) -> Result<JobOutcome, ApplicationError>
 where
     D: DocumentRepository + ?Sized,
@@ -351,6 +369,15 @@ where
             return process_debt_claimed(jobs, transport, renderer, claimed, paper);
         }
     };
+    // TASK-BRK-090 (ADR-104): graphique sale tickets never touch the
+    // renderer or the transport — the job transitions terminally and the
+    // frontend renders the 80mm ticket through the OS graphics path.
+    if graphique {
+        jobs.mark_frontend_rendered(&claimed.job_id)?;
+        return Ok(JobOutcome::FrontendRendered {
+            job_id: claimed.job_id.clone(),
+        });
+    }
     let document = documents
         .get_by_id(document_id)?
         .ok_or(ApplicationError::Validation(DomainError::PrintJobNotFound))?;

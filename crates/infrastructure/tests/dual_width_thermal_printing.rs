@@ -261,21 +261,21 @@ fn sqlite_printer_settings_repository_persists_paper_width() {
 
     // 58mm persists and reads back with the derived dot width.
     settings
-        .update_printer_settings("COM3", 9_600, Some(58), None, None)
+        .update_printer_settings("COM3", 9_600, Some(58), None, None, None)
         .expect("store 58mm");
     let reread = settings.get_printer_settings().expect("reread");
     assert_eq!((reread.paper_width_mm, reread.paper_width_dots), (58, 384));
 
     // Back to 80mm.
     settings
-        .update_printer_settings("COM3", 9_600, Some(80), None, None)
+        .update_printer_settings("COM3", 9_600, Some(80), None, None, None)
         .expect("store 80mm");
     let wide = settings.get_printer_settings().expect("reread");
     assert_eq!((wide.paper_width_mm, wide.paper_width_dots), (80, 576));
 
     // `None` keeps the stored width while port/baud still update.
     settings
-        .update_printer_settings("COM4", 115_200, None, None, None)
+        .update_printer_settings("COM4", 115_200, None, None, None, None)
         .expect("keep width");
     let kept = settings.get_printer_settings().expect("reread");
     assert_eq!(kept.paper_width_mm, 80);
@@ -288,12 +288,12 @@ fn sqlite_printer_settings_repository_persists_paper_width() {
 fn printer_settings_use_cases_handle_dual_width() {
     let (_dir, settings) = settings_harness();
     UpdatePrinterSettingsUseCase::new(&settings)
-        .execute(&admin_session(), "COM3", 9_600, Some(80), None, None)
+        .execute(&admin_session(), "COM3", 9_600, Some(80), None, None, None)
         .expect("baseline");
 
     // Admin stores 58mm through the use case; read-back confirms.
     let narrow = UpdatePrinterSettingsUseCase::new(&settings)
-        .execute(&admin_session(), "COM3", 9_600, Some(58), None, None)
+        .execute(&admin_session(), "COM3", 9_600, Some(58), None, None, None)
         .expect("store 58mm");
     assert_eq!(narrow.paper_width_mm, 58);
     assert_eq!(narrow.paper_width_dots, 384);
@@ -303,7 +303,7 @@ fn printer_settings_use_cases_handle_dual_width() {
     assert_eq!(via_getter.paper_width_mm, 58);
 
     let rejected = UpdatePrinterSettingsUseCase::new(&settings)
-        .execute(&admin_session(), "COM9", 9_600, Some(57), None, None)
+        .execute(&admin_session(), "COM9", 9_600, Some(57), None, None, None)
         .expect_err("57mm is not stocked");
     assert!(
         matches!(
@@ -322,7 +322,7 @@ fn printer_settings_use_cases_handle_dual_width() {
 
     // Non-admin roles cannot touch printer settings at all.
     let denied = UpdatePrinterSettingsUseCase::new(&settings)
-        .execute(&gerant_session(), "COM9", 9_600, Some(58), None, None)
+        .execute(&gerant_session(), "COM9", 9_600, Some(58), None, None, None)
         .expect_err("gerant blocked");
     assert!(
         matches!(

@@ -86,7 +86,9 @@ pub fn spawn_print_worker(deps: WorkerDeps, stop: Arc<AtomicBool>) -> JoinHandle
             );
             match outcome {
                 Ok(JobOutcome::Idle) | Err(_) => sleep_responsive(&stop, POLL_INTERVAL),
-                Ok(JobOutcome::Done { .. }) | Ok(JobOutcome::Failed { .. }) => {}
+                Ok(JobOutcome::Done { .. })
+                | Ok(JobOutcome::FrontendRendered { .. })
+                | Ok(JobOutcome::Failed { .. }) => {}
                 // Deferred (legacy) and retry paths sleep to avoid tight
                 // polling loops and log storms when no printer is present.
                 Ok(JobOutcome::Deferred { .. }) => sleep_responsive(&stop, POLL_INTERVAL),

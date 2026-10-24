@@ -72,6 +72,14 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
                 })
                 .unwrap_or_else(|| baraka_domain::printing::TRANSPORT_SERIAL.to_string()),
             queue_name: self.read_key("printer.queue_name").unwrap_or_default(),
+            ticket_render_mode: self
+                .read_key("printer.ticket_render_mode")
+                .map(|value| value.trim().to_string())
+                .filter(|value| {
+                    value == baraka_domain::printing::TICKET_RENDER_ESC_POS
+                        || value == baraka_domain::printing::TICKET_RENDER_GRAPHIQUE
+                })
+                .unwrap_or_else(|| baraka_domain::printing::TICKET_RENDER_ESC_POS.to_string()),
         })
     }
 
@@ -82,6 +90,7 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         paper_width_mm: Option<u32>,
         transport: Option<&str>,
         queue_name: Option<&str>,
+        ticket_render_mode: Option<&str>,
     ) -> Result<(), ApplicationError> {
         let mut guard = self.lock()?;
         let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
@@ -103,6 +112,11 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         }
         if let Some(queue) = queue_name {
             pairs.push(("printer.queue_name", queue.trim().to_string()));
+        }
+        // Ticket render mode: `None` keeps the stored mode. Validated
+        // upstream before any write.
+        if let Some(mode) = ticket_render_mode {
+            pairs.push(("printer.ticket_render_mode", mode.trim().to_string()));
         }
         run_transaction(&mut guard, |tx| {
             for (key, value) in &pairs {

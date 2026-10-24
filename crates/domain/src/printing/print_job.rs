@@ -13,6 +13,9 @@ pub enum PrintJobStatus {
     Processing,
     /// Physically printed.
     Done,
+    /// Graphique mode: no ESC/POS bytes emitted; the frontend renders the
+    /// 80mm ticket through the OS graphics path (ADR-104). Terminal.
+    FrontendRendered,
     /// Exhausted retries or unrenderable.
     Failed,
 }
@@ -25,6 +28,7 @@ impl PrintJobStatus {
             Self::Pending => "PENDING",
             Self::Processing => "PROCESSING",
             Self::Done => "DONE",
+            Self::FrontendRendered => "FRONTEND_RENDERED",
             Self::Failed => "FAILED",
         }
     }
@@ -35,6 +39,7 @@ impl PrintJobStatus {
             "PENDING" => Ok(Self::Pending),
             "PROCESSING" => Ok(Self::Processing),
             "DONE" => Ok(Self::Done),
+            "FRONTEND_RENDERED" => Ok(Self::FrontendRendered),
             "FAILED" => Ok(Self::Failed),
             other => Err(DomainError::InvalidCanonicalString(format!(
                 "unknown print status: {other}"
@@ -88,4 +93,19 @@ pub struct PrintJob {
     pub status: PrintJobStatus,
     /// Physical send attempts so far.
     pub attempt_count: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frontend_rendered_round_trips_as_terminal_code() {
+        assert_eq!(PrintJobStatus::FrontendRendered.code(), "FRONTEND_RENDERED");
+        assert_eq!(
+            PrintJobStatus::from_code("FRONTEND_RENDERED"),
+            Ok(PrintJobStatus::FrontendRendered)
+        );
+        assert!(PrintJobStatus::from_code("PRINTED").is_err());
+    }
 }

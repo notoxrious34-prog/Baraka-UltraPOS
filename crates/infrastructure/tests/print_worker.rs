@@ -964,7 +964,7 @@ fn worker_honors_configured_58mm_paper_width() {
     // Merchant hardware: compact 58mm printer persisted in settings.
     let printer = SqlitePrinterSettings::new(Arc::clone(&harness.db));
     printer
-        .update_printer_settings("COM1", 9_600, Some(58), None, None)
+        .update_printer_settings("COM1", 9_600, Some(58), None, None, None)
         .expect("store 58mm");
 
     let transport = FakeTransport::working();
@@ -1002,4 +1002,156 @@ fn worker_honors_configured_58mm_paper_width() {
         &[0x30, 0x00],
         "worker honored 58mm (48-byte stride)"
     );
+}
+
+/// Latest audit action recorded for a print job row.
+fn last_job_audit_action(harness: &Harness, job_id: &str) -> Option<String> {
+    rusqlite::Connection::open(harness._dir.path().join("print.db"))
+        .expect("reopen")
+        .query_row(
+            "SELECT action FROM audit_log WHERE entity_type = 'print_jobs' AND entity_id = ?1
+             ORDER BY sequence_no DESC LIMIT 1",
+            [job_id],
+            |row| row.get(0),
+        )
+        .map(Some)
+        .or_else(|error| match error {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            other => Err(other),
+        })
+        .expect("audit read")
+}
+
+#[test]
+fn graphique_mode_frontend_renders_without_bytes_and_audits() {
+    let harness = setup();
+    let warehouse = seed_warehouse(&harness, "MAIN");
+    let (product, unit) = seed_product(&harness, "P1", 10_000);
+    commit_sale(&harness, warehouse, product, unit);
+
+    let printer = SqlitePrinterSettings::new(Arc::clone(&harness.db));
+    printer
+        .update_printer_settings("COM1", 9_600, Some(80), None, None, Some("graphique"))
+        .expect("store graphique");
+    assert_eq!(
+        printer
+            .get_printer_settings()
+            .expect("reread")
+            .ticket_render_mode,
+        "graphique"
+    );
+
+    let transport = FakeTransport::working();
+    let renderer = FakeRenderer { fail: false };
+    let outcome = process_one_job_with_identity(
+        &harness.documents,
+        &harness.jobs,
+        &harness.catalog,
+        &transport,
+        &renderer,
+        &printer,
+        &printer,
+    )
+    .expect("process");
+    let job_id = match outcome {
+        JobOutcome::FrontendRendered { job_id } => job_id,
+        other => panic!("expected FrontendRendered, got {other:?}"),
+    };
+    // Zero-bytes proof: the transport spy saw no payload at all.
+    assert_eq!(transport.sends(), 0, "graphique emits zero ESC/POS bytes");
+    let (status, attempts, _) = job_status(&harness, &job_id);
+    assert_eq!(status, "FRONTEND_RENDERED");
+    assert_eq!(attempts, 0, "graphique consumes no attempt budget");
+    assert_eq!(
+        last_job_audit_action(&harness, &job_id).as_deref(),
+        Some("TICKET_FRONTEND_RENDERED"),
+        "terminal transition carries its audit event"
+    );
+}
+
+#[test]
+fn escpos_mode_stays_on_the_byte_path() {
+    let harness = setup();
+    let warehouse = seed_warehouse(&harness, "MAIN");
+    let (product, unit) = seed_product(&harness, "P1", 10_000);
+    commit_sale(&harness, warehouse, product, unit);
+
+    let printer = SqlitePrinterSettings::new(Arc::clone(&harness.db));
+    printer
+        .update_printer_settings("COM1", 9_600, Some(80), None, None, Some("escpos"))
+        .expect("store escpos");
+
+    let transport = FakeTransport::working();
+    let renderer = FakeRenderer { fail: false };
+    let outcome = process_one_job_with_identity(
+        &harness.documents,
+        &harness.jobs,
+        &harness.catalog,
+        &transport,
+        &renderer,
+        &printer,
+        &printer,
+    )
+    .expect("process");
+    assert!(
+        matches!(outcome, JobOutcome::Done { .. }),
+        "unexpected: {outcome:?}"
+    );
+    assert_eq!(transport.sends(), 1, "escpos still transmits one payload");
+    assert!(last_job_audit_action(
+        &harness,
+        &match outcome {
+            JobOutcome::Done { job_id } => job_id,
+            other => panic!("expected Done, got {other:?}"),
+        }
+    )
+    .is_none());
+}
+
+#[test]
+fn graphique_reprint_returns_terminal_status_without_bytes() {
+    use baraka_application::use_cases::printing::ReprintDocumentUseCase;
+
+    let harness = setup();
+    let warehouse = seed_warehouse(&harness, "MAIN");
+    let (product, unit) = seed_product(&harness, "P1", 10_000);
+    let document = commit_sale(&harness, warehouse, product, unit);
+
+    let printer = SqlitePrinterSettings::new(Arc::clone(&harness.db));
+    printer
+        .update_printer_settings("COM1", 9_600, Some(80), None, None, Some("graphique"))
+        .expect("store graphique");
+
+    let reprint_id = ReprintDocumentUseCase::new(&harness.jobs, &harness.documents)
+        .execute(&session_with(Role::Gerant), document)
+        .expect("reprint");
+    let transport = FakeTransport::working();
+    let renderer = FakeRenderer { fail: false };
+    // Two PENDING rows exist (original sale + DUPLICATA reprint); the
+    // worker claims in row order, so both must drain through graphique.
+    for _ in 0..2 {
+        let outcome = process_one_job_with_identity(
+            &harness.documents,
+            &harness.jobs,
+            &harness.catalog,
+            &transport,
+            &renderer,
+            &printer,
+            &printer,
+        )
+        .expect("process");
+        assert!(
+            matches!(outcome, JobOutcome::FrontendRendered { .. }),
+            "unexpected: {outcome:?}"
+        );
+    }
+    assert_eq!(transport.sends(), 0, "reprint emits zero bytes");
+    let (status, _, _) = job_status(&harness, &reprint_id);
+    assert_eq!(status, "FRONTEND_RENDERED");
+    let row = harness
+        .jobs
+        .get_job_status(document)
+        .expect("status read")
+        .expect("row");
+    assert_eq!(row.status_code, "FRONTEND_RENDERED");
 }

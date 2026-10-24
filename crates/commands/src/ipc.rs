@@ -2870,6 +2870,7 @@ pub fn printer_get_settings(
         paper_width_mm: settings.paper_width_mm,
         transport: settings.transport,
         queue_name: settings.queue_name,
+        ticket_render_mode: settings.ticket_render_mode,
     })
 }
 
@@ -2888,6 +2889,7 @@ pub fn printer_update_settings(
             request.paper_width_mm,
             request.transport.as_deref(),
             request.queue_name.as_deref(),
+            request.ticket_render_mode.as_deref(),
         )
         .map_err(|error| error_code(&error))?;
     Ok(PrinterSettingsDto {
@@ -2897,6 +2899,7 @@ pub fn printer_update_settings(
         paper_width_mm: settings.paper_width_mm,
         transport: settings.transport,
         queue_name: settings.queue_name,
+        ticket_render_mode: settings.ticket_render_mode,
     })
 }
 

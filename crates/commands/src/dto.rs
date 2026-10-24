@@ -1024,6 +1024,9 @@ pub struct PrinterSettingsDto {
     pub transport: String,
     /// Exact Windows spooler queue name ("" when unconfigured).
     pub queue_name: String,
+    /// Ticket render mode ("escpos" default, "graphique" for OS-graphics
+    /// tickets, ADR-104).
+    pub ticket_render_mode: String,
 }
 
 /// Serial printer configuration update.
@@ -1044,6 +1047,10 @@ pub struct UpdatePrinterSettingsRequest {
     /// Spooler queue name (absent keeps stored queue).
     #[serde(default)]
     pub queue_name: Option<String>,
+    /// Ticket render mode ("escpos" or "graphique"; absent keeps
+    /// stored mode).
+    #[serde(default)]
+    pub ticket_render_mode: Option<String>,
 }
 
 // Store identity + diagnostics wire types ---------------------------------

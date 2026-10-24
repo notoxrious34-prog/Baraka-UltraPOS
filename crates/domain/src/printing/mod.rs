@@ -15,6 +15,7 @@ pub use receipt_model::{
     PreviewLine, ReceiptDocument, ReceiptLanguage, ReceiptLine, ReceiptTotals, StoreIdentity,
 };
 pub use transport::{
-    validate_printer_transport, validate_spooler_queue_name, MAX_QUEUE_NAME_CHARS,
-    TRANSPORT_SERIAL, TRANSPORT_SPOOLER,
+    validate_printer_transport, validate_spooler_queue_name, validate_ticket_render_mode,
+    MAX_QUEUE_NAME_CHARS, TICKET_RENDER_ESC_POS, TICKET_RENDER_GRAPHIQUE, TRANSPORT_SERIAL,
+    TRANSPORT_SPOOLER,
 };

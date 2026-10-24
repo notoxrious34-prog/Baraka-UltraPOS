@@ -51,6 +51,29 @@ function fmtQty(micro: string): string {
 /** Full document view (re-exported wire shape from sales_get). */
 export type DocumentDetailsWire = DocumentDetailsWireResponse;
 
+type DetailsLine = DocumentDetailsWireResponse["items"][number];
+
+/**
+ * Display designation for one details line (TASK-DSN-089): active-locale
+ * first, fallback to the other locale, then SKU, then the raw id (orphans
+ * degrade to SKU-or-id with an information badge — never blank).
+ */
+function itemDisplayName(item: DetailsLine, locale: Locale): string {
+  if (item.product_missing) {
+    return item.sku ?? item.product_id;
+  }
+  const primary = locale === "ar-DZ" ? item.product_name_ar : item.product_name_fr;
+  const secondary = locale === "ar-DZ" ? item.product_name_fr : item.product_name_ar;
+  return primary ?? secondary ?? item.sku ?? item.product_id;
+}
+
+/** Selling-unit label in the active locale (null when the unit row is gone). */
+function itemUnitLabel(item: DetailsLine, locale: Locale): string | null {
+  const primary = locale === "ar-DZ" ? item.unit_name_ar : item.unit_name_fr;
+  const secondary = locale === "ar-DZ" ? item.unit_name_fr : item.unit_name_ar;
+  return primary ?? secondary ?? null;
+}
+
 /**
  * A4 print eligibility (TASK-DSN-085): delivery notes and invoices print on
  * A4; tickets stay on the fiscal thermal path (existing DUPLICATA reprint),
@@ -128,8 +151,8 @@ export function DocumentA4Sheet(props: {
           {details.items.map((item, index) => (
             <tr key={`${item.product_id}-${item.unit_id}-${index}`} data-testid="a4-line">
               <td>
-                <bdi dir="ltr" className="a4-num">
-                  {item.product_id}
+                <bdi className="a4-num">
+                  {itemDisplayName(item, locale)}
                 </bdi>
               </td>
               <td>
@@ -229,12 +252,29 @@ export function DocumentDetailsView(props: {
                   className="border-t border-slate-100 dark:border-slate-800"
                 >
                   <td className="py-1 pe-2">
-                    <bdi dir="ltr" className="block font-mono">
-                      {item.product_id}
-                    </bdi>
-                    <bdi dir="ltr" className="block font-mono text-[10px] text-slate-500">
-                      {item.unit_id}
-                    </bdi>
+                    {item.product_missing ? (
+                      <>
+                        <bdi dir="ltr" className="block font-medium">
+                          {item.sku ?? item.product_id}
+                        </bdi>
+                        <span className="mt-0.5 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+                          {t(locale, "documents.detailsOrphanBadge")}
+                        </span>
+                      </>
+                    ) : (
+                      <bdi className="block font-medium">{itemDisplayName(item, locale)}</bdi>
+                    )}
+                    <span className="block text-[10px] text-slate-500">
+                      <bdi dir="ltr">
+                        {[
+                          item.sku,
+                          itemUnitLabel(item, locale),
+                          fmtQty(item.quantity_micro),
+                        ]
+                          .filter((part): part is string => part !== null)
+                          .join(" · ")}
+                      </bdi>
+                    </span>
                   </td>
                   <td className="py-1 pe-2">
                     <bdi dir="ltr" className="font-mono tabular-nums">

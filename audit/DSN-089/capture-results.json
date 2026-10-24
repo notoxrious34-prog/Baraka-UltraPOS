@@ -1,0 +1,45 @@
+{
+  "results": [
+    {
+      "name": "open-documents",
+      "ok": true,
+      "detail": "ok:1"
+    },
+    {
+      "name": "open-drawer",
+      "ok": true,
+      "detail": "clicked"
+    },
+    {
+      "name": "fr-light-asserts",
+      "ok": true,
+      "detail": "names+badge visible, UUID-CLEAN, noPageScroll"
+    },
+    {
+      "name": "shot-fr-light",
+      "ok": true,
+      "detail": "drawer-1280x800-fr-light.png"
+    },
+    {
+      "name": "switch-ar-dark",
+      "ok": true,
+      "detail": "ar-DZ + dark, drawer reopened"
+    },
+    {
+      "name": "ar-dark-asserts",
+      "ok": true,
+      "detail": "ar names+badge visible, UUID-CLEAN, noPageScroll, dir=null"
+    },
+    {
+      "name": "shot-ar-dark",
+      "ok": true,
+      "detail": "drawer-1280x800-ar-dark.png"
+    },
+    {
+      "name": "zero-console-errors",
+      "ok": true,
+      "detail": "0 console errors"
+    }
+  ],
+  "consoleErrors": []
+}

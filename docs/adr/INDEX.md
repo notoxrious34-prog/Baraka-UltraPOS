@@ -110,4 +110,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-102 | Search performance bar restated in catalog-size tiers (S/M gated, 80k monitored; 0017 reverted) | ACCEPTED |
 
-Next free id: ADR-103.
+| ADR-103 | Confined unsafe exception for the Windows spooler FFI crate (spooler_raw only) | ACCEPTED |
+
+Next free id: ADR-104.

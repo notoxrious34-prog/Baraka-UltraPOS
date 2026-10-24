@@ -21,9 +21,10 @@ encore vérifié ou validé, et reste sous votre responsabilité de tester.
 4. **Chiffrement de la base (action : décision).** La base locale N'EST PAS
    chiffrée (SQLCipher absent) : quiconque accède au fichier lit les données.
    *(À faire : décision explicite — poste verrouillé Windows + sauvegardes.)*
-5. **Recherche rapide (action : cycle suivant).** L'index FTS5 est préparé
-   mais NON activé (cutover BRK-077 en attente) ; la recherche reste lente
-   sur gros catalogues. *(Source : audit/BRK-076/REPORT.md.)*
+5. **Recherche rapide (état : livré).** L'index FTS5 est ACTIF depuis le
+   cutover BRK-077 (991251b) : recherche instantanée jusqu'à ~5 000 articles
+   (17–27 ms mesurés), marge jusqu'à 20 000 ; 80 000 surveillés (ADR-102).
+   *(Source : audit/BRK-087/REPORT.md.)*
 
 ## Check-list propriétaire avant mise en service
 - [ ] Ticket d'essai imprimé et lisible (FR + AR) sur l'imprimante du magasin.

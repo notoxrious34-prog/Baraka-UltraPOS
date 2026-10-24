@@ -112,7 +112,7 @@ export function CheckoutModal(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const closeModal = usePosUiStore((state) => state.closeModal);
   const setLastReceipt = usePosUiStore((state) => state.setLastReceipt);
-  const setBanner = usePosUiStore((state) => state.setBanner);
+  const notify = usePosUiStore((state) => state.notify);
   const lines = useCartStore((state) => state.lines);
   const globalDiscountCentimes = useCartStore((state) => state.globalDiscountCentimes);
   const customer = useCartStore((state) => state.customer);
@@ -297,7 +297,6 @@ export function CheckoutModal(): ReactElement {
         setLastReceipt(receipt);
         setDone(receipt);
         clearCart();
-        setBanner(`${t(locale, "checkout.success")} — ${receipt.document_number}`);
         void useCashSessionStore.getState().refresh();
       })
       .catch((failure: unknown) => {
@@ -307,6 +306,12 @@ export function CheckoutModal(): ReactElement {
   };
 
   const finishSale = (): void => {
+    if (done !== null) {
+      notify({
+        title: t(locale, "checkout.success"),
+        detail: `${done.document_number} · ${formatMoney(done.total_ttc_centimes, locale)} · ${t(locale, "print.pending")}`,
+      });
+    }
     setDone(null);
     closeModal();
     const search = document.getElementById("pos-search-input");

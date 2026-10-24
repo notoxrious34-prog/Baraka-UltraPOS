@@ -158,7 +158,7 @@ export function RecordPaymentModal({
   const hasPermission = useSessionStore((state) => state.hasPermission);
   const canRecordPayment = hasPermission("RECORD_CREDIT_PAYMENT");
   const overpaymentAllowed = hasPermission("MANAGE_CUSTOMER_CREDIT");
-  const setBanner = usePosUiStore((state) => state.setBanner);
+  const notify = usePosUiStore((state) => state.notify);
   const [amountText, setAmountText] = useState("");
   const [method, setMethod] = useState<PaymentMethodOption>("CASH");
   const [note, setNote] = useState("");
@@ -250,12 +250,12 @@ export function RecordPaymentModal({
         buildPaymentReference(method, note),
         overpaymentAllowed && allowOverpayment,
       );
-      setBanner(
-        t(locale, "payment.success").replace(
+      notify({
+        title: t(locale, "payment.success").replace(
           "{balance}",
           formatMoney(result.new_balance_centimes, locale),
         ),
-      );
+      });
       // State 4: show the سند قبض receipt view; the caller refresh
       // (onSuccess) and close run from the Fermer/إغلاق button instead.
       setCompletedPayment({

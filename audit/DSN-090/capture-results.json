@@ -1,0 +1,70 @@
+{
+  "results": [
+    {
+      "name": "fr-strip-in-viewport",
+      "ok": true,
+      "detail": "STRIP-OK {\"l\":0,\"t\":40,\"r\":1280,\"b\":80,\"vw\":1280,\"vh\":800} brand-ok no-banner-ok pre-clean-ok"
+    },
+    {
+      "name": "fr-cash-menu-in-viewport",
+      "ok": true,
+      "detail": "MENU-OK {\"l\":34,\"t\":78,\"r\":210,\"b\":146,\"vw\":1280,\"vh\":800} closed-ok"
+    },
+    {
+      "name": "checkout-to-popup",
+      "ok": true,
+      "detail": "popup shown T-2026-0099"
+    },
+    {
+      "name": "fr-light-asserts",
+      "ok": true,
+      "detail": "POPUP-OK 450,96,830,158 noPageScroll"
+    },
+    {
+      "name": "shot-fr-light",
+      "ok": true,
+      "detail": "shell-1280x800-fr-light.png"
+    },
+    {
+      "name": "popup-auto-dismiss",
+      "ok": true,
+      "detail": "dismissed-ok"
+    },
+    {
+      "name": "switch-ar-dark",
+      "ok": true,
+      "detail": "ar-DZ + dark"
+    },
+    {
+      "name": "ar-dark-asserts",
+      "ok": true,
+      "detail": "STRIP-OK {\"l\":0,\"t\":40,\"r\":1280,\"b\":80,\"vw\":1280,\"vh\":800} logout-ok noPageScroll dir=rtl"
+    },
+    {
+      "name": "shot-ar-dark",
+      "ok": true,
+      "detail": "shell-1280x800-ar-dark.png"
+    },
+    {
+      "name": "viewport-1024",
+      "ok": true,
+      "detail": "1024x600 reloaded fr-light"
+    },
+    {
+      "name": "1024-collapse-asserts",
+      "ok": true,
+      "detail": "STRIP-OK {\"l\":0,\"t\":40,\"r\":1024,\"b\":80,\"vw\":1024,\"vh\":600} kept-cash-depot-logout collapsed-ok {\"depot\":0,\"offline\":0,\"ops\":0} noPageScroll"
+    },
+    {
+      "name": "shot-1024",
+      "ok": true,
+      "detail": "shell-1024x600-fr-light.png"
+    },
+    {
+      "name": "zero-console-errors",
+      "ok": true,
+      "detail": "0 console errors"
+    }
+  ],
+  "consoleErrors": []
+}

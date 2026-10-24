@@ -24,14 +24,13 @@ import { ReturnModal } from "@/components/pos/modals/ReturnModal";
 import { usePaymentModalStore } from "@/stores/payment-modal-store";
 import { StockAdjustModal } from "@/components/pos/modals/StockAdjustModal";
 import { ParkedSalesModal } from "@/components/pos/ParkedSalesModal";
+import { NoticePopup } from "@/components/pos/NoticePopup";
 import { useCartStore } from "@/stores/cart-store";
 
 export function PosShell(): ReactElement {
   usePosKeyboard();
   const locale = usePosUiStore((state) => state.locale);
   const activeModal = usePosUiStore((state) => state.activeModal);
-  const banner = usePosUiStore((state) => state.banner);
-  const setBanner = usePosUiStore((state) => state.setBanner);
   const openModal = usePosUiStore((state) => state.openModal);
   const closeModal = usePosUiStore((state) => state.closeModal);
   const paymentTarget = usePaymentModalStore((state) => state.target);
@@ -53,18 +52,8 @@ export function PosShell(): ReactElement {
       lang={locale === "ar-DZ" ? "ar" : "fr"}
       className="flex h-full w-full select-none flex-col overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
     >
-      {banner !== null && (
-        <button
-          type="button"
-          onClick={() => {
-            setBanner(null);
-          }}
-          className="shrink-0 bg-emerald-700 px-3 py-1 text-center text-xs font-bold text-white"
-        >
-          {banner}
-        </button>
-      )}
       <PosShellView />
+      <NoticePopup />
       {activeModal === "checkout" && <CheckoutModal />}
       {activeModal === "customer" && <CustomerSelectModal />}
       {activeModal === "conversion" && <DocumentConversionModal />}

@@ -11,6 +11,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { t } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 import { ipcCashGetSessionReport } from "@/lib/ipc";
+import { ChevronDownIcon } from "@/components/icons";
 
 function useLiveTotal(sessionId: string | null, expected: string | null): string | null {
   const session = useSessionStore((state) => state.session);
@@ -131,11 +132,11 @@ export function CashSessionIndicator(): ReactElement {
           setMenuOpen((value) => !value);
         }}
         className="rounded-md bg-white/20 px-2 py-0.5 hover:bg-white/30"
-      >
-        ▾
-      </button>
+        >
+        <ChevronDownIcon className="h-4 w-4" />
+        </button>
       {menuOpen && (
-        <span className="absolute end-0 top-full z-50 mt-1 flex min-w-44 flex-col gap-1 rounded-lg bg-white p-2 text-slate-900 shadow-2xl">
+        <span className="absolute start-0 top-full z-50 mt-1 flex min-w-44 flex-col gap-1 rounded-lg bg-white p-2 text-slate-900 shadow-2xl">
           <button
             type="button"
             onClick={() => {

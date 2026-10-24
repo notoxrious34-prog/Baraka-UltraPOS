@@ -195,7 +195,7 @@ export const useQuickProductsStore = create<QuickProductsState>()((set, get) => 
     useCartStore.getState().addProduct(product);
     const locale = usePosUiStore.getState().locale;
     const label = locale === "ar-DZ" ? product.name_ar : product.name_fr;
-    usePosUiStore.getState().setBanner(`Alt+${slotIndex + 1} · ${label}`);
+    usePosUiStore.getState().notify({ title: `Alt+${slotIndex + 1} · ${label}` });
     set({ lastFiredSlot: slotIndex });
     return true;
   },

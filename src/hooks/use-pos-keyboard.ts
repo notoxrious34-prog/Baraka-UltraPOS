@@ -46,8 +46,8 @@ export function isPrintableKey(event: {
 
 /**
  * Quick-palette slot for an Alt+Digit keystroke (TASK-DSN-069).
- * Digit1..8 / Numpad1..8 → slots 0..7; anything else (or any extra
- * modifier) → null. Pure: unit-tested without DOM.
+ * Digit1..8 / Numpad1..8 map to slots 0..7; anything else (or any extra
+ * modifier) yields null. Pure: unit-tested without DOM.
  */
 export function altDigitSlotIndex(event: {
   altKey: boolean;
@@ -123,11 +123,11 @@ async function parkSale(): Promise<void> {
       ui.locale === "ar-DZ" ? "AR" : "FR",
     );
     cart.clearCart();
-    ui.setBanner(t(ui.locale, "parked.ok"));
+    ui.notify({ title: t(ui.locale, "parked.ok") });
     focusSearch();
   } catch (error: unknown) {
     const code = typeof error === "string" ? error : "INTERNAL_ERROR";
-    ui.setBanner(translateBackendError(code, ui.locale));
+    ui.notify({ title: translateBackendError(code, ui.locale) });
   }
 }
 
@@ -187,11 +187,11 @@ export function usePosKeyboard(): void {
             const result = cart.cycleLineUnit(line.key);
             if (result.cycled) {
               const name = ui.locale === "ar-DZ" ? result.unitNameAr : result.unitNameFr;
-              ui.setBanner(
-                `${t(ui.locale, "pos.unitChanged")} ${name} (${formatMoney(result.salePriceCentimes, ui.locale)})`,
-              );
+              ui.notify({
+                title: `${t(ui.locale, "pos.unitChanged")} ${name} (${formatMoney(result.salePriceCentimes, ui.locale)})`,
+              });
             } else {
-              ui.setBanner(t(ui.locale, "pos.singleUnitNotice"));
+              ui.notify({ title: t(ui.locale, "pos.singleUnitNotice") });
             }
           }
         }

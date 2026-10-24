@@ -94,7 +94,7 @@ function toCartLine(
 export function ParkedSalesModal(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const closeModal = usePosUiStore((state) => state.closeModal);
-  const setBanner = usePosUiStore((state) => state.setBanner);
+  const notify = usePosUiStore((state) => state.notify);
   const [drafts, setDrafts] = useState<DocumentSummaryWireDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,7 +145,7 @@ export function ParkedSalesModal(): ReactElement {
     ipcDiscardDraft(token, draftId)
       .then(() => {
         setBusyId(null);
-        setBanner(t(usePosUiStore.getState().locale, "parked.discardedOk"));
+        notify({ title: t(usePosUiStore.getState().locale, "parked.discardedOk") });
         loadDrafts();
       })
       .catch((failure: unknown) => {
@@ -189,7 +189,7 @@ export function ParkedSalesModal(): ReactElement {
         useCartStore.getState().loadLines(lines, customer);
         await ipcDiscardDraft(token, draft.id);
         setBusyId(null);
-        setBanner(t(usePosUiStore.getState().locale, "parked.resumedOk"));
+        notify({ title: t(usePosUiStore.getState().locale, "parked.resumedOk") });
         closeModal();
         focusSearch();
       })

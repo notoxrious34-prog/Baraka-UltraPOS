@@ -16,6 +16,18 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useAppViewStore, type AppView } from "@/stores/app-view-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { PosShell } from "@/components/pos/PosShell";
+import {
+  CatalogIcon,
+  CustomersIcon,
+  DocumentsIcon,
+  PosIcon,
+  ReportsIcon,
+  SettingsIcon,
+  StockIcon,
+  SuppliersIcon,
+  UserIcon,
+  type IconProps,
+} from "@/components/icons";
 import { LoginScreen } from "@/features/auth/LoginScreen";
 import { FirstRunSetupScreen } from "@/features/auth/FirstRunSetupScreen";
 import { SuppliersModule } from "@/features/suppliers/SupplierListScreen";
@@ -98,16 +110,17 @@ export function NavRail({
   const canAccessSettings =
     hasPermission("SYSTEM_SETTINGS_MANAGE") || hasPermission("STOCK_ADJUSTMENT");
   const canAccessUsers = hasPermission("USER_MANAGE");
-  const entry = (target: AppView, label: string): ReactElement => (
+  const entry = (target: AppView, label: string, Icon: (props: IconProps) => ReactElement): ReactElement => (
     <button
       type="button"
       onClick={() => {
         onSelect(target);
       }}
-      className={`rounded-md px-3 py-1 text-xs font-bold ${
+      className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-bold ${
         view === target ? "bg-accent-500 text-slate-950" : "bg-white/10 text-white hover:bg-white/20"
       }`}
     >
+      <Icon className="h-4 w-4" />
       {label}
     </button>
   );
@@ -120,18 +133,18 @@ export function NavRail({
           className="h-7 w-7 select-none object-contain drop-shadow-sm"
         />
         <span className="text-xs font-black">
-          <span className="text-amber-300">Baraka</span>
+          <span className="text-amber-300">Baraka UltraPOS</span>
         </span>
       </span>
-      {canAccessPos && entry("pos", t(locale, "nav.pos"))}
-      {canAccessCatalog && entry("catalog", t(locale, "nav.catalog"))}
-      {canAccessStock && entry("stock", t(locale, "nav.stock"))}
-      {canAccessCustomers && entry("customers", t(locale, "nav.customers"))}
-      {canAccessDocuments && entry("documents", t(locale, "nav.documents"))}
-      {canAccessSuppliers && entry("suppliers", t(locale, "nav.suppliers"))}
-      {canAccessReports && entry("reports", t(locale, "nav.reports"))}
-      {canAccessSettings && entry("settings", t(locale, "nav.settings"))}
-      {canAccessUsers && entry("users", t(locale, "nav.users"))}
+      {canAccessPos && entry("pos", t(locale, "nav.pos"), PosIcon)}
+      {canAccessCatalog && entry("catalog", t(locale, "nav.catalog"), CatalogIcon)}
+      {canAccessStock && entry("stock", t(locale, "nav.stock"), StockIcon)}
+      {canAccessCustomers && entry("customers", t(locale, "nav.customers"), CustomersIcon)}
+      {canAccessDocuments && entry("documents", t(locale, "nav.documents"), DocumentsIcon)}
+      {canAccessSuppliers && entry("suppliers", t(locale, "nav.suppliers"), SuppliersIcon)}
+      {canAccessReports && entry("reports", t(locale, "nav.reports"), ReportsIcon)}
+      {canAccessSettings && entry("settings", t(locale, "nav.settings"), SettingsIcon)}
+      {canAccessUsers && entry("users", t(locale, "nav.users"), UserIcon)}
     </nav>
   );
 }

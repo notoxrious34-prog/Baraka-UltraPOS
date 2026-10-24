@@ -153,6 +153,14 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           </select>
         </label>
       </div>
+      <div className="rounded border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+        <p className="font-black">{t(locale, "settings.printerComGuideTitle")}</p>
+        <ul className="mt-1 list-disc space-y-1 ps-5 text-slate-600 dark:text-slate-300">
+          <li>{t(locale, "settings.printerComGuideCom")}</li>
+          <li>{t(locale, "settings.printerComGuideUsb")}</li>
+          <li>{t(locale, "settings.printerComGuideTransport")}</li>
+        </ul>
+      </div>
       <div>
         <button
           type="button"

@@ -1,10 +1,16 @@
 /**
- * POS UI state: locale, modals, search, selection, banners.
+ * POS UI state: locale, modals, search, selection, notices.
  */
 
 import { create } from "zustand";
 import type { ReactNode } from "react";
 import type { ActiveModal, Locale, SaleReceipt } from "@/types/pos";
+
+/** Transient success/info notice (small centered toast). */
+export interface ShellNotice {
+  title: string;
+  detail?: string;
+}
 
 interface PosUiState {
   locale: Locale;
@@ -12,7 +18,7 @@ interface PosUiState {
   searchQuery: string;
   selectedLineIndex: number;
   lastReceipt: SaleReceipt | null;
-  banner: string | null;
+  notice: ShellNotice | null;
   setLocale: (locale: Locale) => void;
   toggleLocale: () => void;
   openModal: (modal: Exclude<ActiveModal, "none">) => void;
@@ -21,7 +27,8 @@ interface PosUiState {
   setSelectedLineIndex: (index: number) => void;
   moveSelection: (delta: number, lineCount: number) => void;
   setLastReceipt: (receipt: SaleReceipt | null) => void;
-  setBanner: (banner: string | null) => void;
+  notify: (notice: ShellNotice) => void;
+  dismissNotice: () => void;
 }
 
 export const usePosUiStore = create<PosUiState>()((set) => ({
@@ -30,11 +37,11 @@ export const usePosUiStore = create<PosUiState>()((set) => ({
   searchQuery: "",
   selectedLineIndex: 0,
   lastReceipt: null,
-  banner: null,
+  notice: null,
   setLocale: (locale) => set({ locale }),
   toggleLocale: () =>
     set((state) => ({ locale: state.locale === "ar-DZ" ? "fr-DZ" : "ar-DZ" })),
-  openModal: (modal) => set({ activeModal: modal, banner: null }),
+  openModal: (modal) => set({ activeModal: modal, notice: null }),
   closeModal: () => set({ activeModal: "none" }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSelectedLineIndex: (index) => set({ selectedLineIndex: Math.max(0, index) }),
@@ -47,7 +54,8 @@ export const usePosUiStore = create<PosUiState>()((set) => ({
       return { selectedLineIndex: Math.min(Math.max(next, 0), lineCount - 1) };
     }),
   setLastReceipt: (receipt) => set({ lastReceipt: receipt }),
-  setBanner: (banner) => set({ banner }),
+  notify: (notice) => set({ notice }),
+  dismissNotice: () => set({ notice: null }),
 }));
 
 /** Props shared by every modal shell (Escape handled globally). */

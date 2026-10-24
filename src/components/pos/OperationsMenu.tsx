@@ -15,6 +15,16 @@ import { useStockAdjustModalStore } from "@/stores/stock-adjust-modal-store";
 import { useBackupModalStore } from "@/stores/backup-modal-store";
 import { t } from "@/lib/i18n";
 import type { ActiveModal } from "@/types/pos";
+import {
+  ChevronDownIcon,
+  DepotIcon,
+  DocumentsIcon,
+  LogoutIcon,
+  PrinterIcon,
+  ShieldIcon,
+  StockIcon,
+  type IconProps,
+} from "@/components/icons";
 
 export type OperationId =
   | "conversion"
@@ -97,13 +107,13 @@ export function runOperation(id: OperationId, deps: OperationDeps): void {
   }
 }
 
-const ITEM_ICON: Record<OperationId, string> = {
-  conversion: "⇄",
-  return: "↩",
-  "warehouse-transfer": "⇄",
-  "stock-adjust": "⚖",
-  backup: "🛡",
-  identity: "🖨",
+const ITEM_ICON: Record<OperationId, (props: IconProps) => ReactElement> = {
+  conversion: DocumentsIcon,
+  return: LogoutIcon,
+  "warehouse-transfer": DepotIcon,
+  "stock-adjust": StockIcon,
+  backup: ShieldIcon,
+  identity: PrinterIcon,
 };
 
 const SECTION_TITLE_KEY: Record<OperationSectionKey, "topbar.operationsDocuments" | "topbar.operationsStock" | "topbar.operationsSystem"> = {
@@ -249,7 +259,9 @@ export function OperationsMenuView({
           <rect x="9" y="9" width="6" height="6" rx="1.5" />
         </svg>
         <span>{t(locale, "topbar.operations")}</span>
-        <span aria-hidden="true">▾</span>
+        <span aria-hidden="true" className="flex w-5 justify-center">
+          <ChevronDownIcon className="h-4 w-4" />
+        </span>
       </button>
       {isOpen && (
         <div className="absolute end-0 top-full z-50 mt-1.5 w-64 rounded-xl border border-slate-200 bg-white p-1.5 text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
@@ -270,8 +282,11 @@ export function OperationsMenuView({
                   }}
                   className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-xs font-bold hover:bg-slate-100 disabled:opacity-40 dark:hover:bg-slate-700/60"
                 >
-                  <span aria-hidden="true" className="w-5 text-center">
-                    {ITEM_ICON[id]}
+                  <span aria-hidden="true" className="flex w-5 justify-center">
+                    {(() => {
+                      const Icon = ITEM_ICON[id];
+                      return <Icon className="h-4 w-4" />;
+                    })()}
                   </span>
                   <span>{itemLabel(id)}</span>
                 </button>

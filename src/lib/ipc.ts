@@ -1302,6 +1302,9 @@ export async function processSaleReturn(
 /** Active printer transport arm (mirrors printer.transport). */
 export type PrinterTransport = 'serial' | 'spooler';
 
+/** Ticket render mode (mirrors printer.ticket_render_mode, ADR-104). */
+export type TicketRenderMode = 'escpos' | 'graphique';
+
 export interface PrinterSettings {
   serialPort: string;
   serialBaud: number;
@@ -1309,6 +1312,11 @@ export interface PrinterSettings {
   paperWidthMm: number;
   transport: PrinterTransport;
   queueName: string;
+  ticketRenderMode: TicketRenderMode;
+}
+
+function toTicketRenderMode(raw: unknown): TicketRenderMode {
+  return raw === 'graphique' ? 'graphique' : 'escpos';
 }
 
 /** Read serial printer configuration. */
@@ -1331,6 +1339,9 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     paperWidthMm: wire.paper_width_mm,
     transport: wire.transport === 'spooler' ? 'spooler' : 'serial',
     queueName: typeof wire.queue_name === 'string' ? wire.queue_name : '',
+    ticketRenderMode: toTicketRenderMode(
+      (wire as { ticket_render_mode?: unknown }).ticket_render_mode,
+    ),
   };
 }
 
@@ -1342,6 +1353,7 @@ export async function ipcUpdatePrinterSettings(
   paperWidthMm: number,
   transport: PrinterTransport = 'serial',
   queueName = '',
+  ticketRenderMode?: TicketRenderMode | null,
 ): Promise<PrinterSettings> {
   const wire = await call<{
     serial_port: string;
@@ -1350,6 +1362,7 @@ export async function ipcUpdatePrinterSettings(
     paper_width_mm: number;
     transport: string;
     queue_name: string;
+    ticket_render_mode: string;
   }>("printer_update_settings", {
     request: {
       session_token: sessionToken,
@@ -1358,6 +1371,8 @@ export async function ipcUpdatePrinterSettings(
       paper_width_mm: paperWidthMm,
       transport,
       queue_name: queueName,
+      // null/absent keeps the stored mode server-side (BRK-090 None-keeps).
+      ticket_render_mode: ticketRenderMode ?? null,
     },
   });
   return {
@@ -1367,6 +1382,7 @@ export async function ipcUpdatePrinterSettings(
     paperWidthMm: wire.paper_width_mm,
     transport: wire.transport === 'spooler' ? 'spooler' : 'serial',
     queueName: typeof wire.queue_name === 'string' ? wire.queue_name : '',
+    ticketRenderMode: toTicketRenderMode(wire.ticket_render_mode),
   };
 }
 

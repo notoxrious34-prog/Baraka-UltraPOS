@@ -10,10 +10,17 @@ import { t, translateBackendError } from "@/lib/i18n";
 import {
   getDocumentDetails,
   getStoreIdentity,
+  ipcGetPrinterSettings,
   ipcReprint,
   type DocumentDetailsWireResponse,
   type DocumentSummaryWireDto,
 } from "@/lib/ipc";
+import {
+  buildTicketPrintHtml,
+  printTicketDocument,
+  ticketArgsFromWire,
+  type TicketPrintStrings,
+} from "@/features/tickets/graphique-ticket";
 import { formatMoney, formatQty } from "@/lib/money";
 import { PrintStatusIndicator } from "@/components/pos/PrintStatusIndicator";
 import type { Locale } from "@/types/pos";
@@ -374,6 +381,9 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
   const [detailsTick, setDetailsTick] = useState<number>(0);
   const [identity, setIdentity] = useState<A4Identity | null>(null);
   const [printing, setPrinting] = useState<boolean>(false);
+  // Graphique ticket mode (TASK-DSN-093): resolved per drawer open; escpos
+  // keeps the engine DUPLICATA reprint below untouched.
+  const [renderMode, setRenderMode] = useState<"escpos" | "graphique">("escpos");
 
   useEffect(() => {
     setReprintState("idle");
@@ -383,6 +393,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
     setDetailsLoading(true);
     setIdentity(null);
     setPrinting(false);
+    setRenderMode("escpos");
     let cancelled = false;
     getDocumentDetails(document.id)
       .then((full) => {
@@ -397,10 +408,19 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
           setDetailsLoading(false);
         }
       });
+    ipcGetPrinterSettings(props.token)
+      .then((settings) => {
+        if (!cancelled) {
+          setRenderMode(settings.ticketRenderMode);
+        }
+      })
+      .catch(() => {
+        // Settings unreadable: stay on the escpos engine path.
+      });
     return () => {
       cancelled = true;
     };
-  }, [document.id, detailsTick]);
+  }, [document.id, detailsTick, props.token]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -458,6 +478,97 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
       })
       .catch(() => {
         setIdentity({
+          storeName: "",
+          storeAddress: "",
+          storePhone: "",
+          nif: "",
+          nis: "",
+          rc: "",
+          ai: "",
+        });
+      });
+  };
+
+  /** Graphique ticket reprint (TASK-DSN-093): same HTML payload as the
+   * checkout auto-print, always marked DUPLICATA (the drawer only opens
+   * committed documents). Language falls back to the UI locale — the
+   * details wire carries no document_language (no engine change). */
+  const printTicket = (): void => {
+    if (details === null) {
+      return;
+    }
+    const snapshot = details;
+    const docLang: "AR" | "FR" = locale === "ar-DZ" ? "AR" : "FR";
+    const strings: TicketPrintStrings = {
+      title: t(locale, "ticket.title"),
+      reprintMark: t(locale, "ticket.reprintMark"),
+      designation: t(locale, "ticket.designation"),
+      qty: t(locale, "ticket.qty"),
+      price: t(locale, "ticket.price"),
+      total: t(locale, "ticket.total"),
+      subtotal: t(locale, "ticket.subtotal"),
+      tva: t(locale, "ticket.tva"),
+      grandTotal: t(locale, "ticket.grandTotal"),
+      paid: t(locale, "ticket.paid"),
+      change: t(locale, "ticket.change"),
+      payment: t(locale, "ticket.payment"),
+      footer: t(locale, "ticket.footer"),
+    };
+    const dispatchWith = (id: A4Identity): void => {
+      printTicketDocument(
+        buildTicketPrintHtml(
+          ticketArgsFromWire(
+            {
+              documentNumber: snapshot.document.number,
+              createdAt: document.created_at,
+              subtotalHt: snapshot.document.subtotal_ht_centimes,
+              tvaTotal: snapshot.document.tva_total_centimes,
+              totalTtc: snapshot.document.total_ttc_centimes,
+              paidAmount: snapshot.document.paid_amount_centimes,
+              changeAmount: snapshot.document.change_amount_centimes,
+              paymentLabel: snapshot.payments.map((p) => p.method_code).join(" + "),
+              items: snapshot.items.map((item) => ({
+                nameFr: item.product_name_fr,
+                nameAr: item.product_name_ar,
+                sku: item.sku,
+                unitFr: item.unit_name_fr,
+                unitAr: item.unit_name_ar,
+                quantityMicro: item.quantity_micro,
+                unitPriceCentimes: item.unit_price_centimes,
+                lineTtcCentimes: item.line_ttc_centimes,
+              })),
+            },
+            {
+              language: docLang,
+              storeName: id.storeName,
+              storeAddress: id.storeAddress,
+              storePhone: id.storePhone,
+              isReprint: true,
+              strings,
+            },
+          ),
+        ),
+      );
+    };
+    if (identity !== null) {
+      dispatchWith(identity);
+      return;
+    }
+    getStoreIdentity()
+      .then((state) => {
+        const found = state.identity;
+        dispatchWith({
+          storeName: found.storeName,
+          storeAddress: found.storeAddress,
+          storePhone: found.storePhone,
+          nif: found.nif,
+          nis: found.nis,
+          rc: found.rc,
+          ai: found.ai,
+        });
+      })
+      .catch(() => {
+        dispatchWith({
           storeName: "",
           storeAddress: "",
           storePhone: "",
@@ -598,14 +709,25 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
         />
       )}
 
-      <button
-        type="button"
-        onClick={reprint}
-        disabled={reprintState === "sending"}
-        className="h-11 shrink-0 rounded-lg bg-accent-500 text-sm font-black text-slate-950 disabled:opacity-50"
-      >
-        {reprintState === "sending" ? t(locale, "documents.reprinting") : t(locale, "documents.reprint")}
-      </button>
+      {renderMode === "graphique" ? (
+        <button
+          type="button"
+          onClick={printTicket}
+          disabled={details === null}
+          className="h-11 shrink-0 rounded-lg bg-accent-500 text-sm font-black text-slate-950 disabled:opacity-50"
+        >
+          {t(locale, "documents.printTicket")}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={reprint}
+          disabled={reprintState === "sending"}
+          className="h-11 shrink-0 rounded-lg bg-accent-500 text-sm font-black text-slate-950 disabled:opacity-50"
+        >
+          {reprintState === "sending" ? t(locale, "documents.reprinting") : t(locale, "documents.reprint")}
+        </button>
+      )}
       {reprintState === "ok" && (
         <p className="rounded-md bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
           {t(locale, "documents.reprintOk")}

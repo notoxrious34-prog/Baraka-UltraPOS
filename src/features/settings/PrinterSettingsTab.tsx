@@ -20,8 +20,14 @@ import {
   printingTestPrint,
   type PrinterTransport,
   type TestPrintLanguage,
+  type TicketRenderMode,
 } from "@/lib/ipc";
-import { PrinterIcon, SettingsIcon } from "@/components/icons";
+import { PrinterIcon, DocumentsIcon, SettingsIcon } from "@/components/icons";
+import {
+  resolveTestPrintNotice,
+  testPrintToneClass,
+  type TestPrintTone,
+} from "./test-print-notice";
 import { BAUD_OPTIONS } from "./settings-helpers";
 
 interface PrinterSettingsTabProps {
@@ -37,11 +43,12 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   const [serialBaud, setSerialBaud] = useState<number>(9600);
   const [paperWidthMm, setPaperWidthMm] = useState<number>(80);
   const [transport, setTransport] = useState<PrinterTransport>("serial");
+  const [renderMode, setRenderMode] = useState<TicketRenderMode>("escpos");
   const [queueName, setQueueName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<TestPrintLanguage | null>(null);
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ tone: TestPrintTone; text: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,13 +59,14 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           setSerialBaud(settings.serialBaud);
           setPaperWidthMm(settings.paperWidthMm);
           setTransport(settings.transport);
+          setRenderMode(settings.ticketRenderMode);
           setQueueName(settings.queueName);
           setLoading(false);
         }
       })
       .catch((failure: unknown) => {
         if (!cancelled) {
-          setNotice({ ok: false, text: String(failure) });
+          setNotice({ tone: "error", text: String(failure) });
           setLoading(false);
         }
       });
@@ -73,7 +81,7 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
     }
     const trimmedQueue = queueName.trim();
     if (transport === "spooler" && trimmedQueue === "") {
-      setNotice({ ok: false, text: t(locale, "settings.printerQueueRequired") });
+      setNotice({ tone: "error", text: t(locale, "settings.printerQueueRequired") });
       return;
     }
     setSaving(true);
@@ -86,15 +94,17 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
         paperWidthMm,
         transport,
         trimmedQueue,
+        renderMode,
       );
       setSerialPort(settings.serialPort);
       setSerialBaud(settings.serialBaud);
       setPaperWidthMm(settings.paperWidthMm);
       setTransport(settings.transport);
+      setRenderMode(settings.ticketRenderMode);
       setQueueName(settings.queueName);
-      setNotice({ ok: true, text: t(locale, "settings.saved") });
+      setNotice({ tone: "success", text: t(locale, "settings.saved") });
     } catch (failure) {
-      setNotice({ ok: false, text: String(failure) });
+      setNotice({ tone: "error", text: String(failure) });
     } finally {
       setSaving(false);
     }
@@ -108,12 +118,9 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
     setNotice(null);
     try {
       const result = await printingTestPrint(language);
-      setNotice({
-        ok: true,
-        text: `${t(locale, "settings.testPrintSent")}: ${result.deviceOutcome} — ${result.captureFileName}`,
-      });
+      setNotice(resolveTestPrintNotice(locale, result));
     } catch (failure) {
-      setNotice({ ok: false, text: String(failure) });
+      setNotice({ tone: "error", text: String(failure) });
     } finally {
       setTesting(null);
     }
@@ -160,6 +167,37 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           <span>{t(locale, "settings.printerTransportSpooler")}</span>
         </button>
       </div>
+      <div
+        role="group"
+        aria-label={t(locale, "settings.ticketRenderTitle")}
+        className="flex gap-1 rounded border border-slate-300 p-1 dark:border-slate-600"
+      >
+        <button
+          type="button"
+          aria-pressed={renderMode === "escpos"}
+          onClick={() => {
+            setRenderMode("escpos");
+          }}
+          className={transportButton(renderMode === "escpos")}
+        >
+          <DocumentsIcon className="h-4 w-4" />
+          <span>{t(locale, "settings.ticketRenderEscpos")}</span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={renderMode === "graphique"}
+          onClick={() => {
+            setRenderMode("graphique");
+          }}
+          className={transportButton(renderMode === "graphique")}
+        >
+          <PrinterIcon className="h-4 w-4" />
+          <span>{t(locale, "settings.ticketRenderGraphique")}</span>
+        </button>
+      </div>
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        {t(locale, "settings.ticketRenderHelp")}
+      </p>
       {transport === "serial" ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
@@ -280,11 +318,7 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
       </fieldset>
       {notice !== null && (
         <p
-          className={`rounded px-2 py-1.5 text-sm font-bold ${
-            notice.ok
-              ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200"
-              : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200"
-          }`}
+          className={`rounded px-2 py-1.5 text-sm font-bold ${testPrintToneClass(notice.tone)}`}
         >
           <bdi dir="ltr">{notice.text}</bdi>
         </p>

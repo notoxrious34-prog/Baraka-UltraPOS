@@ -1,0 +1,41 @@
+{
+  "results": [
+    {
+      "name": "ticket-fr-render",
+      "ok": true,
+      "detail": "html=2600 lines=2 no-duplicata no-scroll"
+    },
+    {
+      "name": "shot-ticket-fr",
+      "ok": true,
+      "detail": "ticket-80mm-fr-light.png"
+    },
+    {
+      "name": "ticket-ar-reprint",
+      "ok": true,
+      "detail": "html=2621 rtl duplicata ltr-nums=16 no-scroll"
+    },
+    {
+      "name": "shot-ticket-ar",
+      "ok": true,
+      "detail": "ticket-80mm-ar-reprint.png"
+    },
+    {
+      "name": "settings-mode-control",
+      "ok": true,
+      "detail": "Ticket ESC/POS=false,Ticket graphique 80mm=true help-ok payload-ok"
+    },
+    {
+      "name": "shot-settings",
+      "ok": true,
+      "detail": "settings-render-mode-1280x800-fr-light.png"
+    },
+    {
+      "name": "console-clean",
+      "ok": true,
+      "detail": "0 console errors"
+    }
+  ],
+  "consoleErrors": [],
+  "at": "2026-10-24T20:58:33.426Z"
+}

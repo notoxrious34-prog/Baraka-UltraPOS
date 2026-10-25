@@ -24,6 +24,9 @@ import { addBig, formatMoney, formatQty, parseMoneyToCentimes } from "@/lib/mone
 import {
   ipcCheckout,
   ipcPreviewTotals,
+  getDocumentDetails,
+  getStoreIdentity,
+  ipcGetPrinterSettings,
   type CheckoutLineWire,
   type CheckoutPaymentWire,
   type PreviewTotalsWire,
@@ -38,6 +41,32 @@ import {
   type CheckoutSubmission,
 } from "@/components/pos/modals/checkout-submission";
 import { evaluateStockGate } from "@/components/pos/modals/stock-gate";
+import {
+  buildTicketPrintHtml,
+  printTicketDocument,
+  ticketArgsFromWire,
+  type TicketPrintStrings,
+} from "@/features/tickets/graphique-ticket";
+import type { Locale } from "@/types/pos";
+
+/** Localised ticket chrome (FR/AR via the document language). */
+function ticketStrings(locale: Locale): TicketPrintStrings {
+  return {
+    title: t(locale, "ticket.title"),
+    reprintMark: t(locale, "ticket.reprintMark"),
+    designation: t(locale, "ticket.designation"),
+    qty: t(locale, "ticket.qty"),
+    price: t(locale, "ticket.price"),
+    total: t(locale, "ticket.total"),
+    subtotal: t(locale, "ticket.subtotal"),
+    tva: t(locale, "ticket.tva"),
+    grandTotal: t(locale, "ticket.grandTotal"),
+    paid: t(locale, "ticket.paid"),
+    change: t(locale, "ticket.change"),
+    payment: t(locale, "ticket.payment"),
+    footer: t(locale, "ticket.footer"),
+  };
+}
 
 function toCentimes(text: string): string {
   if (text.trim() === "") {
@@ -137,9 +166,16 @@ export function CheckoutModal(): ReactElement {
   const shortageSignatureRef = useRef("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<SaleReceipt | null>(null);
+  const [doneLang, setDoneLang] = useState<"AR" | "FR">("FR");
   const [docLang, setDocLang] = useState<"AR" | "FR">(() =>
     usePosUiStore.getState().locale === "ar-DZ" ? "AR" : "FR",
   );
+  // Graphique auto-print (TASK-DSN-093): idempotency guard keyed by committed
+  // document — the effect below must never fire twice for one sale, even
+  // across re-renders (print() has no undo).
+  const ticketPrintedFor = useRef<string | null>(null);
+  const [ticketHtml, setTicketHtml] = useState<string | null>(null);
+  const [graphiqueMode, setGraphiqueMode] = useState(false);
   const previewRequestIdRef = useRef(0);
   const cashPrefilledRef = useRef(false);
   // Single-dispatch submission controller: created once per mounted modal
@@ -247,6 +283,81 @@ export function CheckoutModal(): ReactElement {
     }
   }, [preview]);
 
+  // Graphique auto-print (TASK-DSN-093): once per committed sale, in
+  // graphique mode only. The guard is claimed BEFORE any async work so a
+  // re-render mid-flight can never dispatch a second print() for the same
+  // document. Escpos mode is untouched (engine reprint path as before).
+  useEffect(() => {
+    if (done === null) {
+      return;
+    }
+    if (ticketPrintedFor.current === done.document_id) {
+      return;
+    }
+    ticketPrintedFor.current = done.document_id;
+    setTicketHtml(null);
+    setGraphiqueMode(false);
+    const sessionToken = useSessionStore.getState().session?.token ?? null;
+    if (sessionToken === null) {
+      return;
+    }
+    const receipt = done;
+    const language = doneLang;
+    ipcGetPrinterSettings(sessionToken)
+      .then((settings) => {
+        if (settings.ticketRenderMode !== "graphique") {
+          return;
+        }
+        setGraphiqueMode(true);
+        return Promise.all([
+          getDocumentDetails(receipt.document_id),
+          getStoreIdentity(),
+        ]).then(([full, identityState]) => {
+          const identity = identityState.identity;
+          const args = ticketArgsFromWire(
+            {
+              documentNumber: full.document.number,
+              createdAt: new Date().toLocaleString(
+                language === "AR" ? "ar-DZ" : "fr-DZ",
+              ),
+              subtotalHt: full.document.subtotal_ht_centimes,
+              tvaTotal: full.document.tva_total_centimes,
+              totalTtc: full.document.total_ttc_centimes,
+              paidAmount: full.document.paid_amount_centimes,
+              changeAmount: full.document.change_amount_centimes,
+              paymentLabel: full.payments.map((p) => p.method_code).join(" + "),
+              items: full.items.map((item) => ({
+                nameFr: item.product_name_fr,
+                nameAr: item.product_name_ar,
+                sku: item.sku,
+                unitFr: item.unit_name_fr,
+                unitAr: item.unit_name_ar,
+                quantityMicro: item.quantity_micro,
+                unitPriceCentimes: item.unit_price_centimes,
+                lineTtcCentimes: item.line_ttc_centimes,
+              })),
+            },
+            {
+              language,
+              storeName: identity.storeName,
+              storeAddress: identity.storeAddress,
+              storePhone: identity.storePhone,
+              isReprint: false,
+              strings: ticketStrings(language === "AR" ? "ar-DZ" : "fr-DZ"),
+            },
+          );
+          const html = buildTicketPrintHtml(args);
+          setTicketHtml(html);
+          printTicketDocument(html);
+        });
+      })
+      .catch(() => {
+        // Sale already committed: a ticket failure must never fail the sale.
+        // The fallback button below stays hidden; the engine job row keeps
+        // the FRONTEND_RENDERED audit trail for a later reprint.
+      });
+  }, [done, doneLang]);
+
   // Mount-time cash prefill: the pre-fix modal pre-filled the cash field
   // with the whole-dinar part of the total at open; preserved here, now
   // sourced from the authoritative backend TTC. Runs at most once (first
@@ -296,6 +407,7 @@ export function CheckoutModal(): ReactElement {
       .then((receipt) => {
         setLastReceipt(receipt);
         setDone(receipt);
+        setDoneLang(docLang);
         clearCart();
         void useCashSessionStore.getState().refresh();
       })
@@ -426,6 +538,17 @@ export function CheckoutModal(): ReactElement {
             {t(locale, "checkout.success")} — <span className="font-mono">{done.document_number}</span>
           </p>
           <PrintStatusIndicator documentId={done.document_id} />
+          {graphiqueMode && ticketHtml !== null && (
+            <button
+              type="button"
+              onClick={() => {
+                printTicketDocument(ticketHtml);
+              }}
+              className="h-11 shrink-0 rounded-lg border border-slate-300 text-sm font-black dark:border-slate-600"
+            >
+              {t(locale, "checkout.printTicket")}
+            </button>
+          )}
           <button
             type="button"
             onClick={finishSale}

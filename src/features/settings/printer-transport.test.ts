@@ -42,10 +42,11 @@ describe("transport segmented control (icon+text, both arms)", () => {
 
   it("reuses the icons.tsx set (no new icons, no emoji)", () => {
     expect(TAB_SRC).toContain(
-      'import { PrinterIcon, SettingsIcon } from "@/components/icons"',
+      'import { PrinterIcon, DocumentsIcon, SettingsIcon } from "@/components/icons"',
     );
     expect(TAB_SRC).toContain("<SettingsIcon");
     expect(TAB_SRC).toContain("<PrinterIcon");
+    expect(TAB_SRC).toContain("<DocumentsIcon");
     // No pictographs as UI icons (charter §4): code-point scan instead of
     // a combined-class regex (lint no-misleading-character-class).
     let pictograph = false;

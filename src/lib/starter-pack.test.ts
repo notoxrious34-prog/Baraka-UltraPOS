@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CatalogProduct } from "@/types/pos";
 import type { CreateProductWire, StockAdjustPayload } from "@/lib/ipc";
+import { parseCatalogCsv } from "@/features/catalog/catalog-import-parser";
 import {
   buildCategoryLookup,
   checkStarterPackStatus,
@@ -105,12 +106,15 @@ describe("parseStarterPackCsv", () => {
       ";123;C sans code;بدون رمز;10;20;1;",
     ].join("\n");
     const items = parseStarterPackCsv(csv);
-    expect(items.map((item) => item.code)).toEqual(["TST-001", "TST-002", "ZERO-001"]);
+    // G-EX3 honesty (BRK-093): malformed purchase/stock cells are loud row
+    // errors — never silent zeroes — so the bad-price rows are dropped.
+    expect(items.map((item) => item.code)).toEqual(["TST-001", "TST-002"]);
     expect(items[0]?.purchasePriceCentimes).toBe(12050n);
     expect(items[1]?.salePriceCentimes).toBe(45075n);
     expect(items[1]?.initialStockMicro).toBe(25000n);
-    // Invalid purchase prices degrade to 0 (backend default); the row survives.
-    expect(items[2]?.purchasePriceCentimes).toBe(0n);
+    const parsed = parseCatalogCsv(csv);
+    expect(parsed.errors.map((entry) => entry.message)).toContain("invalid sale_price");
+    expect(parsed.errors.map((entry) => entry.message)).toContain("invalid purchase_price");
   });
 
   it("resolves categories through the provided lookup", () => {

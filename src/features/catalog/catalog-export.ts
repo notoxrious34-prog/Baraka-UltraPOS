@@ -20,8 +20,19 @@ export const CSV_BOM = "\uFEFF";
 
 export const CSV_SEPARATOR = ";";
 
-const CSV_HEADERS =
-  "Réf (SKU);Code-barres;Désignation FR;Désignation AR;Unité;Prix Achat HT (DZD);Prix Vente TTC (DZD);Marge (DZD);Marge (%);Stock (DEP-01);Statut";
+const CSV_HEADERS_PREFIX =
+  "Réf (SKU);Code-barres;Désignation FR;Désignation AR;Unité;Prix Achat HT (DZD);Prix Vente TTC (DZD);Marge (DZD);Marge (%);Stock (";
+
+/**
+ * Bilingual header row. The stock column names the depot its levels were
+ * read from (G-EX4) — the importer matches `Stock (<anything>)` by pattern.
+ */
+export function buildCsvHeaders(depotCode: string | null): string {
+  return `${CSV_HEADERS_PREFIX}${depotCode ?? "DEP-01"});Statut`;
+}
+
+/** Default header (DEP-01 levels) for callers without a picked depot. */
+export const CSV_HEADERS = buildCsvHeaders(null);
 
 /** Canonical centimes -> fixed 2-decimal Latin string (`"15050"` -> `"150.50"`). */
 export function centimesToDecimalFixed(centimes: string): string {
@@ -98,14 +109,16 @@ function rowCells(
 /**
  * Build the full CSV document (BOM + bilingual headers + one row per
  * product). The percent cell stays a bare Latin-digit number (the header
- * already carries `(%)`) so Excel can compute on it.
+ * already carries `(%)`) so Excel can compute on it. `depotCode` names the
+ * depot the `levels` were read from; it lands in the `Stock (…)` header.
  */
 export function buildCatalogCsvContent(
   products: CatalogProduct[],
   stockLevels: Record<string, string>,
   locale: string,
+  depotCode: string | null = null,
 ): string {
-  const lines = [CSV_HEADERS];
+  const lines = [buildCsvHeaders(depotCode)];
   for (const product of products) {
     lines.push(rowCells(product, stockLevels, locale).join(CSV_SEPARATOR));
   }

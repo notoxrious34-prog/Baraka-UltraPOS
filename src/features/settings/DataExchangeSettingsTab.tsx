@@ -69,9 +69,12 @@ export function DataExchangeSettingsTab({
     setBusy(true);
     void (async () => {
       try {
-        const rows: CatalogProduct[] = await ipcSearchCatalog(sessionToken, "", EXPORT_LIMIT);
+        const fetched: CatalogProduct[] = await ipcSearchCatalog(sessionToken, "", EXPORT_LIMIT + 1);
+        const truncated = fetched.length > EXPORT_LIMIT;
+        const rows = truncated ? fetched.slice(0, EXPORT_LIMIT) : fetched;
         const depots = await listWarehouses(sessionToken);
         const depot = pickDepotId(depots);
+        const depotCode = depots.find((entry) => entry.id === depot)?.code ?? null;
         const levels: Record<string, string> = {};
         if (depot !== null) {
           const entries = await Promise.all(
@@ -92,10 +95,16 @@ export function DataExchangeSettingsTab({
         }
         const stamp = new Date().toISOString().slice(0, 10);
         const outcome = downloadTextFile(
-          buildCatalogCsvContent(rows, levels, locale),
+          buildCatalogCsvContent(rows, levels, locale, depotCode),
           `${t(locale, "cat.csvExportFilename")}-${stamp}.csv`,
         );
-        flashNote(outcome.ok ? outcome.filename : null);
+        flashNote(
+          outcome.ok
+            ? truncated
+              ? `${outcome.filename} — ${t(locale, "settings.exchangeTruncated")}`
+              : outcome.filename
+            : null,
+        );
       } catch {
         flashNote(null);
       } finally {

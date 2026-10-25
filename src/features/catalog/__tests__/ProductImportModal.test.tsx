@@ -73,6 +73,7 @@ function report(overrides: Partial<ImportProductsReport>): ImportProductsReport 
   return {
     total_rows: 3,
     imported_count: 2,
+    updated_count: 0,
     skipped_count: 1,
     errors: [{ row_index: 1, sku: "DUP-1", name_fr: "Doublon", error: "DUPLICATE" }],
     duration_ms: 42,
@@ -274,6 +275,6 @@ describe("import modal hub wiring (source pins)", () => {
     ) as string;
     expect(modal).toContain("ipcImportProducts(token, parsed.rows, undefined, policy)");
     expect(modal).toContain('value="skip"');
-    expect(modal).toContain('value="error"');
+    expect(modal).toContain('value="update"');
   });
 });

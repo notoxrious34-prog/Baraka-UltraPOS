@@ -190,6 +190,7 @@ export interface ImportRowError {
 export interface ImportProductsReport {
   total_rows: number;
   imported_count: number;
+  updated_count: number;
   skipped_count: number;
   errors: ImportRowError[];
   duration_ms: number;

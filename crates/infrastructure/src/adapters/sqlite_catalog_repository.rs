@@ -1235,6 +1235,7 @@ fn import_rows_in_transaction(
     let warehouse_id = resolve_import_warehouse(tx, warehouse_code)?;
     let stamp = now_stamp();
     let mut imported_count = 0usize;
+    let mut updated_count = 0usize;
     let mut skipped_count = 0usize;
     let mut errors = Vec::new();
     let mut seen_skus = HashSet::new();
@@ -1262,6 +1263,22 @@ fn import_rows_in_transaction(
                         "SKU already exists: {sku}"
                     )));
                 }
+                ImportDuplicatePolicy::Update => {
+                    if update_product_in_transaction(
+                        tx,
+                        &sku,
+                        row,
+                        *row_index,
+                        &warehouse_id,
+                        &stamp,
+                        actor_user_id,
+                        &mut seen_barcodes,
+                        &mut errors,
+                    )? {
+                        updated_count += 1;
+                    }
+                    continue;
+                }
                 ImportDuplicatePolicy::Skip => {
                     skipped_count += 1;
                     errors.push(ImportRowError {
@@ -1274,23 +1291,40 @@ fn import_rows_in_transaction(
                 }
             }
         }
-        // Barcode guard: an already-assigned barcode is cleared so the
-        // product creation still succeeds (UNIQUE lives on product_units).
-        let mut barcode = row.barcode.clone();
+        // Barcode guard: an already-assigned barcode is a loud row error —
+        // never silently cleared — and the row is skipped.
+        let barcode = row.barcode.clone();
         if let Some(code) = barcode.clone() {
             let taken = row_exists(tx, "SELECT 1 FROM products WHERE barcode = ?1", &code)?
                 || row_exists(tx, "SELECT 1 FROM product_units WHERE barcode = ?1", &code)?
-                || !seen_barcodes.insert(code);
+                || !seen_barcodes.insert(code.clone());
             if taken {
-                barcode = None;
+                errors.push(ImportRowError {
+                    row_index: *row_index,
+                    sku: Some(sku),
+                    name_fr: row.name_fr.clone(),
+                    error: format!("BARCODE_ALREADY_ASSIGNED: {code}"),
+                });
+                continue;
             }
         }
-        // Category guard: unknown ids detach instead of failing the row.
+        // Category guard: an unknown id is a loud row error — never a
+        // silent detach — and the row is skipped.
         let category_id = match row.category_id.as_deref() {
-            Some(id) if row_exists(tx, "SELECT 1 FROM categories WHERE id = ?1", id)? => {
-                Some(id.to_string())
+            Some(id) => {
+                if row_exists(tx, "SELECT 1 FROM categories WHERE id = ?1", id)? {
+                    Some(id.to_string())
+                } else {
+                    errors.push(ImportRowError {
+                        row_index: *row_index,
+                        sku: Some(sku),
+                        name_fr: row.name_fr.clone(),
+                        error: format!("UNKNOWN_CATEGORY: {id}"),
+                    });
+                    continue;
+                }
             }
-            _ => None,
+            None => None,
         };
         let product_id = Uuid::new_v4().to_string();
         tx.execute(
@@ -1383,8 +1417,161 @@ fn import_rows_in_transaction(
     Ok(ImportBatchReport {
         total_rows: rows.len(),
         imported_count,
+        updated_count,
         skipped_count,
         errors,
         duration_ms: 0,
     })
+}
+
+/// In-place overwrite for the `Update` duplicate policy: names, known
+/// category (unknown ids are loud row errors, `None` keeps the existing
+/// link), base-unit prices/names, and an opening-stock top-up mirroring
+/// creation. Returns `true` when the row was applied.
+#[allow(clippy::too_many_arguments)]
+fn update_product_in_transaction(
+    tx: &rusqlite::Transaction,
+    sku: &str,
+    row: &ValidatedImportRow,
+    row_index: usize,
+    warehouse_id: &str,
+    stamp: &str,
+    actor_user_id: &str,
+    seen_barcodes: &mut HashSet<String>,
+    errors: &mut Vec<ImportRowError>,
+) -> Result<bool, ApplicationError> {
+    let product_id: String = tx
+        .query_row(
+            "SELECT id FROM products WHERE sku = ?1",
+            rusqlite::params![sku],
+            |row| row.get(0),
+        )
+        .map_err(|_| store_failure())?;
+    // Barcode collision against OTHER products is loud; re-stating the
+    // product's own barcode is a no-op keeper.
+    if let Some(code) = row.barcode.clone() {
+        let clash_elsewhere: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM product_units WHERE barcode = ?1 AND product_id <> ?2)",
+                rusqlite::params![code, product_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        if clash_elsewhere || !seen_barcodes.insert(code.clone()) {
+            errors.push(ImportRowError {
+                row_index,
+                sku: Some(sku.to_string()),
+                name_fr: row.name_fr.clone(),
+                error: format!("BARCODE_ALREADY_ASSIGNED: {code}"),
+            });
+            return Ok(false);
+        }
+    }
+    // Unknown category ids are loud; an absent category keeps the link.
+    let category_id: Option<String> = match row.category_id.as_deref() {
+        Some(id) => {
+            if row_exists(tx, "SELECT 1 FROM categories WHERE id = ?1", id)? {
+                Some(id.to_string())
+            } else {
+                errors.push(ImportRowError {
+                    row_index,
+                    sku: Some(sku.to_string()),
+                    name_fr: row.name_fr.clone(),
+                    error: format!("UNKNOWN_CATEGORY: {id}"),
+                });
+                return Ok(false);
+            }
+        }
+        None => tx
+            .query_row(
+                "SELECT category_id FROM products WHERE id = ?1",
+                rusqlite::params![product_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?,
+    };
+    tx.execute(
+        "UPDATE products SET name_ar = ?1, name_fr = ?2, category_id = ?3,
+         updated_at = ?4, revision = revision + 1 WHERE id = ?5",
+        rusqlite::params![row.name_ar, row.name_fr, category_id, stamp, product_id],
+    )
+    .map_err(|_| store_failure())?;
+    let unit_id: String = tx
+        .query_row(
+            "SELECT id FROM product_units WHERE product_id = ?1 AND is_base_unit = 1",
+            rusqlite::params![product_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| store_failure())?;
+    let unit_names: (String, String) = tx
+        .query_row(
+            "SELECT unit_name_ar, unit_name_fr FROM product_units WHERE id = ?1",
+            rusqlite::params![unit_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|_| store_failure())?;
+    tx.execute(
+        "UPDATE product_units SET unit_name_ar = ?1, unit_name_fr = ?2, barcode = ?3,
+         sale_price_centimes = ?4, purchase_price_centimes = ?5 WHERE id = ?6",
+        rusqlite::params![
+            row.base_unit_name_ar.clone().unwrap_or(unit_names.0),
+            row.base_unit_name_fr.clone().unwrap_or(unit_names.1),
+            row.barcode.clone().or_else(|| {
+                tx.query_row(
+                    "SELECT barcode FROM product_units WHERE id = ?1",
+                    rusqlite::params![unit_id],
+                    |row| row.get(0),
+                )
+                .ok()
+                .flatten()
+            }),
+            row.sale_price_centimes,
+            row.purchase_price_centimes,
+            unit_id,
+        ],
+    )
+    .map_err(|_| store_failure())?;
+    // Opening-stock top-up: same audited movement as creation.
+    if row.initial_quantity_micro > 0 {
+        let quantity = row.initial_quantity_micro;
+        tx.execute(
+            "INSERT INTO stock_levels
+             (warehouse_id, product_id, quantity_micro, quantity_base_micro, revision, updated_at)
+             VALUES (?1, ?2, ?3, ?3, 0, ?4)
+             ON CONFLICT(warehouse_id, product_id) DO UPDATE SET
+               quantity_micro = stock_levels.quantity_micro + excluded.quantity_micro,
+               quantity_base_micro = stock_levels.quantity_base_micro + excluded.quantity_base_micro,
+               revision = stock_levels.revision + 1,
+               updated_at = excluded.updated_at",
+            rusqlite::params![warehouse_id, product_id, quantity, stamp],
+        )
+        .map_err(|_| store_failure())?;
+        let sequence_no: i64 = tx
+            .query_row(
+                "SELECT COALESCE(MAX(sequence_no), 0) + 1 FROM stock_movements",
+                rusqlite::params![],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        tx.execute(
+            "INSERT INTO stock_movements
+             (id, sequence_no, warehouse_id, product_id, movement_type, unit_id,
+              quantity_micro, quantity_base_micro, reference_type, reference_id,
+              transfer_batch_id, authorized_negative_stock, reason, created_by, created_at)
+             VALUES (?1, ?2, ?3, ?4, 'ADJUSTMENT_POSITIVE', ?5,
+                     ?6, ?6, NULL, NULL, NULL, 0, 'Stock import (update)', ?7, ?8)",
+            rusqlite::params![
+                Uuid::new_v4().to_string(),
+                sequence_no,
+                warehouse_id,
+                product_id,
+                unit_id,
+                quantity,
+                actor_user_id,
+                stamp,
+            ],
+        )
+        .map_err(|_| store_failure())?;
+    }
+    Ok(true)
 }

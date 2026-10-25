@@ -2642,6 +2642,8 @@ pub struct ImportProductsResponseDto {
     pub total_rows: usize,
     /// Rows fully created with base unit (and stock when requested).
     pub imported_count: usize,
+    /// Rows overwritten in place (`update` policy).
+    pub updated_count: usize,
     /// Rows skipped on duplicate SKU (`skip` policy).
     pub skipped_count: usize,
     /// Per-row validation and skip entries, in row order.

@@ -1021,7 +1021,8 @@ pub fn catalog_define_kit(
 ///
 /// Valid rows commit inside ONE `BEGIN IMMEDIATE` transaction; per-row
 /// validation and duplicate failures are reported, never partial without
-/// a report. `on_duplicate_sku: "error"` aborts the whole batch instead.
+/// a report. `on_duplicate_sku: "error"` aborts the whole batch instead;
+/// `"update"` overwrites existing products in place.
 #[tauri::command(rename_all = "snake_case")]
 pub fn catalog_import_products(
     state: tauri::State<'_, AppState>,
@@ -1030,6 +1031,7 @@ pub fn catalog_import_products(
     let session = require_session(&state, &request.session_token)?;
     let on_duplicate = match request.on_duplicate_sku.as_deref() {
         Some("error") => ImportDuplicatePolicy::Error,
+        Some("update") => ImportDuplicatePolicy::Update,
         _ => ImportDuplicatePolicy::Skip,
     };
     let rows = request
@@ -1062,6 +1064,7 @@ pub fn catalog_import_products(
     Ok(ImportProductsResponseDto {
         total_rows: report.total_rows,
         imported_count: report.imported_count,
+        updated_count: report.updated_count,
         skipped_count: report.skipped_count,
         errors: report
             .errors

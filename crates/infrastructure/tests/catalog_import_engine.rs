@@ -342,3 +342,138 @@ fn import_requires_manage_permission() {
         Err(baraka_application::errors::ApplicationError::Unauthorized)
     ));
 }
+
+#[test]
+fn import_batch_update_policy_overwrites_names_prices_and_tops_up_stock() {
+    let harness = setup();
+    seed_product(&harness, "DUP-001");
+    let mut update = row(Some("DUP-001"), "Robinet Neuf", 45_000);
+    update.name_ar = Some("صنبور جديد".to_string());
+    update.purchase_price_centimes = Some(30_000);
+    update.initial_quantity_micro = Some(50_000);
+    let report = run_batch(&harness, vec![update], ImportDuplicatePolicy::Update);
+    assert_eq!(report.imported_count, 0);
+    assert_eq!(report.updated_count, 1);
+    assert_eq!(report.skipped_count, 0);
+    assert!(report.errors.is_empty());
+    assert_eq!(count(&harness, "SELECT COUNT(*) FROM products"), 1);
+    let guard = harness.db.lock().expect("lock");
+    let (name_fr, name_ar, sale, purchase): (String, String, i64, i64) = guard
+        .query_row(
+            "SELECT p.name_fr, p.name_ar, u.sale_price_centimes, u.purchase_price_centimes
+             FROM products p JOIN product_units u ON u.product_id = p.id
+             WHERE p.sku = 'DUP-001'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .expect("updated row");
+    assert_eq!(name_fr, "Robinet Neuf");
+    assert_eq!(name_ar, "صنبور جديد");
+    assert_eq!(sale, 45_000);
+    assert_eq!(purchase, 30_000);
+    let level: i64 = guard
+        .query_row("SELECT quantity_micro FROM stock_levels", [], |row| {
+            row.get(0)
+        })
+        .expect("level");
+    assert_eq!(level, 50_000);
+}
+
+#[test]
+fn import_batch_update_policy_keeps_category_when_absent_and_rejects_unknown() {
+    let harness = setup();
+    seed_product(&harness, "DUP-001");
+    // No category supplied: the existing link (none) is kept, no error.
+    let report = run_batch(
+        &harness,
+        vec![row(Some("DUP-001"), "Robinet Neuf", 45_000)],
+        ImportDuplicatePolicy::Update,
+    );
+    assert_eq!(report.updated_count, 1);
+    assert!(report.errors.is_empty());
+    // Unknown category id: loud row error, nothing applied.
+    let mut bad_cat = row(Some("DUP-001"), "Robinet Neuf", 45_000);
+    bad_cat.category_id = Some("no-such-category".to_string());
+    let report = run_batch(&harness, vec![bad_cat], ImportDuplicatePolicy::Update);
+    assert_eq!(report.updated_count, 0);
+    assert_eq!(report.errors.len(), 1);
+    assert!(report.errors[0].error.starts_with("UNKNOWN_CATEGORY:"));
+}
+
+#[test]
+fn import_batch_barcode_collision_is_a_loud_row_error() {
+    let harness = setup();
+    let mut first = row(Some("BC-001"), "Vis Placo", 15_000);
+    first.barcode = Some("6111250090011".to_string());
+    let report = run_batch(&harness, vec![first], ImportDuplicatePolicy::Skip);
+    assert_eq!(report.imported_count, 1);
+    // Same barcode on a new SKU: row skipped, named in the report.
+    let mut clash = row(Some("BC-002"), "Coude PVC", 8_500);
+    clash.barcode = Some("6111250090011".to_string());
+    let report = run_batch(&harness, vec![clash], ImportDuplicatePolicy::Skip);
+    assert_eq!(report.imported_count, 0);
+    assert_eq!(report.errors.len(), 1);
+    assert_eq!(report.errors[0].row_index, 0);
+    assert_eq!(report.errors[0].sku.as_deref(), Some("BC-002"));
+    assert!(report.errors[0]
+        .error
+        .starts_with("BARCODE_ALREADY_ASSIGNED:"));
+    assert_eq!(count(&harness, "SELECT COUNT(*) FROM products"), 1);
+}
+
+#[test]
+fn import_batch_unknown_category_is_a_loud_row_error() {
+    let harness = setup();
+    let mut bad_cat = row(Some("CAT-001"), "Vis Placo", 15_000);
+    bad_cat.category_id = Some("no-such-category".to_string());
+    let report = run_batch(&harness, vec![bad_cat], ImportDuplicatePolicy::Skip);
+    assert_eq!(report.imported_count, 0);
+    assert_eq!(report.errors.len(), 1);
+    assert!(report.errors[0].error.starts_with("UNKNOWN_CATEGORY:"));
+    assert_eq!(count(&harness, "SELECT COUNT(*) FROM products"), 0);
+}
+
+#[test]
+fn import_batch_rejects_negative_purchase_and_stock() {
+    let harness = setup();
+    let mut bad_purchase = row(Some("NP-001"), "Vis Placo", 15_000);
+    bad_purchase.purchase_price_centimes = Some(-100);
+    let mut bad_stock = row(Some("NS-001"), "Coude PVC", 8_500);
+    bad_stock.initial_quantity_micro = Some(-50_000);
+    let report = run_batch(
+        &harness,
+        vec![bad_purchase, bad_stock],
+        ImportDuplicatePolicy::Skip,
+    );
+    assert_eq!(report.imported_count, 0);
+    assert_eq!(report.errors.len(), 2);
+    assert_eq!(report.errors[0].error, "NEGATIVE_PURCHASE_PRICE");
+    assert_eq!(report.errors[1].error, "NEGATIVE_INITIAL_STOCK");
+    assert_eq!(count(&harness, "SELECT COUNT(*) FROM products"), 0);
+}
+
+#[test]
+fn import_batch_rejects_over_limit_without_writes() {
+    let harness = setup();
+    let mut rows = Vec::new();
+    for index in 0..1001 {
+        rows.push(row(Some(&format!("LIM-{index:04}")), "Vis Placo", 15_000));
+    }
+    let result = ImportProductsUseCase::new(&harness.repo).execute(
+        &gerant(),
+        ImportBatchInput {
+            rows,
+            warehouse_code: None,
+            on_duplicate: ImportDuplicatePolicy::Skip,
+            origin_device_id: TEST_TERMINAL.to_string(),
+        },
+    );
+    let error = result.expect_err("over-limit batch must be rejected");
+    match error {
+        baraka_application::errors::ApplicationError::Validation(
+            baraka_domain::errors::DomainError::InvalidCanonicalString(code),
+        ) => assert_eq!(code, "IMPORT_ROW_LIMIT_EXCEEDED"),
+        other => panic!("expected coded validation failure, got {other:?}"),
+    }
+    assert_eq!(count(&harness, "SELECT COUNT(*) FROM products"), 0);
+}

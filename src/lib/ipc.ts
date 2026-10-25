@@ -337,7 +337,7 @@ export async function ipcImportProducts(
   token: string,
   rows: ImportProductRow[],
   warehouseId?: string,
-  onDuplicateSku?: "skip" | "error",
+  onDuplicateSku?: "skip" | "error" | "update",
 ): Promise<ImportProductsReport> {
   return call<ImportProductsReport>("catalog_import_products", {
     request: {

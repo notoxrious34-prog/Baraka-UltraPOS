@@ -735,6 +735,9 @@ pub enum ImportDuplicatePolicy {
     Skip,
     /// Abort the whole batch (rolls back) on the first duplicate.
     Error,
+    /// Overwrite the existing product (names, known category, base-unit
+    /// prices/names) and top-up opening stock; counted in `updated_count`.
+    Update,
 }
 
 /// One raw batch row (application shape; the commands DTO maps onto this).
@@ -791,7 +794,7 @@ pub struct ValidatedImportRow {
 /// Batch input: rows plus destination warehouse and duplicate policy.
 #[derive(Debug, Clone)]
 pub struct ImportBatchInput {
-    /// Rows to ingest (clamped to [`MAX_IMPORT_ROWS`]).
+    /// Rows to ingest (batches over [`MAX_IMPORT_ROWS`] are rejected).
     pub rows: Vec<ImportProductRow>,
     /// Warehouse code (default `DEP-01`); falls back to first active depot.
     pub warehouse_code: Option<String>,
@@ -821,6 +824,8 @@ pub struct ImportBatchReport {
     pub total_rows: usize,
     /// Rows fully created with base unit (and stock when requested).
     pub imported_count: usize,
+    /// Rows overwritten in place (`Update` policy).
+    pub updated_count: usize,
     /// Rows skipped on duplicate SKU (`Skip` policy).
     pub skipped_count: usize,
     /// Per-row validation and skip entries, in row order.
@@ -850,6 +855,22 @@ pub fn validate_import_row(
             sku: row.sku.clone(),
             name_fr,
             error: "NEGATIVE_SALE_PRICE".to_string(),
+        });
+    }
+    if row.purchase_price_centimes.is_some_and(|price| price < 0) {
+        return Err(ImportRowError {
+            row_index: index,
+            sku: row.sku.clone(),
+            name_fr,
+            error: "NEGATIVE_PURCHASE_PRICE".to_string(),
+        });
+    }
+    if row.initial_quantity_micro.is_some_and(|qty| qty < 0) {
+        return Err(ImportRowError {
+            row_index: index,
+            sku: row.sku.clone(),
+            name_fr,
+            error: "NEGATIVE_INITIAL_STOCK".to_string(),
         });
     }
     let blank_to_none = |value: &Option<String>| {
@@ -907,18 +928,26 @@ where
         Self { store }
     }
 
-    /// Validate rows (Gerant/Admin), clamp to [`MAX_IMPORT_ROWS`], and
-    /// ingest atomically. Returns the structured execution report.
+    /// Validate rows (Gerant/Admin) and ingest atomically. Over-limit
+    /// batches are rejected with `IMPORT_ROW_LIMIT_EXCEEDED` BEFORE any
+    /// write — never silently truncated. Returns the execution report.
     pub fn execute(
         &self,
         session: &SessionContext,
         input: ImportBatchInput,
     ) -> Result<ImportBatchReport, ApplicationError> {
         require_any(session, &MANAGE_PERMISSIONS)?;
+        if input.rows.len() > MAX_IMPORT_ROWS {
+            return Err(ApplicationError::Validation(
+                baraka_domain::errors::DomainError::InvalidCanonicalString(
+                    "IMPORT_ROW_LIMIT_EXCEEDED".to_string(),
+                ),
+            ));
+        }
         let started = std::time::Instant::now();
         let mut rows = Vec::new();
         let mut early_errors = Vec::new();
-        for (index, row) in input.rows.iter().enumerate().take(MAX_IMPORT_ROWS) {
+        for (index, row) in input.rows.iter().enumerate() {
             match validate_import_row(index, row) {
                 Ok(valid) => rows.push((index, valid)),
                 Err(error) => early_errors.push(error),
@@ -1715,6 +1744,7 @@ mod tests {
             Ok(ImportBatchReport {
                 total_rows: 0,
                 imported_count: 0,
+                updated_count: 0,
                 skipped_count: 0,
                 errors: Vec::new(),
                 duration_ms: 0,
@@ -1723,7 +1753,7 @@ mod tests {
     }
 
     #[test]
-    fn import_use_case_clamps_to_max_rows_and_reports_total() {
+    fn import_use_case_rejects_over_limit_batches_without_writes() {
         let store = FakeImportStore {
             seen: Mutex::new(Vec::new()),
         };
@@ -1733,7 +1763,7 @@ mod tests {
         for index in 0..(MAX_IMPORT_ROWS + 5) {
             rows.push(import_row(&format!("Produit {index}"), 1_000));
         }
-        let report = use_case
+        let error = use_case
             .execute(
                 &gerant,
                 ImportBatchInput {
@@ -1743,8 +1773,13 @@ mod tests {
                     origin_device_id: "TERM-1".to_string(),
                 },
             )
-            .expect("import");
-        assert_eq!(report.total_rows, MAX_IMPORT_ROWS);
-        assert_eq!(store.seen.lock().expect("lock").len(), MAX_IMPORT_ROWS);
+            .expect_err("over-limit batch must be rejected");
+        match error {
+            ApplicationError::Validation(
+                baraka_domain::errors::DomainError::InvalidCanonicalString(code),
+            ) => assert_eq!(code, "IMPORT_ROW_LIMIT_EXCEEDED"),
+            other => panic!("expected coded validation failure, got {other:?}"),
+        }
+        assert!(store.seen.lock().expect("lock").is_empty());
     }
 }

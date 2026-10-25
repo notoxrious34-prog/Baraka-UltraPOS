@@ -44,11 +44,23 @@ export function normalizeHeaderCell(cell: string): string {
     .replace(/[\s_-]+/g, "");
 }
 
-const SKU_ALIASES = new Set(["sku", "code", "reference", "ref"]);
-const BARCODE_ALIASES = new Set(["barcode", "codebarre", "cb", "ean"]);
+const SKU_ALIASES = new Set([
+  "sku",
+  "code",
+  "reference",
+  "ref",
+  "réf",
+  "référence",
+  "réf(sku)",
+  "ref(sku)",
+]);
+const BARCODE_ALIASES = new Set(["barcode", "codebarre", "codebarres", "cb", "ean"]);
 const NAME_FR_ALIASES = new Set([
   "namefr",
   "designation",
+  "designationfr",
+  "désignation",
+  "désignationfr",
   "nom",
   "article",
   "libelle",
@@ -58,12 +70,29 @@ const NAME_AR_ALIASES = new Set([
   "namear",
   "nomar",
   "designationar",
+  "désignationar",
   "الاسم",
   "التعيين",
 ]);
-const PURCHASE_ALIASES = new Set(["purchaseprice", "prixachat", "pa", "cout", "coût"]);
-const SALE_ALIASES = new Set(["saleprice", "prixvente", "pv", "prix"]);
+const PURCHASE_ALIASES = new Set([
+  "purchaseprice",
+  "prixachat",
+  "prixachatht",
+  "prixachatht(dzd)",
+  "pa",
+  "cout",
+  "coût",
+]);
+const SALE_ALIASES = new Set([
+  "saleprice",
+  "prixvente",
+  "prixventettc",
+  "prixventettc(dzd)",
+  "pv",
+  "prix",
+]);
 const STOCK_ALIASES = new Set(["initialstock", "stock", "quantite", "quantité", "qty"]);
+const UNIT_ALIASES = new Set(["unité", "unite", "unit"]);
 const CATEGORY_ALIASES = new Set(["category", "categorycode", "rayon", "categorie", "catégorie"]);
 
 /**
@@ -235,7 +264,12 @@ export function parseCatalogCsv(
   const nameArIdx = findColumn(NAME_AR_ALIASES);
   const purchaseIdx = findColumn(PURCHASE_ALIASES);
   const saleIdx = findColumn(SALE_ALIASES);
-  const stockIdx = findColumn(STOCK_ALIASES);
+  // Stock columns carry the picked depot in parentheses (`Stock (DEP-01)`,
+  // `Stock (MAG-02)`, …) — match the pattern, not a fixed header.
+  const stockIdx = headers.findIndex(
+    (cell) => STOCK_ALIASES.has(cell) || (cell.startsWith("stock(") && cell.endsWith(")")),
+  );
+  const unitIdx = findColumn(UNIT_ALIASES);
   const categoryIdx = findColumn(CATEGORY_ALIASES);
   if (nameFrIdx < 0) {
     errors.push({ line: 1, message: "missing name_fr column" });
@@ -245,20 +279,6 @@ export function parseCatalogCsv(
     errors.push({ line: 1, message: "missing sale_price column" });
     return { rows, errors };
   }
-  const resolveCategory = (raw: string): string | undefined => {
-    if (categoriesByCodeOrId === undefined) {
-      const trimmed = raw.trim();
-      return trimmed === "" ? undefined : trimmed;
-    }
-    const trimmed = raw.trim();
-    if (trimmed === "") {
-      return undefined;
-    }
-    return (
-      categoriesByCodeOrId.get(trimmed) ??
-      categoriesByCodeOrId.get(trimmed.toUpperCase())
-    );
-  };
   for (let lineNo = 2; lineNo <= lines.length; lineNo += 1) {
     const fields = splitCsvFields(lines[lineNo - 1] ?? "", delimiter);
     const cell = (index: number): string => {
@@ -281,20 +301,50 @@ export function parseCatalogCsv(
       continue;
     }
     const purchaseRaw = purchaseIdx >= 0 ? cell(purchaseIdx) : "";
+    if (purchaseRaw !== "" && parsePriceToCentimes(purchaseRaw) === null) {
+      errors.push({ line: lineNo, message: "invalid purchase_price" });
+      continue;
+    }
     const purchase =
       purchaseRaw === "" ? undefined : parsePriceToCentimes(purchaseRaw);
     const stockRaw = stockIdx >= 0 ? cell(stockIdx) : "";
+    if (stockRaw !== "") {
+      const stockCheck = parseQuantityToMicros(stockRaw);
+      if (stockCheck == null || stockCheck < 0) {
+        errors.push({ line: lineNo, message: "invalid initial_stock" });
+        continue;
+      }
+    }
     const stock = stockRaw === "" ? undefined : parseQuantityToMicros(stockRaw);
     const skuRaw = skuIdx >= 0 ? cell(skuIdx) : "";
     const barcodeRaw = barcodeIdx >= 0 ? cell(barcodeIdx) : "";
     const nameArRaw = nameArIdx >= 0 ? cell(nameArIdx) : "";
+    const unitRaw = unitIdx >= 0 ? cell(unitIdx) : "";
     const categoryRaw = categoryIdx >= 0 ? cell(categoryIdx) : "";
+    // Unknown category codes are loud row errors when a lookup is provided
+    // (never a silent detach). Without a lookup the raw value passes
+    // through and the engine decides (documented detach path).
+    let categoryId: string | undefined;
+    if (categoryRaw !== "") {
+      if (categoriesByCodeOrId === undefined) {
+        categoryId = categoryRaw;
+      } else {
+        categoryId =
+          categoriesByCodeOrId.get(categoryRaw) ??
+          categoriesByCodeOrId.get(categoryRaw.toUpperCase());
+        if (categoryId === undefined) {
+          errors.push({ line: lineNo, message: `unknown category "${categoryRaw}"` });
+          continue;
+        }
+      }
+    }
     rows.push({
       sku: skuRaw === "" ? undefined : normalizeImportCode(skuRaw),
       barcode: barcodeRaw === "" ? undefined : normalizeImportCode(barcodeRaw),
       name_fr: nameFr,
       name_ar: nameArRaw === "" ? undefined : nameArRaw,
-      category_id: categoryRaw === "" ? undefined : resolveCategory(categoryRaw),
+      category_id: categoryId,
+      base_unit_name_fr: unitRaw === "" ? undefined : unitRaw,
       purchase_price_centimes:
         purchase === null || purchase === undefined ? undefined : purchase,
       sale_price_centimes: sale,

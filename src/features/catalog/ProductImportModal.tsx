@@ -174,6 +174,9 @@ export function ImportReportCard({
         <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
           {report.imported_count} {t(locale, "imp.imported")}
         </span>
+        <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-black text-sky-800 dark:bg-sky-900 dark:text-sky-200">
+          {report.updated_count} {t(locale, "imp.updated")}
+        </span>
         <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800 dark:bg-amber-900 dark:text-amber-200">
           {report.skipped_count} {t(locale, "imp.skipped")}
         </span>
@@ -207,7 +210,7 @@ export function ProductImportModal({
   const [stage, setStage] = useState<ImportStage>("drop");
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState<CatalogCsvParseResult>({ rows: [], errors: [] });
-  const [policy, setPolicy] = useState<"skip" | "error">("skip");
+  const [policy, setPolicy] = useState<"skip" | "update">("skip");
   const [report, setReport] = useState<ImportProductsReport | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   /** Last downloaded template filename (inline confirmation, TASK-REL-055). */
@@ -421,12 +424,12 @@ export function ProductImportModal({
                 <select
                   value={policy}
                   onChange={(event) => {
-                    setPolicy(event.target.value === "error" ? "error" : "skip");
+                    setPolicy(event.target.value === "update" ? "update" : "skip");
                   }}
                   className={inputClass}
                 >
                   <option value="skip">{t(locale, "imp.policySkip")}</option>
-                  <option value="error">{t(locale, "imp.policyError")}</option>
+                  <option value="update">{t(locale, "imp.policyUpdate")}</option>
                 </select>
               </label>
               <div className="flex gap-2">

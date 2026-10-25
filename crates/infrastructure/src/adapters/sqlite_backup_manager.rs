@@ -1096,3 +1096,241 @@ impl SqliteBackupManager {
         Ok(restored_at)
     }
 }
+
+/// Staging + quarantine-swap factory reset (TASK-BRK-091, AUD-043 section 3).
+impl baraka_application::ports::FactoryResetRepository for SqliteBackupManager {
+    fn has_open_cash_session(&self, terminal_id: &str) -> Result<bool, ApplicationError> {
+        let guard = self.lock()?;
+        let hit: Option<String> = guard
+            .query_row(
+                "SELECT id FROM cash_sessions
+                 WHERE terminal_id = ?1 AND status IN ('OPEN','CLOSING') LIMIT 1",
+                [terminal_id],
+                |row| row.get(0),
+            )
+            .map(Some)
+            .or_else(|error| match error {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                other => Err(other),
+            })
+            .map_err(|_| store_failure())?;
+        Ok(hit.is_some())
+    }
+
+    fn expected_reset_token(&self) -> Result<String, ApplicationError> {
+        let guard = self.lock()?;
+        let name: Option<String> = guard
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'store.name'",
+                [],
+                |row| row.get(0),
+            )
+            .map(Some)
+            .or_else(|error| match error {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                other => Err(other),
+            })
+            .map_err(|_| store_failure())?;
+        let trimmed = name
+            .map(|value| value.trim().to_string())
+            .unwrap_or_default();
+        if trimmed.is_empty() {
+            Ok("DEP-01".to_string())
+        } else {
+            Ok(trimmed)
+        }
+    }
+
+    fn execute_reset(
+        &self,
+        actor: &str,
+        backup_file_name: &str,
+    ) -> Result<baraka_domain::backup::FactoryResetOutcome, ApplicationError> {
+        use baraka_domain::backup::FactoryResetOutcome;
+        // F0. Process-wide guard: a concurrent restore/reset fails fast.
+        let _exclusive = self.restore_guard.try_lock().map_err(|error| match error {
+            std::sync::TryLockError::WouldBlock => coded_reset("RESET_IN_PROGRESS"),
+            std::sync::TryLockError::Poisoned(_) => store_failure(),
+        })?;
+        let active = self.active_db_path.clone();
+        let parent = active
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| PathBuf::from("."));
+        let staging = parent.join(format!(
+            ".factory-reset-staging-{}.db",
+            chrono::Utc::now().format("%Y%m%dT%H%M%S%9f")
+        ));
+        // F1. QUIESCE: checkpoint the live database under the shared lock,
+        // then park the connection so file handles close for the swap.
+        let mut live = self.lock()?;
+        live.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+            .map_err(|_| store_failure())?;
+        let parked = std::mem::replace(
+            &mut *live,
+            Connection::open_in_memory().map_err(|_| store_failure())?,
+        );
+        drop(parked);
+        // F2. BUILD: fresh migrated database (first-run state by construction:
+        // the embedded runner applies every seed row, including DEP-01).
+        let build_failed = (|| -> Result<(), ApplicationError> {
+            let mut fresh = open_connection(&staging).map_err(|_| store_failure())?;
+            run_migrations(&mut fresh).map_err(|_| store_failure())?;
+            // Carry the backup history across: the safety net survives.
+            fresh
+                .execute(
+                    "ATTACH DATABASE ?1 AS live_db",
+                    rusqlite::params![active.to_string_lossy().to_string()],
+                )
+                .map_err(|_| store_failure())?;
+            fresh
+                .execute(
+                    "INSERT INTO main.backups_log SELECT * FROM live_db.backups_log",
+                    [],
+                )
+                .map_err(|_| store_failure())?;
+            fresh
+                .execute("DETACH DATABASE live_db", [])
+                .map_err(|_| store_failure())?;
+            fresh
+                .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+                .map_err(|_| store_failure())?;
+            fresh.close().map(|_| ()).map_err(|_| store_failure())?;
+            Ok(())
+        })()
+        .is_err();
+        if build_failed {
+            remove_reset_staging(&staging);
+            let reopened = open_connection(&active).map_err(|_| store_failure())?;
+            *live = reopened;
+            return Err(store_failure());
+        }
+        // F3. QUARANTINE the previous live database (never delete), then
+        // swap the staging file into place (same directory: atomic rename).
+        let quarantine_dir = parent.join("quarantine");
+        let mut moved: Vec<(PathBuf, PathBuf)> = Vec::new();
+        let swap_outcome = (|| -> Result<String, String> {
+            std::fs::create_dir_all(&quarantine_dir)
+                .map_err(|error| format!("quarantine directory failure: {error}"))?;
+            let base = unique_quarantine_base(&quarantine_dir)?;
+            let quarantined_db_name = format!("{base}.db");
+            move_reset_file(
+                active.clone(),
+                quarantine_dir.join(&quarantined_db_name),
+                &mut moved,
+            )?;
+            for suffix in ["-wal", "-shm", "-journal"] {
+                let sidecar = PathBuf::from(format!("{}{suffix}", active.display()));
+                if sidecar.is_file() {
+                    let target = quarantine_dir.join(format!("{base}{suffix}"));
+                    if let Err(detail) = move_reset_file(sidecar, target, &mut moved) {
+                        for (quarantined, original) in moved.iter().rev() {
+                            let _ = std::fs::rename(quarantined, original);
+                        }
+                        return Err(detail);
+                    }
+                }
+            }
+            std::fs::rename(&staging, &active)
+                .map_err(|error| format!("reset activation failure: {error}"))?;
+            Ok(quarantined_db_name)
+        })();
+        let quarantined_db_name = match swap_outcome {
+            Ok(name) => name,
+            Err(detail) => {
+                remove_reset_staging(&staging);
+                let reopened = open_connection(&active).map_err(|_| store_failure())?;
+                *live = reopened;
+                return Err(coded_reset(&format!("RESET_SWAP_FAILED:{detail}")));
+            }
+        };
+        // F4. ACTIVATE: chain-linked RESET_PERFORMED as the FIRST audit row
+        // (empty table chains from GENESIS), checkpoint, close, reopen shared.
+        let reset_at = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let activated = (|| -> Result<(), String> {
+            let mut fresh = open_connection(&active)
+                .map_err(|error| format!("activation open failure: {error}"))?;
+            if !backup_integrity_ok(&fresh) {
+                return Err("activation integrity failure".to_string());
+            }
+            let actor = actor.trim();
+            let actor = if actor.is_empty() { "SYSTEM" } else { actor };
+            let new_json = format!(
+                "{{\"backup_file_name\":\"{}\",\"quarantined_file\":\"{}\",\"reset_at\":\"{}\"}}",
+                json_escape(backup_file_name),
+                json_escape(&quarantined_db_name),
+                json_escape(&reset_at),
+            );
+            run_transaction(&mut fresh, |tx| {
+                insert_cash_audit_row(
+                    tx,
+                    "RESET_PERFORMED",
+                    "factory_reset",
+                    "GLOBAL",
+                    None,
+                    &new_json,
+                    actor,
+                    &reset_at,
+                )
+                .map_err(|error| {
+                    InfrastructureError::Config(format!("reset audit failure: {error}"))
+                })
+            })
+            .map_err(|error| format!("reset audit failure: {error}"))?;
+            fresh
+                .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+                .map_err(|error| format!("activation checkpoint failure: {error}"))?;
+            fresh
+                .close()
+                .map(|_| ())
+                .map_err(|(_, error)| format!("activation close failure: {error}"))?;
+            Ok(())
+        })()
+        .is_ok();
+        if !activated {
+            // Activation failed on the fresh file: move the quarantined
+            // original back, then reopen whatever is live.
+            let quarantined = quarantine_dir.join(&quarantined_db_name);
+            if quarantined.is_file() {
+                let _ = std::fs::rename(&quarantined, &active);
+            }
+            let reopened = open_connection(&active).map_err(|_| store_failure())?;
+            *live = reopened;
+            return Err(coded_reset("RESET_ACTIVATION_FAILED"));
+        }
+        let reopened = open_connection(&active).map_err(|_| store_failure())?;
+        *live = reopened;
+        Ok(FactoryResetOutcome {
+            reset_backup_file_name: backup_file_name.to_string(),
+            quarantined_db_name,
+            reset_at,
+            restart_required: true,
+        })
+    }
+}
+
+/// Stable-code constructor for reset validation failures (wire codes only).
+fn coded_reset(code: &str) -> ApplicationError {
+    ApplicationError::Validation(baraka_domain::errors::DomainError::InvalidCanonicalString(
+        code.to_string(),
+    ))
+}
+
+/// Remove a staging database and its sidecars (best-effort).
+fn remove_reset_staging(staging: &Path) {
+    let _ = std::fs::remove_file(staging);
+    for suffix in ["-wal", "-shm", "-journal"] {
+        let _ = std::fs::remove_file(PathBuf::from(format!("{}{suffix}", staging.display())));
+    }
+}
+
+/// Rename one file, recording the move for rollback.
+fn move_reset_file(
+    from: PathBuf,
+    to: PathBuf,
+    moved: &mut Vec<(PathBuf, PathBuf)>,
+) -> Result<(), String> {
+    std::fs::rename(&from, &to)
+        .map(|()| moved.push((to, from)))
+        .map_err(|error| format!("quarantine move failure: {error}"))
+}

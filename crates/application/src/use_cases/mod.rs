@@ -5,6 +5,7 @@ pub mod cash;
 pub mod catalog;
 pub mod customers;
 pub mod deletion;
+pub mod factory_reset;
 pub mod inventory;
 pub mod printing;
 pub mod purchases;

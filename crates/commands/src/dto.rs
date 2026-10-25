@@ -2381,6 +2381,61 @@ pub struct RestoreOutcomeDto {
     pub restart_required: bool,
 }
 
+/// Factory-reset precheck request (TASK-BRK-091).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FactoryResetPrecheckRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+}
+
+/// One backup row for the reset precheck view (subset of the log row).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResetBackupRefDto {
+    /// Snapshot file name.
+    pub file_name: String,
+    /// Capture instant (RFC3339 UTC).
+    pub created_at: String,
+    /// Lifecycle state (`SUCCESS`, `FAILED`, `CORRUPTED`, `PRUNED`).
+    pub status: String,
+}
+
+/// Read-only factory-reset precheck view (TASK-BRK-091).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResetPrecheckDto {
+    /// An OPEN or CLOSING cash session exists for this terminal.
+    pub open_session: bool,
+    /// The backup directory accepted a write probe.
+    pub backup_dir_writable: bool,
+    /// Newest logged backup, if any.
+    pub newest_backup: Option<ResetBackupRefDto>,
+    /// True only when every gate passes.
+    pub eligible: bool,
+    /// Failed gates in check order (codes only; UI translates).
+    pub reasons: Vec<String>,
+}
+
+/// Destructive factory-reset request (TASK-BRK-091).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FactoryResetExecuteRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Retyped confirmation token (store name, or `DEP-01` when blank).
+    pub typed_token: String,
+}
+
+/// Verified factory-reset outcome view (TASK-BRK-091).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FactoryResetOutcomeDto {
+    /// Snapshot file name of the mandatory pre-reset verified backup.
+    pub reset_backup_file_name: String,
+    /// Quarantine base file name of the previous live database.
+    pub quarantined_to: String,
+    /// Activation instant (RFC3339 UTC).
+    pub reset_at: String,
+    /// Always true: the operator must restart before resuming work.
+    pub restart_required: bool,
+}
+
 /// Managed operator view (mirrors application `UserRecord`; never carries hashes).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserSummaryDto {

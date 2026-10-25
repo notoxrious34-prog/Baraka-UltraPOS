@@ -10,12 +10,12 @@ use std::sync::Arc;
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
     BackupRepository, CaptureSink, CashSessionRepository, CategoryRepository, CheckoutRepository,
-    Clock, CustomerRepository, DocumentRepository, DocumentSearchFilter, FiscalSettingsPort,
-    NewSupplier, PasswordHasher, PrintJobRepository, PrinterSettingsPort, PrinterTransportPort,
-    ProductRepository, PurchaseLineInput, PurchaseRepository, ReceiptRendererPort,
-    ReportingRepository, ReturnRepository, SessionContext, SessionStore, SessionToken,
-    StockRepository, StoreIdentityPort, SupplierRepository, SupplierUpdate, UserRepository,
-    WarehouseRepository,
+    Clock, CustomerRepository, DocumentRepository, DocumentSearchFilter, FactoryResetRepository,
+    FiscalSettingsPort, NewSupplier, PasswordHasher, PrintJobRepository, PrinterSettingsPort,
+    PrinterTransportPort, ProductRepository, PurchaseLineInput, PurchaseRepository,
+    ReceiptRendererPort, ReportingRepository, ReturnRepository, SessionContext, SessionStore,
+    SessionToken, StockRepository, StoreIdentityPort, SupplierRepository, SupplierUpdate,
+    UserRepository, WarehouseRepository,
 };
 use baraka_application::use_cases::backup::{
     CreateBackupUseCase, ListBackupsUseCase, PrecheckRestoreUseCase, RestoreBackupUseCase,
@@ -41,6 +41,9 @@ use baraka_application::use_cases::customers::{
 use baraka_application::use_cases::deletion::{
     DeleteCustomerUseCase, DeleteProductUseCase, DeleteSupplierUseCase, DeleteWarehouseUseCase,
     UpdateWarehouseUseCase,
+};
+use baraka_application::use_cases::factory_reset::{
+    ExecuteFactoryResetUseCase, PrecheckFactoryResetUseCase, ResetExecution,
 };
 use baraka_application::use_cases::inventory::{
     AdjustStockInput, AdjustStockUseCase, CreateWarehouseUseCase, GetStockLevelUseCase,
@@ -108,6 +111,7 @@ use crate::dto::{
     DecodeSummaryDto, DefineKitDto, DeleteEntityRequestDto, DeleteEntityResultDto, DocumentDto,
     DocumentItemDto, DocumentSearchRequest, DocumentSearchResponse, DocumentSummaryDto,
     DocumentsProcessReturnRequestDto, DocumentsProcessReturnResponseDto, DraftSaleResponse,
+    FactoryResetExecuteRequestDto, FactoryResetOutcomeDto, FactoryResetPrecheckRequestDto,
     FiscalSettingsDto, GetCustomerRequestDto, GetProductDto, GetSaleResponse,
     GetSessionReportRequestDto, GetStatementRequest, GetStatementResponse, GetStockLevelRequestDto,
     GetStockLevelResponseDto, GrossMarginRowDto, HealthDto, ImportProductsRequestDto,
@@ -121,20 +125,21 @@ use crate::dto::{
     PurchaseOrderDto, PurchaseOrderLineDto, ReceiveGoodsRequestDto, RecordCreditPaymentRequest,
     RecordCreditPaymentResponse, RecordExpenseRequestDto, RecordSupplierInvoiceRequestDto,
     RecordSupplierPaymentRequestDto, RefundDestinationDto, ReportDateRangeRequestDto,
-    ReprintRequest, ReprintResponse, ResetUserCredentialsRequestDto, RestoreBackupRequestDto,
-    RestoreIneligibleReasonDto, RestoreOutcomeDto, RestoreWarningDto, ReturnContextResponseDto,
-    ReturnableDocumentSummaryDto, ReturnableItemDto, ReturnableLineDto, SalesByCategoryRowDto,
-    SalesByProductRowDto, SaveStoreIdentityRequest, SearchCustomersRequest,
-    SearchCustomersResponse, SearchSuppliersRequestDto, SearchSuppliersResponseDto,
-    StatementEntryDto, StockMovementHistoryRequestDto, StockMovementRowDto,
-    StockShortageWarningDto, StoreIdentityDto, StoreIdentityResponse, SupplierDto,
-    SupplierIdRequestDto, SupplierLedgerEntryDto, SupplierPaymentOutcomeDto, SupplierStatementDto,
-    TestPrintRequest, TestPrintResponse, TransferStockRequestDto, TransferStockResponseDto,
-    UpdateCategoryRequestDto, UpdateCustomerRequest, UpdateFiscalSettingsRequestDto,
-    UpdatePrinterSettingsRequest, UpdateProductDto, UpdateProductUnitDto,
-    UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto, UpdateUserRequestDto,
-    UpdateWarehouseRequestDto, UserActivityRequestDto, UserActivityRowDto, UserSummaryDto,
-    VerifyBackupRequestDto, VerifyBackupResponseDto, WarehouseDto,
+    ReprintRequest, ReprintResponse, ResetBackupRefDto, ResetPrecheckDto,
+    ResetUserCredentialsRequestDto, RestoreBackupRequestDto, RestoreIneligibleReasonDto,
+    RestoreOutcomeDto, RestoreWarningDto, ReturnContextResponseDto, ReturnableDocumentSummaryDto,
+    ReturnableItemDto, ReturnableLineDto, SalesByCategoryRowDto, SalesByProductRowDto,
+    SaveStoreIdentityRequest, SearchCustomersRequest, SearchCustomersResponse,
+    SearchSuppliersRequestDto, SearchSuppliersResponseDto, StatementEntryDto,
+    StockMovementHistoryRequestDto, StockMovementRowDto, StockShortageWarningDto, StoreIdentityDto,
+    StoreIdentityResponse, SupplierDto, SupplierIdRequestDto, SupplierLedgerEntryDto,
+    SupplierPaymentOutcomeDto, SupplierStatementDto, TestPrintRequest, TestPrintResponse,
+    TransferStockRequestDto, TransferStockResponseDto, UpdateCategoryRequestDto,
+    UpdateCustomerRequest, UpdateFiscalSettingsRequestDto, UpdatePrinterSettingsRequest,
+    UpdateProductDto, UpdateProductUnitDto, UpdatePurchaseOrderRequestDto,
+    UpdateSupplierRequestDto, UpdateUserRequestDto, UpdateWarehouseRequestDto,
+    UserActivityRequestDto, UserActivityRowDto, UserSummaryDto, VerifyBackupRequestDto,
+    VerifyBackupResponseDto, WarehouseDto,
 };
 
 /// Shared backend handles for command handlers.
@@ -192,6 +197,8 @@ pub struct AppState {
     pub returns: Arc<dyn ReturnRepository>,
     /// Backup snapshot persistence and audit rows.
     pub backups: Arc<dyn BackupRepository>,
+    /// Factory-reset execution edge (same SQLite manager, second handle).
+    pub factory_reset: Arc<dyn FactoryResetRepository>,
     /// Directory holding backup snapshot files (created on demand).
     pub backup_dir: std::path::PathBuf,
     /// Sovereign terminal identifier (managed state, never client input).
@@ -2394,6 +2401,69 @@ pub fn backups_restore(
         restored_backup_id: outcome.restored_backup_id,
         quarantined_to: outcome.quarantined_to,
         restored_at: outcome.restored_at,
+        restart_required: outcome.restart_required,
+    })
+}
+
+/// `factory_reset_precheck` command: read-only reset gates (TASK-BRK-091).
+/// Admin-only (`SystemSettingsManage`, same gate as restore). Zero writes.
+#[tauri::command(rename_all = "snake_case")]
+pub fn factory_reset_precheck(
+    state: tauri::State<'_, AppState>,
+    request: FactoryResetPrecheckRequestDto,
+) -> Result<ResetPrecheckDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    require_backup_admin(&session)?;
+    let report = PrecheckFactoryResetUseCase::new(state.backups.as_ref(), state.cash.as_ref())
+        .execute(&session, &state.terminal_id, &state.backup_dir)
+        .map_err(|error| error_code(&error))?;
+    Ok(ResetPrecheckDto {
+        open_session: report.open_session,
+        backup_dir_writable: report.backup_dir_writable,
+        newest_backup: report.newest_backup.map(|row| ResetBackupRefDto {
+            file_name: row.file_name,
+            created_at: row.created_at,
+            status: row.status,
+        }),
+        eligible: report.eligible,
+        reasons: report.reasons,
+    })
+}
+
+/// `factory_reset_execute` command: verified destructive reset (TASK-BRK-091).
+/// Admin-only. Validation (session, permission, typed token) runs before any
+/// write; the mandatory verified backup runs before the quarantine-swap.
+/// Nothing is written to `command_log` (the replaced database would record
+/// it — the audit trail is the `RESET_PERFORMED` event in the fresh database
+/// plus the preserved quarantine copy and the pre-reset backup).
+#[tauri::command(rename_all = "snake_case")]
+pub fn factory_reset_execute(
+    state: tauri::State<'_, AppState>,
+    request: FactoryResetExecuteRequestDto,
+) -> Result<FactoryResetOutcomeDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    require_backup_admin(&session)?;
+    let outcome = ExecuteFactoryResetUseCase::new(
+        state.backups.as_ref(),
+        state.cash.as_ref(),
+        state.factory_reset.as_ref(),
+    )
+    .execute(
+        &session,
+        &ResetExecution {
+            terminal_id: &state.terminal_id,
+            backup_dir: &state.backup_dir,
+            retention: 30,
+            app_version: env!("CARGO_PKG_VERSION"),
+            typed_token: &request.typed_token,
+            actor: &session.user_id.to_string(),
+        },
+    )
+    .map_err(|error| error_code(&error))?;
+    Ok(FactoryResetOutcomeDto {
+        reset_backup_file_name: outcome.reset_backup_file_name,
+        quarantined_to: outcome.quarantined_db_name,
+        reset_at: outcome.reset_at,
         restart_required: outcome.restart_required,
     })
 }

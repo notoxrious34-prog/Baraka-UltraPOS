@@ -202,6 +202,26 @@ pub struct RestoreOutcome {
     pub restart_required: bool,
 }
 
+/// Verified factory-reset outcome (TASK-BRK-091, AUD-043 §3).
+///
+/// The reset builds a fresh migrated database file (first-run state),
+/// carries the `backups_log` history across, appends a chain-linked
+/// `RESET_PERFORMED` audit event as the first row, quarantines the
+/// previous live database, and activates the fresh file. Wipe-by-DELETE
+/// is impossible: `BEFORE DELETE` abort-triggers guard every ledger and
+/// log table (0001/0004/0008/0009), so no schema change was needed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FactoryResetOutcome {
+    /// Snapshot file name of the mandatory pre-reset verified backup.
+    pub reset_backup_file_name: String,
+    /// Quarantine base file name of the previous live database.
+    pub quarantined_db_name: String,
+    /// Activation instant (RFC3339 UTC).
+    pub reset_at: String,
+    /// Always true: the operator must restart before resuming work.
+    pub restart_required: bool,
+}
+
 /// Typed failure of the restore protocol (TASK-BRK-054, ADR-062).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RestoreError {

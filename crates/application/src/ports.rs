@@ -2310,6 +2310,32 @@ pub trait BackupRepository: Send + Sync {
     ) -> Result<baraka_domain::backup::RestoreOutcome, baraka_domain::backup::RestoreError>;
 }
 
+/// Factory-reset execution edge (TASK-BRK-091, AUD-043 §3).
+///
+/// Implemented by the same SQLite manager that owns the live connection,
+/// so the quarantine-swap + reopen protocol is shared with restore.
+/// The use case drives backup/verify through `BackupRepository` first;
+/// this port performs zero backup work itself.
+pub trait FactoryResetRepository: Send + Sync {
+    /// True when an OPEN or CLOSING cash session exists for `terminal_id`.
+    fn has_open_cash_session(&self, terminal_id: &str) -> Result<bool, ApplicationError>;
+
+    /// Token the operator must retype: `store.name`, or `DEP-01` when the
+    /// name is blank (SafeDeleteModal entity-code-or-name convention).
+    fn expected_reset_token(&self) -> Result<String, ApplicationError>;
+
+    /// Build a fresh migrated database (first-run state), carry
+    /// `backups_log` across, append chain-linked `RESET_PERFORMED` as the
+    /// first audit row, quarantine the previous live database, activate
+    /// the fresh file on a reopened connection, and report the receipt.
+    /// `backup_file_name` is the mandatory pre-reset verified snapshot.
+    fn execute_reset(
+        &self,
+        actor: &str,
+        backup_file_name: &str,
+    ) -> Result<baraka_domain::backup::FactoryResetOutcome, ApplicationError>;
+}
+
 /// Recorded supplier-payment outcome.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SupplierPaymentOutcome {

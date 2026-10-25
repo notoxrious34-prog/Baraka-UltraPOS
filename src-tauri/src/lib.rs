@@ -124,6 +124,7 @@ pub fn run() {
             let renderer = Arc::new(EscPosRasterizer);
             let printer_settings = Arc::new(SqlitePrinterSettings::new(Arc::clone(&db)));
             let fiscal_settings = Arc::new(SqliteFiscalSettings::new(Arc::clone(&db)));
+            let backups = Arc::new(SqliteBackupManager::new(Arc::clone(&db), db_path.clone()));
             let state = AppState {
                 users: Arc::new(SqliteUserRepository::new(Arc::clone(&db))),
                 sessions: Arc::new(InMemorySessionStore::new(clock.clone())),
@@ -149,7 +150,8 @@ pub fn run() {
                 purchases: Arc::new(SqlitePurchaseRepository::new(Arc::clone(&db))),
                 reports: Arc::new(SqliteReportingRepository::new(Arc::clone(&db))),
                 returns: Arc::new(SqliteReturnRepository::new(Arc::clone(&db))),
-                backups: Arc::new(SqliteBackupManager::new(Arc::clone(&db), db_path.clone())),
+                backups: backups.clone(),
+                factory_reset: backups,
                 backup_dir: data_dir.join("backups"),
                 terminal_id,
             };
@@ -248,6 +250,8 @@ pub fn run() {
             baraka_commands::ipc::backups_verify,
             baraka_commands::ipc::backups_restore_precheck,
             baraka_commands::ipc::backups_restore,
+            baraka_commands::ipc::factory_reset_precheck,
+            baraka_commands::ipc::factory_reset_execute,
             baraka_commands::ipc::customers_create,
             baraka_commands::ipc::customers_update,
             baraka_commands::ipc::customers_delete,

@@ -1,6 +1,7 @@
 //! Use cases: deterministic orchestration over domain primitives.
 
 pub mod backup;
+pub mod backup_hardening;
 pub mod cash;
 pub mod catalog;
 pub mod customers;

@@ -4,6 +4,7 @@
 pub mod argon2_hasher;
 pub mod in_memory_session_store;
 pub mod sqlite_audit_log;
+pub mod sqlite_backup_hardening;
 pub mod sqlite_backup_manager;
 pub mod sqlite_cash_session_repository;
 pub mod sqlite_catalog_repository;
@@ -28,6 +29,7 @@ pub mod system_clock;
 pub use argon2_hasher::Argon2PasswordHasher;
 pub use in_memory_session_store::InMemorySessionStore;
 pub use sqlite_audit_log::SqliteAuditLog;
+pub use sqlite_backup_hardening::SqliteBackupHardening;
 pub use sqlite_backup_manager::SqliteBackupManager;
 pub use sqlite_cash_session_repository::SqliteCashSessionRepository;
 pub use sqlite_catalog_repository::SqliteCatalogRepository;

@@ -19,6 +19,120 @@ pub enum BackupTriggerType {
     Scheduled,
 }
 
+/// Automatic-backup cadence (TASK-BRK-092).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BackupCadence {
+    /// No automatic backups.
+    Disabled,
+    /// One successful backup per local calendar day.
+    Daily,
+    /// One successful backup per ISO week (Monday start).
+    Weekly,
+}
+
+impl BackupCadence {
+    /// Canonical wire code (stored in the `settings` table).
+    pub fn as_code(self) -> &'static str {
+        match self {
+            BackupCadence::Disabled => "disabled",
+            BackupCadence::Daily => "daily",
+            BackupCadence::Weekly => "weekly",
+        }
+    }
+
+    /// Parse a canonical wire code; unknown → `None` (caller validates).
+    pub fn from_code(code: &str) -> Option<Self> {
+        match code {
+            "disabled" => Some(BackupCadence::Disabled),
+            "daily" => Some(BackupCadence::Daily),
+            "weekly" => Some(BackupCadence::Weekly),
+            _ => None,
+        }
+    }
+}
+
+/// Stored automatic-backup schedule: cadence + local wall-clock time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackupSchedule {
+    /// How often an automatic backup may run.
+    pub cadence: BackupCadence,
+    /// Local wall-clock minutes since midnight (0..=1439), or `None` when
+    /// the cadence is disabled. Stored as `HH:MM` in the settings table.
+    pub time_minutes: Option<u32>,
+}
+
+impl Default for BackupSchedule {
+    fn default() -> Self {
+        Self {
+            cadence: BackupCadence::Disabled,
+            time_minutes: None,
+        }
+    }
+}
+
+impl BackupSchedule {
+    /// Validate a wall-clock `HH:MM` (24-hour) value into minutes.
+    pub fn parse_time(hhmm: &str) -> Option<u32> {
+        let (h, m) = hhmm.split_once(':')?;
+        let hours: u32 = h.parse().ok()?;
+        let minutes: u32 = m.parse().ok()?;
+        if hours > 23 || minutes > 59 || h.len() != 2 || m.len() != 2 {
+            return None;
+        }
+        Some(hours * 60 + minutes)
+    }
+
+    /// Format minutes-since-midnight back to `HH:MM`.
+    pub fn format_time(minutes: u32) -> Option<String> {
+        if minutes > 1439 {
+            return None;
+        }
+        Some(format!("{:02}:{:02}", minutes / 60, minutes % 60))
+    }
+}
+
+/// Outcome of one post-backup copy to a removable destination.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UsbCopyOutcome {
+    /// Directory the copy landed in.
+    pub destination: String,
+    /// Snapshot file name on the removable medium (== local file name).
+    pub file_name: String,
+    /// Copied byte count.
+    pub file_size_bytes: u64,
+    /// Copy verified by size + SHA-256 re-check.
+    pub verified: bool,
+}
+
+/// Non-blocking report of the automatic-backup due check.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScheduledBackupReport {
+    /// Cadence as configured (never silently disabled).
+    pub cadence: BackupCadence,
+    /// Configured local wall-clock time (minutes since midnight).
+    pub time_minutes: Option<u32>,
+    /// A backup is past due and none succeeded inside the current window.
+    pub due: bool,
+    /// Latest SUCCESS backup instant (RFC3339 UTC), if any.
+    pub last_backup_at: Option<String>,
+    /// Next local run instant (RFC3339 UTC), if any.
+    pub next_run_at: Option<String>,
+}
+
+/// Durable last-backup state read back for the UI (TASK-BRK-092).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LastBackupStatus {
+    /// `SUCCESS`, `FAILED`, `CORRUPTED`, `PRUNED`, or absent → empty.
+    pub status: String,
+    /// Snapshot file name of the newest logged row, if any.
+    pub file_name: Option<String>,
+    /// Capture instant of the newest logged row (RFC3339 UTC), if any.
+    pub created_at: Option<String>,
+    /// Failure detail of the newest row, if any.
+    pub error_message: Option<String>,
+}
+
 /// Terminal lifecycle state of a backup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BackupStatus {

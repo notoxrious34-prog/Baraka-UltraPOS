@@ -13,14 +13,15 @@ use std::sync::{
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+use baraka_application::use_cases::backup_hardening::ScheduledBackupUseCase;
 use baraka_commands::ipc::AppState;
 use baraka_infrastructure::adapters::{
-    Argon2PasswordHasher, InMemorySessionStore, SqliteBackupManager, SqliteCashSessionRepository,
-    SqliteCatalogRepository, SqliteCheckoutRepository, SqliteCustomerRepository,
-    SqliteDocumentRepository, SqliteFiscalSettings, SqlitePrintJobRepository,
-    SqlitePrinterSettings, SqlitePurchaseRepository, SqliteReportingRepository,
-    SqliteReturnRepository, SqliteStockRepository, SqliteSupplierRepository, SqliteUserRepository,
-    SqliteWarehouseRepository, SystemClock,
+    Argon2PasswordHasher, InMemorySessionStore, SqliteBackupHardening, SqliteBackupManager,
+    SqliteCashSessionRepository, SqliteCatalogRepository, SqliteCheckoutRepository,
+    SqliteCustomerRepository, SqliteDocumentRepository, SqliteFiscalSettings,
+    SqlitePrintJobRepository, SqlitePrinterSettings, SqlitePurchaseRepository,
+    SqliteReportingRepository, SqliteReturnRepository, SqliteStockRepository,
+    SqliteSupplierRepository, SqliteUserRepository, SqliteWarehouseRepository, SystemClock,
 };
 use baraka_infrastructure::persistence::connection::{
     ensure_database_dir, open_connection, resolve_database_path,
@@ -125,6 +126,19 @@ pub fn run() {
             let printer_settings = Arc::new(SqlitePrinterSettings::new(Arc::clone(&db)));
             let fiscal_settings = Arc::new(SqliteFiscalSettings::new(Arc::clone(&db)));
             let backups = Arc::new(SqliteBackupManager::new(Arc::clone(&db), db_path.clone()));
+            let hardening = Arc::new(SqliteBackupHardening::new(Arc::clone(&db)));
+            // TASK-BRK-092 on-launch due-check: silent when not due (never a
+            // startup failure); a due failure is also silent here — the
+            // admin-gated `backup_schedule_run` command surfaces it on
+            // action, and the durable last-status row records every attempt.
+            let _ =
+                ScheduledBackupUseCase::new(backups.as_ref(), hardening.as_ref(), clock.as_ref())
+                    .run_system(
+                        &data_dir.join("backups"),
+                        30,
+                        &terminal_id,
+                        env!("CARGO_PKG_VERSION"),
+                    );
             let state = AppState {
                 users: Arc::new(SqliteUserRepository::new(Arc::clone(&db))),
                 sessions: Arc::new(InMemorySessionStore::new(clock.clone())),
@@ -151,6 +165,7 @@ pub fn run() {
                 reports: Arc::new(SqliteReportingRepository::new(Arc::clone(&db))),
                 returns: Arc::new(SqliteReturnRepository::new(Arc::clone(&db))),
                 backups: backups.clone(),
+                backup_hardening: hardening,
                 factory_reset: backups,
                 backup_dir: data_dir.join("backups"),
                 terminal_id,
@@ -250,6 +265,9 @@ pub fn run() {
             baraka_commands::ipc::backups_verify,
             baraka_commands::ipc::backups_restore_precheck,
             baraka_commands::ipc::backups_restore,
+            baraka_commands::ipc::backup_hardening_status,
+            baraka_commands::ipc::backup_hardening_configure,
+            baraka_commands::ipc::backup_schedule_run,
             baraka_commands::ipc::factory_reset_precheck,
             baraka_commands::ipc::factory_reset_execute,
             baraka_commands::ipc::customers_create,

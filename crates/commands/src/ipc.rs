@@ -9,17 +9,20 @@ use std::sync::Arc;
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    BackupRepository, CaptureSink, CashSessionRepository, CategoryRepository, CheckoutRepository,
-    Clock, CustomerRepository, DocumentRepository, DocumentSearchFilter, FactoryResetRepository,
-    FiscalSettingsPort, NewSupplier, PasswordHasher, PrintJobRepository, PrinterSettingsPort,
-    PrinterTransportPort, ProductRepository, PurchaseLineInput, PurchaseRepository,
-    ReceiptRendererPort, ReportingRepository, ReturnRepository, SessionContext, SessionStore,
-    SessionToken, StockRepository, StoreIdentityPort, SupplierRepository, SupplierUpdate,
-    UserRepository, WarehouseRepository,
+    BackupHardeningPort, BackupRepository, CaptureSink, CashSessionRepository, CategoryRepository,
+    CheckoutRepository, Clock, CustomerRepository, DocumentRepository, DocumentSearchFilter,
+    FactoryResetRepository, FiscalSettingsPort, NewSupplier, PasswordHasher, PrintJobRepository,
+    PrinterSettingsPort, PrinterTransportPort, ProductRepository, PurchaseLineInput,
+    PurchaseRepository, ReceiptRendererPort, ReportingRepository, ReturnRepository, SessionContext,
+    SessionStore, SessionToken, StockRepository, StoreIdentityPort, SupplierRepository,
+    SupplierUpdate, UserRepository, WarehouseRepository,
 };
 use baraka_application::use_cases::backup::{
     CreateBackupUseCase, ListBackupsUseCase, PrecheckRestoreUseCase, RestoreBackupUseCase,
     VerifyBackupIntegrityUseCase,
+};
+use baraka_application::use_cases::backup_hardening::{
+    CashCloseBackupUseCase, LastBackupStatusUseCase, ScheduledBackupUseCase,
 };
 use baraka_application::use_cases::cash::{
     BeginClosingUseCase, CancelClosingUseCase, ConfirmClosingUseCase, GetActiveSessionUseCase,
@@ -97,8 +100,9 @@ use baraka_domain::user::UserId;
 use uuid::Uuid;
 
 use crate::dto::{
-    AdjustStockRequestDto, AdjustStockResponseDto, BackupContentSummaryDto, BackupMetadataDto,
-    BootstrapFirstAdminRequest, BootstrapFirstAdminResponse, CartLineItemDto,
+    AdjustStockRequestDto, AdjustStockResponseDto, BackupContentSummaryDto,
+    BackupHardeningConfigureRequestDto, BackupHardeningStatusDto, BackupMetadataDto,
+    BackupScheduleDto, BootstrapFirstAdminRequest, BootstrapFirstAdminResponse, CartLineItemDto,
     CashClosingCommandDto, CashMovementDto, CashMovementTotalDto, CashSessionDto,
     CashSessionHistoryRowDto, CashSessionReportDto, CashSessionsHistoryRequestDto,
     CatalogMetricsDto, CatalogSearchRequestDto, CategoryResponseDto, CheckFirstRunStatusResponse,
@@ -115,7 +119,7 @@ use crate::dto::{
     FiscalSettingsDto, GetCustomerRequestDto, GetProductDto, GetSaleResponse,
     GetSessionReportRequestDto, GetStatementRequest, GetStatementResponse, GetStockLevelRequestDto,
     GetStockLevelResponseDto, GrossMarginRowDto, HealthDto, ImportProductsRequestDto,
-    ImportProductsResponseDto, ImportRowErrorDto, KitItemDto, LineMarginDto,
+    ImportProductsResponseDto, ImportRowErrorDto, KitItemDto, LastBackupStatusDto, LineMarginDto,
     ListWarehousesResponseDto, LoginRequestDto, LoginResponseDto, LogoutRequestDto,
     LowStockRequestDto, LowStockRowDto, NewCustomerRequest, NewProductUnitDto,
     OpenCashSessionRequestDto, PaymentDto, PaymentLineDto, PreRestoreChecksDto,
@@ -129,17 +133,18 @@ use crate::dto::{
     ResetUserCredentialsRequestDto, RestoreBackupRequestDto, RestoreIneligibleReasonDto,
     RestoreOutcomeDto, RestoreWarningDto, ReturnContextResponseDto, ReturnableDocumentSummaryDto,
     ReturnableItemDto, ReturnableLineDto, SalesByCategoryRowDto, SalesByProductRowDto,
-    SaveStoreIdentityRequest, SearchCustomersRequest, SearchCustomersResponse,
-    SearchSuppliersRequestDto, SearchSuppliersResponseDto, StatementEntryDto,
-    StockMovementHistoryRequestDto, StockMovementRowDto, StockShortageWarningDto, StoreIdentityDto,
-    StoreIdentityResponse, SupplierDto, SupplierIdRequestDto, SupplierLedgerEntryDto,
-    SupplierPaymentOutcomeDto, SupplierStatementDto, TestPrintRequest, TestPrintResponse,
-    TransferStockRequestDto, TransferStockResponseDto, UpdateCategoryRequestDto,
-    UpdateCustomerRequest, UpdateFiscalSettingsRequestDto, UpdatePrinterSettingsRequest,
-    UpdateProductDto, UpdateProductUnitDto, UpdatePurchaseOrderRequestDto,
-    UpdateSupplierRequestDto, UpdateUserRequestDto, UpdateWarehouseRequestDto,
-    UserActivityRequestDto, UserActivityRowDto, UserSummaryDto, VerifyBackupRequestDto,
-    VerifyBackupResponseDto, WarehouseDto,
+    SaveStoreIdentityRequest, ScheduledBackupReportDto, ScheduledRunOutcomeDto,
+    SearchCustomersRequest, SearchCustomersResponse, SearchSuppliersRequestDto,
+    SearchSuppliersResponseDto, StatementEntryDto, StockMovementHistoryRequestDto,
+    StockMovementRowDto, StockShortageWarningDto, StoreIdentityDto, StoreIdentityResponse,
+    SupplierDto, SupplierIdRequestDto, SupplierLedgerEntryDto, SupplierPaymentOutcomeDto,
+    SupplierStatementDto, TestPrintRequest, TestPrintResponse, TransferStockRequestDto,
+    TransferStockResponseDto, UpdateCategoryRequestDto, UpdateCustomerRequest,
+    UpdateFiscalSettingsRequestDto, UpdatePrinterSettingsRequest, UpdateProductDto,
+    UpdateProductUnitDto, UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto,
+    UpdateUserRequestDto, UpdateWarehouseRequestDto, UsbCopyOutcomeDto, UserActivityRequestDto,
+    UserActivityRowDto, UserSummaryDto, VerifyBackupRequestDto, VerifyBackupResponseDto,
+    WarehouseDto,
 };
 
 /// Shared backend handles for command handlers.
@@ -197,6 +202,8 @@ pub struct AppState {
     pub returns: Arc<dyn ReturnRepository>,
     /// Backup snapshot persistence and audit rows.
     pub backups: Arc<dyn BackupRepository>,
+    /// Automatic-backup schedule + USB mirror persistence (TASK-BRK-092).
+    pub backup_hardening: Arc<dyn BackupHardeningPort>,
     /// Factory-reset execution edge (same SQLite manager, second handle).
     pub factory_reset: Arc<dyn FactoryResetRepository>,
     /// Directory holding backup snapshot files (created on demand).
@@ -2468,6 +2475,175 @@ pub fn factory_reset_execute(
     })
 }
 
+fn to_backup_schedule_dto(schedule: &baraka_domain::backup::BackupSchedule) -> BackupScheduleDto {
+    BackupScheduleDto {
+        cadence: schedule.cadence.as_code().to_string(),
+        time: schedule
+            .time_minutes
+            .and_then(baraka_domain::backup::BackupSchedule::format_time),
+    }
+}
+
+fn to_scheduled_report_dto(
+    report: &baraka_domain::backup::ScheduledBackupReport,
+) -> ScheduledBackupReportDto {
+    ScheduledBackupReportDto {
+        cadence: report.cadence.as_code().to_string(),
+        time: report
+            .time_minutes
+            .and_then(baraka_domain::backup::BackupSchedule::format_time),
+        due: report.due,
+        last_backup_at: report.last_backup_at.clone(),
+        next_run_at: report.next_run_at.clone(),
+    }
+}
+
+fn to_last_status_dto(status: &baraka_domain::backup::LastBackupStatus) -> LastBackupStatusDto {
+    LastBackupStatusDto {
+        status: status.status.clone(),
+        file_name: status.file_name.clone(),
+        created_at: status.created_at.clone(),
+        error_message: status.error_message.clone(),
+    }
+}
+
+fn to_usb_outcome_dto(outcome: &baraka_domain::backup::UsbCopyOutcome) -> UsbCopyOutcomeDto {
+    UsbCopyOutcomeDto {
+        destination: outcome.destination.clone(),
+        file_name: outcome.file_name.clone(),
+        file_size_bytes: outcome.file_size_bytes,
+        verified: outcome.verified,
+    }
+}
+
+/// `backup_hardening_status` command: stored schedule + USB destination +
+/// durable last-backup state + due-check report (TASK-BRK-092).
+/// Admin-only, read-only (zero writes).
+#[tauri::command(rename_all = "snake_case")]
+pub fn backup_hardening_status(
+    state: tauri::State<'_, AppState>,
+    session_token: String,
+) -> Result<BackupHardeningStatusDto, String> {
+    let session = require_session(&state, &session_token)?;
+    require_backup_admin(&session)?;
+    let schedule = state
+        .backup_hardening
+        .as_ref()
+        .load_schedule()
+        .map_err(|error| error_code(&error))?;
+    let usb_destination = state
+        .backup_hardening
+        .as_ref()
+        .usb_destination()
+        .map_err(|error| error_code(&error))?
+        .map(|path| path.to_string_lossy().to_string());
+    let last_status = LastBackupStatusUseCase::new(state.backups.as_ref())
+        .read()
+        .map_err(|error| error_code(&error))?;
+    let due = ScheduledBackupUseCase::new(
+        state.backups.as_ref(),
+        state.backup_hardening.as_ref(),
+        state.clock.as_ref(),
+    )
+    .check()
+    .map_err(|error| error_code(&error))?;
+    Ok(BackupHardeningStatusDto {
+        schedule: to_backup_schedule_dto(&schedule),
+        usb_destination,
+        last_status: to_last_status_dto(&last_status),
+        due: to_scheduled_report_dto(&due),
+    })
+}
+
+/// `backup_hardening_configure` command: persist cadence + time + USB
+/// destination (TASK-BRK-092). Admin-only. Cadence validates to
+/// `disabled`/`daily`/`weekly` (`INVALID_BACKUP_CADENCE`); non-disabled
+/// cadences require a valid `HH:MM` (`INVALID_BACKUP_TIME`); a blank USB
+/// destination clears the setting.
+#[tauri::command(rename_all = "snake_case")]
+pub fn backup_hardening_configure(
+    state: tauri::State<'_, AppState>,
+    request: BackupHardeningConfigureRequestDto,
+) -> Result<BackupScheduleDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    require_backup_admin(&session)?;
+    let cadence = baraka_domain::backup::BackupCadence::from_code(request.cadence.trim())
+        .ok_or_else(|| {
+            error_code(&ApplicationError::Validation(
+                DomainError::InvalidCanonicalString("INVALID_BACKUP_CADENCE".to_string()),
+            ))
+        })?;
+    let time_minutes = match cadence {
+        baraka_domain::backup::BackupCadence::Disabled => None,
+        _ => {
+            let raw = request.time.as_deref().map(str::trim).unwrap_or("");
+            if raw.is_empty() {
+                return Err(error_code(&ApplicationError::Validation(
+                    DomainError::InvalidCanonicalString("INVALID_BACKUP_TIME".to_string()),
+                )));
+            }
+            Some(
+                baraka_domain::backup::BackupSchedule::parse_time(raw).ok_or_else(|| {
+                    error_code(&ApplicationError::Validation(
+                        DomainError::InvalidCanonicalString("INVALID_BACKUP_TIME".to_string()),
+                    ))
+                })?,
+            )
+        }
+    };
+    let schedule = baraka_domain::backup::BackupSchedule {
+        cadence,
+        time_minutes,
+    };
+    state
+        .backup_hardening
+        .as_ref()
+        .save_schedule(&schedule)
+        .map_err(|error| error_code(&error))?;
+    let usb = request
+        .usb_destination
+        .as_deref()
+        .map(str::trim)
+        .filter(|text| !text.is_empty());
+    state
+        .backup_hardening
+        .as_ref()
+        .set_usb_destination(usb.map(std::path::Path::new))
+        .map_err(|error| error_code(&error))?;
+    Ok(to_backup_schedule_dto(&schedule))
+}
+
+/// `backup_schedule_run` command: on-action due-check entry point
+/// (TASK-BRK-092). Admin-only. Runs one scheduled capture (same pipeline as
+/// manual, `Scheduled` trigger) plus the best-effort USB mirror when the
+/// cadence is due; `BACKUP_NOT_DUE` when the window already holds a SUCCESS
+/// backup.
+#[tauri::command(rename_all = "snake_case")]
+pub fn backup_schedule_run(
+    state: tauri::State<'_, AppState>,
+    session_token: String,
+) -> Result<ScheduledRunOutcomeDto, String> {
+    let session = require_session(&state, &session_token)?;
+    require_backup_admin(&session)?;
+    let outcome = ScheduledBackupUseCase::new(
+        state.backups.as_ref(),
+        state.backup_hardening.as_ref(),
+        state.clock.as_ref(),
+    )
+    .run(
+        &session,
+        &state.backup_dir,
+        30,
+        &state.terminal_id,
+        env!("CARGO_PKG_VERSION"),
+    )
+    .map_err(|error| error_code(&error))?;
+    Ok(ScheduledRunOutcomeDto {
+        backup: to_backup_dto(&outcome.backup),
+        usb: outcome.usb.as_ref().map(to_usb_outcome_dto),
+    })
+}
+
 /// `sales_create_draft` command (`sales.create_draft`): park an editable draft.
 #[tauri::command(rename_all = "snake_case")]
 pub fn sales_create_draft(
@@ -3153,6 +3329,7 @@ fn to_cash_session_dto(view: &baraka_application::ports::CashSessionView) -> Cas
         revision: view.revision.to_string(),
         created_at: view.created_at.clone(),
         updated_at: view.updated_at.clone(),
+        backup_warning: None,
     }
 }
 
@@ -3238,7 +3415,23 @@ pub fn cash_confirm_closing(
             &request.command_id,
         )
         .map_err(|error| error_code(&error))?;
-    Ok(to_cash_session_dto(&view))
+    // TASK-BRK-092 close hook: AFTER the close commits (never before — a
+    // stranded till is worse than a missed automatic backup). A failed
+    // post-close backup surfaces as a non-blocking `backup_warning` code;
+    // the committed close is never rolled back.
+    let backup_warning = match CashCloseBackupUseCase::new(state.backups.as_ref()).run_after_close(
+        &session,
+        &state.backup_dir,
+        30,
+        &state.terminal_id,
+        env!("CARGO_PKG_VERSION"),
+    ) {
+        Ok(_) => None,
+        Err(error) => Some(error_code(&error)),
+    };
+    let mut dto = to_cash_session_dto(&view);
+    dto.backup_warning = backup_warning;
+    Ok(dto)
 }
 
 /// `cash.getActiveSession` command: active OPEN/CLOSING session, if any.

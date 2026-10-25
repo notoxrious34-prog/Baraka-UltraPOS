@@ -1187,6 +1187,9 @@ pub struct CashSessionDto {
     pub created_at: String,
     /// Row update instant (RFC3339).
     pub updated_at: String,
+    /// Non-blocking post-close automatic-backup warning code, if any
+    /// (TASK-BRK-092; the close itself already committed).
+    pub backup_warning: Option<String>,
 }
 
 /// Stored cash movement view.
@@ -2202,6 +2205,91 @@ pub struct BackupMetadataDto {
     pub error_message: Option<String>,
     /// Capture instant (RFC3339).
     pub created_at: String,
+}
+
+/// Automatic-backup schedule view (TASK-BRK-092).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackupScheduleDto {
+    /// Cadence code (`disabled`, `daily`, `weekly`).
+    pub cadence: String,
+    /// Local wall-clock `HH:MM`, or `None` when disabled/absent.
+    pub time: Option<String>,
+}
+
+/// Automatic-backup due-check report (TASK-BRK-092).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScheduledBackupReportDto {
+    /// Cadence code.
+    pub cadence: String,
+    /// Local wall-clock `HH:MM`, or `None`.
+    pub time: Option<String>,
+    /// A backup is past due and none succeeded inside the window.
+    pub due: bool,
+    /// Latest SUCCESS backup instant (RFC3339 UTC), if any.
+    pub last_backup_at: Option<String>,
+    /// Next local run instant (RFC3339 UTC), if any.
+    pub next_run_at: Option<String>,
+}
+
+/// Durable last-backup status (TASK-BRK-092).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LastBackupStatusDto {
+    /// `SUCCESS`, `FAILED`, `CORRUPTED`, `PRUNED`, or empty.
+    pub status: String,
+    /// Newest logged snapshot file name, if any.
+    pub file_name: Option<String>,
+    /// Newest logged capture instant (RFC3339 UTC), if any.
+    pub created_at: Option<String>,
+    /// Failure detail, if any.
+    pub error_message: Option<String>,
+}
+
+/// USB copy outcome view (TASK-BRK-092).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UsbCopyOutcomeDto {
+    /// Directory the copy landed in.
+    pub destination: String,
+    /// Snapshot file name on the removable medium.
+    pub file_name: String,
+    /// Copied byte count.
+    pub file_size_bytes: u64,
+    /// Copy verified by size + SHA-256 re-check.
+    pub verified: bool,
+}
+
+/// Combined automatic-backup status read (TASK-BRK-092).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackupHardeningStatusDto {
+    /// Stored cadence + time.
+    pub schedule: BackupScheduleDto,
+    /// Removable destination directory, if set.
+    pub usb_destination: Option<String>,
+    /// Durable last-backup state (success or failure).
+    pub last_status: LastBackupStatusDto,
+    /// Due-check report.
+    pub due: ScheduledBackupReportDto,
+}
+
+/// `backup_hardening_configure` request (TASK-BRK-092).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackupHardeningConfigureRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Cadence code (`disabled`, `daily`, `weekly`).
+    pub cadence: String,
+    /// Local wall-clock `HH:MM` (required unless disabled).
+    pub time: Option<String>,
+    /// Removable USB destination directory (blank clears it).
+    pub usb_destination: Option<String>,
+}
+
+/// Scheduled-backup run outcome (TASK-BRK-092).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScheduledRunOutcomeDto {
+    /// Verified local snapshot metadata.
+    pub backup: BackupMetadataDto,
+    /// USB mirror outcome, or `None` when unset/failed.
+    pub usb: Option<UsbCopyOutcomeDto>,
 }
 
 /// Backup verification request (TASK-BRK-052).

@@ -2336,6 +2336,36 @@ pub trait FactoryResetRepository: Send + Sync {
     ) -> Result<baraka_domain::backup::FactoryResetOutcome, ApplicationError>;
 }
 
+/// Automatic-backup hardening edge (TASK-BRK-092): schedule persistence
+/// (`backup.*` keys in the `settings` table — zero schema changes) and the
+/// copy-verified USB mirror step. Backup capture/verify itself stays on
+/// `BackupRepository` (single pipeline, no fork).
+pub trait BackupHardeningPort: Send + Sync {
+    /// Load the stored cadence + wall-clock time (absent keys → disabled).
+    fn load_schedule(&self) -> Result<baraka_domain::backup::BackupSchedule, ApplicationError>;
+
+    /// Persist cadence + time (ADMIN-gated upstream; validated first).
+    fn save_schedule(
+        &self,
+        schedule: &baraka_domain::backup::BackupSchedule,
+    ) -> Result<(), ApplicationError>;
+
+    /// Removable destination directory, or `None` when unset/empty.
+    fn usb_destination(&self) -> Result<Option<std::path::PathBuf>, ApplicationError>;
+
+    /// Persist the removable destination directory (`None` clears it).
+    fn set_usb_destination(&self, path: Option<&std::path::Path>) -> Result<(), ApplicationError>;
+
+    /// Copy a verified local snapshot to `dest_dir` (copy, never move) and
+    /// re-verify by size + SHA-256. On mismatch the copy is removed and the
+    /// error carries a stable code; the local file is never touched.
+    fn copy_to_usb(
+        &self,
+        source: &std::path::Path,
+        dest_dir: &std::path::Path,
+    ) -> Result<baraka_domain::backup::UsbCopyOutcome, ApplicationError>;
+}
+
 /// Recorded supplier-payment outcome.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SupplierPaymentOutcome {

@@ -1,0 +1,41 @@
+{
+  "results": [
+    {
+      "name": "reset-danger-fr",
+      "ok": true,
+      "detail": "eligible newest-ok exec-disabled no-hscroll"
+    },
+    {
+      "name": "shot-reset-danger-fr",
+      "ok": true,
+      "detail": "reset-danger-fr-light.png"
+    },
+    {
+      "name": "reset-blocked-fr",
+      "ok": true,
+      "detail": "reasons-verbatim guidance-ok exec-disabled"
+    },
+    {
+      "name": "shot-reset-blocked-fr",
+      "ok": true,
+      "detail": "reset-blocked-fr-light.png"
+    },
+    {
+      "name": "reset-confirm-ar",
+      "ok": true,
+      "detail": "ar token-typed exec-enabled rtl no-hscroll"
+    },
+    {
+      "name": "shot-reset-confirm-ar",
+      "ok": true,
+      "detail": "reset-confirm-ar-light.png"
+    },
+    {
+      "name": "console-clean",
+      "ok": true,
+      "detail": "0 console errors"
+    }
+  ],
+  "consoleErrors": [],
+  "at": "2026-10-25T17:16:08.130Z"
+}

@@ -2763,3 +2763,87 @@ export async function restoreBackup(
     restartRequired: wire.restart_required,
   };
 }
+
+/** One backup row of the factory-reset precheck view. */
+export interface ResetBackupRef {
+  fileName: string;
+  createdAt: string;
+  status: string;
+}
+
+/** Read-only factory-reset precheck view (mirrors ResetPrecheckDto). */
+export interface FactoryResetPrecheck {
+  openSession: boolean;
+  backupDirWritable: boolean;
+  newestBackup: ResetBackupRef | null;
+  eligible: boolean;
+  reasons: string[];
+}
+
+/** Verified factory-reset outcome view (mirrors FactoryResetOutcomeDto). */
+export interface FactoryResetOutcome {
+  resetBackupFileName: string;
+  quarantinedTo: string;
+  resetAt: string;
+  restartRequired: boolean;
+}
+
+/**
+ * Read-only factory-reset gates (TASK-DSN-094). Admin-enforced server-side;
+ * rejects with the backend wire code verbatim (UNAUTHORIZED, …).
+ */
+export async function getFactoryResetPrecheck(
+  sessionToken: string,
+): Promise<FactoryResetPrecheck> {
+  interface ResetPrecheckWire {
+    open_session: boolean;
+    backup_dir_writable: boolean;
+    newest_backup: { file_name: string; created_at: string; status: string } | null;
+    eligible: boolean;
+    reasons: string[];
+  }
+  const wire = await call<ResetPrecheckWire>("factory_reset_precheck", {
+    request: { session_token: sessionToken },
+  });
+  return {
+    openSession: wire.open_session,
+    backupDirWritable: wire.backup_dir_writable,
+    newestBackup:
+      wire.newest_backup === null
+        ? null
+        : {
+            fileName: wire.newest_backup.file_name,
+            createdAt: wire.newest_backup.created_at,
+            status: wire.newest_backup.status,
+          },
+    eligible: wire.eligible,
+    reasons: wire.reasons,
+  };
+}
+
+/**
+ * Destructive factory reset (TASK-DSN-094). Admin-enforced server-side with
+ * validation before any write; rejects with the backend wire code verbatim
+ * (RESET_OPEN_SESSION, RESET_TOKEN_MISMATCH, RESET_BACKUP_UNWRITABLE,
+ * RESET_BACKUP_FAILED, RESET_SWAP_FAILED, …).
+ */
+export async function executeFactoryReset(
+  sessionToken: string,
+  typedToken: string,
+): Promise<FactoryResetOutcome> {
+  interface FactoryResetOutcomeWire {
+    reset_backup_file_name: string;
+    quarantined_to: string;
+    reset_at: string;
+    restart_required: boolean;
+  }
+  const wire = await call<FactoryResetOutcomeWire>("factory_reset_execute", {
+    request: { session_token: sessionToken, typed_token: typedToken },
+  });
+  return {
+    resetBackupFileName: wire.reset_backup_file_name,
+    quarantinedTo: wire.quarantined_to,
+    resetAt: wire.reset_at,
+    restartRequired: wire.restart_required,
+  };
+}

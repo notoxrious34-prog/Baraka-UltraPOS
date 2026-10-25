@@ -13,6 +13,7 @@ import { useSessionStore } from "@/stores/session-store";
 import type { Locale } from "@/types/pos";
 import { createBackup, listBackups, type BackupMetadata } from "@/lib/ipc";
 import { checksumPrefix, formatBytes, triggerBadgeClass } from "./settings-helpers";
+import { FactoryResetSection } from "./FactoryResetSection";
 
 interface BackupSettingsTabProps {
   locale: Locale;
@@ -179,6 +180,7 @@ export function BackupSettingsTab({
           </table>
         </div>
       )}
+      <FactoryResetSection locale={locale} sessionToken={sessionToken} />
     </div>
   );
 }

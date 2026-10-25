@@ -26,10 +26,10 @@ import { t, type I18nKey } from "@/lib/i18n";
 import { useSessionStore } from "@/stores/session-store";
 import type { Locale } from "@/types/pos";
 
-/** Human-readable byte count (`850 KB`, `2.45 MB`, …). */
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) {
-    return "…";
+/** Human-readable byte count (`850 KB`, `2.45 MB`, …; `None` wire → "—"). */
+export function formatBytes(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes) || bytes <= 0) {
+    return "—";
   }
   if (bytes < 1024) {
     return `${bytes} B`;

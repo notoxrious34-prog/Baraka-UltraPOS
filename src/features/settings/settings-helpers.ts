@@ -7,9 +7,14 @@
 export const BAUD_OPTIONS: readonly number[] = [9600, 19200, 38400, 57600, 115200];
 
 /** Human byte size: B, KB (1 decimal), or MB (1 decimal). */
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) {
-    return "0 B";
+/**
+ * Wire-enabling (BRK-094): the list wire carries `number | null`
+ * (`None` = legacy row). Unknown renders as an em dash — never 0.
+ * DSN-095 owns the final human-size pass (o/Ko/Mo).
+ */
+export function formatBytes(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes) || bytes <= 0) {
+    return "—";
   }
   if (bytes < 1024) {
     return `${bytes} B`;

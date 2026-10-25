@@ -2458,7 +2458,7 @@ export type BackupTriggerType = "MANUAL" | "SHIFT_CLOSE" | "SCHEDULED";
 export interface BackupMetadata {
   id: string;
   fileName: string;
-  fileSizeBytes: number;
+  fileSizeBytes: number | null;
   sha256Checksum: string;
   triggerType: string;
   status: string;

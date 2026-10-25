@@ -332,7 +332,7 @@ fn usb_copy_verified_and_local_snapshot_kept() {
     let outcome = h.hardening.copy_to_usb(source, &usb_dir).expect("usb copy");
     assert!(outcome.verified);
     assert_eq!(outcome.file_name, meta.file_name);
-    assert_eq!(outcome.file_size_bytes, meta.file_size_bytes);
+    assert_eq!(outcome.file_size_bytes, meta.file_size_bytes.expect("size"));
 
     // Copy, never move: the local snapshot is untouched and identical.
     assert!(source.exists());

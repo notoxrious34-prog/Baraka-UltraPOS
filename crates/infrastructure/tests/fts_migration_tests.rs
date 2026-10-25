@@ -143,23 +143,32 @@ fn fresh_apply_registers_v16_with_checksum() {
     assert_eq!(checksum, expected);
 }
 
-/// 0016 applies on an upgraded database (0001-0015 pre-applied raw).
+/// 0016+0017 apply on an upgraded database (0001-0015 pre-applied raw).
 #[test]
 fn upgrade_path_applies_only_v16() {
     let dir = tempfile::tempdir().expect("tempdir");
     let mut conn = open_connection(&dir.path().join("up.db")).expect("open");
     apply_pre16(&mut conn);
-    run_migrations(&mut conn).expect("upgrade to 16");
+    run_migrations(&mut conn).expect("upgrade to 17");
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| {
             row.get(0)
         })
         .expect("count");
-    assert_eq!(count, 16);
+    assert_eq!(count, 17);
     let fts_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM products_fts", [], |row| row.get(0))
         .expect("fts readable");
     assert_eq!(fts_count, 0);
+    let backup_cols: Vec<String> = conn
+        .prepare("PRAGMA table_info(backups_log)")
+        .expect("pragma")
+        .query_map([], |row| row.get(1))
+        .expect("query")
+        .collect::<Result<_, _>>()
+        .expect("cols");
+    assert!(backup_cols.contains(&"file_size_bytes".to_string()));
+    assert!(backup_cols.contains(&"trigger".to_string()));
 }
 
 /// Data preservation on a migrated COPY: counts equal, spot norms exact.

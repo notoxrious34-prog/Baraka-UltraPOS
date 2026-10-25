@@ -74,11 +74,12 @@ const ROW = {
 };
 
 describe("formatBytes", () => {
-  it("renders clean KB/MB units", () => {
-    expect(formatBytes(0)).toBe("0 B");
+  it("renders clean KB/MB units, unknown as em dash", () => {
+    expect(formatBytes(null)).toBe("—");
+    expect(formatBytes(0)).toBe("—");
     expect(formatBytes(850 * 1024)).toBe("850.0 KB");
     expect(formatBytes(2572288)).toBe("2.45 MB");
-    expect(formatBytes(Number.NaN)).toBe("…");
+    expect(formatBytes(Number.NaN)).toBe("—");
   });
 });
 

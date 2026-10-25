@@ -175,12 +175,13 @@ describe("backup bindings", () => {
     expect(BACKUP_SRC).toContain("settings.backupEmpty");
   });
 
-  it("formats byte sizes (B / KB / MB)", () => {
-    expect(formatBytes(0)).toBe("0 B");
+  it("formats byte sizes (B / KB / MB), unknown as em dash", () => {
+    expect(formatBytes(null)).toBe("—");
+    expect(formatBytes(0)).toBe("—");
     expect(formatBytes(512)).toBe("512 B");
     expect(formatBytes(2048)).toBe("2.0 KB");
     expect(formatBytes(5 * 1024 * 1024)).toBe("5.0 MB");
-    expect(formatBytes(-1)).toBe("0 B");
+    expect(formatBytes(-1)).toBe("—");
   });
 
   it("badges MANUAL blue and other triggers green", () => {

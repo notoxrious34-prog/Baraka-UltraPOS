@@ -2164,6 +2164,7 @@ fn to_backup_dto(meta: &baraka_domain::backup::BackupMetadata) -> BackupMetadata
             baraka_domain::backup::BackupTriggerType::Manual => "MANUAL",
             baraka_domain::backup::BackupTriggerType::ShiftClose => "SHIFT_CLOSE",
             baraka_domain::backup::BackupTriggerType::Scheduled => "SCHEDULED",
+            baraka_domain::backup::BackupTriggerType::Reset => "RESET",
         }
         .to_string(),
         status: match meta.status {
@@ -2193,6 +2194,7 @@ pub fn backups_create(
         None | Some("") | Some("MANUAL") => baraka_domain::backup::BackupTriggerType::Manual,
         Some("SHIFT_CLOSE") => baraka_domain::backup::BackupTriggerType::ShiftClose,
         Some("SCHEDULED") => baraka_domain::backup::BackupTriggerType::Scheduled,
+        Some("RESET") => baraka_domain::backup::BackupTriggerType::Reset,
         Some(_) => {
             return Err(error_code(&ApplicationError::Validation(
                 DomainError::InvalidCanonicalString("INVALID_TRIGGER_TYPE".to_string()),

@@ -157,8 +157,9 @@ impl BackupRepository for SqliteBackupManager {
             .execute(
                 "INSERT INTO backups_log
                  (id, backup_id, app_version, schema_version, created_at,
-                  source_device_id, database_hash, cipher_version, status)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                  source_device_id, database_hash, cipher_version, status,
+                  file_size_bytes, trigger)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 rusqlite::params![
                     entry.id,
                     entry.backup_id,
@@ -169,6 +170,8 @@ impl BackupRepository for SqliteBackupManager {
                     entry.database_hash,
                     entry.cipher_version,
                     entry.status,
+                    entry.file_size_bytes,
+                    entry.trigger,
                 ],
             )
             .map_err(|_| store_failure())?;
@@ -180,7 +183,8 @@ impl BackupRepository for SqliteBackupManager {
         guard
             .query_row(
                 "SELECT id, backup_id, app_version, schema_version, created_at,
-                        source_device_id, database_hash, cipher_version, status
+                        source_device_id, database_hash, cipher_version, status,
+                        file_size_bytes, trigger
                  FROM backups_log WHERE backup_id = ?1",
                 [backup_id],
                 |row| {
@@ -195,6 +199,10 @@ impl BackupRepository for SqliteBackupManager {
                         database_hash: row.get(6)?,
                         cipher_version: row.get(7)?,
                         status: row.get(8)?,
+                        file_size_bytes: row
+                            .get::<_, Option<i64>>(9)?
+                            .and_then(|size| u64::try_from(size).ok().filter(|size| *size > 0)),
+                        trigger: row.get::<_, Option<String>>(10)?.unwrap_or_default(),
                     })
                 },
             )
@@ -211,7 +219,8 @@ impl BackupRepository for SqliteBackupManager {
         let mut statement = guard
             .prepare(
                 "SELECT id, backup_id, app_version, schema_version, created_at,
-                        source_device_id, database_hash, cipher_version, status
+                        source_device_id, database_hash, cipher_version, status,
+                        file_size_bytes, trigger
                  FROM backups_log ORDER BY created_at DESC LIMIT ?1",
             )
             .map_err(|_| store_failure())?;
@@ -228,11 +237,30 @@ impl BackupRepository for SqliteBackupManager {
                     database_hash: row.get(6)?,
                     cipher_version: row.get(7)?,
                     status: row.get(8)?,
+                    file_size_bytes: row
+                        .get::<_, Option<i64>>(9)?
+                        .and_then(|size| u64::try_from(size).ok().filter(|size| *size > 0)),
+                    trigger: row.get::<_, Option<String>>(10)?.unwrap_or_default(),
                 })
             })
             .map_err(|_| store_failure())?;
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(|_| store_failure())
+    }
+
+    fn correct_file_size(
+        &self,
+        backup_id: &str,
+        file_size_bytes: u64,
+    ) -> Result<(), ApplicationError> {
+        let guard = self.lock()?;
+        guard
+            .execute(
+                "UPDATE backups_log SET file_size_bytes = ?1 WHERE backup_id = ?2",
+                rusqlite::params![file_size_bytes as i64, backup_id],
+            )
+            .map_err(|_| store_failure())?;
+        Ok(())
     }
 
     fn mark_status(&self, backup_id: &str, status: &str) -> Result<(), ApplicationError> {

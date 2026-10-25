@@ -2243,6 +2243,12 @@ pub struct BackupLogEntry {
     pub cipher_version: String,
     /// Lifecycle state (`SUCCESS`, `FAILED`, `CORRUPTED`, `PRUNED`).
     pub status: String,
+    /// Snapshot size in bytes (`None` = legacy row predating measurement;
+    /// the UI contract renders this as "—", never 0).
+    pub file_size_bytes: Option<u64>,
+    /// Stored trigger code (`manual|scheduled|cash_close|reset`; legacy
+    /// blanks default to `manual`).
+    pub trigger: String,
 }
 
 /// Backup persistence port (TASK-BRK-051, ADR-010).
@@ -2283,6 +2289,13 @@ pub trait BackupRepository: Send + Sync {
 
     /// Rewrite a row's lifecycle state.
     fn mark_status(&self, backup_id: &str, status: &str) -> Result<(), ApplicationError>;
+
+    /// Correct a row's stored size after a verify re-stat (drift repair).
+    fn correct_file_size(
+        &self,
+        backup_id: &str,
+        file_size_bytes: u64,
+    ) -> Result<(), ApplicationError>;
 
     /// Remove one snapshot file from disk (rotation support).
     fn delete_file(&self, path: &std::path::Path) -> Result<(), ApplicationError>;

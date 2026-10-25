@@ -91,6 +91,8 @@ where
                 database_hash: String::new(),
                 cipher_version: "NONE".to_string(),
                 status: "FAILED".to_string(),
+                file_size_bytes: None,
+                trigger: trigger.as_code().to_string(),
             })?;
             return Err(coded("BACKUP_VERIFICATION_FAILED"));
         }
@@ -107,13 +109,15 @@ where
             database_hash: sha256_checksum.clone(),
             cipher_version: "NONE".to_string(),
             status: "SUCCESS".to_string(),
+            file_size_bytes: Some(file_size_bytes),
+            trigger: trigger.as_code().to_string(),
         })?;
         self.enforce_retention(dest_dir, keep)?;
         Ok(BackupMetadata {
             id,
             file_name,
             file_path: dest.to_string_lossy().to_string(),
-            file_size_bytes,
+            file_size_bytes: Some(file_size_bytes),
             sha256_checksum,
             trigger_type: trigger,
             status: BackupStatus::Success,
@@ -172,9 +176,9 @@ where
                 id: Uuid::parse_str(&row.id).unwrap_or_else(|_| Uuid::nil()),
                 file_name: row.file_name.clone(),
                 file_path: dest_dir.join(&row.file_name).to_string_lossy().to_string(),
-                file_size_bytes: 0,
+                file_size_bytes: row.file_size_bytes,
                 sha256_checksum: row.database_hash.clone(),
-                trigger_type: BackupTriggerType::Manual,
+                trigger_type: BackupTriggerType::from_code(&row.trigger),
                 status: match row.status.as_str() {
                     "SUCCESS" => BackupStatus::Success,
                     "CORRUPTED" => BackupStatus::Corrupted,
@@ -236,13 +240,18 @@ where
             return Err(coded("BACKUP_CORRUPTED"));
         }
         let size = self.backups.file_size_of(&path)?;
+        // Verify re-stats and corrects drift: a row whose stored size no
+        // longer matches the file it points at is repaired in place.
+        if row.file_size_bytes != Some(size) {
+            self.backups.correct_file_size(&row.backup_id, size)?;
+        }
         Ok(BackupMetadata {
             id: Uuid::parse_str(&row.id).unwrap_or_else(|_| Uuid::nil()),
             file_name: row.file_name.clone(),
             file_path: path.to_string_lossy().to_string(),
-            file_size_bytes: size,
+            file_size_bytes: Some(size),
             sha256_checksum: actual,
-            trigger_type: BackupTriggerType::Manual,
+            trigger_type: BackupTriggerType::from_code(&row.trigger),
             status: BackupStatus::Success,
             schema_version: u32::try_from(row.schema_version).unwrap_or(u32::MAX),
             error_message: None,

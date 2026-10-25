@@ -17,6 +17,32 @@ pub enum BackupTriggerType {
     ShiftClose,
     /// Automatic capture on a timer.
     Scheduled,
+    /// Safety capture around factory reset.
+    Reset,
+}
+
+impl BackupTriggerType {
+    /// Stored log code (`manual|scheduled|cash_close|reset`, TASK-BRK-094).
+    #[must_use]
+    pub fn as_code(&self) -> &'static str {
+        match self {
+            BackupTriggerType::Manual => "manual",
+            BackupTriggerType::ShiftClose => "cash_close",
+            BackupTriggerType::Scheduled => "scheduled",
+            BackupTriggerType::Reset => "reset",
+        }
+    }
+
+    /// Parse a stored code; legacy blanks/unknowns default to `Manual`.
+    #[must_use]
+    pub fn from_code(code: &str) -> Self {
+        match code.trim() {
+            "scheduled" => BackupTriggerType::Scheduled,
+            "cash_close" => BackupTriggerType::ShiftClose,
+            "reset" => BackupTriggerType::Reset,
+            _ => BackupTriggerType::Manual,
+        }
+    }
 }
 
 /// Automatic-backup cadence (TASK-BRK-092).
@@ -153,8 +179,8 @@ pub struct BackupMetadata {
     pub file_name: String,
     /// Absolute snapshot path at creation time.
     pub file_path: String,
-    /// Snapshot size in bytes.
-    pub file_size_bytes: u64,
+    /// Snapshot size in bytes (`None` = legacy row predating measurement).
+    pub file_size_bytes: Option<u64>,
     /// SHA-256 hex over the exact snapshot bytes.
     pub sha256_checksum: String,
     /// What triggered the backup.

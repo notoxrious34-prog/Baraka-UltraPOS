@@ -1,4 +1,4 @@
-//! TASK-REL-054 drill: migration replay & data preservation 0001 -> 0016.
+//! TASK-REL-054 drill: migration replay & data preservation 0001 -> 0017.
 //!
 //! A merchant upgrading Baraka UltraPOS must never lose a centime, a stock
 //! unit, or a ledger entry. This suite proves the zero-data-loss invariant
@@ -9,9 +9,10 @@
 //!   admin user, categories, products, indebted customer, append-only
 //!   ledger entry, stock level, one finalized BL with item + payment) and
 //!   capture baseline aggregates.
-//! * Stage 2 — run the official [`run_migrations`] upgrade path to 0016
-//!   (0016 adds the FTS5 `products_fts` index with in-transaction backfill).
-//! * Stage 3 — assert byte-level parity: all 16 bookkeeping rows present
+//! * Stage 2 — run the official [`run_migrations`] upgrade path to 0017
+//!   (0016 adds the FTS5 `products_fts` index with in-transaction backfill;
+//!   0017 adds NULL-able `backups_log.file_size_bytes` + `trigger`).
+//! * Stage 3 — assert byte-level parity: all 17 bookkeeping rows present
 //!   with valid checksums, debt balance exactly 450,000 centimes, stock
 //!   untouched, documents/ledger untouched, 0014 nullability + 0015 tier
 //!   columns in their canonical shapes, plus FTS existence, consistency,
@@ -318,17 +319,17 @@ fn build_upgraded_db(name: &str) -> (ScratchDb, Baseline) {
 }
 
 fn assert_parity(conn: &Connection, baseline: &Baseline) {
-    // All 16 migrations recorded, checksums non-empty and byte-identical to
+    // All 17 migrations recorded, checksums non-empty and byte-identical to
     // the embedded SQL (a changed byte would abort the runner on real DBs).
     let (count, max_version): (i64, i64) = conn
         .query_row(
-            "SELECT COUNT(*), MAX(version) FROM schema_migrations WHERE version BETWEEN 1 AND 16",
+            "SELECT COUNT(*), MAX(version) FROM schema_migrations WHERE version BETWEEN 1 AND 17",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .expect("migration bookkeeping readable");
-    assert_eq!(count, 16, "all 16 migrations recorded");
-    assert_eq!(max_version, 16, "schema at version 16");
+    assert_eq!(count, 17, "all 17 migrations recorded");
+    assert_eq!(max_version, 17, "schema at version 17");
     for migration in MIGRATIONS.iter() {
         let recorded: String = conn
             .query_row(
@@ -554,11 +555,11 @@ fn downgrade_guard_probe_future_version_is_deterministic() {
     assert_eq!(future_name, "9999_future_schema.sql");
 
     // Data is byte-intact after the probe: full parity still holds
-    // (assert_parity scopes the bookkeeping check to versions 1..=16,
+    // (assert_parity scopes the bookkeeping check to versions 1..=17,
     // so the synthetic future row coexists without tripping it).
     assert_parity(&db.conn, &baseline);
 
-    // Re-running is idempotent: still Ok, still 17 rows (16 known + future).
+    // Re-running is idempotent: still Ok, still 18 rows (17 known + future).
     run_migrations(&mut db.conn).expect("second run after probe");
     let total: i64 = db
         .conn
@@ -566,5 +567,5 @@ fn downgrade_guard_probe_future_version_is_deterministic() {
             row.get(0)
         })
         .expect("total rows");
-    assert_eq!(total, 17, "16 known + 1 future row, no duplication");
+    assert_eq!(total, 18, "17 known + 1 future row, no duplication");
 }

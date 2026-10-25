@@ -261,7 +261,10 @@ fn live_backup_creates_verified_logged_snapshot() {
     assert_eq!(meta.status, baraka_domain::backup::BackupStatus::Success);
     assert!(meta.file_path.ends_with(&meta.file_name));
     assert!(meta.file_name.starts_with("baraka_pos_backup_"));
-    assert!(meta.file_size_bytes > 0);
+    assert_eq!(
+        meta.file_size_bytes,
+        Some(std::fs::metadata(&meta.file_path).expect("stat").len())
+    );
     assert_eq!(meta.sha256_checksum.len(), 64);
     assert!(meta.error_message.is_none());
     assert_eq!(
@@ -421,4 +424,137 @@ fn foreign_key_violations_mark_backup_corrupted() {
         .expect("get")
         .expect("row");
     assert_eq!(row.status, "CORRUPTED");
+}
+
+/// TASK-BRK-094: every capture path records its true size + trigger.
+#[test]
+fn create_records_real_size_and_trigger_per_path() {
+    use baraka_domain::backup::BackupTriggerType;
+    let harness = setup();
+    let dir = backup_dir(&harness);
+    let cases = [
+        (BackupTriggerType::Manual, "manual"),
+        (BackupTriggerType::ShiftClose, "cash_close"),
+        (BackupTriggerType::Scheduled, "scheduled"),
+        (BackupTriggerType::Reset, "reset"),
+    ];
+    for (trigger, code) in cases {
+        let meta = CreateBackupUseCase::new(&harness.backups)
+            .execute(
+                &session_with(Role::Gerant),
+                trigger,
+                &dir,
+                30,
+                TEST_TERMINAL,
+                APP_VERSION,
+            )
+            .expect("backup");
+        let actual = std::fs::metadata(&meta.file_path).expect("stat").len();
+        assert_eq!(meta.file_size_bytes, Some(actual));
+        let row = harness
+            .backups
+            .get_backup(&meta.file_name)
+            .expect("get")
+            .expect("row");
+        assert_eq!(row.file_size_bytes, Some(actual));
+        assert_eq!(row.trigger, code);
+        let listed = ListBackupsUseCase::new(&harness.backups)
+            .execute(&session_with(Role::Gerant), &dir, 10)
+            .expect("list");
+        let found = listed
+            .iter()
+            .find(|item| item.file_name == meta.file_name)
+            .expect("listed");
+        assert_eq!(found.file_size_bytes, Some(actual));
+        assert_eq!(found.trigger_type, trigger);
+    }
+}
+
+/// Legacy rows (NULL size/trigger) surface as unknown, defaulting to manual.
+/// UI contract: `None` renders as "—", never 0.
+#[test]
+fn legacy_null_row_surfaces_unknown_size_and_manual_trigger() {
+    let harness = setup();
+    harness
+        .db
+        .lock()
+        .expect("lock")
+        .execute(
+            "INSERT INTO backups_log
+             (id, backup_id, app_version, schema_version, created_at,
+              source_device_id, database_hash, cipher_version, status,
+              file_size_bytes, trigger)
+             VALUES ('00000000-0000-7000-8000-000000000099',
+                     'baraka_pos_backup_legacy.db', '1.0.0', 16,
+                     '2026-01-01T00:00:00.000Z', 'OLD-TERM',
+                     'abc123', 'NONE', 'SUCCESS', NULL, NULL)",
+            [],
+        )
+        .expect("legacy row");
+    let row = harness
+        .backups
+        .get_backup("baraka_pos_backup_legacy.db")
+        .expect("get")
+        .expect("row");
+    assert_eq!(row.file_size_bytes, None);
+    let listed = ListBackupsUseCase::new(&harness.backups)
+        .execute(&session_with(Role::Gerant), &backup_dir(&harness), 10)
+        .expect("list");
+    let found = listed
+        .iter()
+        .find(|item| item.file_name == "baraka_pos_backup_legacy.db")
+        .expect("listed");
+    assert_eq!(found.file_size_bytes, None);
+    assert_eq!(
+        found.trigger_type,
+        baraka_domain::backup::BackupTriggerType::Manual
+    );
+}
+
+/// Verify re-stats and repairs a drifted stored size.
+#[test]
+fn verify_corrects_drifted_stored_size() {
+    let harness = setup();
+    let meta = create(&harness, 30);
+    let actual = std::fs::metadata(&meta.file_path).expect("stat").len();
+    harness
+        .backups
+        .correct_file_size(&meta.file_name, actual + 12_345)
+        .expect("drift");
+    let drifted = harness
+        .backups
+        .get_backup(&meta.file_name)
+        .expect("get")
+        .expect("row");
+    assert_eq!(drifted.file_size_bytes, Some(actual + 12_345));
+    VerifyBackupIntegrityUseCase::new(&harness.backups)
+        .execute(
+            &session_with(Role::Gerant),
+            &backup_dir(&harness),
+            &meta.file_name,
+        )
+        .expect("verify");
+    let repaired = harness
+        .backups
+        .get_backup(&meta.file_name)
+        .expect("get")
+        .expect("row");
+    assert_eq!(repaired.file_size_bytes, Some(actual));
+}
+
+/// Migration 0017 replay: fresh databases gain both columns.
+#[test]
+fn migration_0017_adds_size_and_trigger_columns() {
+    let harness = setup();
+    let guard = harness.db.lock().expect("lock");
+    let mut names: Vec<String> = guard
+        .prepare("PRAGMA table_info(backups_log)")
+        .expect("pragma")
+        .query_map([], |row| row.get::<_, String>(1))
+        .expect("query")
+        .collect::<Result<_, _>>()
+        .expect("names");
+    names.sort();
+    assert!(names.contains(&"file_size_bytes".to_string()));
+    assert!(names.contains(&"trigger".to_string()));
 }

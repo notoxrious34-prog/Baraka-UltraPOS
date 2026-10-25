@@ -2191,8 +2191,8 @@ pub struct BackupMetadataDto {
     pub id: String,
     /// Snapshot file name.
     pub file_name: String,
-    /// Snapshot size in bytes.
-    pub file_size_bytes: u64,
+    /// Snapshot size in bytes (`None` = legacy row; UI shows "—").
+    pub file_size_bytes: Option<u64>,
     /// SHA-256 hex over the exact snapshot bytes.
     pub sha256_checksum: String,
     /// Trigger code (`MANUAL`, `SHIFT_CLOSE`, `SCHEDULED`).

@@ -413,7 +413,7 @@ fn precheck_returns_eligible_report_for_healthy_backup() {
     let report = precheck(&harness, &meta.file_name).expect("precheck");
     assert_eq!(report.backup_id, meta.file_name);
     assert_eq!(report.file_name, meta.file_name);
-    assert_eq!(report.file_size_bytes, meta.file_size_bytes);
+    assert_eq!(report.file_size_bytes, meta.file_size_bytes.expect("size"));
     assert!(report.checks.file_exists);
     assert!(report.checks.sha256_matches);
     assert!(report.checks.integrity_ok);
@@ -771,6 +771,15 @@ fn restore_older_schema_backup_is_migrated() {
                 .expect("drop v16 norm column fr");
             conn.execute("ALTER TABLE products DROP COLUMN search_norm_ar;", [])
                 .expect("drop v16 norm column ar");
+        }
+        if app_version >= 17 {
+            // Genuine v16 backups predate migration 0017, so its two
+            // NULL-able `backups_log` columns must go, or replaying the
+            // ADD COLUMN migration fails with "duplicate column name".
+            conn.execute("ALTER TABLE backups_log DROP COLUMN file_size_bytes;", [])
+                .expect("drop v17 size column");
+            conn.execute("ALTER TABLE backups_log DROP COLUMN trigger;", [])
+                .expect("drop v17 trigger column");
         }
     }
     repoint_logged_hash(

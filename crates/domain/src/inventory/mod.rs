@@ -10,4 +10,4 @@ pub use kit_expansion::{
 };
 pub use movement::{ReferenceType, StockMovement, StockMovementType};
 pub use stock_level::{apply_delta, StockLevel};
-pub use warehouse::{Warehouse, WarehouseCode, WarehouseId};
+pub use warehouse::{Warehouse, WarehouseCode, WarehouseId, WarehouseStockPresence};

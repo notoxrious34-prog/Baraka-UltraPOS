@@ -245,6 +245,7 @@ pub fn run() {
             baraka_commands::ipc::warehouses_list,
             baraka_commands::ipc::warehouses_update,
             baraka_commands::ipc::warehouses_delete,
+            baraka_commands::ipc::warehouses_stock_presence,
             baraka_commands::ipc::stock_get,
             baraka_commands::ipc::stock_adjust,
             baraka_commands::ipc::stock_transfer,

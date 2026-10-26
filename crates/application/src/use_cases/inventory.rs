@@ -1,11 +1,15 @@
 //! Inventory use cases: warehouses, adjustments, transfers, reads.
 //!
 //! Every mutating command verifies the session permission BEFORE any
-//! database transaction opens. Reads require an authenticated session only
-//! (enforced at the IPC boundary); no role check happens here.
+//! database transaction opens. Plain list reads require an authenticated
+//! session only (enforced at the IPC boundary); the stock-presence read is
+//! the exception — it shares the deletion path's `ManageWarehouses` gate
+//! because it exists solely to drive the delete pre-check.
 
 use baraka_domain::errors::DomainError;
-use baraka_domain::inventory::{StockMovementType, Warehouse, WarehouseCode, WarehouseId};
+use baraka_domain::inventory::{
+    StockMovementType, Warehouse, WarehouseCode, WarehouseId, WarehouseStockPresence,
+};
 use baraka_domain::role::Permission;
 use uuid::Uuid;
 
@@ -147,6 +151,39 @@ where
     /// Return active warehouses ordered by code.
     pub fn execute(&self, _session: &SessionContext) -> Result<Vec<Warehouse>, ApplicationError> {
         self.warehouses.list_active()
+    }
+}
+
+/// Depot stock-presence read (BRK-095): non-zero level counts for every
+/// active depot in one GROUP BY query. Same gate as the depot deletion
+/// read path (`ManageWarehouses`, mirroring `DeleteWarehouseUseCase`);
+/// performs zero writes. DEP-01 is reported truthfully — the lock badge
+/// stays a UI decision, never this use case's.
+pub struct WarehouseStockPresenceUseCase<'a, W>
+where
+    W: ?Sized,
+{
+    warehouses: &'a W,
+}
+
+impl<'a, W> WarehouseStockPresenceUseCase<'a, W>
+where
+    W: WarehouseRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(warehouses: &'a W) -> Self {
+        Self { warehouses }
+    }
+
+    /// Non-zero level counts, code-ordered, zero-count depots included.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+    ) -> Result<Vec<WarehouseStockPresence>, ApplicationError> {
+        if !session.role.has_permission(Permission::ManageWarehouses) {
+            return Err(ApplicationError::Unauthorized);
+        }
+        self.warehouses.active_nonzero_level_counts()
     }
 }
 

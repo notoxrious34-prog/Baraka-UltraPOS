@@ -457,6 +457,22 @@ pub struct ListWarehousesResponseDto {
     pub warehouses: Vec<WarehouseDto>,
 }
 
+/// Depot stock-presence row (BRK-095): non-zero level count for one depot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WarehouseStockPresenceDto {
+    /// Warehouse id (UUID string).
+    pub warehouse_id: String,
+    /// Level rows with non-zero quantity in this depot.
+    pub nonzero_levels: u64,
+}
+
+/// Depot stock-presence response: one row per active depot, code-ordered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WarehouseStockPresenceResponseDto {
+    /// Presence rows (zero-count depots included; UI derives `stocked`).
+    pub presence: Vec<WarehouseStockPresenceDto>,
+}
+
 /// Stock level read request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GetStockLevelRequestDto {

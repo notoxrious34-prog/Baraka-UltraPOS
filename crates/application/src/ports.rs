@@ -9,7 +9,7 @@ use baraka_domain::catalog::{
     Barcode, Category, CategoryId, KitItem, Product, ProductId, ProductUnit, Sku, UnitId,
 };
 use baraka_domain::inventory::{
-    ReferenceType, StockMovementType, Warehouse, WarehouseCode, WarehouseId,
+    ReferenceType, StockMovementType, Warehouse, WarehouseCode, WarehouseId, WarehouseStockPresence,
 };
 use baraka_domain::primitives::FactorMicro;
 use baraka_domain::role::Role;
@@ -364,6 +364,11 @@ pub trait WarehouseRepository: Send + Sync {
 
     /// Count stock level rows holding non-zero quantity in the warehouse.
     fn count_warehouse_nonzero_levels(&self, id: WarehouseId) -> Result<u64, ApplicationError>;
+
+    /// One-shot read: non-zero level counts for every active depot
+    /// (code-ordered, zero-count depots included). Single GROUP BY query —
+    /// the pre-delete pre-check path; performs zero writes.
+    fn active_nonzero_level_counts(&self) -> Result<Vec<WarehouseStockPresence>, ApplicationError>;
 
     /// Permanently purge an unreferenced, empty warehouse (audited in-tx).
     fn hard_delete_warehouse(

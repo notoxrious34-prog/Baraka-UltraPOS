@@ -4,7 +4,9 @@ use std::sync::{Arc, Mutex};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{SessionContext, SessionToken, WarehouseRepository};
-use baraka_application::use_cases::inventory::{CreateWarehouseUseCase, ListWarehousesUseCase};
+use baraka_application::use_cases::inventory::{
+    CreateWarehouseUseCase, ListWarehousesUseCase, WarehouseStockPresenceUseCase,
+};
 use baraka_domain::role::Role;
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::SqliteWarehouseRepository;
@@ -148,4 +150,119 @@ fn created_warehouse_persists_terminal_origin_device_id() {
         )
         .expect("origin");
     assert_eq!(stored, terminal);
+}
+
+/// Seed one product row (FK target for `stock_levels` inserts).
+fn seed_product(conn: &rusqlite::Connection, sku: &str) -> String {
+    let id = uuid::Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO products (id, sku, name_ar, name_fr, created_at, updated_at, origin_device_id) \
+         VALUES (?1, ?2, 'صنف', 'Article', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', 'TEST')",
+        rusqlite::params![id, sku],
+    )
+    .expect("seed product");
+    id
+}
+
+/// Snapshot mutable-table row counts (zero-write proof baseline).
+fn row_counts(conn: &rusqlite::Connection) -> Vec<(String, i64)> {
+    ["warehouses", "stock_levels", "stock_movements", "audit_log"]
+        .iter()
+        .map(|table| {
+            let count: i64 = conn
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .expect("count");
+            (table.to_string(), count)
+        })
+        .collect()
+}
+
+#[test]
+fn presence_empty_depot_reports_zero() {
+    let harness = setup();
+    let admin = session_with(Role::Admin);
+    CreateWarehouseUseCase::new(&harness.repo)
+        .execute(&admin, "MAIN", "Principal", TEST_TERMINAL)
+        .expect("create");
+    let presence = WarehouseStockPresenceUseCase::new(&harness.repo)
+        .execute(&admin)
+        .expect("presence");
+    // DEP-01 (seeded) + MAIN, code-ordered, both untouched by stock.
+    assert_eq!(presence.len(), 2);
+    assert!(presence.iter().all(|row| row.nonzero_levels == 0));
+}
+
+#[test]
+fn presence_stocked_depot_reports_counts_code_ordered() {
+    let harness = setup();
+    let admin = session_with(Role::Admin);
+    let create = CreateWarehouseUseCase::new(&harness.repo);
+    let main = create
+        .execute(&admin, "MAIN", "Principal", TEST_TERMINAL)
+        .expect("main");
+    let east = create
+        .execute(&admin, "EAST", "Est", TEST_TERMINAL)
+        .expect("east");
+    let db = open_connection(&harness._dir.path().join("wh.db")).expect("reopen");
+    let sku_a = seed_product(&db, "SKU-A");
+    let sku_b = seed_product(&db, "SKU-B");
+    // Two non-zero rows in MAIN, one zero-quantity row in EAST (must not count).
+    for (warehouse, product, qty) in [
+        (main.to_string(), sku_a.clone(), 5_000),
+        (main.to_string(), sku_b.clone(), 2_000),
+        (east.to_string(), sku_a.clone(), 0),
+    ] {
+        db.execute(
+            "INSERT INTO stock_levels (warehouse_id, product_id, quantity_base_micro) VALUES (?1, ?2, ?3)",
+            rusqlite::params![warehouse, product, qty],
+        )
+        .expect("seed level");
+    }
+    let presence = WarehouseStockPresenceUseCase::new(&harness.repo)
+        .execute(&admin)
+        .expect("presence");
+    // DEP-01, EAST, MAIN — code order, DEP-01 truthfully empty here.
+    let codes: Vec<u64> = presence.iter().map(|row| row.nonzero_levels).collect();
+    assert_eq!(codes, vec![0, 0, 2]);
+}
+
+#[test]
+fn presence_reports_dep01_stock_and_writes_nothing() {
+    let harness = setup();
+    let admin = session_with(Role::Admin);
+    let db = open_connection(&harness._dir.path().join("wh.db")).expect("reopen");
+    let dep01: String = db
+        .query_row(
+            "SELECT id FROM warehouses WHERE code = 'DEP-01'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("dep01");
+    let sku = seed_product(&db, "SKU-DEP");
+    db.execute(
+        "INSERT INTO stock_levels (warehouse_id, product_id, quantity_base_micro) VALUES (?1, ?2, 100)",
+        rusqlite::params![dep01, sku],
+    )
+    .expect("seed level");
+    let before = row_counts(&db);
+    let presence = WarehouseStockPresenceUseCase::new(&harness.repo)
+        .execute(&admin)
+        .expect("presence");
+    // The wire does not hide DEP-01: the lock badge stays a UI decision.
+    let dep = presence.first().expect("dep01 row");
+    assert_eq!(dep.nonzero_levels, 1);
+    let after = row_counts(&open_connection(&harness._dir.path().join("wh.db")).expect("reopen"));
+    assert_eq!(before, after, "presence read must not write");
+}
+
+#[test]
+fn presence_rejects_vendeur_like_deletion_path() {
+    let harness = setup();
+    let vendeur = session_with(Role::Vendeur);
+    assert!(matches!(
+        WarehouseStockPresenceUseCase::new(&harness.repo).execute(&vendeur),
+        Err(ApplicationError::Unauthorized)
+    ));
 }

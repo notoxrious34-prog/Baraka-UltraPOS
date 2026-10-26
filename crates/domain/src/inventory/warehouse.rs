@@ -86,6 +86,18 @@ impl Warehouse {
     }
 }
 
+/// Read-only stock-presence snapshot for one active depot: how many
+/// level rows hold a non-zero quantity. The UI derives `stocked` as
+/// `nonzero_levels > 0`; DEP-01 is reported truthfully (the lock badge
+/// stays a UI decision, never this wire's).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WarehouseStockPresence {
+    /// Stable depot identifier.
+    pub warehouse_id: WarehouseId,
+    /// Level rows with `quantity_base_micro != 0` in this depot.
+    pub nonzero_levels: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -51,6 +51,7 @@ use baraka_application::use_cases::factory_reset::{
 use baraka_application::use_cases::inventory::{
     AdjustStockInput, AdjustStockUseCase, CreateWarehouseUseCase, GetStockLevelUseCase,
     ListWarehousesUseCase, StockDirection, TransferStockInput, TransferStockUseCase,
+    WarehouseStockPresenceUseCase,
 };
 use baraka_application::use_cases::printing::{GetPrintStatusUseCase, ReprintDocumentUseCase};
 use baraka_application::use_cases::printing::{
@@ -144,7 +145,7 @@ use crate::dto::{
     UpdateProductUnitDto, UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto,
     UpdateUserRequestDto, UpdateWarehouseRequestDto, UsbCopyOutcomeDto, UserActivityRequestDto,
     UserActivityRowDto, UserSummaryDto, VerifyBackupRequestDto, VerifyBackupResponseDto,
-    WarehouseDto,
+    WarehouseDto, WarehouseStockPresenceDto, WarehouseStockPresenceResponseDto,
 };
 
 /// Shared backend handles for command handlers.
@@ -1274,6 +1275,30 @@ pub fn warehouses_delete(
         id: outcome.id,
         mode: outcome.mode.to_string(),
         message: outcome.message.to_string(),
+    })
+}
+
+/// `warehouses_stock_presence` command (BRK-095): read-only non-zero
+/// level counts for every active depot, code-ordered. Same
+/// `ManageWarehouses` gate as the depot deletion path (enforced in the
+/// use case); performs zero writes. The delete pre-check wire.
+#[tauri::command(rename_all = "snake_case")]
+pub fn warehouses_stock_presence(
+    state: tauri::State<'_, AppState>,
+    session_token: String,
+) -> Result<WarehouseStockPresenceResponseDto, String> {
+    let session = require_session(&state, &session_token)?;
+    let presence = WarehouseStockPresenceUseCase::new(state.warehouses.as_ref())
+        .execute(&session)
+        .map_err(|error| error_code(&error))?;
+    Ok(WarehouseStockPresenceResponseDto {
+        presence: presence
+            .into_iter()
+            .map(|row| WarehouseStockPresenceDto {
+                warehouse_id: row.warehouse_id.to_string(),
+                nonzero_levels: row.nonzero_levels,
+            })
+            .collect(),
     })
 }
 

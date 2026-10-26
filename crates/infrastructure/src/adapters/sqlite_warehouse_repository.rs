@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{DeleteAudit, WarehouseRepository};
-use baraka_domain::inventory::{Warehouse, WarehouseCode, WarehouseId};
+use baraka_domain::inventory::{Warehouse, WarehouseCode, WarehouseId, WarehouseStockPresence};
 use rusqlite::Connection;
 use uuid::Uuid;
 
@@ -202,6 +202,43 @@ impl WarehouseRepository for SqliteWarehouseRepository {
             )
             .map_err(|_| store_failure())?;
         Ok(count.max(0) as u64)
+    }
+
+    fn active_nonzero_level_counts(&self) -> Result<Vec<WarehouseStockPresence>, ApplicationError> {
+        let guard = self.lock()?;
+        let mut statement = guard
+            .prepare(
+                "SELECT w.id, COUNT(s.warehouse_id) \
+                 FROM warehouses w \
+                 LEFT JOIN stock_levels s \
+                   ON s.warehouse_id = w.id AND s.quantity_base_micro != 0 \
+                 WHERE w.is_active = 1 \
+                 GROUP BY w.id \
+                 ORDER BY w.code",
+            )
+            .map_err(|_| store_failure())?;
+        let presence = statement
+            .query_map([], |row| {
+                let id_text: String = row.get(0)?;
+                let count: i64 = row.get(1)?;
+                Ok((id_text, count))
+            })
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?;
+        presence
+            .into_iter()
+            .map(|(id_text, count)| {
+                let warehouse_id = Uuid::parse_str(&id_text)
+                    .map(WarehouseId::from)
+                    .map_err(|_| corrupt())
+                    .map_err(|_| store_failure())?;
+                Ok(WarehouseStockPresence {
+                    warehouse_id,
+                    nonzero_levels: count.max(0) as u64,
+                })
+            })
+            .collect()
     }
 
     fn hard_delete_warehouse(

@@ -506,6 +506,33 @@ export async function ipcDeleteWarehouse(
   });
 }
 
+/** Depot stock-presence row: non-zero level count for one depot. */
+export interface WarehouseStockPresence {
+  warehouseId: string;
+  nonzeroLevels: number;
+}
+
+/**
+ * Read-only stock presence for every active depot (BRK-095): one row per
+ * depot, code-ordered, zero-count depots included. Same ManageWarehouses
+ * gate as the depot deletion path; performs zero writes. The delete
+ * pre-check wire — the UI derives `stocked` as `nonzeroLevels > 0`.
+ */
+export async function ipcWarehouseStockPresence(
+  sessionToken: string,
+): Promise<WarehouseStockPresence[]> {
+  interface PresenceWire {
+    presence: Array<{ warehouse_id: string; nonzero_levels: number }>;
+  }
+  const wire = await call<PresenceWire>("warehouses_stock_presence", {
+    session_token: sessionToken,
+  });
+  return wire.presence.map((row) => ({
+    warehouseId: row.warehouse_id,
+    nonzeroLevels: row.nonzero_levels,
+  }));
+}
+
 /** Managed operator view (mirrors UserSummaryDto; never carries hashes). */
 export interface UserInfo {
   id: string;

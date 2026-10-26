@@ -15,6 +15,7 @@ import {
   ipcDeleteWarehouse,
   ipcSearchCatalog,
   ipcUpdateWarehouse,
+  ipcWarehouseStockPresence,
   listWarehouses,
   transferStock,
   type WarehouseItem,
@@ -65,6 +66,9 @@ interface WarehouseTransferStoreState {
   activeTab: WarehouseTransferTab;
   warehouses: WarehouseItem[];
   isLoadingWarehouses: boolean;
+  /** Non-zero level counts by depot id (BRK-095 presence wire). */
+  stockPresence: Record<string, number>;
+  isLoadingPresence: boolean;
   sourceWarehouseId: string | null;
   destinationWarehouseId: string | null;
   transferItems: TransferLineItem[];
@@ -78,6 +82,8 @@ interface WarehouseTransferStoreState {
   closeModal: () => void;
   setActiveTab: (tab: WarehouseTransferTab) => void;
   loadWarehouses: () => Promise<void>;
+  /** Read-only presence snapshot for the delete pre-check (zero writes). */
+  loadStockPresence: () => Promise<void>;
   setSourceWarehouse: (id: string) => void;
   setDestinationWarehouse: (id: string) => void;
   addTransferItem: (
@@ -107,6 +113,8 @@ const initialState = {
   activeTab: "transfer" as WarehouseTransferTab,
   warehouses: [] as WarehouseItem[],
   isLoadingWarehouses: false,
+  stockPresence: {} as Record<string, number>,
+  isLoadingPresence: false,
   sourceWarehouseId: null as string | null,
   destinationWarehouseId: null as string | null,
   transferItems: [] as TransferLineItem[],
@@ -171,6 +179,29 @@ export const useWarehouseTransferStore = create<WarehouseTransferStoreState>()(
         });
       } finally {
         set({ isLoadingWarehouses: false });
+      }
+    },
+
+    loadStockPresence: async () => {
+      const token = useSessionStore.getState().getSessionToken();
+      if (token === null) {
+        return;
+      }
+      set({ isLoadingPresence: true });
+      try {
+        const rows = await ipcWarehouseStockPresence(token);
+        const stockPresence: Record<string, number> = {};
+        for (const row of rows) {
+          stockPresence[row.warehouseId] = row.nonzeroLevels;
+        }
+        set({ stockPresence });
+      } catch {
+        // Fail-open to the pre-existing behavior: buttons stay enabled and
+        // the engine rejection remains the backstop. Never surface a
+        // read-path failure as a red banner on the manage tab.
+        set({ stockPresence: {} });
+      } finally {
+        set({ isLoadingPresence: false });
       }
     },
 

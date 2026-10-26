@@ -58,6 +58,16 @@ function ManageDepotsTab({ canManage }: { canManage: boolean }): ReactElement {
     setDrafts(seeded);
   }, [s.warehouses]);
 
+  // Pre-delete presence snapshot (BRK-095, read-only): stocked depots get
+  // a disabled delete button + guidance; the engine rejection stays the
+  // race backstop. DEP-01 never reaches a delete button (locked above).
+  useEffect(() => {
+    if (canManage) {
+      void s.loadStockPresence();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManage]);
+
   if (!canManage) {
     return (
       <p className="rounded-md bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
@@ -104,6 +114,8 @@ function ManageDepotsTab({ canManage }: { canManage: boolean }): ReactElement {
         {s.warehouses.map((warehouse) => {
           const locked = warehouse.code === PRINCIPAL_DEPOT_CODE;
           const draft = draftOf(warehouse);
+          // Pre-blocked before any IPC: stocked depots cannot reach confirm.
+          const stocked = (s.stockPresence[warehouse.id] ?? 0) > 0;
           return (
             <div
               key={warehouse.id}
@@ -178,17 +190,22 @@ function ManageDepotsTab({ canManage }: { canManage: boolean }): ReactElement {
                   </button>
                   <button
                     type="button"
-                    disabled={s.isSubmitting}
+                    disabled={s.isSubmitting || stocked}
                     onClick={() => {
                       setDeleting(warehouse);
                     }}
                     aria-label={`${t(locale, "del.delete")} — ${warehouse.code}`}
-                    title={t(locale, "del.delete")}
+                    title={stocked ? undefined : t(locale, "del.delete")}
                     className="h-9 shrink-0 rounded-md bg-red-50 px-3 text-xs font-black text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50"
                   >
                     {t(locale, "del.delete")}
                   </button>
                 </>
+              )}
+              {stocked && !locked && (
+                <p className="w-full rounded-md bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                  {t(locale, "wh.stockedGuidance").replace("{name}", warehouse.name)}
+                </p>
               )}
             </div>
           );

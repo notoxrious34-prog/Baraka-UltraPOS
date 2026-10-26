@@ -1,0 +1,74 @@
+{
+  "results": [
+    {
+      "name": "login lands in shell",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "fr manage tab renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "fr dep01 locked, no delete offered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "fr stocked depot pre-blocked + guidance",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "fr stocked guidance names the depot",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "fr empty depot delete enabled",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "fr no confirm opened for stocked depot",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "shot depot-blocked-fr-light.png written",
+      "ok": true,
+      "detail": "retry"
+    },
+    {
+      "name": "ar manage tab renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ar stocked depot pre-blocked + guidance",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ar guidance names the depot + action",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ar rtl shell",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "shot depot-blocked-ar-light.png written",
+      "ok": true,
+      "detail": "retry"
+    },
+    {
+      "name": "zero console errors",
+      "ok": true,
+      "detail": "[]"
+    }
+  ]
+}

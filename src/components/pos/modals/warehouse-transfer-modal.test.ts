@@ -267,3 +267,60 @@ describe("warehouse transfer store", () => {
     }
   });
 });
+
+describe("depot delete pre-check (DSN-096-R presence wire)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    primeSession();
+  });
+
+  it("maps the presence wire into a per-depot count record", async () => {
+    invokeMock.mockResolvedValueOnce({
+      presence: [
+        { warehouse_id: "w1", nonzero_levels: 0 },
+        { warehouse_id: "w2", nonzero_levels: 3 },
+      ],
+    });
+    await useWarehouseTransferStore.getState().loadStockPresence();
+    expect(invokeMock).toHaveBeenCalledWith("warehouses_stock_presence", {
+      session_token: "tok-wh-9",
+    });
+    expect(useWarehouseTransferStore.getState().stockPresence).toEqual({ w1: 0, w2: 3 });
+    expect(useWarehouseTransferStore.getState().isLoadingPresence).toBe(false);
+  });
+
+  it("fails open on presence read errors (engine stays the backstop)", async () => {
+    invokeMock.mockRejectedValueOnce("INTERNAL_ERROR");
+    await useWarehouseTransferStore.getState().loadStockPresence();
+    expect(useWarehouseTransferStore.getState().stockPresence).toEqual({});
+    expect(useWarehouseTransferStore.getState().errorMessage ?? "").not.toContain("INTERNAL");
+  });
+
+  it("pre-blocks stocked depots before any IPC (source pins)", () => {
+    expect(MODAL_SRC).toContain("(s.stockPresence[warehouse.id] ?? 0) > 0");
+    expect(MODAL_SRC).toContain("disabled={s.isSubmitting || stocked}");
+    expect(MODAL_SRC).toContain('t(locale, "wh.stockedGuidance").replace("{name}"');
+    expect(MODAL_SRC).toContain("void s.loadStockPresence()");
+    // Locked DEP-01 keeps its badge-only look: no guidance line there.
+    expect(MODAL_SRC).toContain("{stocked && !locked && (");
+  });
+
+  it("keeps the DEP-01 lock and the confirm-path backstop untouched", () => {
+    expect(MODAL_SRC).toContain("warehouse.code === PRINCIPAL_DEPOT_CODE");
+    expect(MODAL_SRC).toContain("isBlocked={deleting.code === PRINCIPAL_DEPOT_CODE}");
+    expect(MODAL_SRC).toContain("s.submitDeleteWarehouse(deleting.id, reason)");
+    // Engine rejection stays the race backstop: the error line renders the
+    // translated backend code (i18n carries WAREHOUSE_HAS_STOCK).
+    expect(MODAL_SRC).toContain("translateBackendError(s.errorMessage, locale)");
+    const i18n = readSrc("src", "lib", "i18n.ts");
+    expect(i18n).toContain("WAREHOUSE_HAS_STOCK");
+  });
+
+  it("carries the stocked guidance in FR + AR", () => {
+    const i18n = readSrc("src", "lib", "i18n.ts");
+    const hits = i18n.match(/"wh\.stockedGuidance"/g) ?? [];
+    expect(hits).toHaveLength(2);
+    expect(i18n).toContain("transférez-le vers un autre dépôt");
+    expect(i18n).toContain("انقل المخزون إلى مستودع آخر");
+  });
+});

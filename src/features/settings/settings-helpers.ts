@@ -4,25 +4,59 @@
  * at call sites.
  */
 
+import type { Locale } from "@/types/pos";
+
 export const BAUD_OPTIONS: readonly number[] = [9600, 19200, 38400, 57600, 115200];
 
-/** Human byte size: B, KB (1 decimal), or MB (1 decimal). */
+/** Canonical BCP 47 tag for a POS locale (both are DZ-rooted). */
+function bcp47(locale: Locale): string {
+  return locale === "ar-DZ" ? "ar-DZ" : "fr-DZ";
+}
+
 /**
- * Wire-enabling (BRK-094): the list wire carries `number | null`
- * (`None` = legacy row). Unknown renders as an em dash — never 0.
- * DSN-095 owns the final human-size pass (o/Ko/Mo).
+ * Human file size, locale-aware (DSN-095): French uses o/Ko/Mo/Go with
+ * fr-DZ grouping; Arabic uses ar-DZ numerals with ب/ك.ب/م.ب/غ.ب units.
+ * Unknown (legacy NULL), non-finite, zero, or negative renders as an em
+ * dash — never 0. Call sites wrap the result in `<bdi>` (LTR isolation).
  */
-export function formatBytes(bytes: number | null): string {
+export function formatBytes(bytes: number | null, locale: Locale = "fr-DZ"): string {
   if (bytes === null || !Number.isFinite(bytes) || bytes <= 0) {
     return "—";
   }
-  if (bytes < 1024) {
-    return `${bytes} B`;
+  const units = locale === "ar-DZ" ? ["ب", "ك.ب", "م.ب", "غ.ب"] : ["o", "Ko", "Mo", "Go"];
+  let value = bytes;
+  let unit = units[0] ?? (locale === "ar-DZ" ? "ب" : "o");
+  for (const next of units.slice(1)) {
+    if (value < 1024) {
+      break;
+    }
+    value /= 1024;
+    unit = next;
   }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
+  const numeral = new Intl.NumberFormat(bcp47(locale), {
+    maximumFractionDigits: value < 10 && value !== Math.floor(value) ? 1 : 0,
+  }).format(value);
+  return `${numeral} ${unit}`;
+}
+
+/**
+ * Locale backup timestamp (DSN-095): medium date + short time in the POS
+ * locale (fr-DZ / ar-DZ). Unparseable input falls back to the raw string —
+ * never a blank cell.
+ */
+export function formatBackupDate(iso: string, locale: Locale): string {
+  const time = Date.parse(iso);
+  if (Number.isNaN(time)) {
+    return iso;
   }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  try {
+    return new Intl.DateTimeFormat(bcp47(locale), {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(time));
+  } catch {
+    return iso;
+  }
 }
 
 /** Commercial name rule: 2–100 chars after trimming. */

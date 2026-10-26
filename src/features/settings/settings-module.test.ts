@@ -28,6 +28,7 @@ const BACKUP_SRC = readSrc("src", "features", "settings", "BackupSettingsTab.tsx
 
 import {
   checksumPrefix,
+  formatBackupDate,
   formatBytes,
   triggerBadgeClass,
   validateFiscalField,
@@ -161,27 +162,66 @@ describe("backup bindings", () => {
     expect(IPC_SRC).toContain('"backups_list"');
   });
 
-  it("renders file/date/type/size/status columns with bidi guards", () => {
+  it("renders locale rows: date, human size, localized trigger, VERIFIED badge, checksum details", () => {
     for (const key of [
-      "settings.colFile",
-      "settings.colDate",
-      "settings.colType",
-      "settings.colSize",
-      "settings.colStatus",
+      "backups.title",
+      "backups.subtitle",
+      "backups.loading",
+      "backups.empty",
+      "backups.retentionNotice",
+      "backups.successCreated",
+      "backups.verifiedOk",
+      "backups.verifiedFail",
+      "backups.checksumDetails",
+      "backups.triggerManual",
+      "backups.triggerShiftClose",
+      "backups.triggerScheduled",
+      "backups.triggerReset",
+      "backups.statusSuccess",
+      "backups.statusFailed",
+      "backups.statusCorrupted",
+      "backups.statusPruned",
     ]) {
       expect(BACKUP_SRC).toContain(key);
     }
-    expect(BACKUP_SRC).toContain('<bdi dir="ltr">');
-    expect(BACKUP_SRC).toContain("settings.backupEmpty");
+    expect(BACKUP_SRC).toContain("formatBackupDate(row.createdAt, locale)");
+    expect(BACKUP_SRC).toContain("formatBytes(row.fileSizeBytes, locale)");
+    expect(BACKUP_SRC).toContain("<details");
+    expect(BACKUP_SRC).toContain("<bdi dir=");
+    // No raw engine codes on screen: no UTC dump, no raw checksum column.
+    expect(BACKUP_SRC).not.toContain("{row.createdAt}</bdi>");
+    expect(BACKUP_SRC).not.toContain("{row.triggerType}</bdi>");
+    expect(BACKUP_SRC).not.toContain("settings.colFile");
   });
 
-  it("formats byte sizes (B / KB / MB), unknown as em dash", () => {
+  it("exposes exactly one primary create action and one refresh action", () => {
+    expect(BACKUP_SRC).toContain('t(locale, "backups.createNow")');
+    expect(BACKUP_SRC).toContain('aria-label={t(locale, "backups.refresh")}');
+    const createSites = BACKUP_SRC.match(/await createBackup\(sessionToken, "MANUAL"\)/g) ?? [];
+    expect(createSites).toHaveLength(1);
+    const refreshLabels = BACKUP_SRC.match(/t\(locale, "backups\.refresh"\)/g) ?? [];
+    expect(refreshLabels).toHaveLength(2); // title + aria-label of the single icon button
+  });
+
+  it("formats byte sizes locale-aware (o/Ko/Mo FR, ب/ك.ب/م.ب AR), unknown as em dash", () => {
     expect(formatBytes(null)).toBe("—");
     expect(formatBytes(0)).toBe("—");
-    expect(formatBytes(512)).toBe("512 B");
-    expect(formatBytes(2048)).toBe("2.0 KB");
-    expect(formatBytes(5 * 1024 * 1024)).toBe("5.0 MB");
+    expect(formatBytes(512)).toBe("512 o");
+    expect(formatBytes(2048)).toBe("2 Ko");
+    expect(formatBytes(5 * 1024 * 1024)).toBe("5 Mo");
     expect(formatBytes(-1)).toBe("—");
+    expect(formatBytes(512, "ar-DZ")).toContain("ب");
+    expect(formatBytes(5 * 1024 * 1024, "ar-DZ")).toContain("م.ب");
+    expect(formatBytes(null, "ar-DZ")).toBe("—");
+  });
+
+  it("formats backup dates in the POS locale, raw fallback never blank", () => {
+    const fr = formatBackupDate("2026-09-29T12:00:00.000Z", "fr-DZ");
+    expect(fr).not.toContain("2026-09-29T12:00:00");
+    expect(fr).toContain("2026");
+    const ar = formatBackupDate("2026-09-29T12:00:00.000Z", "ar-DZ");
+    expect(ar).not.toContain("2026-09-29T12:00:00");
+    expect(formatBackupDate("not-a-date", "fr-DZ")).toBe("not-a-date");
   });
 
   it("badges MANUAL blue and other triggers green", () => {
@@ -210,6 +250,20 @@ describe("settings i18n (FR/AR symmetric)", () => {
     ]) {
       expect(I18N_SRC).toContain(key);
     }
+  });
+
+  it("declares the DSN-095 backup keys once per locale (FR/AR symmetric)", () => {
+    for (const key of [
+      '"backups.triggerReset"',
+      '"backups.checksumDetails"',
+      '"backups.verifiedOk"',
+      '"backups.retentionNotice"',
+    ]) {
+      const hits = I18N_SRC.split(key).length - 1;
+      expect(hits).toBe(2);
+    }
+    expect(I18N_SRC).toContain("Réinitialisation");
+    expect(I18N_SRC).toContain("إعادة ضبط");
   });
 
   it("carries the mandated Algerian commercial terminology", () => {

@@ -1,0 +1,95 @@
+{
+  "results": [
+    {
+      "name": "list shows locale size (2,5 Mo)",
+      "ok": true,
+      "detail": "Baraka UltraPOS\nCaisse\nCatalogue\nStock & Dépôts\nClients & Crédit\nDocuments & Factures\nFournisseurs\nRapports\nParamètres\nUtilisateurs & Accès\nParamètres & Configuration\n\nMAGASIN\n\nIdentité du Magasin\nRay"
+    },
+    {
+      "name": "list shows legacy unknown em dash",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "list shows VERIFIED badge",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "list shows localized triggers",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "list shows localized status",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "checksum affordance present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "no raw UTC dump",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "no horizontal scroll (list fr)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "danger precheck rows calm",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "backup modal opens from operations menu",
+      "ok": true,
+      "detail": "opened-modal"
+    },
+    {
+      "name": "restore report shows checks",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "locale toggles to Arabic",
+      "ok": true,
+      "detail": "toggled:العربية"
+    },
+    {
+      "name": "AR list renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "AR unknown size em dash",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "AR shell is RTL",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "AR danger rows calm",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "AR backup modal opens",
+      "ok": true,
+      "detail": "opened-modal"
+    },
+    {
+      "name": "zero console errors",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "consoleErrors": []
+}

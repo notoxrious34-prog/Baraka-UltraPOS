@@ -23,6 +23,55 @@ import {
 import type { Locale } from "@/types/pos";
 import { canExecuteReset, expectedResetToken } from "./factory-reset";
 
+/** Localized status label for the newest-backup line. */
+function newestBackupStatusKey(status: string): I18nKey {
+  switch (status) {
+    case "SUCCESS":
+      return "backups.statusSuccess";
+    case "FAILED":
+      return "backups.statusFailed";
+    case "CORRUPTED":
+      return "backups.statusCorrupted";
+    default:
+      return "backups.statusPruned";
+  }
+}
+
+/** Quiet checklist glyph (stroke icon, no emoji). */
+function DangerIcon(): ReactElement {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      className="h-4 w-4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10 2 2.5 16.5h15L10 2Z" />
+      <path d="M10 8v4" />
+      <circle cx={10} cy={14} r={0.5} fill="currentColor" />
+    </svg>
+  );
+}
+
+/** One quiet precondition row: colored glyph + calm text, no loud pill. */
+function PrecheckRow({ ok, text }: { ok: boolean; text: string }): ReactElement {
+  return (
+    <li className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+      <span
+        aria-hidden="true"
+        className={`mt-px font-black ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}
+      >
+        {ok ? "✓" : "✕"}
+      </span>
+      <span>{text}</span>
+    </li>
+  );
+}
+
 interface FactoryResetSectionProps {
   locale: Locale;
   sessionToken: string;
@@ -110,10 +159,13 @@ export function FactoryResetSection({
   return (
     <section
       aria-label={t(locale, "settings.resetDangerTitle")}
-      className="shrink-0 rounded-lg border-2 border-red-500 bg-red-50/50 p-4 dark:bg-red-900/10"
+      className="shrink-0 rounded-xl border border-red-200 bg-red-50/40 p-4 dark:border-red-900/60 dark:bg-red-900/10"
     >
-      <p className="text-sm font-black text-red-800 dark:text-red-200">
-        {"\u26A0 "}{t(locale, "settings.resetDangerTitle")}
+      <p className="flex items-center gap-2 text-sm font-black text-red-800 dark:text-red-200">
+        <span aria-hidden="true" className="text-red-500 dark:text-red-400">
+          <DangerIcon />
+        </span>
+        {t(locale, "settings.resetDangerTitle")}
       </p>
       <p className="mt-1 text-xs text-red-700 dark:text-red-300">
         {t(locale, "settings.resetDangerBody")}
@@ -137,36 +189,36 @@ export function FactoryResetSection({
             </button>
           </div>
 
-          <ul className="flex flex-col gap-1 text-sm">
-            <li
-              className={`rounded px-2 py-1 font-bold ${
+          <ul className="flex flex-col gap-1.5">
+            <PrecheckRow
+              ok={!precheck.openSession}
+              text={
                 precheck.openSession
-                  ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200"
-                  : "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
-              }`}
-            >
-              {precheck.openSession
-                ? t(locale, "settings.resetOpenSessionBlocked")
-                : t(locale, "settings.resetNoOpenSession")}
-            </li>
-            <li
-              className={`rounded px-2 py-1 font-bold ${
+                  ? t(locale, "settings.resetOpenSessionBlocked")
+                  : t(locale, "settings.resetNoOpenSession")
+              }
+            />
+            <PrecheckRow
+              ok={precheck.backupDirWritable}
+              text={
                 precheck.backupDirWritable
-                  ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
-                  : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200"
-              }`}
-            >
-              {precheck.backupDirWritable
-                ? t(locale, "settings.resetBackupDirOk")
-                : t(locale, "settings.resetBackupDirBlocked")}
-            </li>
-            <li className="rounded bg-slate-100 px-2 py-1 font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-              {precheck.newestBackup === null
-                ? t(locale, "settings.resetNoBackup")
-                : t(locale, "settings.resetNewestBackup")
-                    .replace("{file}", precheck.newestBackup.fileName)
-                    .replace("{status}", precheck.newestBackup.status)}
-            </li>
+                  ? t(locale, "settings.resetBackupDirOk")
+                  : t(locale, "settings.resetBackupDirBlocked")
+              }
+            />
+            <PrecheckRow
+              ok={precheck.newestBackup !== null}
+              text={
+                precheck.newestBackup === null
+                  ? t(locale, "settings.resetNoBackup")
+                  : t(locale, "settings.resetNewestBackup")
+                      .replace("{file}", precheck.newestBackup.fileName)
+                      .replace(
+                        "{status}",
+                        t(locale, newestBackupStatusKey(precheck.newestBackup.status)),
+                      )
+              }
+            />
           </ul>
 
           {precheck.reasons.length > 0 && (

@@ -86,6 +86,8 @@ function triggerKey(trigger: string): Parameters<typeof t>[1] {
       return "backups.triggerShiftClose";
     case "SCHEDULED":
       return "backups.triggerScheduled";
+    case "RESET":
+      return "backups.triggerReset";
     default:
       return "backups.triggerManual";
   }

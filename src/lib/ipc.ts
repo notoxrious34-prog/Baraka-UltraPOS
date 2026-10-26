@@ -2470,7 +2470,7 @@ export interface BackupMetadata {
 interface BackupMetadataWire {
   id: string;
   file_name: string;
-  file_size_bytes: number;
+  file_size_bytes: number | null;
   sha256_checksum: string;
   trigger_type: string;
   status: string;

@@ -1,85 +1,127 @@
-# TASK-DSN-095 REPORT — Backup/restore/reset screen redesign
+# TASK-DSN-095-R REPORT — Backup/restore/reset screen redesign (block lifted by BRK-094 `bc11c8c`)
 
-STATUS: **BLOCKED** (engine-side 0 B gap — no UI fakery, zero production
-changes made). DO NOT COMMIT.
+STATUS: **DONE**. DO NOT COMMIT.
 
-## 1. FAIL-before (current chaos refs)
+Prior trace committed as `e581cdf` (engine-side 0 B verdict); engine fix
+landed as `bc11c8c` (0017 + real size/trigger). This report replaces the
+earlier version in full.
 
-- Raw UTC timestamps: `src/features/settings/BackupSettingsTab.tsx:171`
-  (`<bdi dir="ltr">{row.createdAt}</bdi>` — RFC3339 string, no locale
-  formatting).
-- "0 B" sizes: same file `:172` (`formatBytes(row.fileSizeBytes)` — the
-  formatter is correct; the wire feeds it `0`, see §2).
-- Truncated raw checksums as a status column: `:176`
-  (`checksumPrefix(row.sha256Checksum)` — 12 hex chars + ellipsis where a
-  VERIFIED badge belongs).
-- Duplicated backup actions: tab-level create (`:96-104`) + refresh
-  (`:106-114`) AND a second verified-backup entry inside the danger zone
-  (`src/features/settings/FactoryResetSection.tsx:188`,
-  `handleCreateBackup` `:65-72` reusing `createBackup`).
-- Type pill fed by a hardcoded wire value (§2) via
-  `triggerBadgeClass(row.triggerType)` (`settings-helpers.ts:57-62`).
-- Restore: wire exists (`backups_restore_precheck` / `backups_restore`)
-  but has **zero UI callers** (no hits in `src/features/settings`,
-  `src/components`) — polishable only after unblock.
+## 1. FAIL-before (owner-verdict "chaos", quoted from the pre-redesign tree)
 
-## 2. 0 B verdict + lines — ENGINE-SIDE (blocked fork taken)
+- Raw UTC timestamps: `BackupSettingsTab.tsx:162`
+  (`<bdi dir="ltr">{row.createdAt}</bdi>` — RFC3339 dump, no locale).
+- "0 B" sizes: `:172` (`formatBytes(row.fileSizeBytes)` fed literal `0`
+  from `backup.rs:175`).
+- Truncated raw checksums as the status column: `:175`
+  (`checksumPrefix(row.sha256Checksum)` — 12 hex chars where a VERIFIED
+  badge belongs).
+- Duplicated actions: tab create (`:90-99`) + text refresh (`:100-109`),
+  plus the danger-zone verified-backup entry
+  (`FactoryResetSection.tsx:188`).
+- Type pill showing the hardcoded wire code (`:168`
+  `<bdi dir="ltr">{row.triggerType}</bdi>`, always MANUAL).
+- Raw-code status: no localized labels anywhere on the tab.
 
-`backups_list` (`crates/commands/src/ipc.rs:2218-2226`) maps
-`ListBackupsUseCase`, which hardcodes the size:
+## 2. 0 B verdict + wire lines — ENGINE, now FIXED upstream
 
-- `crates/application/src/use_cases/backup.rs:175` —
-  `file_size_bytes: 0` (literal zero, with the comment "Load rows and
-  rejoin each file name with `dest_dir`").
-- Root cause: `BackupLogEntry` (`crates/application/src/ports.rs:2225-2246`)
-  carries **no size field**, and `backups_log`
-  (`0001_baseline_schema.sql:314-324`) has **no size/trigger columns** —
-  `record_backup` (`sqlite_backup_manager.rs:154-176`) and `list_backups`
-  (`:209-236`) / `get_backup` select only the 9 sizeless columns.
-- Same gap forces `trigger_type: BackupTriggerType::Manual`
-  (`backup.rs:177`) — every row's pill reads MANUAL regardless of the
-  SHIFT_CLOSE/SCHEDULED capture that wrote it.
+`backup.rs:175 file_size_bytes: 0` + `:177 Manual` hardcodes removed by
+BRK-094; rows now carry measured size + trigger (`manual|scheduled|
+cash_close|reset`, migration 0017, legacy NULL → UI "—").
+Wire re-verified this task (`src/lib/ipc.ts:2458-2468`):
+`BackupMetadata.fileSizeBytes: number | null`, `triggerType`, `status`,
+`sha256Checksum`, `createdAt` — all present.
+One stale facade type found and fixed (no hardcoding):
+`BackupMetadataWire.file_size_bytes: number` → `number | null`
+(`src/lib/ipc.ts:2473`) so legacy NULL rows typecheck through.
 
-No UI formatter can honestly fix this: any displayed size would be
-fabricated. Per the task fork: STATE BLOCKED, no UI fakery.
+## 3. Component lines (presentation only, zero engine)
 
-**QUESTION FOR ARCHITECT**: authorize a BRK follow-up persisting
-`file_size_bytes` (+ `trigger`) per backup row — (a) append-only
-migration `00XX` adding the columns, populated in `record_backup` from
-the already-known snapshot size, selected in `list_backups`/`get_backup`
-and threaded through `BackupLogEntry` → `BackupMetadata` → DTO?
+- `src/features/settings/settings-helpers.ts` — `formatBytes(bytes,
+  locale)`: FR `o/Ko/Mo/Go` (fr-DZ numerals), AR `ب/ك.ب/م.ب/غ.ب`
+  (ar-DZ numerals); NULL/≤0/NaN → "—", never 0. New
+  `formatBackupDate(iso, locale)` (medium date + short time, raw fallback
+  never blank).
+- `src/features/settings/BackupSettingsTab.tsx` — card rows (filename +
+  localized status pill; locale date · size + localized trigger pill;
+  VERIFIED `backups.verifiedOk` badge on SUCCESS, failure line otherwise;
+  `<details>` checksum affordance); section heading + subtitle; single
+  primary icon+text create (`backups.createNow`/`creating`) + single icon
+  refresh (`backups.refresh` title + aria-label); `backups.empty /
+  loading / retentionNotice / successCreated{file}`; restriction view
+  unchanged.
+- `src/features/settings/FactoryResetSection.tsx` — calm danger card
+  (thin border, `DangerIcon` SVG — the old `⚠` text glyph is gone);
+  preconditions as quiet `PrecheckRow` checklist (glyph + text, no loud
+  pills); newest-backup line carries the localized status; token confirm,
+  execute, refresh, error and outcome flows byte-identical in behavior.
+- `src/lib/i18n.ts` — `backups.triggerReset` (FR "Réinitialisation" / AR
+  "إعادة ضبط"), `backups.checksumDetails` (FR "Détails SHA-256" / AR
+  "تفاصيل SHA-256"), both locales.
+- `src/components/pos/modals/BackupModal.tsx` — `triggerKey` gains the
+  `RESET` case (RESET rows previously fell through to "Manuelle").
+- `src/lib/ipc.ts` — wire `file_size_bytes: number | null` (see §2).
 
-**PROPOSED SOLUTION** (not implemented): option (a) above; list-time
-`fs::metadata` stat rejected (TOCTOU + I/O per row, PRUNED rows have no
-file). UI redesign resumes on the follow-up's green.
+## 4. Pin lines (`settings-module.test.ts`, 30/30 in file)
 
-## 3. Component lines — NONE (frozen by block)
+- "renders locale rows" — 17 `backups.*` keys in source,
+  `formatBackupDate(row.createdAt, locale)`,
+  `formatBytes(row.fileSizeBytes, locale)`, `<details`, `<bdi dir=`,
+  negatives: no `{row.createdAt}</bdi>`, no `{row.triggerType}</bdi>`,
+  no `settings.colFile`.
+- "exactly one primary create + one refresh" — single
+  `await createBackup(sessionToken, "MANUAL")` site; two
+  `t(locale, "backups.refresh")` hits (title + aria-label of the one icon
+  button). Danger-zone keeps its own entry (`settings.resetCreateBackup`
+  + scoped `settings.refresh` in `FactoryResetSection.tsx`).
+- "locale sizes" — `512→"512 o"`, `2048→"2 Ko"`, `5MiB→"5 Mo"`,
+  null/0/-1→"—"; AR contains `ب`, `م.ب`, null→"—".
+- "locale dates" — FR/AR contain year, no ISO dump; garbage in → raw out.
+- "key symmetry" — `triggerReset`, `checksumDetails`, `verifiedOk`,
+  `retentionNotice` each exactly 2× in `i18n.ts` + FR/AR copy spot-checks.
 
-Zero files changed. On unblock the redesign touches only:
-`BackupSettingsTab.tsx`, `FactoryResetSection.tsx` (elegance pass),
-`settings-helpers.ts` (locale date + o/Ko/Mo formatters), `lib/ipc.ts`
-facade (unchanged wire), `lib/i18n.ts` (FR/AR keys), pins + captures.
+## 5. PNGs + asserts (6/6 distinct SHAs, 18/18 asserts, 0 console)
 
-## 4. Pin lines — NONE (blocked before pins)
+Harness: headless Chrome CDP vs `vite :5173`, `__TAURI_INTERNALS__`
+stubbed with canned rows (incl. a legacy NULL-size SCHEDULED row and a
+FAILED row); real login form → settings → backups tab; FR + AR.
+`audit/DSN-095/capture-results.json`: **18/18 PASS, consoleErrors 0**
+(danger close-up re-shoot: 0 console errors on its own run).
+Vision-QA: all six viewed (list-fr, list-ar, restoring-fr, restoring-ar,
+danger-fr, danger-ar — "double __" in two readbacks is a small-mono-font
+misread, stub bytes are single-underscore, verified by grep).
 
-## 5. PNG names + asserts — NONE (no redesigned states to capture)
+| PNG | SHA-256 (short) | Assert coverage |
+| --- | --------------- | --------------- |
+| `backup-list-fr-light.png` | `8af6afdb…` | 2,5 Mo · Manuelle/Planifiée/Clôture · Réussie/Échouée · "Intègre (SHA-256 vérifié)" · Détails SHA-256 · no UTC · no h-scroll |
+| `backup-list-ar-light.png` | `af1b9cd8…` | يدوية · ناجحة · "—" · `[dir=rtl]` shell · no raw codes |
+| `backup-restoring-fr-light.png` | `e8a598ff…` | modal opens from Opérations · report 8/8 checks · `Confirmation obligatoire` gate |
+| `backup-restoring-ar-light.png` | `8a99d171…` | `تأكيد إلزامي` · 8/8 checks AR · `اكتب RESTORE` · RTL modal |
+| `backup-danger-fr-light.png` | `72e85d50…` | element-clipped card · calm checklist 3×✓ · token empty → execute disabled |
+| `backup-danger-ar-light.png` | `ec4ab524…` | element-clipped card · `الشروط المسبقة` 3×✓ · RTL mirroring · no defects |
 
-## 6. G4-G7 exits + counts (untouched tree, baseline proof)
+All six SHAs pairwise distinct (danger shots are element clips, not
+reused list frames).
 
-- G4 `npm run lint`: exit 0, GREEN.
-- G5 `npx tsc --noEmit`: clean, GREEN.
-- G7 `npx vitest run`: **819 passed, 0 failed**.
-- G1-G3: N/A — zero Rust changes (state reason); engine untouched.
+## 6. Gates
 
-## 7. git status --short
+| Gate | Result |
+| ---- | ------ |
+| G4 `npm run lint` | exit 0, GREEN |
+| G5 `npx tsc --noEmit` | clean, GREEN |
+| G6 `npm run build` | ✓ built in 4.89s, GREEN |
+| G7 `npx vitest run` | **81 files / 822 tests passed**, GREEN |
+| G1–G3 | N/A — zero Rust touched (state reason) |
 
-Clean (this task changed nothing — verify at seal time).
+No product file changed since the green run — tallies stand as stated.
 
-## 8. STATE / DONE / REMAINING
+## 7. NO_LEFTOVERS + ports
 
-- STATE: **BLOCKED** (engine-side size/trigger gap, DTO lines quoted §2).
-- DONE: full trace (wire → field), FAIL-before refs, baseline G4/G5/G7 green.
-- REMAINING: entire redesign (items 2-7) pending the BRK size/trigger
-  follow-up; restore UI has no callers yet (wire ready).
+- Scratch deleted: `dsn095-capture.mjs`, `dsn095-danger.mjs`,
+  `dsn095-vite.log`, `dsn095-chrome/` — `ls scratch | grep dsn095`
+  empty (proof below).
+- No port left listening: vite :5173 + CDP :9222 servers killed (own
+  PIDs only, verified by `curl` DOWN + port check).
+- Ad-hoc scripts: none remain in-repo (`git status` shows only the
+  capture PNGs + `capture-results.json` under `audit/DSN-095/`).
 
-NEXT READY: NO.
+NEXT READY: YES.

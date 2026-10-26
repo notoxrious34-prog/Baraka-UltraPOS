@@ -42,6 +42,14 @@ export interface ProductImportModalProps {
 
 type ImportStage = "drop" | "preview" | "importing" | "report";
 
+/**
+ * Client mirror of the engine `MAX_IMPORT_ROWS` (BRK-093): batches over
+ * this size are rejected with `IMPORT_ROW_LIMIT_EXCEEDED` before any
+ * write. The pre-launch guard below surfaces that verdict up front; the
+ * engine rejection stays the backstop (race between preview and launch).
+ */
+export const MAX_IMPORT_ROWS_CLIENT = 1000;
+
 /** Build the code-or-id -> id lookup for category resolution. Pure. */
 export function buildCategoryLookup(categories: Category[]): Map<string, string> {
   const lookup = new Map<string, string>();
@@ -293,6 +301,7 @@ export function ProductImportModal({
 
   const busy = stage === "importing";
   const totalDetected = parsed.rows.length + parsed.errors.length;
+  const overLimit = parsed.rows.length > MAX_IMPORT_ROWS_CLIENT;
 
   return (
     <div
@@ -351,7 +360,19 @@ export function ProductImportModal({
                 className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-10 text-center dark:border-slate-600"
               >
                 <span className="text-4xl" aria-hidden="true">
-                  📥
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    className="h-10 w-10"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M4 21h16" />
+                  </svg>
                 </span>
                 <p className="text-sm font-bold">
                   {t(locale, "imp.dropHint")} {t(locale, "imp.browse")}
@@ -404,6 +425,14 @@ export function ProductImportModal({
                 )}
               </div>
               <p className="truncate text-xs font-bold opacity-70">{fileName}</p>
+              {overLimit && (
+                <p
+                  role="alert"
+                  className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-black text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                >
+                  {t(locale, "imp.overLimit").replace("{n}", String(parsed.rows.length))}
+                </p>
+              )}
               <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
                 <ImportPreviewTable
                   rows={previewRows(parsed)}
@@ -445,7 +474,7 @@ export function ProductImportModal({
                 </button>
                 <button
                   type="button"
-                  disabled={parsed.rows.length === 0}
+                  disabled={parsed.rows.length === 0 || overLimit}
                   onClick={launchImport}
                   className="h-10 flex-1 rounded-lg bg-primary-600 px-4 text-sm font-black text-white hover:bg-primary-900 disabled:opacity-50"
                 >

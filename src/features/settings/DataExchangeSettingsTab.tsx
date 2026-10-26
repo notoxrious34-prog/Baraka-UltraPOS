@@ -156,7 +156,7 @@ export function DataExchangeSettingsTab({
             className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-slate-700 dark:bg-slate-900"
           >
             <h2 className="text-sm font-black">{t(locale, card.titleKey)}</h2>
-            <p className="min-h-8 flex-1 text-xs leading-relaxed text-slate-500">
+            <p className="min-h-8 flex-1 break-words text-xs leading-relaxed text-slate-500">
               {t(locale, card.copyKey)}
             </p>
             <button

@@ -268,6 +268,76 @@ describe("import modal hub wiring (source pins)", () => {
     expect(menu).toContain("cat.exchangeExport");
   });
 
+describe("exchange final polish (DSN-096 source pins)", () => {
+  const modalSrc = () =>
+    readFileSync(
+      join(process.cwd(), "src", "features", "catalog", "ProductImportModal.tsx"),
+      "utf8",
+    ) as string;
+  const i18nSrc = () =>
+    readFileSync(join(process.cwd(), "src", "lib", "i18n.ts"), "utf8") as string;
+
+  it("mirrors the engine row cap and gates launch before IPC", async () => {
+    const { MAX_IMPORT_ROWS_CLIENT } = await import(
+      "@/features/catalog/ProductImportModal"
+    );
+    expect(MAX_IMPORT_ROWS_CLIENT).toBe(1000);
+    const src = modalSrc();
+    expect(src).toContain("overLimit");
+    expect(src).toContain("disabled={parsed.rows.length === 0 || overLimit}");
+    expect(src).toContain('t(locale, "imp.overLimit")');
+  });
+
+  it("carries the over-limit guidance in FR + AR", () => {
+    const src = i18nSrc();
+    const hits = src.match(/"imp\.overLimit"/g) ?? [];
+    expect(hits).toHaveLength(2);
+    expect(src).toContain("fractionnez le fichier");
+    expect(src).toContain("قسّم الملف");
+  });
+
+  it("labels the template entry point with the importer dialect", () => {
+    const src = i18nSrc();
+    const hits = src.match(/"settings\.exchangeTemplateCopy"/g) ?? [];
+    expect(hits).toHaveLength(2);
+    expect(src).toContain("name_fr;name_ar");
+    expect(src).toContain("initial_stock;category_code");
+  });
+
+  it("states the export row cap up front in FR + AR", () => {
+    const src = i18nSrc();
+    const hits = src.match(/"settings\.exchangeExportCopy"/g) ?? [];
+    expect(hits).toHaveLength(2);
+    expect(src).toContain("1000 premières lignes");
+    expect(src).toContain("أول 1000 سطر");
+  });
+
+  it("uses no emoji in the import drop zone", () => {
+    expect(modalSrc()).not.toContain("📥");
+  });
+
+  it("wraps the long dialect token instead of clipping it", () => {
+    const tab = readFileSync(
+      join(process.cwd(), "src", "features", "settings", "DataExchangeSettingsTab.tsx"),
+      "utf8",
+    ) as string;
+    expect(tab).toContain("break-words");
+  });
+
+  it("renders updated + errored counts from the wire report", () => {
+    const html = renderToStaticMarkup(
+      <ImportReportCard
+        report={report({ updated_count: 5 })}
+        locale="fr-DZ"
+      />,
+    );
+    expect(html).toContain("5");
+    expect(html).toContain("mis à jour");
+    expect(html).toContain("erreurs");
+    expect(html).toContain("DUP-1");
+  });
+});
+
   it("maps the policy selector to the IPC payload", () => {
     const modal = readFileSync(
       join(process.cwd(), "src", "features", "catalog", "ProductImportModal.tsx"),

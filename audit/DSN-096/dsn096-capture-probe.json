@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "name": "app boots to login",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "invoke stub installed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "login submitted",
+      "ok": true,
+      "detail": "login-clicked:true"
+    }
+  ],
+  "navInfo": "[\"Caisse\",\"Catalogue\",\"Stock & Dépôts\",\"Clients & Crédit\",\"Documents & Factures\",\"Fournisseurs\",\"Rapports\",\"Paramètres\",\"Utilisateurs & Accès\",\"Ouvrir la session\",\"Opérations\",\"العربية\",\"\",\"Déconnexion\",\"Tous\",\"Kits\",\"Pièces\",\"Produits rapides\",\"Alt+1…\",\"Alt+2…\",\"Alt+3…\",\"Alt+4…\",\"Alt+5…\",\"Alt+6…\",\"Alt+7…\",\"Alt+8…\",\"⚙️\",\"Ticket de caisse\",\"Facture légale\",\"Bon de livraison\",\"Client ComptantF2\"]"
+}

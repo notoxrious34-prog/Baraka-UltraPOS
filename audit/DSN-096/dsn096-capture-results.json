@@ -1,0 +1,104 @@
+{
+  "results": [
+    {
+      "name": "login lands in shell",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "fr exchange tab renders",
+      "ok": true,
+      "detail": "Échanges & Données"
+    },
+    {
+      "name": "fr export cap disclosed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "fr template dialect labeled",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "fr import card present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "shot exchange-fr-light.png written",
+      "ok": true,
+      "detail": "retry"
+    },
+    {
+      "name": "fr csv injected + preview",
+      "ok": true,
+      "detail": "injected/clicked"
+    },
+    {
+      "name": "fr report counts",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "fr report success line",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "shot exchange-report-fr-light.png written",
+      "ok": true,
+      "detail": "retry"
+    },
+    {
+      "name": "ar exchange tab renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ar export cap disclosed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ar template dialect labeled",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ar rtl shell",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "shot exchange-ar-light.png written",
+      "ok": true,
+      "detail": "retry"
+    },
+    {
+      "name": "ar csv injected + preview",
+      "ok": true,
+      "detail": "injected/clicked"
+    },
+    {
+      "name": "ar report counts",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ar report success line",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "shot exchange-report-ar-light.png written",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "zero console errors",
+      "ok": true,
+      "detail": "[]"
+    }
+  ]
+}

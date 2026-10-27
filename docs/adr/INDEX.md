@@ -114,4 +114,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-104 | Ticket rendering split: ESC/POS vs graphique for label-class USB printers | ACCEPTED |
 
-Next free id: ADR-105.
+| ADR-105 | Silent TSPL printing for the single XP-410B (ticket 80mm + label 40×20, button-triggered) | ACCEPTED |
+
+Next free id: ADR-106.

@@ -1,0 +1,547 @@
+//! Silent TSPL print use-case tests (TASK-BRK-097, ADR-105).
+//!
+//! No SQLite here: every port is a deterministic fake, so these tests pin
+//! the spooler-only gate, the byte transcription (discounted PU vs legacy
+//! NULL), and the exact spooled bytes. Any repository *write* method
+//! panics — passing tests prove the silent jobs are zero-write.
+
+use std::sync::Mutex;
+
+use baraka_application::errors::ApplicationError;
+use baraka_application::ports::{
+    ConvertBlToFactureCommand, ConvertBlToFactureResult, ConvertDevisToBlCommand,
+    ConvertDevisToBlResult, DocumentRepository, DocumentSearchFilter, DocumentSummary,
+    PrinterSettings, PrinterSettingsPort, PrinterTransportPort, SessionContext, SessionToken,
+    StoreIdentityPort, StoredPayment,
+};
+use baraka_application::use_cases::tspl_printing::{PrintTsplLabelUseCase, PrintTsplTicketUseCase};
+use baraka_domain::catalog::{ProductId, UnitId};
+use baraka_domain::errors::DomainError;
+use baraka_domain::inventory::WarehouseId;
+use baraka_domain::role::Role;
+use baraka_domain::sales::{
+    Document, DocumentId, DocumentItem, DocumentItemView, DocumentLanguage, DocumentStatus,
+    DocumentType,
+};
+use baraka_domain::user::UserId;
+
+fn session_with(role: Role) -> SessionContext {
+    SessionContext {
+        token: SessionToken::new_random(),
+        user_id: UserId::new(),
+        role,
+        expires_at: chrono::Utc::now() + chrono::TimeDelta::hours(1),
+    }
+}
+
+struct FakeSettings {
+    transport: String,
+}
+
+impl PrinterSettingsPort for FakeSettings {
+    fn get_printer_settings(&self) -> Result<PrinterSettings, ApplicationError> {
+        Ok(PrinterSettings {
+            serial_port: String::new(),
+            serial_baud: 9600,
+            paper_width_dots: 640,
+            paper_width_mm: 80,
+            transport: self.transport.clone(),
+            queue_name: "XP-410B".to_string(),
+            ticket_render_mode: "graphique".to_string(),
+        })
+    }
+
+    fn update_printer_settings(
+        &self,
+        _serial_port: &str,
+        _serial_baud: u32,
+        _paper_width_mm: Option<u32>,
+        _transport: Option<&str>,
+        _queue_name: Option<&str>,
+        _ticket_render_mode: Option<&str>,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests: settings are read-only here");
+    }
+}
+
+struct FakeTransport {
+    sent: Mutex<Vec<Vec<u8>>>,
+}
+
+impl FakeTransport {
+    fn new() -> Self {
+        Self {
+            sent: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn payloads(&self) -> Vec<Vec<u8>> {
+        self.sent.lock().expect("lock").clone()
+    }
+}
+
+impl PrinterTransportPort for FakeTransport {
+    fn send_raster(&self, bytes: &[u8]) -> Result<(), ApplicationError> {
+        self.sent.lock().expect("lock").push(bytes.to_vec());
+        Ok(())
+    }
+
+    fn is_available(&self) -> bool {
+        true
+    }
+}
+
+struct FakeIdentity;
+
+impl StoreIdentityPort for FakeIdentity {
+    fn load_identity(&self) -> Result<baraka_domain::printing::StoreIdentity, ApplicationError> {
+        Ok(baraka_domain::printing::StoreIdentity {
+            store_name: "BARAKA QUINCAILLERIE".to_string(),
+            store_address: "Rue des Frères".to_string(),
+            store_phone: "0550 00 00 00".to_string(),
+            nif: String::new(),
+            nis: String::new(),
+            rc: String::new(),
+            ai: String::new(),
+            ticket_footer_message: "Merci".to_string(),
+        })
+    }
+
+    fn save_identity(
+        &self,
+        _identity: &baraka_domain::printing::StoreIdentity,
+        _actor: &str,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests: identity is read-only here");
+    }
+
+    fn device_kind(&self) -> Result<String, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+
+    fn save_device(&self, _kind: &str, _actor: &str) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+
+    fn append_settings_audit(
+        &self,
+        _actor: &str,
+        _action: &str,
+        _detail: &str,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+}
+
+/// One finalized ticket: line 1 carries a per-unit discount
+/// (3 x (1000 - 100)), line 2 is a legacy NULL row (raw PU).
+fn ticket_document() -> (Document, Vec<DocumentItemView>, Vec<StoredPayment>) {
+    let document = Document {
+        id: DocumentId::new(),
+        language: DocumentLanguage::Fr,
+        number: "T-2026-000123".to_string(),
+        fiscal_year: 2026,
+        doc_type: DocumentType::Ticket,
+        status: DocumentStatus::Finalized,
+        warehouse_id: WarehouseId::new(),
+        party_id: None,
+        subtotal_ht_centimes: 3_200,
+        vat_total_centimes: 0,
+        global_discount_centimes: 0,
+        timbre_centimes: 0,
+        ttc_centimes: 3_200,
+        paid_amount_centimes: 3_200,
+        change_amount_centimes: 0,
+        payment_method: "CASH".to_string(),
+        notes: None,
+        created_at: chrono::Utc::now(),
+        created_by: UserId::new(),
+    };
+    let discounted = DocumentItem {
+        id: uuid::Uuid::new_v4(),
+        document_id: document.id,
+        product_id: ProductId::new(),
+        unit_id: UnitId::new(),
+        quantity_micro: 3 * 10_000,
+        quantity_base_micro: 3 * 10_000,
+        unit_price_centimes: 1_000,
+        discount_centimes: 300,
+        discount_per_unit_centimes: Some(100),
+        tva_rate_micro: 0,
+        line_ht_centimes: 2_700,
+        line_tva_centimes: 0,
+        line_ttc_centimes: 2_700,
+        cost_price_centimes: 800,
+        sort_order: 0,
+    };
+    let legacy = DocumentItem {
+        id: uuid::Uuid::new_v4(),
+        document_id: document.id,
+        product_id: ProductId::new(),
+        unit_id: UnitId::new(),
+        quantity_micro: 10_000,
+        quantity_base_micro: 10_000,
+        unit_price_centimes: 500,
+        discount_centimes: 0,
+        discount_per_unit_centimes: None,
+        tva_rate_micro: 0,
+        line_ht_centimes: 500,
+        line_tva_centimes: 0,
+        line_ttc_centimes: 500,
+        cost_price_centimes: 400,
+        sort_order: 1,
+    };
+    let views = vec![
+        DocumentItemView {
+            item: discounted,
+            product_name_fr: Some("Vis 8x40".to_string()),
+            product_name_ar: None,
+            sku: Some("VIS-001".to_string()),
+            unit_name_fr: Some("Pièce".to_string()),
+            unit_name_ar: None,
+            product_missing: false,
+        },
+        DocumentItemView {
+            item: legacy,
+            product_name_fr: Some("Clou 5cm".to_string()),
+            product_name_ar: None,
+            sku: None,
+            unit_name_fr: None,
+            unit_name_ar: None,
+            product_missing: false,
+        },
+    ];
+    let payments = vec![StoredPayment {
+        id: "pay-1".to_string(),
+        document_id: document.id,
+        customer_id: None,
+        amount_centimes: 3_200,
+        method_code: "CASH".to_string(),
+        cash_session_id: None,
+    }];
+    (document, views, payments)
+}
+
+struct FakeDocuments {
+    document: Document,
+    views: Vec<DocumentItemView>,
+    payments: Vec<StoredPayment>,
+}
+
+impl FakeDocuments {
+    fn ticket() -> Self {
+        let (document, views, payments) = ticket_document();
+        Self {
+            document,
+            views,
+            payments,
+        }
+    }
+}
+
+impl DocumentRepository for FakeDocuments {
+    fn create_draft(
+        &self,
+        _document: &Document,
+        _items: &[DocumentItem],
+        _origin_device_id: &str,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+
+    fn cancel_draft(&self, _id: DocumentId) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+
+    fn get_by_id(&self, _id: DocumentId) -> Result<Option<Document>, ApplicationError> {
+        Ok(Some(self.document.clone()))
+    }
+
+    fn get_by_number(
+        &self,
+        _doc_type_code: &str,
+        _fiscal_year: i32,
+        _number: &str,
+    ) -> Result<Option<Document>, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+
+    fn get_items(&self, _id: DocumentId) -> Result<Vec<DocumentItem>, ApplicationError> {
+        Ok(self.views.iter().map(|view| view.item.clone()).collect())
+    }
+
+    fn get_items_with_names(
+        &self,
+        _id: DocumentId,
+    ) -> Result<Vec<DocumentItemView>, ApplicationError> {
+        Ok(self.views.clone())
+    }
+
+    fn get_payments(&self, _id: DocumentId) -> Result<Vec<StoredPayment>, ApplicationError> {
+        Ok(self.payments.clone())
+    }
+
+    fn get_print_status(&self, _id: DocumentId) -> Result<String, ApplicationError> {
+        Ok("NONE".to_string())
+    }
+
+    fn finalize_document(
+        &self,
+        _document: &Document,
+        _items: &[DocumentItem],
+        _payments: &[StoredPayment],
+        _origin_device_id: &str,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests: zero writes");
+    }
+
+    fn convert_devis_to_bl(
+        &self,
+        _command: &ConvertDevisToBlCommand,
+    ) -> Result<ConvertDevisToBlResult, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+
+    fn convert_bl_to_facture(
+        &self,
+        _command: &ConvertBlToFactureCommand,
+    ) -> Result<ConvertBlToFactureResult, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+
+    fn search_documents(
+        &self,
+        _filter: &DocumentSearchFilter,
+    ) -> Result<Vec<DocumentSummary>, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+}
+
+fn spooler() -> FakeSettings {
+    FakeSettings {
+        transport: "spooler".to_string(),
+    }
+}
+
+#[test]
+fn label_spools_exact_bytes_and_reports_count() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let outcome = PrintTsplLabelUseCase::new(&settings, &transport)
+        .execute(
+            &session_with(Role::Caissier),
+            "Vis 8x40",
+            1_000,
+            "VIS-001",
+            3,
+        )
+        .expect("spooler label prints");
+    let payloads = transport.payloads();
+    assert_eq!(payloads.len(), 1, "exactly one spooler submission");
+    assert_eq!(outcome.bytes_sent, payloads[0].len());
+    let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
+    assert!(text.starts_with("SIZE 40 mm,20 mm\r\n"));
+    assert!(text.contains("TEXT 8,36,\"3\",0,1,1,\"10.00 DZD\""));
+    assert!(text.contains("BARCODE 8,72,\"128\",56,1,0,2,2,\"VIS-001\""));
+    assert!(text.ends_with("PRINT 1,3"));
+}
+
+#[test]
+fn label_rejects_non_spooler_transport_without_touching_the_queue() {
+    for arm in ["serial", "escpos"] {
+        let settings = FakeSettings {
+            transport: arm.to_string(),
+        };
+        let transport = FakeTransport::new();
+        let error = PrintTsplLabelUseCase::new(&settings, &transport)
+            .execute(
+                &session_with(Role::Caissier),
+                "Vis 8x40",
+                1_000,
+                "VIS-001",
+                1,
+            )
+            .expect_err("non-spooler arm rejected");
+        assert!(
+            matches!(
+                error,
+                ApplicationError::Validation(DomainError::TsplTransportRequiresSpooler)
+            ),
+            "arm: {arm}"
+        );
+        assert!(transport.payloads().is_empty(), "queue untouched");
+    }
+}
+
+#[test]
+fn ticket_rejects_non_spooler_transport_without_touching_the_queue() {
+    let settings = FakeSettings {
+        transport: "serial".to_string(),
+    };
+    let transport = FakeTransport::new();
+    let documents = FakeDocuments::ticket();
+    let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
+        .execute(&session_with(Role::Caissier), documents.document.id)
+        .expect_err("non-spooler arm rejected");
+    assert!(matches!(
+        error,
+        ApplicationError::Validation(DomainError::TsplTransportRequiresSpooler)
+    ));
+    assert!(transport.payloads().is_empty(), "queue untouched");
+}
+
+#[test]
+fn ticket_transcribes_discounted_and_legacy_lines_verbatim() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let documents = FakeDocuments::ticket();
+    let outcome = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
+        .execute(&session_with(Role::Caissier), documents.document.id)
+        .expect("spooler ticket prints");
+    let payloads = transport.payloads();
+    assert_eq!(payloads.len(), 1);
+    assert_eq!(outcome.bytes_sent, payloads[0].len());
+    let text = String::from_utf8(payloads[0].clone()).expect("bytes kept");
+    assert!(text.starts_with("SIZE 80 mm,"));
+    // Per-unit line: stored net PU 900, never the raw 1000.
+    assert!(text.contains("3 Pièce x 9.00 = 27.00"));
+    assert!(
+        !text.contains("10.00"),
+        "raw PU never leaks into a discounted line"
+    );
+    // Legacy NULL line: raw PU transcribed verbatim.
+    assert!(text.contains("5.00"));
+    // Graphique-parity totals (stored values only).
+    assert!(text.contains("Sous-total: 32.00"));
+    assert!(text.contains("TOTAL: 32.00"));
+    assert!(text.contains("Payé (CASH): 32.00"));
+    assert!(text.ends_with("PRINT 1,1"));
+}
+
+#[test]
+fn ticket_gate_reprint_document_but_label_allows_vendeur() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let documents = FakeDocuments::ticket();
+    // Vendeur lacks ReprintDocument: ticket refused before any read.
+    let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
+        .execute(&session_with(Role::Vendeur), documents.document.id)
+        .expect_err("vendeur cannot print tickets");
+    assert!(matches!(error, ApplicationError::Unauthorized));
+    assert!(transport.payloads().is_empty());
+    // Vendeur holds PosSell: shelf labels allowed.
+    PrintTsplLabelUseCase::new(&settings, &transport)
+        .execute(
+            &session_with(Role::Vendeur),
+            "Vis 8x40",
+            1_000,
+            "VIS-001",
+            1,
+        )
+        .expect("vendeur prints labels");
+    assert_eq!(transport.payloads().len(), 1);
+}
+
+#[test]
+fn label_copies_and_price_guards_reject_before_spooling() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let use_case = PrintTsplLabelUseCase::new(&settings, &transport);
+    let session = session_with(Role::Caissier);
+    assert!(matches!(
+        use_case
+            .execute(&session, "Vis 8x40", 1_000, "VIS-001", 0)
+            .expect_err("0 copies rejected"),
+        ApplicationError::Validation(DomainError::TsplCopiesOutOfRange)
+    ));
+    assert!(matches!(
+        use_case
+            .execute(&session, "Vis 8x40", -1, "VIS-001", 1)
+            .expect_err("negative price rejected"),
+        ApplicationError::Validation(DomainError::InvalidCanonicalString(_))
+    ));
+    assert!(matches!(
+        use_case
+            .execute(&session, "Vis 8x40", 1_000, "VIS-é-001", 1)
+            .expect_err("non-ascii barcode rejected"),
+        ApplicationError::Validation(DomainError::TsplBarcodeUnencodable)
+    ));
+    assert!(transport.payloads().is_empty(), "queue untouched");
+}
+
+#[test]
+fn ticket_missing_document_surfaces_not_found() {
+    struct EmptyDocuments;
+    impl DocumentRepository for EmptyDocuments {
+        fn create_draft(
+            &self,
+            _document: &Document,
+            _items: &[DocumentItem],
+            _origin_device_id: &str,
+        ) -> Result<(), ApplicationError> {
+            panic!("out of scope")
+        }
+        fn cancel_draft(&self, _id: DocumentId) -> Result<(), ApplicationError> {
+            panic!("out of scope")
+        }
+        fn get_by_id(&self, _id: DocumentId) -> Result<Option<Document>, ApplicationError> {
+            Ok(None)
+        }
+        fn get_by_number(
+            &self,
+            _doc_type_code: &str,
+            _fiscal_year: i32,
+            _number: &str,
+        ) -> Result<Option<Document>, ApplicationError> {
+            panic!("out of scope")
+        }
+        fn get_items(&self, _id: DocumentId) -> Result<Vec<DocumentItem>, ApplicationError> {
+            panic!("out of scope")
+        }
+        fn get_items_with_names(
+            &self,
+            _id: DocumentId,
+        ) -> Result<Vec<DocumentItemView>, ApplicationError> {
+            panic!("out of scope")
+        }
+        fn get_payments(&self, _id: DocumentId) -> Result<Vec<StoredPayment>, ApplicationError> {
+            panic!("out of scope")
+        }
+        fn get_print_status(&self, _id: DocumentId) -> Result<String, ApplicationError> {
+            panic!("out of scope")
+        }
+        fn finalize_document(
+            &self,
+            _document: &Document,
+            _items: &[DocumentItem],
+            _payments: &[StoredPayment],
+            _origin_device_id: &str,
+        ) -> Result<(), ApplicationError> {
+            panic!("out of scope")
+        }
+        fn convert_devis_to_bl(
+            &self,
+            _command: &ConvertDevisToBlCommand,
+        ) -> Result<ConvertDevisToBlResult, ApplicationError> {
+            panic!("out of scope")
+        }
+        fn convert_bl_to_facture(
+            &self,
+            _command: &ConvertBlToFactureCommand,
+        ) -> Result<ConvertBlToFactureResult, ApplicationError> {
+            panic!("out of scope")
+        }
+        fn search_documents(
+            &self,
+            _filter: &DocumentSearchFilter,
+        ) -> Result<Vec<DocumentSummary>, ApplicationError> {
+            panic!("out of scope")
+        }
+    }
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let error = PrintTsplTicketUseCase::new(&EmptyDocuments, &settings, &FakeIdentity, &transport)
+        .execute(&session_with(Role::Caissier), DocumentId::new())
+        .expect_err("missing document rejected");
+    assert!(matches!(error, ApplicationError::NotFound(_)));
+}

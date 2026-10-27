@@ -1033,6 +1033,41 @@ pub struct ReprintResponse {
     pub document_id: String,
 }
 
+// Silent TSPL wire types (TASK-BRK-097, ADR-105) ---------------------------
+// Money travels as integer-centime strings; copies as u32. No float ever
+// crosses this boundary. Responses carry byte counts only; no content.
+
+/// Silent 40x20 mm label print request (button-triggered, spooler only).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TsplLabelRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Display name (single locale, chosen by the caller).
+    pub name: String,
+    /// Selling price in integer centimes (canonical string).
+    pub price_centimes: String,
+    /// Code128 payload (SKU/barcode).
+    pub barcode: String,
+    /// Copies, 1..=99 (enforced in PRINT m,n, never by resending).
+    pub copies: u32,
+}
+
+/// Silent TSPL print response (label or ticket).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TsplPrintResponse {
+    /// Bytes handed to the spooler transport.
+    pub bytes_sent: usize,
+}
+
+/// Silent 80 mm ticket print request (button-triggered, spooler only).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TsplTicketRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Document id (UUID string).
+    pub document_id: String,
+}
+
 /// Serial printer configuration view.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrinterSettingsDto {

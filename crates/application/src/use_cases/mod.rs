@@ -14,6 +14,7 @@ pub mod reports;
 pub mod returns;
 pub mod sales;
 pub mod suppliers;
+pub mod tspl_printing;
 pub mod users;
 
 use baraka_domain::errors::DomainError;

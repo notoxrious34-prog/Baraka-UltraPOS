@@ -82,6 +82,7 @@ use baraka_application::use_cases::suppliers::{
     CreateSupplierUseCase, GetSupplierStatementUseCase, GetSupplierUseCase, ListSuppliersUseCase,
     SearchSuppliersUseCase, UpdateSupplierUseCase,
 };
+use baraka_application::use_cases::tspl_printing::{PrintTsplLabelUseCase, PrintTsplTicketUseCase};
 use baraka_application::use_cases::users::{
     CreateUserUseCase, ListUsersUseCase, ResetUserCredentialsUseCase, UpdateUserUseCase,
 };
@@ -140,12 +141,13 @@ use crate::dto::{
     StockMovementRowDto, StockShortageWarningDto, StoreIdentityDto, StoreIdentityResponse,
     SupplierDto, SupplierIdRequestDto, SupplierLedgerEntryDto, SupplierPaymentOutcomeDto,
     SupplierStatementDto, TestPrintRequest, TestPrintResponse, TransferStockRequestDto,
-    TransferStockResponseDto, UpdateCategoryRequestDto, UpdateCustomerRequest,
-    UpdateFiscalSettingsRequestDto, UpdatePrinterSettingsRequest, UpdateProductDto,
-    UpdateProductUnitDto, UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto,
-    UpdateUserRequestDto, UpdateWarehouseRequestDto, UsbCopyOutcomeDto, UserActivityRequestDto,
-    UserActivityRowDto, UserSummaryDto, VerifyBackupRequestDto, VerifyBackupResponseDto,
-    WarehouseDto, WarehouseStockPresenceDto, WarehouseStockPresenceResponseDto,
+    TransferStockResponseDto, TsplLabelRequest, TsplPrintResponse, TsplTicketRequest,
+    UpdateCategoryRequestDto, UpdateCustomerRequest, UpdateFiscalSettingsRequestDto,
+    UpdatePrinterSettingsRequest, UpdateProductDto, UpdateProductUnitDto,
+    UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto, UpdateUserRequestDto,
+    UpdateWarehouseRequestDto, UsbCopyOutcomeDto, UserActivityRequestDto, UserActivityRowDto,
+    UserSummaryDto, VerifyBackupRequestDto, VerifyBackupResponseDto, WarehouseDto,
+    WarehouseStockPresenceDto, WarehouseStockPresenceResponseDto,
 };
 
 /// Shared backend handles for command handlers.
@@ -299,6 +301,18 @@ fn error_code(error: &ApplicationError) -> String {
         }
         ApplicationError::Validation(DomainError::PrinterTransportUnavailable) => {
             "PRINTER_UNAVAILABLE".to_string()
+        }
+        ApplicationError::Validation(DomainError::TsplTransportRequiresSpooler) => {
+            "TSPL_REQUIRES_SPOOLER".to_string()
+        }
+        ApplicationError::Validation(DomainError::TsplBarcodeUnencodable) => {
+            "TSPL_BARCODE_UNENCODABLE".to_string()
+        }
+        ApplicationError::Validation(DomainError::TsplBarcodeTooWide) => {
+            "TSPL_BARCODE_TOO_WIDE".to_string()
+        }
+        ApplicationError::Validation(DomainError::TsplCopiesOutOfRange) => {
+            "TSPL_COPIES_OUT_OF_RANGE".to_string()
         }
         ApplicationError::Validation(DomainError::CashSessionAlreadyOpenForTerminal) => {
             "CASH_SESSION_ALREADY_OPEN_FOR_TERMINAL".to_string()
@@ -3160,6 +3174,62 @@ pub fn documents_reprint(
     Ok(ReprintResponse {
         job_id,
         document_id: id.to_string(),
+    })
+}
+
+/// `print_tspl_label` command: silent 40x20 mm shelf-label print (BRK-097).
+///
+/// Button-triggered only, spooler transport only — no dialog, no preview.
+/// The price travels as canonical centime string; copies ride `PRINT m,n`.
+#[tauri::command(rename_all = "snake_case")]
+pub fn print_tspl_label(
+    state: tauri::State<'_, AppState>,
+    request: TsplLabelRequest,
+) -> Result<TsplPrintResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let price_centimes = parse_wire_int(&request.price_centimes, "price_centimes")
+        .map_err(|error| error_code(&error))?;
+    let outcome = PrintTsplLabelUseCase::new(
+        state.printer_settings.as_ref(),
+        state.printer_transport.as_ref(),
+    )
+    .execute(
+        &session,
+        request.name.trim(),
+        price_centimes,
+        request.barcode.trim(),
+        request.copies,
+    )
+    .map_err(|error| error_code(&error))?;
+    Ok(TsplPrintResponse {
+        bytes_sent: outcome.bytes_sent,
+    })
+}
+
+/// `print_tspl_ticket` command: silent 80 mm ticket print (BRK-097).
+///
+/// Button-triggered only, spooler transport only — no dialog, no preview.
+/// Content mirrors the graphique ticket wire (stored values, transcription
+/// only; discounted PU when stored, raw legacy PU otherwise).
+#[tauri::command(rename_all = "snake_case")]
+pub fn print_tspl_ticket(
+    state: tauri::State<'_, AppState>,
+    request: TsplTicketRequest,
+) -> Result<TsplPrintResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let id = parse_wire_id(&request.document_id, "document_id")
+        .map(baraka_domain::sales::DocumentId::from)
+        .map_err(|error| error_code(&error))?;
+    let outcome = PrintTsplTicketUseCase::new(
+        state.documents.as_ref(),
+        state.printer_settings.as_ref(),
+        state.store_identity.as_ref(),
+        state.printer_transport.as_ref(),
+    )
+    .execute(&session, id)
+    .map_err(|error| error_code(&error))?;
+    Ok(TsplPrintResponse {
+        bytes_sent: outcome.bytes_sent,
     })
 }
 

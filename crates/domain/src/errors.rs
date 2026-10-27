@@ -196,4 +196,20 @@ pub enum DomainError {
     /// A printer paper width was neither 58 nor 80 millimeters.
     #[error("invalid printer paper width (millimeters): {0}")]
     InvalidPaperWidthMillimeters(u32),
+    /// A silent TSPL job was requested while the `printer.transport`
+    /// selector points at another arm (BRK-097: spooler only, no dialog).
+    #[error("tspl print requires the spooler transport")]
+    TsplTransportRequiresSpooler,
+    /// A TSPL Code128 payload holds a character outside printable ASCII
+    /// (BRK-097: no mojibake — reject, never transliterate).
+    #[error("tspl barcode payload not encodable in Code128")]
+    TsplBarcodeUnencodable,
+    /// A TSPL Code128 payload is encodable but wider than the media
+    /// (BRK-097: never silently shrink a barcode — reject).
+    #[error("tspl barcode payload wider than the label")]
+    TsplBarcodeTooWide,
+    /// A silent TSPL label asked for a copy count outside 1..=99
+    /// (BRK-097: copies live in PRINT m,n, never in resends).
+    #[error("tspl copies out of range")]
+    TsplCopiesOutOfRange,
 }

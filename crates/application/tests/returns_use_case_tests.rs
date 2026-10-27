@@ -78,6 +78,7 @@ fn source_line(document: &Document, qty_units: i64, unit_price: i64) -> Document
         quantity_base_micro: qty_units * 10_000,
         unit_price_centimes: unit_price,
         discount_centimes: 0,
+        discount_per_unit_centimes: None,
         tva_rate_micro: 0,
         line_ht_centimes: unit_price * qty_units,
         line_tva_centimes: 0,

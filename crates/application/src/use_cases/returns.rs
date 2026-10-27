@@ -302,15 +302,50 @@ where
             }
             // Step 4: fixed-point line math (half-up, i128-checked).
             let ret_qty = item.quantity_micro.micros();
-            let line_ht = Money::from_centimes(original.unit_price_centimes)
-                .checked_mul_qty(QtyMicro::from_micros(ret_qty))
-                .map_err(ApplicationError::Validation)?
-                .centimes();
-            let discount =
-                mul_div_half_up(original.discount_centimes, ret_qty, original.quantity_micro)?;
-            let net_ht = line_ht
-                .checked_sub(discount)
-                .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+            // Per-unit discount path (BRK-096): exact, no division. The
+            // stored per-unit value replays the kernel arithmetic
+            // (`round(ret_qty x discounted PU)`); the stored lump stays
+            // `gross - net` exactly as at commit.
+            // Legacy path (`None`): the old lump pro-rating, unchanged —
+            // pre-BRK-096 lines reprice exactly as before.
+            let (net_ht, discount) = match original.discount_per_unit_centimes {
+                Some(discount_per_unit) => {
+                    let discounted_unit_price = original
+                        .unit_price_centimes
+                        .checked_sub(discount_per_unit)
+                        .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+                    if discount_per_unit > original.unit_price_centimes {
+                        return Err(coded("INCOHERENT_RETURN_SOURCE"));
+                    }
+                    let net_ht = Money::from_centimes(discounted_unit_price)
+                        .checked_mul_qty(QtyMicro::from_micros(ret_qty))
+                        .map_err(ApplicationError::Validation)?
+                        .centimes();
+                    let gross_ht = Money::from_centimes(original.unit_price_centimes)
+                        .checked_mul_qty(QtyMicro::from_micros(ret_qty))
+                        .map_err(ApplicationError::Validation)?
+                        .centimes();
+                    let lump = gross_ht
+                        .checked_sub(net_ht)
+                        .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+                    (net_ht, lump)
+                }
+                None => {
+                    let gross_ht = Money::from_centimes(original.unit_price_centimes)
+                        .checked_mul_qty(QtyMicro::from_micros(ret_qty))
+                        .map_err(ApplicationError::Validation)?
+                        .centimes();
+                    let pro_rated = mul_div_half_up(
+                        original.discount_centimes,
+                        ret_qty,
+                        original.quantity_micro,
+                    )?;
+                    let net = gross_ht
+                        .checked_sub(pro_rated)
+                        .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+                    (net, pro_rated)
+                }
+            };
             let line_tva = if original.line_ht_centimes == 0 {
                 0
             } else {
@@ -347,6 +382,7 @@ where
                 quantity_base_micro,
                 unit_price_centimes: original.unit_price_centimes,
                 discount_centimes: discount,
+                discount_per_unit_centimes: original.discount_per_unit_centimes,
                 line_ht_centimes: net_ht,
                 line_tva_centimes: line_tva,
                 line_ttc_centimes: line_ttc,

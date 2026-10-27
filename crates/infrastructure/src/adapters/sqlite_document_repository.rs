@@ -142,29 +142,31 @@ fn map_item(row: &rusqlite::Row) -> Result<DocumentItem, rusqlite::Error> {
         quantity_base_micro: row.get(5)?,
         unit_price_centimes: row.get(6)?,
         discount_centimes: row.get(7)?,
-        tva_rate_micro: row.get(8)?,
-        line_ht_centimes: row.get(9)?,
-        line_tva_centimes: row.get(10)?,
-        line_ttc_centimes: row.get(11)?,
-        cost_price_centimes: row.get(12)?,
-        sort_order: row.get(13)?,
+        discount_per_unit_centimes: row.get(8)?,
+        tva_rate_micro: row.get(9)?,
+        line_ht_centimes: row.get(10)?,
+        line_tva_centimes: row.get(11)?,
+        line_ttc_centimes: row.get(12)?,
+        cost_price_centimes: row.get(13)?,
+        sort_order: row.get(14)?,
     })
 }
 
 /// Map one joined details row: frozen snapshot + live display designation.
-/// Indices 0-13 mirror [`ITEM_COLUMNS`] (same shape as [`map_item`]);
-/// indices 14-18 carry the LEFT-JOINed designation (all NULL when the row
+/// Indices 0-14 mirror [`ITEM_COLUMNS`] (same shape as [`map_item`]);
+/// names start at 15.
+/// indices 15-19 carry the LEFT-JOINed designation (all NULL when the row
 /// is missing).
 fn map_item_view(row: &rusqlite::Row) -> Result<DocumentItemView, rusqlite::Error> {
     let item = map_item(row)?;
-    let product_name_fr: Option<String> = row.get(14)?;
+    let product_name_fr: Option<String> = row.get(15)?;
     Ok(DocumentItemView {
         product_missing: product_name_fr.is_none(),
         product_name_fr,
-        product_name_ar: row.get(15)?,
-        sku: row.get(16)?,
-        unit_name_fr: row.get(17)?,
-        unit_name_ar: row.get(18)?,
+        product_name_ar: row.get(16)?,
+        sku: row.get(17)?,
+        unit_name_fr: row.get(18)?,
+        unit_name_ar: row.get(19)?,
         item,
     })
 }
@@ -190,7 +192,7 @@ fn map_payment(row: &rusqlite::Row) -> Result<StoredPayment, rusqlite::Error> {
 }
 
 const DOCUMENT_COLUMNS: &str = "id, number, fiscal_year, type, party_id, warehouse_id, language, subtotal_ht_centimes, vat_total_centimes, global_discount_centimes, timbre_centimes, ttc_centimes, paid_amount_centimes, change_amount_centimes, payment_method, status, created_at, created_by, notes";
-const ITEM_COLUMNS: &str = "id, document_id, product_id, unit_id, quantity_micro, quantity_base_micro, unit_price_centimes, discount_centimes, tva_rate_micro, line_ht_centimes, line_tva_centimes, line_ttc_centimes, cost_price_centimes, sort_order";
+const ITEM_COLUMNS: &str = "id, document_id, product_id, unit_id, quantity_micro, quantity_base_micro, unit_price_centimes, discount_centimes, discount_per_unit_centimes, tva_rate_micro, line_ht_centimes, line_tva_centimes, line_ttc_centimes, cost_price_centimes, sort_order";
 
 fn insert_document_tx(
     tx: &rusqlite::Transaction,
@@ -244,9 +246,10 @@ fn insert_items_tx(
             "INSERT INTO document_items
              (id, document_id, product_id, unit_id, quantity_micro,
               quantity_base_micro, unit_price_centimes, discount_centimes,
-              tva_rate_micro, line_ht_centimes, line_tva_centimes,
-              line_ttc_centimes, cost_price_centimes, sort_order)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+              discount_per_unit_centimes, tva_rate_micro, line_ht_centimes,
+              line_tva_centimes, line_ttc_centimes, cost_price_centimes,
+              sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             rusqlite::params![
                 item.id.to_string(),
                 item.document_id.to_string(),
@@ -256,6 +259,7 @@ fn insert_items_tx(
                 item.quantity_base_micro,
                 item.unit_price_centimes,
                 item.discount_centimes,
+                item.discount_per_unit_centimes,
                 item.tva_rate_micro,
                 item.line_ht_centimes,
                 item.line_tva_centimes,
@@ -364,8 +368,9 @@ impl DocumentRepository for SqliteDocumentRepository {
             .prepare(
                 "SELECT di.id, di.document_id, di.product_id, di.unit_id, di.quantity_micro, \
                  di.quantity_base_micro, di.unit_price_centimes, di.discount_centimes, \
-                 di.tva_rate_micro, di.line_ht_centimes, di.line_tva_centimes, \
-                 di.line_ttc_centimes, di.cost_price_centimes, di.sort_order, \
+                 di.discount_per_unit_centimes, di.tva_rate_micro, di.line_ht_centimes, \
+                 di.line_tva_centimes, di.line_ttc_centimes, di.cost_price_centimes, \
+                 di.sort_order, \
                  p.name_fr, p.name_ar, p.sku, u.unit_name_fr, u.unit_name_ar \
                  FROM document_items di \
                  LEFT JOIN products p ON p.id = di.product_id \

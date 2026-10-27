@@ -273,6 +273,10 @@ pub struct DocumentItem {
     pub unit_price_centimes: i64,
     /// Line discount in centimes.
     pub discount_centimes: i64,
+    /// Per-unit line discount in centimes (BRK-096: exact, no division).
+    /// `None` = legacy pre-BRK-096 line: the lump `discount_centimes`
+    /// applies to the line gross and no discounted PU is recoverable.
+    pub discount_per_unit_centimes: Option<i64>,
     /// TVA rate in micros (basis points x 100).
     pub tva_rate_micro: i64,
     /// Line HT after all discounts.

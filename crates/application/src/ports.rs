@@ -610,6 +610,8 @@ pub struct PricedCheckoutLine {
     pub unit_price_centimes: i64,
     /// Line discount in centimes.
     pub discount_centimes: i64,
+    /// Per-unit line discount in centimes (BRK-096, exact).
+    pub discount_per_unit_centimes: i64,
     /// TVA rate in micros (basis points x 100).
     pub tva_rate_micro: i64,
     /// Line HT after all discounts.
@@ -949,6 +951,9 @@ pub struct PersistReturnLine {
     pub unit_price_centimes: i64,
     /// Pro-rated line discount in centimes.
     pub discount_centimes: i64,
+    /// Per-unit line discount in centimes (BRK-096, exact). `None` =
+    /// legacy source line (pro-rated path).
+    pub discount_per_unit_centimes: Option<i64>,
     /// Computed line HT after discount.
     pub line_ht_centimes: i64,
     /// Computed line TVA.

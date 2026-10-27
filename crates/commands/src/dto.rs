@@ -576,7 +576,9 @@ pub struct CartLineItemDto {
     pub quantity_micro: String,
     /// Explicit operator price (`Some` = override attempt).
     pub unit_price_centimes: Option<String>,
-    /// Line discount in centimes.
+    /// Line discount PER UNIT in centimes (BRK-096: the F5 amount hits the
+    /// unit price — `unit_price - discount` — never the line gross; the
+    /// kernel derives the line total as `qty x discounted PU`).
     pub line_discount_centimes: String,
 }
 

@@ -207,6 +207,7 @@ fn bl_line(
         quantity_base_micro: micros,
         unit_price_centimes: unit_price,
         discount_centimes: 0,
+        discount_per_unit_centimes: None,
         tva_rate_micro: 0,
         line_ht_centimes: total,
         line_tva_centimes: 0,

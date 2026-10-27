@@ -44,7 +44,9 @@ pub struct CartLineInput {
     pub quantity_micro: i64,
     /// Explicit operator price (`Some` = override attempt).
     pub unit_price_override: Option<i64>,
-    /// Line discount in centimes.
+    /// Line discount PER UNIT in centimes (owner-locked BRK-096: the F5
+    /// amount hits the unit price; the kernel derives the line total as
+    /// `qty x (unit_price - discount)` with no division).
     pub line_discount_centimes: i64,
 }
 
@@ -318,29 +320,37 @@ where
             }
         }
         // Priced persistence lines with cost snapshots. Stored discount is
-        // the line discount plus the allocated global share.
+        // the line lump plus the allocated global share, where the line
+        // lump is exactly `gross - after` (no re-rounding, no division);
+        // the per-unit value rides alongside for exact display/returns.
         let priced_lines: Vec<PricedCheckoutLine> = verified
             .iter()
             .zip(priced.lines.iter())
             .zip(input.lines.iter())
             .enumerate()
-            .map(|(index, ((line, priced_line), raw))| PricedCheckoutLine {
-                product_id: line.product_id,
-                unit_id: line.unit_id,
-                quantity_micro: line.quantity_micro,
-                quantity_base_micro: line.quantity_base_micro,
-                unit_price_centimes: line.unit_price_centimes,
-                discount_centimes: raw
-                    .line_discount_centimes
-                    .saturating_add(priced_line.allocated_global_discount),
-                tva_rate_micro: 0,
-                line_ht_centimes: priced_line.line_taxable_ht,
-                line_tva_centimes: priced_line.line_tva,
-                line_ttc_centimes: priced_line.line_ttc,
-                cost_price_centimes: line.cost_price_centimes,
-                sort_order: index as i64,
+            .map(|(index, ((line, priced_line), raw))| {
+                let line_lump = priced_line
+                    .line_gross
+                    .checked_sub(priced_line.line_after_discount)
+                    .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+                Ok(PricedCheckoutLine {
+                    product_id: line.product_id,
+                    unit_id: line.unit_id,
+                    quantity_micro: line.quantity_micro,
+                    quantity_base_micro: line.quantity_base_micro,
+                    unit_price_centimes: line.unit_price_centimes,
+                    discount_centimes: line_lump
+                        .saturating_add(priced_line.allocated_global_discount),
+                    discount_per_unit_centimes: raw.line_discount_centimes,
+                    tva_rate_micro: 0,
+                    line_ht_centimes: priced_line.line_taxable_ht,
+                    line_tva_centimes: priced_line.line_tva,
+                    line_ttc_centimes: priced_line.line_ttc,
+                    cost_price_centimes: line.cost_price_centimes,
+                    sort_order: index as i64,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, ApplicationError>>()?;
         let command = CheckoutCommand {
             request_canonical: canonical_request(&input, &verified, &terminal_id),
             command_id: input.command_id.trim().to_string(),
@@ -802,21 +812,30 @@ where
             .zip(priced.lines.iter())
             .zip(input.lines.iter())
             .enumerate()
-            .map(|(index, ((line, priced_line), raw))| DocumentItem {
-                id: Uuid::new_v4(),
-                document_id: id,
-                product_id: line.product_id,
-                unit_id: line.unit_id,
-                quantity_micro: line.quantity_micro,
-                quantity_base_micro: line.quantity_base_micro,
-                unit_price_centimes: line.unit_price_centimes,
-                discount_centimes: raw.line_discount_centimes,
-                tva_rate_micro: 0,
-                line_ht_centimes: priced_line.line_taxable_ht,
-                line_tva_centimes: priced_line.line_tva,
-                line_ttc_centimes: priced_line.line_ttc,
-                cost_price_centimes: line.cost_price_centimes,
-                sort_order: index as i64,
+            .map(|(index, ((line, priced_line), raw))| {
+                // Drafts carry no global share yet; the lump is exactly
+                // `gross - after` (same kernel values the commit stores).
+                let line_lump = priced_line
+                    .line_gross
+                    .checked_sub(priced_line.line_after_discount)
+                    .unwrap_or(0);
+                DocumentItem {
+                    id: Uuid::new_v4(),
+                    document_id: id,
+                    product_id: line.product_id,
+                    unit_id: line.unit_id,
+                    quantity_micro: line.quantity_micro,
+                    quantity_base_micro: line.quantity_base_micro,
+                    unit_price_centimes: line.unit_price_centimes,
+                    discount_centimes: line_lump,
+                    discount_per_unit_centimes: Some(raw.line_discount_centimes),
+                    tva_rate_micro: 0,
+                    line_ht_centimes: priced_line.line_taxable_ht,
+                    line_tva_centimes: priced_line.line_tva,
+                    line_ttc_centimes: priced_line.line_ttc,
+                    cost_price_centimes: line.cost_price_centimes,
+                    sort_order: index as i64,
+                }
             })
             .collect();
         self.documents

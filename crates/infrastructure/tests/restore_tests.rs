@@ -274,6 +274,7 @@ fn seed_document(
                 quantity_base_micro: 10_000,
                 unit_price_centimes: 10_000,
                 discount_centimes: 0,
+                discount_per_unit_centimes: None,
                 tva_rate_micro: 0,
                 line_ht_centimes: 10_000,
                 line_tva_centimes: 0,
@@ -780,6 +781,16 @@ fn restore_older_schema_backup_is_migrated() {
                 .expect("drop v17 size column");
             conn.execute("ALTER TABLE backups_log DROP COLUMN trigger;", [])
                 .expect("drop v17 trigger column");
+        }
+        if app_version >= 18 {
+            // Genuine v17 backups predate migration 0018, so the NULL-able
+            // `document_items.discount_per_unit_centimes` column must go,
+            // or replaying the ADD COLUMN migration fails the same way.
+            conn.execute(
+                "ALTER TABLE document_items DROP COLUMN discount_per_unit_centimes;",
+                [],
+            )
+            .expect("drop v18 per-unit column");
         }
     }
     repoint_logged_hash(

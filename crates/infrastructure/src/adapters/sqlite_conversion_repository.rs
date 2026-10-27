@@ -163,6 +163,7 @@ struct SourceLine {
     quantity_base_micro: i64,
     unit_price_centimes: i64,
     discount_centimes: i64,
+    discount_per_unit_centimes: Option<i64>,
     tva_rate_micro: i64,
     line_ht_centimes: i64,
     line_tva_centimes: i64,
@@ -218,7 +219,7 @@ fn read_source_lines(
         "SELECT product_id, unit_id, quantity_micro, quantity_base_micro,
                 unit_price_centimes, discount_centimes, tva_rate_micro,
                 line_ht_centimes, line_tva_centimes, line_ttc_centimes,
-                cost_price_centimes, sort_order
+                cost_price_centimes, sort_order, discount_per_unit_centimes
          FROM document_items WHERE document_id = ?1 ORDER BY sort_order",
     )?;
     let rows = statement
@@ -236,6 +237,7 @@ fn read_source_lines(
                 line_ttc_centimes: row.get(9)?,
                 cost_price_centimes: row.get(10)?,
                 sort_order: row.get(11)?,
+                discount_per_unit_centimes: row.get(12)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -358,9 +360,10 @@ pub(crate) fn convert_devis_to_bl_atomic(
                 "INSERT INTO document_items
                  (id, document_id, product_id, unit_id, quantity_micro,
                   quantity_base_micro, unit_price_centimes, discount_centimes,
-                  tva_rate_micro, line_ht_centimes, line_tva_centimes,
-                  line_ttc_centimes, cost_price_centimes, sort_order)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                  discount_per_unit_centimes, tva_rate_micro, line_ht_centimes,
+                  line_tva_centimes, line_ttc_centimes, cost_price_centimes,
+                  sort_order)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
                 rusqlite::params![
                     Uuid::new_v4().to_string(),
                     bl_id,
@@ -370,6 +373,7 @@ pub(crate) fn convert_devis_to_bl_atomic(
                     line.quantity_base_micro,
                     line.unit_price_centimes,
                     line.discount_centimes,
+                    line.discount_per_unit_centimes,
                     line.tva_rate_micro,
                     line.line_ht_centimes,
                     line.line_tva_centimes,
@@ -650,9 +654,10 @@ pub(crate) fn convert_bl_to_facture_atomic(
                 "INSERT INTO document_items
                  (id, document_id, product_id, unit_id, quantity_micro,
                   quantity_base_micro, unit_price_centimes, discount_centimes,
-                  tva_rate_micro, line_ht_centimes, line_tva_centimes,
-                  line_ttc_centimes, cost_price_centimes, sort_order)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                  discount_per_unit_centimes, tva_rate_micro, line_ht_centimes,
+                  line_tva_centimes, line_ttc_centimes, cost_price_centimes,
+                  sort_order)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
                 rusqlite::params![
                     Uuid::new_v4().to_string(),
                     facture_id,
@@ -662,6 +667,7 @@ pub(crate) fn convert_bl_to_facture_atomic(
                     line.quantity_base_micro,
                     line.unit_price_centimes,
                     line.discount_centimes,
+                    line.discount_per_unit_centimes,
                     line.tva_rate_micro,
                     line.line_ht_centimes,
                     line.line_tva_centimes,

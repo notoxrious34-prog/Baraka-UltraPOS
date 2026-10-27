@@ -211,6 +211,7 @@ fn seed_document_with_line(
                 quantity_base_micro: 10_000,
                 unit_price_centimes: 10_000,
                 discount_centimes: 0,
+                discount_per_unit_centimes: None,
                 tva_rate_micro: 0,
                 line_ht_centimes: 10_000,
                 line_tva_centimes: 0,

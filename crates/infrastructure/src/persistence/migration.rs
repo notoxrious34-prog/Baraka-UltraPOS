@@ -109,6 +109,11 @@ pub const MIGRATIONS: &[EmbeddedMigration] = &[
         name: "0017_backup_size_trigger.sql",
         sql: include_str!("../../migrations/0017_backup_size_trigger.sql"),
     },
+    EmbeddedMigration {
+        version: 18,
+        name: "0018_line_discount_per_unit.sql",
+        sql: include_str!("../../migrations/0018_line_discount_per_unit.sql"),
+    },
 ];
 
 /// SHA-256 hex digest of `input` (pure Rust, no extra dependency).

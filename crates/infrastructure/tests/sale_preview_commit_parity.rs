@@ -313,9 +313,9 @@ fn preview_equals_commit_with_discounts_bl_no_timbre() {
     seed_stock(&harness, product_b, warehouse, 100_000);
     ensure_cash_session(&harness, warehouse);
     let session = session_with(Role::Vendeur);
-    // A: 2 x 100.00 − 10.00 = 190.00 after line discount.
+    // A: 2 x (100.00 - 10.00) = 180.00 after per-unit discount.
     // B: 1 x 50.50 = 50.50. Global discount 40.50 over bases
-    // [190.00, 50.50] -> allocated [32.00, 8.50], HT = 158.00 + 42.00 = 200.00.
+    // [180.00, 50.50] -> allocated [31.63, 8.87], HT = 148.37 + 41.63 = 190.00.
     let lines = vec![
         CartLineInput {
             product_id: product_a,
@@ -365,7 +365,7 @@ fn preview_equals_commit_with_discounts_bl_no_timbre() {
             preview_untendered.change,
             preview_untendered.remaining_due,
         ),
-        (20_000, 0, 4_050, 0, 20_000, 0, 0, 20_000)
+        (19_000, 0, 4_050, 0, 19_000, 0, 0, 19_000)
     );
     assert_eq!(count(&harness, "documents"), 0);
     // 2. The cashier tenders exactly the previewed TTC (cheque, no cash).
@@ -406,7 +406,7 @@ fn preview_equals_commit_with_discounts_bl_no_timbre() {
             preview.change,
             preview.remaining_due,
         ),
-        (20_000, 0, 4_050, 0, 20_000, 20_000, 0, 0)
+        (19_000, 0, 4_050, 0, 19_000, 19_000, 0, 0)
     );
     // 4. COMMIT the same cart state atomically.
     let receipt = CheckoutSaleUseCase::new(
@@ -451,7 +451,30 @@ fn preview_equals_commit_with_discounts_bl_no_timbre() {
     // 6. The persisted books equal the previewed figures too.
     assert_eq!(
         stored_document_totals(&harness, &receipt.document_id),
-        (20_000, 0, 4_050, 0, 20_000, 20_000, 0)
+        (19_000, 0, 4_050, 0, 19_000, 19_000, 0)
+    );
+    // 7. Per-unit discount persisted exactly (BRK-096): line A stores
+    // per-unit 1,000 with lump (20,000 - 18,000) + 3,163 share = 5,163;
+    // line B stores per-unit 0 with lump 0 + 887 share = 887.
+    let stored: Vec<(i64, Option<i64>, i64, i64)> = read_conn(&harness)
+        .prepare(
+            "SELECT unit_price_centimes, discount_per_unit_centimes,
+                    discount_centimes, line_ht_centimes
+             FROM document_items WHERE document_id = ?1 ORDER BY sort_order",
+        )
+        .expect("lines query")
+        .query_map([receipt.document_id.clone()], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .expect("lines")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("rows");
+    assert_eq!(
+        stored,
+        vec![
+            (10_000, Some(1_000), 5_163, 14_837),
+            (5_050, Some(0), 887, 4_163)
+        ]
     );
 }
 

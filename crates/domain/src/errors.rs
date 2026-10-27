@@ -67,9 +67,9 @@ pub enum DomainError {
     /// A global discount exceeds the document gross.
     #[error("discount exceeds total")]
     DiscountExceedsTotal,
-    /// A line discount exceeds its line gross.
-    #[error("line discount exceeds gross")]
-    LineDiscountExceedsGross,
+    /// A line discount exceeds its unit price.
+    #[error("line discount exceeds unit price")]
+    LineDiscountExceedsUnitPrice,
     /// A quantity is zero or negative where positive is required.
     #[error("invalid quantity")]
     InvalidQuantity,

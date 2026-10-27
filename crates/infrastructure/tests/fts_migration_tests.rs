@@ -143,19 +143,19 @@ fn fresh_apply_registers_v16_with_checksum() {
     assert_eq!(checksum, expected);
 }
 
-/// 0016+0017 apply on an upgraded database (0001-0015 pre-applied raw).
+/// 0016+0017+0018 apply on an upgraded database (0001-0015 pre-applied raw).
 #[test]
-fn upgrade_path_applies_only_v16() {
+fn upgrade_path_applies_only_pending() {
     let dir = tempfile::tempdir().expect("tempdir");
     let mut conn = open_connection(&dir.path().join("up.db")).expect("open");
     apply_pre16(&mut conn);
-    run_migrations(&mut conn).expect("upgrade to 17");
+    run_migrations(&mut conn).expect("upgrade to 18");
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| {
             row.get(0)
         })
         .expect("count");
-    assert_eq!(count, 17);
+    assert_eq!(count, 18);
     let fts_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM products_fts", [], |row| row.get(0))
         .expect("fts readable");

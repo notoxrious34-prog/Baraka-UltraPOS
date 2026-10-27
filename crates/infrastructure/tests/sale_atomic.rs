@@ -912,6 +912,61 @@ fn draft_parks_without_side_effects() {
 }
 
 #[test]
+fn draft_parks_per_unit_discount_exact() {
+    let harness = setup();
+    let warehouse = seed_warehouse(&harness, "MAIN");
+    let (product, unit) = seed_product(&harness, "P1", 10_000, false);
+    seed_stock(&harness, product, warehouse, 100_000);
+    let session = session_with(Role::Vendeur);
+    let clock = baraka_infrastructure::adapters::SystemClock;
+    // Owner example (BRK-096): 3 x (10,000 - 1,000) = 27,000 parked.
+    let draft_id = CreateDraftSaleUseCase::new(
+        &harness.catalog,
+        &harness.documents,
+        &harness.warehouses,
+        &harness.customers,
+        &clock,
+    )
+    .execute(
+        &session,
+        DraftInput {
+            warehouse_id: warehouse,
+            customer_id: None,
+            language: DocumentLanguage::Ar,
+            lines: vec![CartLineInput {
+                product_id: product,
+                unit_id: unit,
+                quantity_micro: 30_000,
+                unit_price_override: None,
+                line_discount_centimes: 1_000,
+            }],
+            notes: None,
+        },
+        TEST_TERMINAL,
+    )
+    .expect("draft");
+    let detail = GetSaleUseCase::new(&harness.documents)
+        .execute(&session, draft_id)
+        .expect("fetch draft");
+    assert_eq!(detail.items.len(), 1);
+    assert_eq!(detail.items[0].discount_per_unit_centimes, Some(1_000));
+    // Lump is exactly `gross - after`: 30,000 - 27,000 = 3,000.
+    assert_eq!(detail.items[0].discount_centimes, 3_000);
+    assert_eq!(detail.items[0].line_ht_centimes, 27_000);
+    assert_eq!(detail.document.subtotal_ht_centimes, 27_000);
+    assert_eq!(detail.document.ttc_centimes, 27_000);
+    assert_eq!(
+        harness
+            .stock
+            .get_stock_level(product, warehouse)
+            .expect("level"),
+        100_000
+    );
+    assert_eq!(count(&harness, "stock_movements"), 0);
+    assert_eq!(count(&harness, "payments"), 0);
+}
+
+#[test]
 fn gapless_numbers_stay_consecutive() {
     let harness = setup();
     let warehouse = seed_warehouse(&harness, "MAIN");

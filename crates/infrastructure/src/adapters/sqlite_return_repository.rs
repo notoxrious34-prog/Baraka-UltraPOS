@@ -209,10 +209,10 @@ fn persist_return_atomic(
                 "INSERT INTO document_items
                  (id, document_id, product_id, unit_id, source_item_id,
                   quantity_micro, quantity_base_micro, unit_price_centimes,
-                  discount_centimes, tva_rate_micro, line_ht_centimes,
-                  line_tva_centimes, line_ttc_centimes, cost_price_centimes,
-                  sort_order)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10, ?11, ?12, ?13, ?14)",
+                  discount_centimes, discount_per_unit_centimes, tva_rate_micro,
+                  line_ht_centimes, line_tva_centimes, line_ttc_centimes,
+                  cost_price_centimes, sort_order)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 0, ?11, ?12, ?13, ?14, ?15)",
                 rusqlite::params![
                     Uuid::new_v4().to_string(),
                     avoir_id,
@@ -223,6 +223,7 @@ fn persist_return_atomic(
                     line.quantity_base_micro,
                     line.unit_price_centimes,
                     line.discount_centimes,
+                    line.discount_per_unit_centimes,
                     line.line_ht_centimes,
                     line.line_tva_centimes,
                     line.line_ttc_centimes,

@@ -305,9 +305,10 @@ impl CheckoutRepository for SqliteCheckoutRepository {
                     "INSERT INTO document_items
                      (id, document_id, product_id, unit_id, quantity_micro,
                       quantity_base_micro, unit_price_centimes, discount_centimes,
-                      tva_rate_micro, line_ht_centimes, line_tva_centimes,
-                      line_ttc_centimes, cost_price_centimes, sort_order)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                      discount_per_unit_centimes, tva_rate_micro, line_ht_centimes,
+                      line_tva_centimes, line_ttc_centimes, cost_price_centimes,
+                      sort_order)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
                     rusqlite::params![
                         Uuid::new_v4().to_string(),
                         document_id,
@@ -317,6 +318,7 @@ impl CheckoutRepository for SqliteCheckoutRepository {
                         line.quantity_base_micro,
                         line.unit_price_centimes,
                         line.discount_centimes,
+                        line.discount_per_unit_centimes,
                         line.tva_rate_micro,
                         line.line_ht_centimes,
                         line.line_tva_centimes,

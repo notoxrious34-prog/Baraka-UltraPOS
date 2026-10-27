@@ -509,6 +509,8 @@ fn parse_customer_tier(
 
 /// Parse one cart line DTO (same field contract as `sales_checkout` and
 /// `sales_create_draft`, per the established sales edge-parse precedent).
+/// `line_discount_centimes` is the PER-UNIT F5 discount (BRK-096); the
+/// shape is unchanged, only the meaning moved from line gross to unit price.
 fn parse_cart_line_dto(dto: &CartLineItemDto) -> Result<CartLineInput, ApplicationError> {
     Ok(CartLineInput {
         product_id: parse_wire_id(&dto.product_id, "product_id").map(ProductId::from)?,

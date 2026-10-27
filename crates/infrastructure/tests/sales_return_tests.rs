@@ -185,6 +185,7 @@ fn sale_line(
         quantity_base_micro: micros,
         unit_price_centimes: unit_price,
         discount_centimes: 0,
+        discount_per_unit_centimes: None,
         tva_rate_micro: 0,
         line_ht_centimes: unit_price * qty_units,
         line_tva_centimes: 0,
@@ -461,6 +462,73 @@ fn partial_return_with_customer_credit_reduces_debt() {
         .expect("balance");
     assert_eq!(balance, -10_000);
     assert_eq!(stock_level(&harness, p1, warehouse), 90_000);
+}
+
+#[test]
+fn partial_return_with_per_unit_discount_is_exact() {
+    let harness = setup();
+    let warehouse = seed_warehouse(&harness, "MAIN");
+    let (p1, u1) = seed_product(&harness, "SR1", 10_000);
+    set_stock(&harness, p1, warehouse, 70_000);
+    let session_id = seed_cash_session(&harness, warehouse);
+    let draft = DocumentId::new();
+    // 3 x (10,000 - 1,000) = 27,000: stored per-unit + exact lump.
+    let mut line = sale_line(draft, p1, u1, 3, 10_000, 0);
+    line.discount_per_unit_centimes = Some(1_000);
+    line.discount_centimes = 3_000;
+    line.line_ht_centimes = 27_000;
+    line.line_ttc_centimes = 27_000;
+    let (sale, lines) = seed_document(
+        &harness,
+        warehouse,
+        DocumentType::Ticket,
+        DocumentStatus::Finalized,
+        "TICK-2026-000002",
+        vec![line],
+        None,
+    );
+    // Return 1 of 3 units: exact replay round(1 x 9,000) = 9,000, no division.
+    let result = execute(
+        &harness,
+        return_command(
+            sale,
+            &[(lines[0].id, 1)],
+            RefundDestination::Cash {
+                cash_session_id: session_id.clone(),
+            },
+        ),
+    )
+    .expect("partial per-unit return");
+    assert_eq!(result.total_refund_ht.centimes(), 9_000);
+    assert_eq!(result.total_refund_ttc.centimes(), 9_000);
+    assert_eq!(result.items_returned_count, 1);
+    // Avoir line replays the stored per-unit value exactly.
+    let avoir: (Option<i64>, i64, i64) = harness
+        .db
+        .lock()
+        .expect("lock")
+        .query_row(
+            "SELECT discount_per_unit_centimes, discount_centimes, line_ht_centimes
+             FROM document_items WHERE document_id = ?1",
+            [result.return_document_id.to_string()],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("avoir line");
+    assert_eq!(avoir, (Some(1_000), 1_000, 9_000));
+    // Drawer paid out exactly 9,000; stock restored by one unit.
+    let refund: i64 = harness
+        .db
+        .lock()
+        .expect("lock")
+        .query_row(
+            "SELECT amount_centimes FROM cash_movements
+             WHERE cash_session_id = ?1 AND movement_type = 'REFUND_OUT'",
+            [&session_id],
+            |row| row.get(0),
+        )
+        .expect("refund");
+    assert_eq!(refund, -9_000);
+    assert_eq!(stock_level(&harness, p1, warehouse), 80_000);
 }
 
 #[test]

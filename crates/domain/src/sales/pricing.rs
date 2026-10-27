@@ -21,7 +21,9 @@ pub struct PricedLineInput {
     pub quantity_micro: i64,
     /// Agreed unit price in centimes.
     pub unit_price_centimes: i64,
-    /// Line discount in centimes (`<=` gross).
+    /// Line discount PER UNIT in centimes (owner-locked BRK-096: the F5
+    /// amount applies to the unit price, so 100 x 3 units = 300 line
+    /// discount; `<=` the unit price, never divided).
     pub line_discount_centimes: i64,
     /// TVA rate in basis points (19% = 1900).
     pub tva_rate_basis_points: i64,
@@ -32,10 +34,14 @@ pub struct PricedLineInput {
 /// One priced line output (all centimes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PricedLine {
-    /// `round(qty * price)`.
+    /// `round(qty * price)` on the agreed (pre-discount) unit price.
     pub line_gross: i64,
-    /// Gross minus line discount.
+    /// `round(qty * discounted_unit_price)` — the line amount after the
+    /// per-unit discount (exact subtraction, single rounding).
     pub line_after_discount: i64,
+    /// Discounted unit price (`unit_price - line_discount`, exact, no
+    /// division) — displayed and printed by DSN-097.
+    pub discounted_unit_price_centimes: i64,
     /// Hare-Niemeyer share of the global discount.
     pub allocated_global_discount: i64,
     /// Taxable HT after all discounts.
@@ -301,17 +307,26 @@ pub fn price_document(
     if global_discount_centimes < 0 {
         return Err(DomainError::NegativeMoneyForbidden);
     }
-    // Gross + line discounts.
+    // Gross + per-unit line discounts (BRK-096): the discount hits the
+    // unit price by exact subtraction (no division anywhere); the line
+    // amount is then the single canonical `round(qty * discounted PU)`.
     let mut gross_lines: Vec<(i64, i64)> = Vec::with_capacity(lines.len());
+    let mut discounted_prices: Vec<i64> = Vec::with_capacity(lines.len());
     for line in lines {
         if line.line_discount_centimes < 0 {
             return Err(DomainError::NegativeMoneyForbidden);
         }
-        let gross = price_line_gross(line.quantity_micro, line.unit_price_centimes)?;
-        if line.line_discount_centimes > gross {
-            return Err(DomainError::LineDiscountExceedsGross);
+        if line.line_discount_centimes > line.unit_price_centimes {
+            return Err(DomainError::LineDiscountExceedsUnitPrice);
         }
-        gross_lines.push((gross, gross - line.line_discount_centimes));
+        let discounted_unit_price = line
+            .unit_price_centimes
+            .checked_sub(line.line_discount_centimes)
+            .ok_or(DomainError::MoneyOverflow)?;
+        let gross = price_line_gross(line.quantity_micro, line.unit_price_centimes)?;
+        let after = price_line_gross(line.quantity_micro, discounted_unit_price)?;
+        gross_lines.push((gross, after));
+        discounted_prices.push(discounted_unit_price);
     }
     // Global allocation over after-discount bases.
     let shares: Vec<DiscountShare> = lines
@@ -327,7 +342,12 @@ pub fn price_document(
     let mut priced = Vec::with_capacity(lines.len());
     let mut subtotal_ht: i128 = 0;
     let mut total_tva: i128 = 0;
-    for ((line, (_, after)), share) in lines.iter().zip(gross_lines.iter()).zip(allocated.iter()) {
+    for (((line, (_, after)), share), discounted) in lines
+        .iter()
+        .zip(gross_lines.iter())
+        .zip(allocated.iter())
+        .zip(discounted_prices.iter())
+    {
         let taxable = after
             .checked_sub(*share)
             .ok_or(DomainError::MoneyOverflow)?;
@@ -342,6 +362,7 @@ pub fn price_document(
         priced.push(PricedLine {
             line_gross: gross_lines[priced.len()].0,
             line_after_discount: *after,
+            discounted_unit_price_centimes: *discounted,
             allocated_global_discount: *share,
             line_taxable_ht: taxable,
             line_tva: tva,
@@ -393,6 +414,7 @@ mod tests {
         PricedLineInput {
             quantity_micro: qty,
             unit_price_centimes: price,
+            // Per-unit discount (BRK-096): hits the unit price, not the gross.
             line_discount_centimes: discount,
             tva_rate_basis_points: tva,
             sort_order: order,
@@ -533,6 +555,9 @@ mod tests {
 
     #[test]
     fn full_document_prices_end_to_end() {
+        // Line 2 carries a per-unit discount: 5,000 - 500 = 4,500 PU',
+        // x1 unit = 4,500 after (same numerals as the old lump math here
+        // because qty is exactly 1.0; the PU' field is the new proof).
         let lines = [
             input(20_000, 10_000, 0, 1_900, 0),
             input(10_000, 5_000, 500, 1_900, 1),
@@ -543,7 +568,9 @@ mod tests {
         }];
         let priced =
             price_document(&lines, 1_000, DocumentType::Ticket, &payments, true).expect("price");
-        // Gross: 20,000 + 4,500 after line discount; global 1,000 splits.
+        // Gross: 20,000 + 4,500 after per-unit line discount; PU' echoed.
+        assert_eq!(priced.lines[0].discounted_unit_price_centimes, 10_000);
+        assert_eq!(priced.lines[1].discounted_unit_price_centimes, 4_500);
         assert_eq!(priced.global_discount, 1_000);
         let allocated: i64 = priced
             .lines
@@ -572,10 +599,47 @@ mod tests {
             price_document(&[], 0, DocumentType::Ticket, &[], true),
             Err(DomainError::EmptyCart)
         );
+        // Per-unit discount above the unit price is rejected (no free-plus).
         let bad = [input(10_000, 1_000, 2_000, 0, 0)];
         assert_eq!(
             price_document(&bad, 0, DocumentType::Ticket, &[], true),
-            Err(DomainError::LineDiscountExceedsGross)
+            Err(DomainError::LineDiscountExceedsUnitPrice)
+        );
+    }
+
+    #[test]
+    fn per_unit_owner_example_three_units_off_100() {
+        // Owner-locked BRK-096 example: 3 x (1,000 - 100) = 2,700 line
+        // total with discounted PU 900. Exact: subtraction only, the only
+        // division in play is the canonical qty scaling inside
+        // `price_line_gross`.
+        let lines = [input(30_000, 1_000, 100, 0, 0)];
+        let priced = price_document(&lines, 0, DocumentType::Ticket, &[], true).expect("price");
+        assert_eq!(priced.lines[0].discounted_unit_price_centimes, 900);
+        assert_eq!(priced.lines[0].line_gross, 3_000);
+        assert_eq!(priced.lines[0].line_after_discount, 2_700);
+        assert_eq!(priced.subtotal_ht, 2_700);
+        assert_eq!(priced.total_ttc, 2_700);
+    }
+
+    #[test]
+    fn per_unit_discount_bound_edges() {
+        // Discount equal to the unit price zeroes the line (allowed).
+        let free = [input(20_000, 1_000, 1_000, 0, 0)];
+        let priced = price_document(&free, 0, DocumentType::Ticket, &[], true).expect("free line");
+        assert_eq!(priced.lines[0].discounted_unit_price_centimes, 0);
+        assert_eq!(priced.lines[0].line_after_discount, 0);
+        // One centime over the unit price is rejected.
+        let over = [input(20_000, 1_000, 1_001, 0, 0)];
+        assert_eq!(
+            price_document(&over, 0, DocumentType::Ticket, &[], true),
+            Err(DomainError::LineDiscountExceedsUnitPrice)
+        );
+        // Negative discounts stay forbidden.
+        let negative = [input(20_000, 1_000, -1, 0, 0)];
+        assert_eq!(
+            price_document(&negative, 0, DocumentType::Ticket, &[], true),
+            Err(DomainError::NegativeMoneyForbidden)
         );
     }
 

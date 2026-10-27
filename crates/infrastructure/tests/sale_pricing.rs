@@ -153,6 +153,33 @@ fn priced_document_invariants_hold() {
         true,
     )
     .expect("price");
+    // Per-unit line discount (BRK-096): 3.0 x (12,000 - 1,000) = 33,000;
+    // 1.5 x 8,000 = 12,000. Global 2,500 over bases [33,000, 12,000]
+    // -> allocated [1,833, 667] by largest remainder.
+    assert_eq!(
+        priced
+            .lines
+            .iter()
+            .map(|line| line.discounted_unit_price_centimes)
+            .collect::<Vec<_>>(),
+        vec![11_000, 8_000]
+    );
+    assert_eq!(
+        priced
+            .lines
+            .iter()
+            .map(|line| line.line_after_discount)
+            .collect::<Vec<_>>(),
+        vec![33_000, 12_000]
+    );
+    assert_eq!(
+        priced
+            .lines
+            .iter()
+            .map(|line| line.allocated_global_discount)
+            .collect::<Vec<_>>(),
+        vec![1_833, 667]
+    );
     assert_eq!(
         priced
             .lines

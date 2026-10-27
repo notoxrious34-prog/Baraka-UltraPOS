@@ -984,6 +984,51 @@ export async function ipcReprint(
   return wire.job_id;
 }
 
+/** Silent 40x20 label job input (mirrors TsplLabelRequest; copies 1..99 validated upstream). */
+export interface TsplLabelJob {
+  name: string;
+  priceCentimes: string;
+  barcode: string;
+  copies: number;
+}
+
+/** Silent TSPL print outcome: spooled byte count (mirrors TsplPrintResponse). */
+export interface TsplPrintOutcome {
+  bytesSent: number;
+}
+
+interface TsplPrintWire {
+  bytes_sent: number;
+}
+
+/** Silent 40x20 mm shelf-label print (button-triggered, spooler only — never a dialog). */
+export async function ipcPrintTsplLabel(
+  sessionToken: string,
+  job: TsplLabelJob,
+): Promise<number> {
+  const wire = await call<TsplPrintWire>("print_tspl_label", {
+    request: {
+      session_token: sessionToken,
+      name: job.name,
+      price_centimes: job.priceCentimes,
+      barcode: job.barcode,
+      copies: job.copies,
+    },
+  });
+  return wire.bytes_sent;
+}
+
+/** Silent 80 mm ticket print (button-triggered, spooler only — never a dialog). */
+export async function ipcPrintTsplTicket(
+  sessionToken: string,
+  documentId: string,
+): Promise<number> {
+  const wire = await call<TsplPrintWire>("print_tspl_ticket", {
+    request: { session_token: sessionToken, document_id: documentId },
+  });
+  return wire.bytes_sent;
+}
+
 /** DEVIS-to-BL conversion request (mirrors ConvertDevisToBlRequest). */
 export interface ConvertDevisToBlWireRequest {
   session_token: string;

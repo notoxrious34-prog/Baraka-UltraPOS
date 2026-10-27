@@ -16,6 +16,8 @@ import { useSessionStore } from "@/stores/session-store";
 import { ipcGetCatalogMetrics, ipcGetStock, ipcListCategories, ipcSearchCatalog, listWarehouses } from "@/lib/ipc";
 import type { CatalogMetricsDto } from "@/lib/ipc";
 import { ipcDeleteProduct, type DeleteEntityResult } from "@/lib/ipc";
+import { ipcGetPrinterSettings } from "@/lib/ipc";
+import { SilentLabelModal } from "@/features/catalog/SilentLabelModal";
 import { SafeDeleteModal } from "@/components/common/SafeDeleteModal";
 import { formatMoney, formatQty } from "@/lib/money";
 import type { CatalogProduct } from "@/types/pos";
@@ -706,6 +708,9 @@ export function CatalogModule(): ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [labelProduct, setLabelProduct] = useState<CatalogProduct | null>(null);
+  // Spooler transport owns the silent 40x20 TSPL modal; anything else keeps
+  // the frozen dialog-bound label modal (entry point unchanged either way).
+  const [spoolerMode, setSpoolerMode] = useState(false);
   const [editProduct, setEditProduct] = useState<CatalogProduct | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<CatalogProduct | null>(null);
   /** Inline confirmation after a safe deletion (mode-aware copy). */
@@ -867,6 +872,30 @@ export function CatalogModule(): ReactElement {
     };
   }, [token]);
 
+  // Transport probe for the label entry point: spooler mounts the silent
+  // 40x20 TSPL modal, anything else keeps the frozen dialog modal.
+  useEffect(() => {
+    if (token === null) {
+      return;
+    }
+    const activeToken: string = token;
+    let cancelled = false;
+    ipcGetPrinterSettings(activeToken)
+      .then((settings) => {
+        if (!cancelled) {
+          setSpoolerMode(settings.transport === "spooler");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSpoolerMode(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   // Defense in depth: the screen verifies the role itself, independent of
   // NavRail visibility (URL/state manipulation must never expose the hub).
   if (!authed) {
@@ -997,7 +1026,17 @@ export function CatalogModule(): ReactElement {
           refresh();
         }}
       />
-      {labelProduct !== null && (
+      {labelProduct !== null && spoolerMode && (
+        <SilentLabelModal
+          product={labelProduct}
+          isOpen
+          token={activeToken}
+          onClose={() => {
+            setLabelProduct(null);
+          }}
+        />
+      )}
+      {labelProduct !== null && !spoolerMode && (
         <ProductLabelModal
           product={labelProduct}
           isOpen

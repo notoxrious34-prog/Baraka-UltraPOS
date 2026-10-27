@@ -11,10 +11,12 @@ import {
   getDocumentDetails,
   getStoreIdentity,
   ipcGetPrinterSettings,
+  ipcPrintTsplTicket,
   ipcReprint,
   type DocumentDetailsWireResponse,
   type DocumentSummaryWireDto,
 } from "@/lib/ipc";
+import { resolveTicketPrintPath } from "@/lib/ticket-print-path";
 import {
   buildTicketPrintHtml,
   printTicketDocument,
@@ -410,6 +412,12 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
   // Graphique ticket mode (TASK-DSN-093): resolved per drawer open; escpos
   // keeps the engine DUPLICATA reprint below untouched.
   const [renderMode, setRenderMode] = useState<"escpos" | "graphique">("escpos");
+  // Silent TSPL ticket (TASK-DSN-098): spooler transport owns the silent
+  // button; anything else keeps the frozen graphique/engine paths below.
+  const [transport, setTransport] = useState<"spooler" | "serial">("serial");
+  const [tsplState, setTsplState] = useState<"idle" | "sending" | "ok" | "fail">("idle");
+  const [tsplError, setTsplError] = useState<string | null>(null);
+  const [tsplBytes, setTsplBytes] = useState<number | null>(null);
 
   useEffect(() => {
     setReprintState("idle");
@@ -420,6 +428,10 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
     setIdentity(null);
     setPrinting(false);
     setRenderMode("escpos");
+    setTransport("serial");
+    setTsplState("idle");
+    setTsplError(null);
+    setTsplBytes(null);
     let cancelled = false;
     getDocumentDetails(document.id)
       .then((full) => {
@@ -438,6 +450,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
       .then((settings) => {
         if (!cancelled) {
           setRenderMode(settings.ticketRenderMode);
+          setTransport(settings.transport);
         }
       })
       .catch(() => {
@@ -624,6 +637,31 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
       });
   };
 
+  // Silent TSPL ticket (TASK-DSN-098): spooler-only, never window.print.
+  const printTsplTicketSilent = (): void => {
+    if (tsplState === "sending") {
+      return;
+    }
+    setTsplState("sending");
+    setTsplError(null);
+    setTsplBytes(null);
+    ipcPrintTsplTicket(props.token, document.id)
+      .then((bytes) => {
+        setTsplBytes(bytes);
+        setTsplState("ok");
+      })
+      .catch((failure: unknown) => {
+        setTsplState("fail");
+        setTsplError(typeof failure === "string" ? failure : "INTERNAL_ERROR");
+      });
+  };
+
+  const ticketPath = resolveTicketPrintPath({
+    transport,
+    renderMode,
+    documentType: document.document_type,
+  });
+
   return (
     <aside className="flex h-full w-[400px] min-h-0 flex-none flex-col gap-3 overflow-y-auto border-s border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-start gap-2">
@@ -737,7 +775,17 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
         />
       )}
 
-      {renderMode === "graphique" ? (
+      {ticketPath === "silent-tspl" ? (
+        <button
+          type="button"
+          data-testid="silent-tspl-ticket"
+          onClick={printTsplTicketSilent}
+          disabled={tsplState === "sending"}
+          className="h-11 shrink-0 rounded-lg bg-accent-500 text-sm font-black text-slate-950 disabled:opacity-50"
+        >
+          {tsplState === "sending" ? t(locale, "tspl.ticketSending") : t(locale, "tspl.silentTicket")}
+        </button>
+      ) : renderMode === "graphique" ? (
         <button
           type="button"
           onClick={printTicket}
@@ -755,6 +803,17 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
         >
           {reprintState === "sending" ? t(locale, "documents.reprinting") : t(locale, "documents.reprint")}
         </button>
+      )}
+      {ticketPath === "silent-tspl" && tsplState === "ok" && (
+        <p className="rounded-md bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200" data-testid="silent-tspl-ticket-notice" role="status">
+          {t(locale, "tspl.ticketOk").replace("{bytes}", String(tsplBytes ?? 0))}
+        </p>
+      )}
+      {ticketPath === "silent-tspl" && tsplState === "fail" && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200" data-testid="silent-tspl-ticket-error" role="alert">
+          {t(locale, "tspl.ticketFail")}
+          {tsplError !== null && ` · ${translateBackendError(tsplError, locale)}`}
+        </p>
       )}
       {reprintState === "ok" && (
         <p className="rounded-md bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">

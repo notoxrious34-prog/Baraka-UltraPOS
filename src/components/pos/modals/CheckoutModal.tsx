@@ -27,12 +27,14 @@ import {
   getDocumentDetails,
   getStoreIdentity,
   ipcGetPrinterSettings,
+  ipcPrintTsplTicket,
   type CheckoutLineWire,
   type CheckoutPaymentWire,
   type PreviewTotalsWire,
   type StockShortageWarningWire,
 } from "@/lib/ipc";
 import type { CartLine, SaleReceipt } from "@/types/pos";
+import { resolveTicketPrintPath } from "@/lib/ticket-print-path";
 import { ModalShell } from "@/components/pos/modals/ModalShell";
 import { PrintStatusIndicator } from "@/components/pos/PrintStatusIndicator";
 import { useCashSessionStore } from "@/stores/cash-session-store";
@@ -179,6 +181,12 @@ export function CheckoutModal(): ReactElement {
   const ticketPrintedFor = useRef<string | null>(null);
   const [ticketHtml, setTicketHtml] = useState<string | null>(null);
   const [graphiqueMode, setGraphiqueMode] = useState(false);
+  // Silent TSPL reprint (TASK-DSN-098): spooler owns the paper via the
+  // button below; the graphique auto/manual dialog path stays frozen.
+  const [spoolerMode, setSpoolerMode] = useState(false);
+  const [tsplState, setTsplState] = useState<"idle" | "sending" | "ok" | "fail">("idle");
+  const [tsplError, setTsplError] = useState<string | null>(null);
+  const [tsplBytes, setTsplBytes] = useState<number | null>(null);
   const previewRequestIdRef = useRef(0);
   const cashPrefilledRef = useRef(false);
   // Single-dispatch submission controller: created once per mounted modal
@@ -300,6 +308,10 @@ export function CheckoutModal(): ReactElement {
     ticketPrintedFor.current = done.document_id;
     setTicketHtml(null);
     setGraphiqueMode(false);
+    setSpoolerMode(false);
+    setTsplState("idle");
+    setTsplError(null);
+    setTsplBytes(null);
     const sessionToken = useSessionStore.getState().session?.token ?? null;
     if (sessionToken === null) {
       return;
@@ -308,6 +320,13 @@ export function CheckoutModal(): ReactElement {
     const language = doneLang;
     ipcGetPrinterSettings(sessionToken)
       .then((settings) => {
+        if (settings.transport === "spooler") {
+          // Spooler owns the paper: mark the receipt handled and stop here —
+          // no graphique html, no auto window.print; the silent TSPL button
+          // below is the only paper path for this receipt.
+          setSpoolerMode(true);
+          return;
+        }
         if (settings.ticketRenderMode !== "graphique") {
           return;
         }
@@ -535,6 +554,35 @@ export function CheckoutModal(): ReactElement {
       .replace("{available}", fmtQty(warning.available_qty_micro))
       .replace("{requested}", fmtQty(warning.requested_qty_micro));
 
+  // Silent TSPL reprint (TASK-DSN-098): spooler-only, never window.print.
+  const printTsplTicketSilent = (): void => {
+    if (done === null || tsplState === "sending") {
+      return;
+    }
+    const sessionToken = useSessionStore.getState().session?.token ?? null;
+    if (sessionToken === null) {
+      return;
+    }
+    setTsplState("sending");
+    setTsplError(null);
+    setTsplBytes(null);
+    ipcPrintTsplTicket(sessionToken, done.document_id)
+      .then((bytes) => {
+        setTsplBytes(bytes);
+        setTsplState("ok");
+      })
+      .catch((failure: unknown) => {
+        setTsplState("fail");
+        setTsplError(typeof failure === "string" ? failure : "INTERNAL_ERROR");
+      });
+  };
+
+  const postSaleTicketPath = resolveTicketPrintPath({
+    transport: spoolerMode ? "spooler" : "serial",
+    renderMode: graphiqueMode ? "graphique" : "escpos",
+    documentType: "TICKET",
+  });
+
   if (done !== null) {
     return (
       <ModalShell title={t(locale, "checkout.title")} onClose={finishSale}>
@@ -543,16 +591,39 @@ export function CheckoutModal(): ReactElement {
             {t(locale, "checkout.success")} — <span className="font-mono">{done.document_number}</span>
           </p>
           <PrintStatusIndicator documentId={done.document_id} />
-          {graphiqueMode && ticketHtml !== null && (
+          {postSaleTicketPath === "silent-tspl" ? (
             <button
               type="button"
-              onClick={() => {
-                printTicketDocument(ticketHtml);
-              }}
+              data-testid="silent-tspl-postsale"
+              onClick={printTsplTicketSilent}
+              disabled={tsplState === "sending"}
               className="h-11 shrink-0 rounded-lg border border-slate-300 text-sm font-black dark:border-slate-600"
             >
-              {t(locale, "checkout.printTicket")}
+              {tsplState === "sending" ? t(locale, "tspl.ticketSending") : t(locale, "tspl.silentTicket")}
             </button>
+          ) : (
+            graphiqueMode && ticketHtml !== null && (
+              <button
+                type="button"
+                onClick={() => {
+                  printTicketDocument(ticketHtml);
+                }}
+                className="h-11 shrink-0 rounded-lg border border-slate-300 text-sm font-black dark:border-slate-600"
+              >
+                {t(locale, "checkout.printTicket")}
+              </button>
+            )
+          )}
+          {postSaleTicketPath === "silent-tspl" && tsplState === "ok" && (
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-center text-sm font-bold text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200" data-testid="silent-tspl-postsale-notice" role="status">
+              {t(locale, "tspl.ticketOk").replace("{bytes}", String(tsplBytes ?? 0))}
+            </p>
+          )}
+          {postSaleTicketPath === "silent-tspl" && tsplState === "fail" && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-center text-sm font-bold text-red-800 dark:bg-red-900/30 dark:text-red-200" data-testid="silent-tspl-postsale-error" role="alert">
+              {t(locale, "tspl.ticketFail")}
+              {tsplError !== null && ` · ${translateBackendError(tsplError, locale)}`}
+            </p>
           )}
           <button
             type="button"

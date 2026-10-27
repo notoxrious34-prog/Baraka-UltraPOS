@@ -100,7 +100,10 @@ function ttcToDisplay(ttcCentimes: string): string {
   }
 }
 
-/** Cart lines on the wire (identical shape for preview and commit). */
+/** Cart lines on the wire (identical shape for preview and commit).
+ * `line_discount_centimes` travels AS the typed per-unit F5 amount
+ * (BRK-096: the edge, kernel, and storage all read it per unit) — mapped
+ * through verbatim here, never reinterpreted. */
 function buildLineWires(lines: CartLine[]): CheckoutLineWire[] {
   return lines.map((line) => {
     const unit = line.units[line.unitIndex];
@@ -334,6 +337,8 @@ export function CheckoutModal(): ReactElement {
                 unitAr: item.unit_name_ar,
                 quantityMicro: item.quantity_micro,
                 unitPriceCentimes: item.unit_price_centimes,
+                discountPerUnitCentimes: item.discount_per_unit_centimes,
+                discountedUnitPriceCentimes: item.discounted_unit_price_centimes,
                 lineTtcCentimes: item.line_ttc_centimes,
               })),
             },

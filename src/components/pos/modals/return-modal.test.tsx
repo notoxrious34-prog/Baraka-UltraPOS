@@ -91,6 +91,8 @@ const contextWire = {
       unit_id: "unit-1",
       unit_name: "Pièce",
       unit_price_centimes: "7750",
+      discount_per_unit_centimes: null,
+      discounted_unit_price_centimes: null,
       original_quantity_micro: "20000",
       already_returned_micro: "5000",
       remaining_allowable_micro: "15000",
@@ -167,6 +169,8 @@ describe("settlement math", () => {
             ...contextWire.items[0]!,
             remaining_allowable_micro: "20000",
             unit_price_centimes: "7750",
+            discount_per_unit_centimes: null,
+            discounted_unit_price_centimes: null,
             discount_centimes: "0",
             tva_rate: 190000,
           },
@@ -299,5 +303,59 @@ describe("error mapping", () => {
       expect(translateBackendError(code, "fr-DZ")).not.toBe("Erreur interne du noyau");
       expect(translateBackendError(code, "ar-DZ")).not.toBe("خطأ داخلي في النواة");
     }
+  });
+});
+
+describe("per-unit settlement (DSN-097)", () => {
+  function perUnitContext() {
+    return {
+      ...contextWire,
+      items: [
+        {
+          ...contextWire.items[0]!,
+          unit_price_centimes: "1000",
+          discount_per_unit_centimes: "100",
+          discounted_unit_price_centimes: "900",
+          original_quantity_micro: "30000",
+          remaining_allowable_micro: "30000",
+          already_returned_micro: "0",
+          discount_centimes: "300",
+          tva_rate: 0,
+        },
+      ],
+    };
+  }
+
+  it("prices picked x net PU verbatim from the wire (1 of 3 x (1000-100) = 900)", () => {
+    const totals = computeReturnTotals(perUnitContext(), { [LINE_ID]: "10000" });
+    expect(totals.totalHtCents).toBe(900n);
+    expect(totals.totalTvaCents).toBe(0n);
+    expect(totals.totalTtcCents).toBe(900n);
+    expect(totals.totalQtyMicro).toBe(10000n);
+  });
+
+  it("keeps the legacy lump pro-rating path byte-identical when per-unit is null", () => {
+    const totals = computeReturnTotals(
+      {
+        ...contextWire,
+        items: [
+          {
+            ...contextWire.items[0]!,
+            unit_price_centimes: "1000",
+            discount_per_unit_centimes: null,
+            discounted_unit_price_centimes: null,
+            original_quantity_micro: "30000",
+            remaining_allowable_micro: "30000",
+            already_returned_micro: "0",
+            discount_centimes: "300",
+            tva_rate: 0,
+          },
+        ],
+      },
+      { [LINE_ID]: "10000" },
+    );
+    // Legacy: 1 x 1000 gross, pro-rated lump 300/3 = 100 -> net 900.
+    expect(totals.totalHtCents).toBe(900n);
+    expect(totals.totalTtcCents).toBe(900n);
   });
 });

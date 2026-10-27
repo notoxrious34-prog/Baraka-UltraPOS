@@ -2047,6 +2047,13 @@ pub fn documents_get_return_context(
             unit_id: item.unit_id.to_string(),
             unit_name,
             unit_price_centimes: item.unit_price_centimes.to_string(),
+            discount_per_unit_centimes: item
+                .discount_per_unit_centimes
+                .map(|discount| discount.to_string()),
+            discounted_unit_price_centimes: discounted_unit_price_text(
+                item.unit_price_centimes,
+                item.discount_per_unit_centimes,
+            ),
             original_quantity_micro: item.quantity_micro.to_string(),
             already_returned_micro: already.to_string(),
             remaining_allowable_micro: remaining.to_string(),
@@ -2760,6 +2767,23 @@ pub fn sales_discard_draft(
         .map_err(|error| error_code(&error))
 }
 
+/// Display transcription of the stored per-unit discount (DSN-097):
+/// exact `unit_price - per_unit`, `None` when the line predates migration
+/// 0018 (legacy display keeps the raw unit price). Not kernel math — the
+/// engine validated `per_unit <= unit_price` at commit time; the fallback
+/// only keeps a corrupt row from printing a misleading ticket.
+fn discounted_unit_price_text(
+    unit_price_centimes: i64,
+    discount_per_unit_centimes: Option<i64>,
+) -> Option<String> {
+    discount_per_unit_centimes.map(|discount| {
+        unit_price_centimes
+            .checked_sub(discount)
+            .unwrap_or(unit_price_centimes)
+            .to_string()
+    })
+}
+
 /// `sales_get` command (`sales.get`): full sale view.
 #[tauri::command(rename_all = "snake_case")]
 pub fn sales_get(
@@ -2801,6 +2825,14 @@ pub fn sales_get(
                 unit_id: view.item.unit_id.to_string(),
                 quantity_micro: view.item.quantity_micro.to_string(),
                 unit_price_centimes: view.item.unit_price_centimes.to_string(),
+                discount_per_unit_centimes: view
+                    .item
+                    .discount_per_unit_centimes
+                    .map(|discount| discount.to_string()),
+                discounted_unit_price_centimes: discounted_unit_price_text(
+                    view.item.unit_price_centimes,
+                    view.item.discount_per_unit_centimes,
+                ),
                 line_tva_centimes: view.item.line_tva_centimes.to_string(),
                 line_ttc_centimes: view.item.line_ttc_centimes.to_string(),
                 product_name_fr: view.product_name_fr.clone(),

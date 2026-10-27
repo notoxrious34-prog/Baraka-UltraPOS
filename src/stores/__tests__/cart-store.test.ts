@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { CartLine, CartUnitSnapshot, CatalogProduct } from "@/types/pos";
 import {
   calculateBaseQuantityEquivalent,
+  previewDiscountedUnitPrice,
   previewLineTotal,
   useCartStore,
 } from "@/stores/cart-store";
@@ -204,5 +205,30 @@ describe("calculateBaseQuantityEquivalent", () => {
     expect(
       calculateBaseQuantityEquivalent("abc", "1000000", "Pièces", "قطعة", "fr-DZ"),
     ).toBe("");
+  });
+});
+
+describe("per-unit discount display (DSN-097)", () => {
+  it("prices the F5 amount on EACH unit (owner example: 3 x (1000 - 100) = 2700)", () => {
+    const owner = line({
+      units: [unit({ unitId: "u-piece", salePriceCentimes: "1000" })],
+      quantityMicro: "30000",
+      lineDiscountCentimes: "100",
+    });
+    expect(previewDiscountedUnitPrice(owner)).toBe("900");
+    expect(previewLineTotal(owner)).toBe("2700");
+  });
+
+  it("shows the raw price and gross-derived total when no discount is set", () => {
+    const plain = line();
+    expect(previewDiscountedUnitPrice(plain)).toBe("15020");
+    // 3 x 150.20 = 450.60 -> 45060 centimes.
+    expect(previewLineTotal(plain)).toBe("45060");
+  });
+
+  it("floors a corrupt over-price discount at zero instead of going negative", () => {
+    const corrupt = line({ lineDiscountCentimes: "99999" });
+    expect(previewDiscountedUnitPrice(corrupt)).toBe("0");
+    expect(previewLineTotal(corrupt)).toBe("0");
   });
 });

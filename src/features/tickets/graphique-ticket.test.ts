@@ -149,6 +149,8 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
         unitAr: "كيس",
         quantityMicro: "20000",
         unitPriceCentimes: "85000",
+        discountPerUnitCentimes: null,
+        discountedUnitPriceCentimes: null,
         lineTtcCentimes: "170000",
       },
       {
@@ -159,6 +161,8 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
         unitAr: null,
         quantityMicro: "10000",
         unitPriceCentimes: "0",
+        discountPerUnitCentimes: null,
+        discountedUnitPriceCentimes: null,
         lineTtcCentimes: "0",
       },
     ],
@@ -199,5 +203,70 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
     });
     expect(fr.lines[1]?.designation).toBe("—");
     expect(fr.lines[1]?.sku).toBe("—");
+  });
+});
+
+describe("per-unit price mapping (DSN-097)", () => {
+  const OPTS = {
+    language: "FR" as const,
+    storeName: "S",
+    storeAddress: "",
+    storePhone: "",
+    isReprint: false,
+    strings: baseArgs().strings,
+  };
+
+  function wireItem(overrides: Record<string, unknown>) {
+    return {
+      nameFr: "Vis 8x40",
+      nameAr: "برغي",
+      sku: "VIS-001",
+      unitFr: "Pièce",
+      unitAr: "قطعة",
+      quantityMicro: "30000",
+      unitPriceCentimes: "1000",
+      discountPerUnitCentimes: null,
+      discountedUnitPriceCentimes: null,
+      lineTtcCentimes: "2700",
+      ...overrides,
+    };
+  }
+
+  function detailsWith(item: ReturnType<typeof wireItem>): TicketWireDetails {
+    return {
+      documentNumber: "T-9",
+      createdAt: "2026-10-26",
+      subtotalHt: "2700",
+      tvaTotal: "0",
+      totalTtc: "2700",
+      paidAmount: "2700",
+      changeAmount: "0",
+      paymentLabel: "CASH",
+      items: [item],
+    };
+  }
+
+  it("renders the wire net PU verbatim for a per-unit line (3 x 900 = 2700)", () => {
+    const args = ticketArgsFromWire(
+      detailsWith(
+        wireItem({
+          discountPerUnitCentimes: "100",
+          discountedUnitPriceCentimes: "900",
+        }),
+      ),
+      OPTS,
+    );
+    expect(args.lines[0]?.unitPrice).toBe("900");
+    expect(args.lines[0]?.lineTotal).toBe("2700");
+    const html = buildTicketPrintHtml({ ...baseArgs(), lines: args.lines });
+    expect(html).toContain("9,00 DZD");
+    expect(html).not.toContain("10,00 DZD");
+  });
+
+  it("falls back to the raw PU for legacy lines (null per-unit)", () => {
+    const args = ticketArgsFromWire(detailsWith(wireItem({})), OPTS);
+    expect(args.lines[0]?.unitPrice).toBe("1000");
+    const html = buildTicketPrintHtml({ ...baseArgs(), lines: args.lines });
+    expect(html).toContain("10,00 DZD");
   });
 });

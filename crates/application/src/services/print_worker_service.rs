@@ -85,10 +85,18 @@ where
             .find_by_id(item.product_id)?
             .map(|(product, _)| product.name_fr)
             .unwrap_or_else(|| item.product_id.to_string());
+        // Per-unit ticket transcription (DSN-097): `qty x discounted PU =
+        // total` from STORED values; legacy lines (`None`, pre-0018) keep
+        // the raw unit price exactly. Not kernel math — the engine priced
+        // and validated the line at commit time.
+        let unit_price = item
+            .discount_per_unit_centimes
+            .and_then(|discount| item.unit_price_centimes.checked_sub(discount))
+            .unwrap_or(item.unit_price_centimes);
         lines.push(ReceiptLine {
             designation,
             quantity_text: format_qty_plain(item.quantity_micro),
-            unit_price_text: format_centimes_plain(item.unit_price_centimes),
+            unit_price_text: format_centimes_plain(unit_price),
             total_text: format_centimes_plain(item.line_ttc_centimes),
         });
     }

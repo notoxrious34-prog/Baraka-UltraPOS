@@ -82,14 +82,27 @@ export function computeReturnTotals(
     if (qty <= 0n) {
       continue;
     }
-    const unitPrice = parseMicro(item.unit_price_centimes);
-    const ht = returnLineHtCents(qty, unitPrice);
-    const discount = returnLineDiscountCents(
-      parseMicro(item.discount_centimes),
-      qty,
-      parseMicro(item.original_quantity_micro),
-    );
-    const taxable = ht - discount > 0n ? ht - discount : 0n;
+    // Per-unit path (BRK-096/DSN-097): the wire carries the exact net unit
+    // price transcribed at the edge — the discount already lives in it, so
+    // the preview prices picked x net PU verbatim. Legacy path (null):
+    // raw PU x picked minus the lump pro-rating, exactly as before.
+    const netPrice =
+      item.discounted_unit_price_centimes !== null
+        ? parseMicro(item.discounted_unit_price_centimes)
+        : null;
+    const ht = returnLineHtCents(qty, netPrice ?? parseMicro(item.unit_price_centimes));
+    const taxable =
+      netPrice !== null
+        ? ht
+        : (() => {
+            const discount = returnLineDiscountCents(
+              parseMicro(item.discount_centimes),
+              qty,
+              parseMicro(item.original_quantity_micro),
+            );
+            const net = ht - discount;
+            return net > 0n ? net : 0n;
+          })();
     totalHtCents += taxable;
     totalTvaCents += returnLineTvaCents(taxable, BigInt(item.tva_rate));
     totalQtyMicro += qty;

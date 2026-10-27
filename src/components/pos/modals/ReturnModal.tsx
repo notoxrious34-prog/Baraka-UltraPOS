@@ -270,7 +270,11 @@ export function ReturnModal(): ReactElement {
               {s.context.items.map((item) => {
                 const remaining = tryBigInt(item.remaining_allowable_micro);
                 const picked = tryBigInt(s.quantities[item.source_item_id] ?? "0");
-                const pickedHt = returnLineHtCents(picked, tryBigInt(item.unit_price_centimes));
+                // Net PU + per-unit discount arrive verbatim on the wire
+                // (null = legacy line: raw PU display, legacy pro-rating).
+                const hasPerUnit = item.discount_per_unit_centimes !== null;
+                const netPu = hasPerUnit ? tryBigInt(item.discounted_unit_price_centimes ?? "0") : 0n;
+                const pickedHt = returnLineHtCents(picked, hasPerUnit ? netPu : tryBigInt(item.unit_price_centimes));
                 const lineTtcPreview =
                   pickedHt +
                   returnLineTvaCents(pickedHt, tryBigInt(String(item.tva_rate)));
@@ -290,7 +294,25 @@ export function ReturnModal(): ReactElement {
                     <div className="flex flex-wrap gap-x-3 font-mono text-[11px] opacity-80">
                       <span>
                         {t(locale, "returns.colUnitPrice")}:{" "}
-                        {fmtCents(tryBigInt(item.unit_price_centimes), locale)}
+                        {hasPerUnit ? (
+                          <>
+                            <s className="opacity-70">
+                              <bdi dir="ltr">{fmtCents(tryBigInt(item.unit_price_centimes), locale)}</bdi>
+                            </s>{" "}
+                            <bdi dir="ltr" className="font-black">
+                              {fmtCents(netPu, locale)}
+                            </bdi>{" "}
+                            <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                              ({t(locale, "returns.perUnitDiscount")}:{" "}
+                              <bdi dir="ltr">
+                                {fmtCents(tryBigInt(item.discount_per_unit_centimes ?? "0"), locale)}
+                              </bdi>
+                              )
+                            </span>
+                          </>
+                        ) : (
+                          fmtCents(tryBigInt(item.unit_price_centimes), locale)
+                        )}
                       </span>
                       <span>
                         {t(locale, "returns.colPurchased")}:{" "}

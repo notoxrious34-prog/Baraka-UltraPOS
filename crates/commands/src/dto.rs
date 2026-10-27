@@ -782,6 +782,12 @@ pub struct DocumentItemDto {
     pub quantity_micro: String,
     /// Unit price in centimes.
     pub unit_price_centimes: String,
+    /// Stored per-unit discount in centimes (DSN-097; None = legacy line
+    /// written before migration 0018 - legacy display keeps the raw unit price).
+    pub discount_per_unit_centimes: Option<String>,
+    /// Discounted unit price in centimes (exact unit_price minus per_unit at the
+    /// edge; None = legacy line, display falls back to the raw unit price).
+    pub discounted_unit_price_centimes: Option<String>,
     /// Line TVA.
     pub line_tva_centimes: String,
     /// Line TTC.
@@ -2111,6 +2117,11 @@ pub struct ReturnableItemDto {
     pub unit_name: String,
     /// Agreed unit price in centimes.
     pub unit_price_centimes: String,
+    /// Stored per-unit discount in centimes (DSN-097; None = legacy line).
+    pub discount_per_unit_centimes: Option<String>,
+    /// Discounted unit price in centimes (exact edge transcription; None =
+    /// legacy line, display falls back to the raw unit price).
+    pub discounted_unit_price_centimes: Option<String>,
     /// Originally sold magnitude in selling-unit micros.
     pub original_quantity_micro: String,
     /// Cumulatively returned magnitude in selling-unit micros.

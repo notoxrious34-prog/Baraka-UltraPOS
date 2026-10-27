@@ -1117,6 +1117,10 @@ export interface DocumentDetailsWireResponse {
     unit_id: string;
     quantity_micro: string;
     unit_price_centimes: string;
+    /** Stored per-unit discount (`null` = legacy line, pre-0018). */
+    discount_per_unit_centimes: string | null;
+    /** Exact `unit_price - per_unit` (`null` = legacy line: show raw PU). */
+    discounted_unit_price_centimes: string | null;
     line_tva_centimes: string;
     line_ttc_centimes: string;
     /** Commercial designation (FR); null when the product row is gone. */
@@ -1256,6 +1260,10 @@ export interface ReturnableItem {
   unit_id: string;
   unit_name: string;
   unit_price_centimes: string;
+  /** Stored per-unit discount (`null` = legacy line, pre-0018). */
+  discount_per_unit_centimes: string | null;
+  /** Exact `unit_price - per_unit` (`null` = legacy line: show raw PU). */
+  discounted_unit_price_centimes: string | null;
   original_quantity_micro: string;
   already_returned_micro: string;
   remaining_allowable_micro: string;

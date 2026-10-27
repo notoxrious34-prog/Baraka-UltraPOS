@@ -241,15 +241,23 @@ export function isLineTierPriced(line: CartLine, tier: CustomerTier): boolean {
   return lineUnitPriceCentimes(line, tier) !== unit.salePriceCentimes;
 }
 
-/** Preview total of one line: max(0, qty*tierPrice - discount). */
+/** Preview discounted unit price: max(0, tierPrice - perUnitDiscount).
+ * The F5 amount hits EACH unit (BRK-096); the modal gate + engine bound
+ * keep discount <= unit price, maxZero only guards corrupt display state. */
+export function previewDiscountedUnitPrice(
+  line: CartLine,
+  tier: CustomerTier = "retail",
+): string {
+  return maxZero(subBig(lineUnitPriceCentimes(line, tier), line.lineDiscountCentimes));
+}
+
+/** Preview total of one line: qty * discounted unit price (per-unit F5). */
 export function previewLineTotal(line: CartLine, tier: CustomerTier = "retail"): string {
   const unit = line.units[line.unitIndex];
   if (unit === undefined) {
     return "0";
   }
-  return maxZero(
-    subBig(mulQtyPrice(line.quantityMicro, lineUnitPriceCentimes(line, tier)), line.lineDiscountCentimes),
-  );
+  return mulQtyPrice(line.quantityMicro, previewDiscountedUnitPrice(line, tier));
 }
 
 /**

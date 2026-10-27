@@ -93,6 +93,10 @@ export interface TicketWireItem {
   unitAr: string | null;
   quantityMicro: string;
   unitPriceCentimes: string;
+  /** Stored per-unit discount (`null` = legacy line). */
+  discountPerUnitCentimes: string | null;
+  /** Exact edge-transcribed net PU (`null` = legacy: show raw PU). */
+  discountedUnitPriceCentimes: string | null;
   lineTtcCentimes: string;
 }
 
@@ -139,7 +143,9 @@ export function ticketArgsFromWire(
       sku: item.sku ?? "—",
       quantity: item.quantityMicro,
       unit: (fr ? item.unitFr : item.unitAr) ?? (fr ? item.unitAr : item.unitFr) ?? "",
-      unitPrice: item.unitPriceCentimes,
+      // Discounted PU when the wire carries it, raw PU for legacy lines —
+      // both verbatim, zero arithmetic in the template layer.
+      unitPrice: item.discountedUnitPriceCentimes ?? item.unitPriceCentimes,
       lineTotal: item.lineTtcCentimes,
     })),
     subtotalHt: wire.subtotalHt,

@@ -13,6 +13,7 @@ import { join } from "node:path";
 import {
   canPrintA4,
   DocumentA4Sheet,
+  DocumentDetailsView,
   type A4Identity,
   type DocumentDetailsWire,
 } from "@/features/documents/DocumentDetailDrawer";
@@ -57,6 +58,8 @@ function detailsWithLines(count: number, docType: string, number: string): Docum
       unit_id: "unit-pcs",
       quantity_micro: "10000",
       unit_price_centimes: "1000",
+      discount_per_unit_centimes: null,
+      discounted_unit_price_centimes: null,
       line_tva_centimes: "190",
       line_ttc_centimes: "1190",
       product_name_fr: `Produit ${i}`,
@@ -141,5 +144,64 @@ describe("A4 i18n keys (DSN-085)", () => {
     ]) {
       expect(I18N_SRC).toContain(entry);
     }
+  });
+});
+
+describe("per-unit price display (DSN-097)", () => {
+  function detailsWith(unitPrice: string, perUnit: string | null, net: string | null) {
+    const base = detailsWithLines(1, "FACTURE", "FAC-2026-000001");
+    const item = base.items[0]!;
+    return {
+      ...base,
+      items: [
+        {
+          ...item,
+          unit_price_centimes: unitPrice,
+          discount_per_unit_centimes: perUnit,
+          discounted_unit_price_centimes: net,
+        },
+      ],
+    };
+  }
+
+  it("details view strikes raw PU and shows net + per-unit badge (FR)", () => {
+    const html = renderToStaticMarkup(
+      DocumentDetailsView({ locale: "fr-DZ", details: detailsWith("1000", "100", "900") }) as never,
+    );
+    expect(html).toContain("<s ");
+    expect(html).toContain("dont remise /u");
+  });
+
+  it("details view renders raw PU alone for legacy lines (null per-unit)", () => {
+    const html = renderToStaticMarkup(
+      DocumentDetailsView({ locale: "fr-DZ", details: detailsWith("1000", null, null) }) as never,
+    );
+    expect(html).not.toContain("<s ");
+    expect(html).not.toContain("dont remise /u");
+  });
+
+  it("A4 sheet strikes raw PU and shows net; AR caption renders", () => {
+    const html = renderToStaticMarkup(
+      DocumentA4Sheet({
+        locale: "ar-DZ",
+        details: detailsWith("1000", "100", "900"),
+        identity: FULL_IDENTITY,
+        createdAt: "2026-10-26",
+      }),
+    );
+    expect(html).toContain("<s>");
+    expect(html).toContain('dir="ltr"');
+  });
+
+  it("A4 sheet renders raw PU alone for legacy lines", () => {
+    const html = renderToStaticMarkup(
+      DocumentA4Sheet({
+        locale: "fr-DZ",
+        details: detailsWith("1000", null, null),
+        identity: FULL_IDENTITY,
+        createdAt: "2026-10-26",
+      }),
+    );
+    expect(html).not.toContain("<s>");
   });
 });

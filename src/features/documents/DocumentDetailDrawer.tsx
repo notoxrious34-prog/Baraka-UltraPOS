@@ -168,9 +168,17 @@ export function DocumentA4Sheet(props: {
                 </bdi>
               </td>
               <td>
-                <bdi dir="ltr" className="a4-num">
-                  {fmtAmount(item.unit_price_centimes, locale)}
-                </bdi>
+                {item.discounted_unit_price_centimes !== null &&
+                item.discounted_unit_price_centimes !== item.unit_price_centimes ? (
+                  <bdi dir="ltr" className="a4-num">
+                    <s>{fmtAmount(item.unit_price_centimes, locale)}</s>{" "}
+                    {fmtAmount(item.discounted_unit_price_centimes, locale)}
+                  </bdi>
+                ) : (
+                  <bdi dir="ltr" className="a4-num">
+                    {fmtAmount(item.unit_price_centimes, locale)}
+                  </bdi>
+                )}
               </td>
               <td>
                 <bdi dir="ltr" className="a4-num">
@@ -289,9 +297,27 @@ export function DocumentDetailsView(props: {
                     </bdi>
                   </td>
                   <td className="py-1 pe-2">
-                    <bdi dir="ltr" className="font-mono tabular-nums">
-                      {fmtAmount(item.unit_price_centimes, locale)}
-                    </bdi>
+                    {item.discounted_unit_price_centimes !== null &&
+                    item.discounted_unit_price_centimes !== item.unit_price_centimes ? (
+                      <>
+                        <s className="font-mono tabular-nums text-slate-400">
+                          <bdi dir="ltr">{fmtAmount(item.unit_price_centimes, locale)}</bdi>
+                        </s>{" "}
+                        <bdi dir="ltr" className="font-mono font-bold tabular-nums">
+                          {fmtAmount(item.discounted_unit_price_centimes, locale)}
+                        </bdi>
+                        <span className="block text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                          {t(locale, "documents.perUnitDiscount")}{" "}
+                          <bdi dir="ltr" className="font-mono tabular-nums">
+                            {fmtAmount(item.discount_per_unit_centimes ?? "0", locale)}
+                          </bdi>
+                        </span>
+                      </>
+                    ) : (
+                      <bdi dir="ltr" className="font-mono tabular-nums">
+                        {fmtAmount(item.unit_price_centimes, locale)}
+                      </bdi>
+                    )}
                     <span className="block text-[10px] text-slate-500">
                       {t(locale, "documents.colLineTva")}{" "}
                       <bdi dir="ltr" className="font-mono tabular-nums">
@@ -535,6 +561,8 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
                 unitAr: item.unit_name_ar,
                 quantityMicro: item.quantity_micro,
                 unitPriceCentimes: item.unit_price_centimes,
+                discountPerUnitCentimes: item.discount_per_unit_centimes,
+                discountedUnitPriceCentimes: item.discounted_unit_price_centimes,
                 lineTtcCentimes: item.line_ttc_centimes,
               })),
             },

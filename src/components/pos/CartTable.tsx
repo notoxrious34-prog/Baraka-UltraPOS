@@ -8,6 +8,7 @@ import {
   calculateBaseQuantityEquivalent,
   isLineTierPriced,
   lineUnitPriceCentimes,
+  previewDiscountedUnitPrice,
   previewLineTotal,
   useCartStore,
 } from "@/stores/cart-store";
@@ -127,6 +128,11 @@ export function CartTableView({
           const unit = line.units[line.unitIndex];
           const selected = index === selectedLineIndex;
           const tierPriced = isLineTierPriced(line, customerTier);
+          // Discounted unit price (per-unit F5): struck raw + net when the
+          // line carries a discount, raw price alone otherwise (legacy look).
+          const rawPu = lineUnitPriceCentimes(line, customerTier);
+          const netPu = previewDiscountedUnitPrice(line, customerTier);
+          const hasLineDiscount = netPu !== rawPu;
           const margin = margins.find((entry) => entry.line_index === index);
           const belowCost = margin?.is_below_cost === true;
           return (
@@ -236,7 +242,22 @@ export function CartTableView({
                 />
               </td>
               <td className="px-1 py-2 text-end font-mono text-xs font-bold">
-                {unit !== undefined ? formatMoney(lineUnitPriceCentimes(line, customerTier), locale) : "—"}
+                {unit !== undefined ? (
+                  hasLineDiscount ? (
+                    <span>
+                      <s className="font-medium text-slate-400">
+                        <bdi dir="ltr">{formatMoney(rawPu, locale)}</bdi>
+                      </s>{" "}
+                      <bdi dir="ltr" className="text-emerald-700 dark:text-emerald-300">
+                        {formatMoney(netPu, locale)}
+                      </bdi>
+                    </span>
+                  ) : (
+                    formatMoney(rawPu, locale)
+                  )
+                ) : (
+                  "—"
+                )}
               </td>
               <td className="px-1 py-2">
                 <span className="flex items-center justify-center gap-1">

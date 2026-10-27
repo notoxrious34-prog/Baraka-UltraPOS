@@ -1,0 +1,96 @@
+{
+  "results": [
+    {
+      "name": "discount-cart-fr-light.png: fr per-unit label",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-cart-fr-light.png: fr EACH-unit hint",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-cart-fr-light.png: fr net PU 9,00 DZD",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-cart-fr-light.png: fr line total 27,00 DZD",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-cart-fr-light.png: fr raw PU struck",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-cart-fr-light.png: fr no confirm opened spuriously",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-cart-fr-light.png: shot discount-cart-fr-light.png written",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "discount-cart-row-fr-light.png: row net PU 9,00 DZD",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-cart-row-fr-light.png: row raw PU struck",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-cart-row-fr-light.png: row total 27,00 DZD",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-cart-row-fr-light.png: row qty 3",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-cart-row-fr-light.png: shot discount-cart-row-fr-light.png written",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "discount-ticket-ar-light.png: ar rtl root",
+      "ok": true,
+      "detail": "rtl"
+    },
+    {
+      "name": "discount-ticket-ar-light.png: ar net PU 9,00",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-ticket-ar-light.png: ar line total 27,00",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-ticket-ar-light.png: ar one ticket line",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "name": "discount-ticket-ar-light.png: ar designation",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "discount-ticket-ar-light.png: shot discount-ticket-ar-light.png written",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "consoleErrors": 0,
+  "consoleDetail": []
+}

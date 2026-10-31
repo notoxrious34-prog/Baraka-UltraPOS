@@ -3191,6 +3191,7 @@ pub fn print_tspl_label(
         .map_err(|error| error_code(&error))?;
     let outcome = PrintTsplLabelUseCase::new(
         state.printer_settings.as_ref(),
+        state.store_identity.as_ref(),
         state.printer_transport.as_ref(),
     )
     .execute(

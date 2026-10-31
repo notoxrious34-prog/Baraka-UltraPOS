@@ -53,25 +53,29 @@ where
     }
 }
 
-/// Silent 40x20 mm shelf-label print (name + price + Code128).
-pub struct PrintTsplLabelUseCase<'a, S, T>
+/// Silent 40x20 mm shelf-label print (brand + name + price + Code128).
+pub struct PrintTsplLabelUseCase<'a, S, I, T>
 where
     S: ?Sized,
+    I: ?Sized,
     T: ?Sized,
 {
     settings: &'a S,
+    identity: &'a I,
     transport: &'a T,
 }
 
-impl<'a, S, T> PrintTsplLabelUseCase<'a, S, T>
+impl<'a, S, I, T> PrintTsplLabelUseCase<'a, S, I, T>
 where
     S: PrinterSettingsPort + ?Sized,
+    I: StoreIdentityPort + ?Sized,
     T: PrinterTransportPort + ?Sized,
 {
     /// Wire the use case to its ports.
-    pub fn new(settings: &'a S, transport: &'a T) -> Self {
+    pub fn new(settings: &'a S, identity: &'a I, transport: &'a T) -> Self {
         Self {
             settings,
+            identity,
             transport,
         }
     }
@@ -94,9 +98,12 @@ where
                 DomainError::InvalidCanonicalString("TSPL_PRICE_MUST_BE_NON_NEGATIVE".to_string()),
             ));
         }
+        let identity = self.identity.load_identity()?;
         let bytes = render_label_40x20(&TsplLabel {
+            brand_text: &identity.store_name,
             name,
             price_text: &format_centimes_plain(price_centimes),
+            currency_text: "DZD",
             barcode,
             copies,
         })?;
@@ -171,6 +178,7 @@ where
                 unit: pick_name(&view.unit_name_fr, &view.unit_name_ar, french, ""),
                 unit_price: format_centimes_plain(net_unit_price),
                 line_total: format_centimes_plain(item.line_ttc_centimes),
+                discount: item.discount_per_unit_centimes.map(format_centimes_plain),
             });
         }
         // Phase 2: borrow the owned strings into the pure renderer input.
@@ -183,6 +191,7 @@ where
                 unit_text: &line.unit,
                 unit_price_text: &line.unit_price,
                 line_total_text: &line.line_total,
+                discount_text: line.discount.as_deref(),
             })
             .collect();
 
@@ -196,16 +205,30 @@ where
             .created_at
             .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         let subtotal_ht = format_centimes_plain(document.subtotal_ht_centimes);
+        let global_discount = format_centimes_plain(document.global_discount_centimes);
         let tva = format_centimes_plain(document.vat_total_centimes);
         let total_ttc = format_centimes_plain(document.ttc_centimes);
         let paid = format_centimes_plain(document.paid_amount_centimes);
         let change = format_centimes_plain(document.change_amount_centimes);
+        // Cashier + depot ride the stored identifiers verbatim (no lookup
+        // port on this path — collapse, never invent).
+        let cashier_text = document.created_by.to_string();
+        let warehouse_text = document.warehouse_id.to_string();
+        let tax_rows = [
+            ("NIF", identity.nif.as_str()),
+            ("NIS", identity.nis.as_str()),
+            ("RC", identity.rc.as_str()),
+            ("AI", identity.ai.as_str()),
+        ];
         let ticket = TsplTicket {
             store_name: &identity.store_name,
             store_address: &identity.store_address,
             store_phone: &identity.store_phone,
+            tax_rows: &tax_rows,
             number: &document.number,
             created_at: &created_at,
+            cashier_text: &cashier_text,
+            warehouse_text: &warehouse_text,
             captions: if french {
                 TsplCaptionLang::French
             } else {
@@ -214,6 +237,7 @@ where
             lines: &lines,
             totals: TsplTicketTotals {
                 subtotal_ht: &subtotal_ht,
+                global_discount: &global_discount,
                 tva: &tva,
                 total_ttc: &total_ttc,
                 paid: &paid,
@@ -238,6 +262,8 @@ struct OwnedTicketLine {
     unit: String,
     unit_price: String,
     line_total: String,
+    /// Per-unit discount badge (stored value), `None` for legacy NULL rows.
+    discount: Option<String>,
 }
 
 /// Graphique fallback chain (`fr ?? ar ?? fallback`, locale-first).

@@ -327,7 +327,7 @@ fn spooler() -> FakeSettings {
 fn label_spools_exact_bytes_and_reports_count() {
     let settings = spooler();
     let transport = FakeTransport::new();
-    let outcome = PrintTsplLabelUseCase::new(&settings, &transport)
+    let outcome = PrintTsplLabelUseCase::new(&settings, &FakeIdentity, &transport)
         .execute(
             &session_with(Role::Caissier),
             "Vis 8x40",
@@ -341,8 +341,12 @@ fn label_spools_exact_bytes_and_reports_count() {
     assert_eq!(outcome.bytes_sent, payloads[0].len());
     let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
     assert!(text.starts_with("SIZE 40 mm,20 mm\r\n"));
-    assert!(text.contains("TEXT 8,36,\"3\",0,1,1,\"10.00 DZD\""));
-    assert!(text.contains("BARCODE 8,72,\"128\",56,1,0,2,2,\"VIS-001\""));
+    // BRK-098 anatomy: brand micro-line from the identity wire, double-
+    // height price + right-aligned currency, Code128 + human-readable.
+    assert!(text.contains("\"BARAKA QUINCAILLERIE\""));
+    assert!(text.contains("TEXT 8,58,\"3\",0,2,2,\"10.00\""));
+    assert!(text.contains("\"DZD\""));
+    assert!(text.contains("BARCODE 8,106,\"128\",40,1,0,2,2,\"VIS-001\""));
     assert!(text.ends_with("PRINT 1,3"));
 }
 
@@ -353,7 +357,7 @@ fn label_rejects_non_spooler_transport_without_touching_the_queue() {
             transport: arm.to_string(),
         };
         let transport = FakeTransport::new();
-        let error = PrintTsplLabelUseCase::new(&settings, &transport)
+        let error = PrintTsplLabelUseCase::new(&settings, &FakeIdentity, &transport)
             .execute(
                 &session_with(Role::Caissier),
                 "Vis 8x40",
@@ -411,10 +415,21 @@ fn ticket_transcribes_discounted_and_legacy_lines_verbatim() {
     );
     // Legacy NULL line: raw PU transcribed verbatim.
     assert!(text.contains("5.00"));
-    // Graphique-parity totals (stored values only).
+    // Per-unit discount badge (stored value), absent for legacy NULL rows.
+    assert!(text.contains("remise 1.00"));
+    // BRK-098 doc meta: cashier + depot ride the stored identifiers.
+    assert!(text.contains("Caissier: "));
+    assert!(text.contains("Depot: "));
+    // Graphique-parity totals hierarchy + stored global discount row.
     assert!(text.contains("Sous-total: 32.00"));
-    assert!(text.contains("TOTAL: 32.00"));
+    assert!(text.contains("Remise totale: 0.00"));
+    assert!(text.contains("HT: 32.00"));
+    assert!(text.contains("TVA: 0.00"));
+    assert!(text.contains("TOTAL TTC: 32.00"));
     assert!(text.contains("Payé (CASH): 32.00"));
+    assert!(text.contains("Rendu: 0.00"));
+    // Doc-number Code128 with human-readable number.
+    assert!(text.contains("BARCODE"));
     assert!(text.ends_with("PRINT 1,1"));
 }
 
@@ -430,7 +445,7 @@ fn ticket_gate_reprint_document_but_label_allows_vendeur() {
     assert!(matches!(error, ApplicationError::Unauthorized));
     assert!(transport.payloads().is_empty());
     // Vendeur holds PosSell: shelf labels allowed.
-    PrintTsplLabelUseCase::new(&settings, &transport)
+    PrintTsplLabelUseCase::new(&settings, &FakeIdentity, &transport)
         .execute(
             &session_with(Role::Vendeur),
             "Vis 8x40",
@@ -446,7 +461,7 @@ fn ticket_gate_reprint_document_but_label_allows_vendeur() {
 fn label_copies_and_price_guards_reject_before_spooling() {
     let settings = spooler();
     let transport = FakeTransport::new();
-    let use_case = PrintTsplLabelUseCase::new(&settings, &transport);
+    let use_case = PrintTsplLabelUseCase::new(&settings, &FakeIdentity, &transport);
     let session = session_with(Role::Caissier);
     assert!(matches!(
         use_case

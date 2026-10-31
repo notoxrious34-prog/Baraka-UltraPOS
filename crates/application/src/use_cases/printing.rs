@@ -514,6 +514,8 @@ where
         gap_mm: Option<u32>,
         density: Option<u8>,
         speed: Option<u8>,
+        // TEMPORARY-DIAGNOSTIC (BRK-100): validated spelling, never silent.
+        probe_mode: Option<String>,
     ) -> Result<crate::ports::PrinterSettings, ApplicationError> {
         if !session
             .role
@@ -530,8 +532,11 @@ where
         if let Some(speed) = speed {
             baraka_domain::printing::validate_tspl_speed(speed)?;
         }
+        if let Some(mode) = probe_mode.as_deref() {
+            baraka_domain::printing::parse_tspl_probe_mode(mode)?;
+        }
         self.settings
-            .update_tspl_media_settings(gap_mm, density, speed)?;
+            .update_tspl_media_settings(gap_mm, density, speed, probe_mode)?;
         self.settings.get_printer_settings()
     }
 }

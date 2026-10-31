@@ -3255,6 +3255,8 @@ pub fn printer_get_settings(
         tspl_gap_mm: settings.tspl_gap_mm,
         tspl_density: settings.tspl_density,
         tspl_speed: settings.tspl_speed,
+        // TEMPORARY-DIAGNOSTIC (BRK-100): probe switch wire.
+        tspl_probe_mode: settings.tspl_probe_mode.clone(),
     })
 }
 
@@ -3280,6 +3282,7 @@ pub fn printer_update_settings(
     if request.tspl_gap_mm.is_some()
         || request.tspl_density.is_some()
         || request.tspl_speed.is_some()
+        || request.tspl_probe_mode.is_some()
     {
         settings = UpdateTsplMediaSettingsUseCase::new(state.printer_settings.as_ref())
             .execute(
@@ -3287,6 +3290,8 @@ pub fn printer_update_settings(
                 request.tspl_gap_mm,
                 request.tspl_density,
                 request.tspl_speed,
+                // TEMPORARY-DIAGNOSTIC (BRK-100): validated spelling upstairs.
+                request.tspl_probe_mode,
             )
             .map_err(|error| error_code(&error))?;
     }
@@ -3301,6 +3306,8 @@ pub fn printer_update_settings(
         tspl_gap_mm: settings.tspl_gap_mm,
         tspl_density: settings.tspl_density,
         tspl_speed: settings.tspl_speed,
+        // TEMPORARY-DIAGNOSTIC (BRK-100): probe switch wire.
+        tspl_probe_mode: settings.tspl_probe_mode,
     })
 }
 

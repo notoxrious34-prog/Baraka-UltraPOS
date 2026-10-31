@@ -1396,6 +1396,10 @@ pub struct PrinterSettings {
     pub tspl_density: u8,
     /// TSPL print speed in inch/sec, 1..=6 (default 4).
     pub tspl_speed: u8,
+    /// TEMPORARY-DIAGNOSTIC TSPL probe mode wire spelling
+    /// (`normal|no_codepage|ascii_only|font1_only`; default `normal`;
+    /// BRK-100 — remove in the lock-in task).
+    pub tspl_probe_mode: String,
 }
 
 /// Printer configuration port (`settings` table in infrastructure).
@@ -1425,6 +1429,8 @@ pub trait PrinterSettingsPort: Send + Sync {
         gap_mm: Option<u32>,
         density: Option<u8>,
         speed: Option<u8>,
+        // TEMPORARY-DIAGNOSTIC (BRK-100): `None` keeps the stored mode.
+        probe_mode: Option<String>,
     ) -> Result<(), ApplicationError>;
 }
 

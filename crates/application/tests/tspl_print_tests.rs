@@ -19,6 +19,7 @@ use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
 use baraka_domain::inventory::WarehouseId;
 use baraka_domain::printing::TsplMediaSetup;
+use baraka_domain::printing::TsplProbeMode;
 use baraka_domain::role::Role;
 use baraka_domain::sales::{
     Document, DocumentId, DocumentItem, DocumentItemView, DocumentLanguage, DocumentStatus,
@@ -53,6 +54,7 @@ impl PrinterSettingsPort for FakeSettings {
             tspl_gap_mm: self.media.gap_mm,
             tspl_density: self.media.density,
             tspl_speed: self.media.speed,
+            tspl_probe_mode: self.media.probe_mode.as_str().to_string(),
         })
     }
 
@@ -73,6 +75,7 @@ impl PrinterSettingsPort for FakeSettings {
         _gap_mm: Option<u32>,
         _density: Option<u8>,
         _speed: Option<u8>,
+        _probe_mode: Option<String>,
     ) -> Result<(), ApplicationError> {
         panic!("out of scope for TSPL tests: settings are read-only here");
     }
@@ -373,6 +376,7 @@ fn label_preamble_uses_stored_media_setup() {
             gap_mm: 7,
             density: 12,
             speed: 2,
+            probe_mode: TsplProbeMode::Normal,
         },
     };
     let transport = FakeTransport::new();
@@ -390,6 +394,36 @@ fn label_preamble_uses_stored_media_setup() {
     assert!(
         text.starts_with("SIZE 40 mm,20 mm\r\nGAP 7,0\r\nDENSITY 12\r\nSPEED 2\r\nCODEPAGE UTF-8\r\nDIRECTION 1\r\nCLS\r\n"),
         "stored media rides the preamble, order pinned"
+    );
+}
+
+// TEMPORARY-DIAGNOSTIC (BRK-100): stored probe mode rides the spooled bytes.
+#[test]
+fn label_preamble_uses_stored_probe_mode() {
+    let settings = FakeSettings {
+        transport: "spooler".to_string(),
+        media: TsplMediaSetup {
+            probe_mode: TsplProbeMode::NoCodepage,
+            ..TsplMediaSetup::default()
+        },
+    };
+    let transport = FakeTransport::new();
+    PrintTsplLabelUseCase::new(&settings, &FakeIdentity, &transport)
+        .execute(
+            &session_with(Role::Caissier),
+            "Vis 8x40",
+            1_000,
+            "VIS-001",
+            1,
+        )
+        .expect("spooler label prints");
+    let payloads = transport.payloads();
+    let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
+    assert!(
+        text.starts_with(
+            "SIZE 40 mm,20 mm\r\nGAP 3,0\r\nDENSITY 8\r\nSPEED 4\r\nDIRECTION 1\r\nCLS\r\n"
+        ),
+        "stored NoCodepage drops CODEPAGE from spooled bytes"
     );
 }
 

@@ -101,6 +101,53 @@ pub const TSPL_SPEED_MAX: u8 = 6;
 /// OWNER-VERIFY: if the XP-410B rejects the line, drop to no-CODEPAGE.
 pub const TSPL_CODEPAGE_LINE: &str = "CODEPAGE UTF-8";
 
+/// TEMPORARY-DIAGNOSTIC probe switch (BRK-100 — REMOVE in the lock-in task).
+/// One owner trial discriminates the TEXT-rejection cause (AUD-047 P1–P3):
+/// `Normal` = today's bytes; `NoCodepage` = drop the CODEPAGE line (P1);
+/// `AsciiOnly` = LOSSY fold of non-ASCII payload bytes to `?` (P2 — never a
+/// default, diagnostic only); `Font1Only` = force font "1" everywhere (P3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TsplProbeMode {
+    /// Production bytes (byte-identical to pre-probe output).
+    #[default]
+    Normal,
+    /// P1: omit `CODEPAGE UTF-8` from the preamble.
+    NoCodepage,
+    /// P2: LOSSY — every non-ASCII scalar becomes `?`.
+    AsciiOnly,
+    /// P3: every TEXT line uses built-in font "1".
+    Font1Only,
+}
+
+/// Canonical wire spelling of the default probe mode.
+pub const TSPL_PROBE_MODE_DEFAULT: &str = "normal";
+
+/// Parse a stored probe-mode string; unknown values reject LOUDLY with
+/// `TSPL_PROBE_MODE_UNKNOWN` — never a silent fallback to `Normal`.
+pub fn parse_tspl_probe_mode(raw: &str) -> Result<TsplProbeMode, DomainError> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "normal" => Ok(TsplProbeMode::Normal),
+        "no_codepage" => Ok(TsplProbeMode::NoCodepage),
+        "ascii_only" => Ok(TsplProbeMode::AsciiOnly),
+        "font1_only" => Ok(TsplProbeMode::Font1Only),
+        _ => Err(DomainError::InvalidCanonicalString(
+            "TSPL_PROBE_MODE_UNKNOWN".to_string(),
+        )),
+    }
+}
+
+impl TsplProbeMode {
+    /// Canonical wire spelling (`normal|no_codepage|ascii_only|font1_only`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TsplProbeMode::Normal => "normal",
+            TsplProbeMode::NoCodepage => "no_codepage",
+            TsplProbeMode::AsciiOnly => "ascii_only",
+            TsplProbeMode::Font1Only => "font1_only",
+        }
+    }
+}
+
 /// Self-describing media setup carried by every silent job — no NVRAM luck
 /// (BRK-099, AUD-045). Label jobs use the stored gap; ticket jobs force
 /// gap 0 (`GAP 0,0` = declared continuous).
@@ -112,6 +159,8 @@ pub struct TsplMediaSetup {
     pub density: u8,
     /// Print speed in inch/sec, 1..=6.
     pub speed: u8,
+    /// TEMPORARY-DIAGNOSTIC probe mode (BRK-100 — remove in lock-in).
+    pub probe_mode: TsplProbeMode,
 }
 
 impl Default for TsplMediaSetup {
@@ -120,6 +169,7 @@ impl Default for TsplMediaSetup {
             gap_mm: TSPL_GAP_MM_DEFAULT,
             density: TSPL_DENSITY_DEFAULT,
             speed: TSPL_SPEED_DEFAULT,
+            probe_mode: TsplProbeMode::Normal,
         }
     }
 }
@@ -176,7 +226,11 @@ fn push_media_preamble(
     out.push(format!("GAP {},0", media.gap_mm));
     out.push(format!("DENSITY {}", media.density));
     out.push(format!("SPEED {}", media.speed));
-    out.push(TSPL_CODEPAGE_LINE.to_string());
+    // P1 (BRK-100 TEMPORARY-DIAGNOSTIC): NoCodepage drops the CODEPAGE line;
+    // every other mode keeps it verbatim.
+    if media.probe_mode != TsplProbeMode::NoCodepage {
+        out.push(TSPL_CODEPAGE_LINE.to_string());
+    }
     out.push("DIRECTION 1".to_string());
     out.push("CLS".to_string());
     Ok(())
@@ -399,11 +453,43 @@ fn right_x(right_edge: i64, dots: i64) -> i64 {
     (right_edge - dots).max(0)
 }
 
-/// Emit one TEXT command.
-fn push_text(out: &mut Vec<String>, x: i64, y: i64, font: &str, scale: i64, content: &str) {
-    out.push(format!(
-        "TEXT {x},{y},\"{font}\",0,{scale},{scale},\"{content}\""
-    ));
+/// Emit one TEXT command. TEMPORARY-DIAGNOSTIC (BRK-100): `Font1Only` forces
+/// face "1"; `AsciiOnly` folds the payload LOSSY (see `ascii_probe_lossy`).
+fn push_text(
+    out: &mut Vec<String>,
+    x: i64,
+    y: i64,
+    font: &str,
+    scale: i64,
+    content: &str,
+    probe: TsplProbeMode,
+) {
+    let face = if probe == TsplProbeMode::Font1Only {
+        "1"
+    } else {
+        font
+    };
+    if probe == TsplProbeMode::AsciiOnly {
+        let lossy = ascii_probe_lossy(content);
+        out.push(format!(
+            "TEXT {x},{y},\"{face}\",0,{scale},{scale},\"{lossy}\""
+        ));
+    } else {
+        out.push(format!(
+            "TEXT {x},{y},\"{face}\",0,{scale},{scale},\"{content}\""
+        ));
+    }
+}
+
+/// TEMPORARY-DIAGNOSTIC LOSSY fold (BRK-100 P2 — remove in lock-in): every
+/// non-ASCII scalar becomes `?`. Layout widths stay computed on the original
+/// text, so alignment may shift — acceptable: the probe asks print-vs-ignore,
+/// never beauty.
+fn ascii_probe_lossy(content: &str) -> String {
+    content
+        .chars()
+        .map(|c| if c.is_ascii() { c } else { '?' })
+        .collect()
 }
 
 /// Emit one solid rule across the full width (BAR, 2 dots high).
@@ -448,6 +534,8 @@ pub fn render_label_40x20(label: &TsplLabel<'_>) -> Result<Vec<u8>, DomainError>
     let price_chars = ((LABEL_WIDTH_DOTS - 16) / (FONT_3_W * 2)) as usize;
 
     let mut out = Vec::new();
+    // TEMPORARY-DIAGNOSTIC (BRK-100): probe mode rides every TEXT line.
+    let probe = label.media.probe_mode;
     push_media_preamble(&mut out, "SIZE 40 mm,20 mm", &label.media)?;
     // Brand micro-line (collapses when blank).
     let brand = truncate_to_width(label.brand_text.trim(), brand_chars);
@@ -456,24 +544,24 @@ pub fn render_label_40x20(label: &TsplLabel<'_>) -> Result<Vec<u8>, DomainError>
             LABEL_WIDTH_DOTS,
             text_dots(brand.chars().count(), FONT_1_W, 1),
         );
-        push_text(&mut out, x, 2, "1", 1, &brand);
+        push_text(&mut out, x, 2, "1", 1, &brand, probe);
     }
     // Designation: two lines max, second line marked "..." when cut.
     let clean_name = sanitize_tspl_text(label.name.trim());
     let first: String = clean_name.chars().take(name_chars).collect();
     let rest: String = clean_name.chars().skip(name_chars).collect();
-    push_text(&mut out, 8, 16, "2", 1, &first);
+    push_text(&mut out, 8, 16, "2", 1, &first, probe);
     if !rest.trim().is_empty() {
         let second = truncate_to_width(&rest, name_chars);
-        push_text(&mut out, 8, 38, "2", 1, &second);
+        push_text(&mut out, 8, 38, "2", 1, &second, probe);
     }
     // Price double-height, currency right-aligned inside the price band.
     let price = truncate_to_width(label.price_text.trim(), price_chars);
-    push_text(&mut out, 8, 58, "3", 2, &price);
+    push_text(&mut out, 8, 58, "3", 2, &price, probe);
     let currency = truncate_to_width(label.currency_text.trim(), brand_chars);
     if !currency.is_empty() {
         let x = right_x(right_edge, text_dots(currency.chars().count(), FONT_1_W, 1));
-        push_text(&mut out, x, 94, "1", 1, &currency);
+        push_text(&mut out, x, 94, "1", 1, &currency, probe);
     }
     out.push(format!(
         "BARCODE 8,106,\"128\",{LABEL_BARCODE_HEIGHT},1,0,2,2,\"{barcode}\""
@@ -483,7 +571,7 @@ pub fn render_label_40x20(label: &TsplLabel<'_>) -> Result<Vec<u8>, DomainError>
         LABEL_WIDTH_DOTS,
         text_dots(human.chars().count(), FONT_1_W, 1),
     );
-    push_text(&mut out, human_x, 148, "1", 1, &human);
+    push_text(&mut out, human_x, 148, "1", 1, &human, probe);
     out.push(format!("PRINT 1,{}", label.copies));
     Ok(out.join("\r\n").into_bytes())
 }
@@ -502,6 +590,8 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         return Err(DomainError::TsplBarcodeTooWide);
     }
     let number = sanitize_tspl_text(ticket.number);
+    // TEMPORARY-DIAGNOSTIC (BRK-100): probe mode rides every TEXT line.
+    let probe = ticket.media.probe_mode;
     let barcode_dots = barcode_width_dots(number.chars().count()) as i64;
     let barcode_x = centered_x(TICKET_WIDTH_DOTS, barcode_dots);
     let right_edge = TICKET_WIDTH_DOTS - TICKET_MARGIN_X;
@@ -526,6 +616,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
             "3",
             1,
             &store,
+            probe,
         );
         y += PITCH_F3;
     }
@@ -540,6 +631,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
                 "1",
                 1,
                 &shown,
+                probe,
             );
             y += PITCH_F1;
         }
@@ -559,6 +651,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
             "1",
             1,
             &shown,
+            probe,
         );
         y += PITCH_F1;
     }
@@ -566,11 +659,11 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
     y += 10;
     // Doc meta: number, capture instant, cashier, depot.
     let number_shown = truncate_to_width(&number, wide_chars);
-    push_text(&mut body, TICKET_MARGIN_X, y, "2", 1, &number_shown);
+    push_text(&mut body, TICKET_MARGIN_X, y, "2", 1, &number_shown, probe);
     y += PITCH_F2;
     let instant = sanitize_tspl_text(ticket.created_at);
     let instant_shown = truncate_to_width(&instant[..instant.len().min(19)], narrow_chars);
-    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &instant_shown);
+    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &instant_shown, probe);
     y += PITCH_F1;
     let cashier = format!(
         "{}: {}",
@@ -578,7 +671,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         sanitize_tspl_text(ticket.cashier_text)
     );
     let cashier_shown = truncate_to_width(&cashier, narrow_chars);
-    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &cashier_shown);
+    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &cashier_shown, probe);
     y += PITCH_F1;
     let depot = format!(
         "{}: {}",
@@ -586,18 +679,18 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         sanitize_tspl_text(ticket.warehouse_text)
     );
     let depot_shown = truncate_to_width(&depot, narrow_chars);
-    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &depot_shown);
+    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &depot_shown, probe);
     y += PITCH_F1;
     push_rule(&mut body, y, TICKET_WIDTH_DOTS);
     y += 10;
     // Column header.
     let header = truncate_to_width(caps.column_header, narrow_chars);
-    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &header);
+    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &header, probe);
     y += PITCH_F1;
     // Item rows.
     for line in ticket.lines {
         let designation = truncate_to_width(line.designation.trim(), wide_chars);
-        push_text(&mut body, TICKET_MARGIN_X, y, "2", 1, &designation);
+        push_text(&mut body, TICKET_MARGIN_X, y, "2", 1, &designation, probe);
         y += PITCH_F2;
         let detail = if line.unit_text.trim().is_empty() {
             format!(
@@ -624,6 +717,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
             "1",
             1,
             &detail_shown,
+            probe,
         );
         y += PITCH_F1;
         if let Some(discount) = line.discount_text {
@@ -637,6 +731,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
                 "1",
                 1,
                 &badge_shown,
+                probe,
             );
             y += PITCH_F1;
         }
@@ -654,7 +749,15 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         let row = format!("{caption}: {}", sanitize_tspl_text(value));
         let shown = truncate_to_width(&row, wide_chars);
         let dots = text_dots(shown.chars().count(), FONT_2_W, 1);
-        push_text(&mut body, right_x(right_edge, dots), y, "2", 1, &shown);
+        push_text(
+            &mut body,
+            right_x(right_edge, dots),
+            y,
+            "2",
+            1,
+            &shown,
+            probe,
+        );
         y += PITCH_F2;
     }
     let total_row = format!(
@@ -671,6 +774,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         "3",
         2,
         &total_shown,
+        probe,
     );
     y += PITCH_F3_X2;
     // Payment block.
@@ -689,6 +793,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         "1",
         1,
         &payment_shown,
+        probe,
     );
     y += PITCH_F1;
     let change_row = format!(
@@ -705,6 +810,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         "1",
         1,
         &change_shown,
+        probe,
     );
     y += PITCH_F1;
     // Doc-number barcode (centered, quiet zones >= 20 dots per side) with
@@ -723,6 +829,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         "1",
         1,
         &human,
+        probe,
     );
     y += PITCH_F1 + 4;
     // Footer: owner message (collapses when blank) + constant thanks.
@@ -736,6 +843,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
             "1",
             1,
             &footer,
+            probe,
         );
         y += PITCH_F1;
     }
@@ -748,6 +856,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         "1",
         1,
         &thanks,
+        probe,
     );
     y += PITCH_F1 + 16;
 
@@ -1105,7 +1214,127 @@ mod tests {
         assert_eq!(media.gap_mm, 3);
         assert_eq!(media.density, TSPL_DENSITY_DEFAULT);
         assert_eq!(media.speed, TSPL_SPEED_DEFAULT);
+        assert_eq!(media.probe_mode, TsplProbeMode::Normal);
         media.validate().expect("defaults validate");
+    }
+
+    // TEMPORARY-DIAGNOSTIC pins (BRK-100 — remove with the switch in lock-in).
+
+    #[test]
+    fn probe_mode_parses_all_four_spellings_and_rejects_unknown() {
+        assert_eq!(
+            parse_tspl_probe_mode("normal").expect("normal"),
+            TsplProbeMode::Normal
+        );
+        assert_eq!(
+            parse_tspl_probe_mode("no_codepage").expect("p1"),
+            TsplProbeMode::NoCodepage
+        );
+        assert_eq!(
+            parse_tspl_probe_mode("ascii_only").expect("p2"),
+            TsplProbeMode::AsciiOnly
+        );
+        assert_eq!(
+            parse_tspl_probe_mode("font1_only").expect("p3"),
+            TsplProbeMode::Font1Only
+        );
+        assert_eq!(TsplProbeMode::Normal.as_str(), "normal");
+        assert_eq!(
+            parse_tspl_probe_mode("bogus").expect_err("unknown rejected"),
+            DomainError::InvalidCanonicalString("TSPL_PROBE_MODE_UNKNOWN".to_string())
+        );
+        assert_eq!(
+            parse_tspl_probe_mode("").expect_err("empty rejected"),
+            DomainError::InvalidCanonicalString("TSPL_PROBE_MODE_UNKNOWN".to_string())
+        );
+    }
+
+    #[test]
+    fn probe_no_codepage_drops_only_the_codepage_line() {
+        let probed = TsplLabel {
+            media: TsplMediaSetup {
+                probe_mode: TsplProbeMode::NoCodepage,
+                ..TsplMediaSetup::default()
+            },
+            ..owner_label(1)
+        };
+        let text = String::from_utf8(render_label_40x20(&probed).expect("renders"))
+            .expect("tspl is ascii-clean");
+        let head: Vec<&str> = text.split("\r\n").take(6).collect();
+        assert_eq!(
+            head,
+            [
+                "SIZE 40 mm,20 mm",
+                "GAP 3,0",
+                "DENSITY 8",
+                "SPEED 4",
+                "DIRECTION 1",
+                "CLS",
+            ],
+            "P1: CODEPAGE absent, everything else pinned"
+        );
+        assert!(!text.contains("CODEPAGE"), "no CODEPAGE anywhere");
+    }
+
+    #[test]
+    fn probe_ascii_only_folds_lossy_with_question_marks() {
+        // LOSSY documented: accents + Arabic collapse to `?`; the probe asks
+        // print-vs-ignore, never beauty.
+        assert_eq!(ascii_probe_lossy("café Üمر"), "caf? ???");
+        let probed = TsplLabel {
+            brand_text: "café",
+            media: TsplMediaSetup {
+                probe_mode: TsplProbeMode::AsciiOnly,
+                ..TsplMediaSetup::default()
+            },
+            ..owner_label(1)
+        };
+        let text = String::from_utf8(render_label_40x20(&probed).expect("renders"))
+            .expect("probe output is ascii-clean");
+        assert!(
+            text.contains("TEXT") && text.contains("caf?"),
+            "P2: payload folded, got: {text}"
+        );
+        assert!(text.is_ascii(), "P2 output is pure ASCII");
+    }
+
+    #[test]
+    fn probe_font1_only_unifies_every_text_face() {
+        let probed = TsplLabel {
+            media: TsplMediaSetup {
+                probe_mode: TsplProbeMode::Font1Only,
+                ..TsplMediaSetup::default()
+            },
+            ..owner_label(1)
+        };
+        let text = String::from_utf8(render_label_40x20(&probed).expect("renders"))
+            .expect("tspl is ascii-clean");
+        for line in text.lines().filter(|l| l.starts_with("TEXT ")) {
+            assert!(
+                line.contains(",\"1\",0,"),
+                "P3: every TEXT uses font 1, got: {line}"
+            );
+        }
+        assert!(
+            text.lines().filter(|l| l.starts_with("TEXT ")).count() > 0,
+            "label carries TEXT lines"
+        );
+    }
+
+    #[test]
+    fn probe_normal_is_byte_identical_to_today() {
+        // Regression: Normal == pre-probe output — `label_bytes_are_exact`
+        // pins the bytes; here we assert the mode itself is a no-op.
+        let normal = render_label_40x20(&owner_label(1)).expect("renders");
+        let explicit = TsplLabel {
+            media: TsplMediaSetup {
+                probe_mode: TsplProbeMode::Normal,
+                ..TsplMediaSetup::default()
+            },
+            ..owner_label(1)
+        };
+        let bytes = render_label_40x20(&explicit).expect("renders");
+        assert_eq!(normal, bytes, "explicit Normal == default output");
     }
 
     #[test]
@@ -1142,6 +1371,7 @@ mod tests {
             gap_mm: 0,
             density: 15,
             speed: 6,
+            probe_mode: TsplProbeMode::Normal,
         }
         .validate()
         .expect("edges validate");
@@ -1149,6 +1379,7 @@ mod tests {
             gap_mm: 10,
             density: 0,
             speed: 1,
+            probe_mode: TsplProbeMode::Normal,
         }
         .validate()
         .expect("edges validate");

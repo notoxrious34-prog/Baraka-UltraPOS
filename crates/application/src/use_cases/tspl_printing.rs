@@ -61,10 +61,14 @@ where
     P: PrinterSettingsPort + ?Sized,
 {
     let stored = settings.get_printer_settings()?;
+    // TEMPORARY-DIAGNOSTIC (BRK-100): a hand-edited stored spelling fails
+    // the print LOUDLY here — never a silent fallback to `Normal`.
+    let probe_mode = baraka_domain::printing::parse_tspl_probe_mode(&stored.tspl_probe_mode)?;
     Ok(TsplMediaSetup {
         gap_mm: stored.tspl_gap_mm,
         density: stored.tspl_density,
         speed: stored.tspl_speed,
+        probe_mode,
     })
 }
 

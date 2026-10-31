@@ -1092,6 +1092,8 @@ pub struct PrinterSettingsDto {
     pub tspl_density: u8,
     /// TSPL print speed in inch/sec, 1..=6 (default 4).
     pub tspl_speed: u8,
+    /// TEMPORARY-DIAGNOSTIC probe mode wire spelling (BRK-100).
+    pub tspl_probe_mode: String,
 }
 
 /// Serial printer configuration update.
@@ -1125,6 +1127,9 @@ pub struct UpdatePrinterSettingsRequest {
     /// TSPL print speed in inch/sec (1..=6; absent keeps stored speed).
     #[serde(default)]
     pub tspl_speed: Option<u8>,
+    /// TEMPORARY-DIAGNOSTIC probe mode selector (BRK-100).
+    #[serde(default)]
+    pub tspl_probe_mode: Option<String>,
 }
 
 // Store identity + diagnostics wire types ---------------------------------

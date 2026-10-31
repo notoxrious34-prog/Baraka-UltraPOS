@@ -105,6 +105,15 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
             tspl_gap_mm: gap_mm,
             tspl_density: density,
             tspl_speed: speed,
+            // TEMPORARY-DIAGNOSTIC (BRK-100): absent key reads as `normal`;
+            // present-but-unknown spellings also read as `normal` here —
+            // writes are validated LOUDLY upstream, so only a hand-edited
+            // DB can hold garbage (same posture as the numeric media keys).
+            tspl_probe_mode: self
+                .read_key("tspl.probe_mode")
+                .map(|value| value.trim().to_string())
+                .filter(|value| baraka_domain::printing::parse_tspl_probe_mode(value).is_ok())
+                .unwrap_or_else(|| baraka_domain::printing::TSPL_PROBE_MODE_DEFAULT.to_string()),
         })
     }
 
@@ -157,6 +166,8 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         gap_mm: Option<u32>,
         density: Option<u8>,
         speed: Option<u8>,
+        // TEMPORARY-DIAGNOSTIC (BRK-100): `None` keeps the stored mode.
+        probe_mode: Option<String>,
     ) -> Result<(), ApplicationError> {
         // `None` keeps the stored value; `Some` was validated upstream.
         let mut guard = self.lock()?;
@@ -170,6 +181,9 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         }
         if let Some(speed) = speed {
             pairs.push(("tspl.print_speed", speed.to_string()));
+        }
+        if let Some(mode) = probe_mode {
+            pairs.push(("tspl.probe_mode", mode));
         }
         run_transaction(&mut guard, |tx| {
             for (key, value) in &pairs {

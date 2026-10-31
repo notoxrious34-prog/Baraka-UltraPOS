@@ -1059,6 +1059,23 @@ pub struct TsplPrintResponse {
     pub bytes_sent: usize,
 }
 
+/// Silent raster-only print request (button-triggered, spooler only, BRK-101).
+/// Pixels are 1-bit rows, MSB-first, left-to-right (see render_bitmap_job);
+/// caps enforced pre-send, never truncated.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RawBitmapRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Packed 1-bit pixels, row-major (Vec<u8> rides a JSON number array).
+    pub pixels: Vec<u8>,
+    /// Frame width in BYTES (dots = width_bytes x 8, 80 mm max).
+    pub width_bytes: u32,
+    /// Frame height in DOTS (1638 max).
+    pub height_rows: u32,
+    /// Copies, 1..=99 (enforced in PRINT 1,n, never by resending).
+    pub copies: u32,
+}
+
 /// Silent 80 mm ticket print request (button-triggered, spooler only).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TsplTicketRequest {

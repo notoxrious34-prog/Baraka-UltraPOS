@@ -1029,6 +1029,27 @@ export async function ipcPrintTsplTicket(
   return wire.bytes_sent;
 }
 
+/** Silent raster-only print (BRK-101 — TEXT path DEAD; WYSIWYG pixels). */
+export async function ipcPrintRawBitmap(
+  sessionToken: string,
+  pixels: Uint8Array,
+  widthBytes: number,
+  heightRows: number,
+  copies: number,
+): Promise<number> {
+  const wire = await call<TsplPrintWire>("print_raw_bitmap", {
+    request: {
+      session_token: sessionToken,
+      // Vec<u8> rides a JSON number array; Array.from keeps bytes unsigned.
+      pixels: Array.from(pixels),
+      width_bytes: widthBytes,
+      height_rows: heightRows,
+      copies,
+    },
+  });
+  return wire.bytes_sent;
+}
+
 /** DEVIS-to-BL conversion request (mirrors ConvertDevisToBlRequest). */
 export interface ConvertDevisToBlWireRequest {
   session_token: string;

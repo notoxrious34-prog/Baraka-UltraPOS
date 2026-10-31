@@ -14,7 +14,9 @@ use baraka_application::ports::{
     PrinterSettings, PrinterSettingsPort, PrinterTransportPort, SessionContext, SessionToken,
     StoreIdentityPort, StoredPayment,
 };
-use baraka_application::use_cases::tspl_printing::{PrintTsplLabelUseCase, PrintTsplTicketUseCase};
+use baraka_application::use_cases::tspl_printing::{
+    PrintRawBitmapUseCase, PrintTsplLabelUseCase, PrintTsplTicketUseCase,
+};
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
 use baraka_domain::inventory::WarehouseId;
@@ -425,6 +427,40 @@ fn label_preamble_uses_stored_probe_mode() {
         ),
         "stored NoCodepage drops CODEPAGE from spooled bytes"
     );
+}
+
+// BRK-101: raster-only print through the existing spooler transport.
+#[test]
+fn raw_bitmap_spools_validated_bytes_and_rejects_before_send() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    // 2x1 mixed frame: preamble + BITMAP + PRINT.
+    let outcome = PrintRawBitmapUseCase::new(&settings, &transport)
+        .execute(&session_with(Role::Caissier), &[0xAA, 0x55], 2, 1, 1)
+        .expect("raster spools");
+    let payloads = transport.payloads();
+    assert_eq!(payloads.len(), 1, "one job spooled");
+    assert_eq!(outcome.bytes_sent, payloads[0].len());
+    assert!(
+        payloads[0].starts_with(b"SIZE 2 mm,1 mm\r\n"),
+        "size from geometry"
+    );
+    assert!(
+        !payloads[0].windows(8).any(|w| w == b"CODEPAGE"),
+        "no CODEPAGE in raster job"
+    );
+    // Oversize frame: rejected pre-send, transport untouched.
+    let before = transport.payloads().len();
+    let huge = vec![0xAA_u8; 81 * 1638];
+    PrintRawBitmapUseCase::new(&settings, &transport)
+        .execute(&session_with(Role::Caissier), &huge, 81, 1638, 1)
+        .expect_err("too wide rejected");
+    assert_eq!(transport.payloads().len(), before, "nothing sent on reject");
+    // Blank frame: rejected pre-send.
+    PrintRawBitmapUseCase::new(&settings, &transport)
+        .execute(&session_with(Role::Caissier), &[0x00, 0x00], 2, 1, 1)
+        .expect_err("blank rejected");
+    assert_eq!(transport.payloads().len(), before, "nothing sent on blank");
 }
 
 #[test]

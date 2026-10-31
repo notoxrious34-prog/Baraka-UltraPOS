@@ -82,7 +82,9 @@ use baraka_application::use_cases::suppliers::{
     CreateSupplierUseCase, GetSupplierStatementUseCase, GetSupplierUseCase, ListSuppliersUseCase,
     SearchSuppliersUseCase, UpdateSupplierUseCase,
 };
-use baraka_application::use_cases::tspl_printing::{PrintTsplLabelUseCase, PrintTsplTicketUseCase};
+use baraka_application::use_cases::tspl_printing::{
+    PrintRawBitmapUseCase, PrintTsplLabelUseCase, PrintTsplTicketUseCase,
+};
 use baraka_application::use_cases::users::{
     CreateUserUseCase, ListUsersUseCase, ResetUserCredentialsUseCase, UpdateUserUseCase,
 };
@@ -128,26 +130,26 @@ use crate::dto::{
     PreRestoreReportDto, PreRestoreRequestDto, PreviewLineDto, PreviewTotalsRequest,
     PreviewTotalsResponse, PrintStatusResponse, PrinterSettingsDto, ProcessReturnRequestDto,
     ProcessReturnResponseDto, ProductResponseDto, ProductUnitDto, PurchaseLineRequestDto,
-    PurchaseOrderDto, PurchaseOrderLineDto, ReceiveGoodsRequestDto, RecordCreditPaymentRequest,
-    RecordCreditPaymentResponse, RecordExpenseRequestDto, RecordSupplierInvoiceRequestDto,
-    RecordSupplierPaymentRequestDto, RefundDestinationDto, ReportDateRangeRequestDto,
-    ReprintRequest, ReprintResponse, ResetBackupRefDto, ResetPrecheckDto,
-    ResetUserCredentialsRequestDto, RestoreBackupRequestDto, RestoreIneligibleReasonDto,
-    RestoreOutcomeDto, RestoreWarningDto, ReturnContextResponseDto, ReturnableDocumentSummaryDto,
-    ReturnableItemDto, ReturnableLineDto, SalesByCategoryRowDto, SalesByProductRowDto,
-    SaveStoreIdentityRequest, ScheduledBackupReportDto, ScheduledRunOutcomeDto,
-    SearchCustomersRequest, SearchCustomersResponse, SearchSuppliersRequestDto,
-    SearchSuppliersResponseDto, StatementEntryDto, StockMovementHistoryRequestDto,
-    StockMovementRowDto, StockShortageWarningDto, StoreIdentityDto, StoreIdentityResponse,
-    SupplierDto, SupplierIdRequestDto, SupplierLedgerEntryDto, SupplierPaymentOutcomeDto,
-    SupplierStatementDto, TestPrintRequest, TestPrintResponse, TransferStockRequestDto,
-    TransferStockResponseDto, TsplLabelRequest, TsplPrintResponse, TsplTicketRequest,
-    UpdateCategoryRequestDto, UpdateCustomerRequest, UpdateFiscalSettingsRequestDto,
-    UpdatePrinterSettingsRequest, UpdateProductDto, UpdateProductUnitDto,
-    UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto, UpdateUserRequestDto,
-    UpdateWarehouseRequestDto, UsbCopyOutcomeDto, UserActivityRequestDto, UserActivityRowDto,
-    UserSummaryDto, VerifyBackupRequestDto, VerifyBackupResponseDto, WarehouseDto,
-    WarehouseStockPresenceDto, WarehouseStockPresenceResponseDto,
+    PurchaseOrderDto, PurchaseOrderLineDto, RawBitmapRequest, ReceiveGoodsRequestDto,
+    RecordCreditPaymentRequest, RecordCreditPaymentResponse, RecordExpenseRequestDto,
+    RecordSupplierInvoiceRequestDto, RecordSupplierPaymentRequestDto, RefundDestinationDto,
+    ReportDateRangeRequestDto, ReprintRequest, ReprintResponse, ResetBackupRefDto,
+    ResetPrecheckDto, ResetUserCredentialsRequestDto, RestoreBackupRequestDto,
+    RestoreIneligibleReasonDto, RestoreOutcomeDto, RestoreWarningDto, ReturnContextResponseDto,
+    ReturnableDocumentSummaryDto, ReturnableItemDto, ReturnableLineDto, SalesByCategoryRowDto,
+    SalesByProductRowDto, SaveStoreIdentityRequest, ScheduledBackupReportDto,
+    ScheduledRunOutcomeDto, SearchCustomersRequest, SearchCustomersResponse,
+    SearchSuppliersRequestDto, SearchSuppliersResponseDto, StatementEntryDto,
+    StockMovementHistoryRequestDto, StockMovementRowDto, StockShortageWarningDto, StoreIdentityDto,
+    StoreIdentityResponse, SupplierDto, SupplierIdRequestDto, SupplierLedgerEntryDto,
+    SupplierPaymentOutcomeDto, SupplierStatementDto, TestPrintRequest, TestPrintResponse,
+    TransferStockRequestDto, TransferStockResponseDto, TsplLabelRequest, TsplPrintResponse,
+    TsplTicketRequest, UpdateCategoryRequestDto, UpdateCustomerRequest,
+    UpdateFiscalSettingsRequestDto, UpdatePrinterSettingsRequest, UpdateProductDto,
+    UpdateProductUnitDto, UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto,
+    UpdateUserRequestDto, UpdateWarehouseRequestDto, UsbCopyOutcomeDto, UserActivityRequestDto,
+    UserActivityRowDto, UserSummaryDto, VerifyBackupRequestDto, VerifyBackupResponseDto,
+    WarehouseDto, WarehouseStockPresenceDto, WarehouseStockPresenceResponseDto,
 };
 
 /// Shared backend handles for command handlers.
@@ -3228,6 +3230,34 @@ pub fn print_tspl_ticket(
         state.printer_transport.as_ref(),
     )
     .execute(&session, id)
+    .map_err(|error| error_code(&error))?;
+    Ok(TsplPrintResponse {
+        bytes_sent: outcome.bytes_sent,
+    })
+}
+
+/// `print_raw_bitmap` command: silent raster-only print (BRK-101).
+///
+/// Button-triggered only, spooler transport only — no dialog, no preview.
+/// The frontend packs WYSIWYG pixels (1-bit, MSB-first); every cap is
+/// enforced pre-send by `render_bitmap_job`, never truncated.
+#[tauri::command(rename_all = "snake_case")]
+pub fn print_raw_bitmap(
+    state: tauri::State<'_, AppState>,
+    request: RawBitmapRequest,
+) -> Result<TsplPrintResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let outcome = PrintRawBitmapUseCase::new(
+        state.printer_settings.as_ref(),
+        state.printer_transport.as_ref(),
+    )
+    .execute(
+        &session,
+        &request.pixels,
+        request.width_bytes as usize,
+        request.height_rows as usize,
+        request.copies,
+    )
     .map_err(|error| error_code(&error))?;
     Ok(TsplPrintResponse {
         bytes_sent: outcome.bytes_sent,

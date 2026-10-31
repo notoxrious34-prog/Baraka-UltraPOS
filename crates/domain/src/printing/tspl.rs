@@ -874,6 +874,89 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
     Ok(out.join("\r\n").into_bytes())
 }
 
+/// BITMAP raster bounds (BRK-101; architect-verified TSC reference
+/// `BITMAP X,Y,width,height,mode,data`: width IN BYTES, height IN DOTS,
+/// mode 0 OVERWRITE, raw binary data after the comma).
+/// Width ceiling = 80 mm ticket (640 dots); height ceiling guards the
+/// spooler transfer; total ceiling = 128 KiB (ticket ~52 KiB typical).
+pub const BITMAP_MAX_WIDTH_DOTS: usize = 640;
+pub const BITMAP_MAX_HEIGHT_DOTS: usize = 1638;
+pub const BITMAP_MAX_BYTES: usize = 131072;
+
+/// Render a silent raster-only job (BRK-101 — TEXT path is DEAD, owner
+/// all-red on P1–P3): self-describing preamble
+/// SIZE → GAP → DENSITY → SPEED → DIRECTION → CLS (**NO CODEPAGE — zero
+/// text bytes anywhere**), then `BITMAP x,y,w,h,0,<raw>`, then `PRINT 1,n`.
+/// SIZE is derived from the raster geometry (millimeters, integer math).
+/// Pure: parameters in, bytes out. Refuses, never truncates.
+#[allow(clippy::too_many_arguments)]
+pub fn render_bitmap_job(
+    media: &TsplMediaSetup,
+    x: i64,
+    y: i64,
+    width_bytes: usize,
+    height_rows: usize,
+    data: &[u8],
+    copies: u32,
+) -> Result<Vec<u8>, DomainError> {
+    media.validate()?;
+    let code = |name: &str| DomainError::InvalidCanonicalString(name.to_string());
+    if x < 0 || y < 0 {
+        return Err(code("BITMAP_ORIGIN_MUST_BE_NON_NEGATIVE"));
+    }
+    if width_bytes == 0 || height_rows == 0 {
+        return Err(code("BITMAP_DIMENSIONS_MUST_BE_POSITIVE"));
+    }
+    if width_bytes
+        .checked_mul(8)
+        .filter(|dots| *dots <= BITMAP_MAX_WIDTH_DOTS)
+        .is_none()
+    {
+        return Err(code("BITMAP_WIDTH_TOO_WIDE"));
+    }
+    if height_rows > BITMAP_MAX_HEIGHT_DOTS {
+        return Err(code("BITMAP_TOO_TALL"));
+    }
+    let expected = width_bytes
+        .checked_mul(height_rows)
+        .ok_or_else(|| code("BITMAP_TOO_LARGE"))?;
+    if expected > BITMAP_MAX_BYTES {
+        return Err(code("BITMAP_TOO_LARGE"));
+    }
+    if data.len() != expected {
+        return Err(code("BITMAP_LENGTH_MISMATCH"));
+    }
+    // Anti-blank guard: an all-white or all-black frame is a rasterizer bug
+    // or a dead transfer — never worth spooling.
+    if data.iter().all(|byte| *byte == 0x00) || data.iter().all(|byte| *byte == 0xFF) {
+        return Err(code("BITMAP_BLANK_IMAGE"));
+    }
+    if !(TSPL_MIN_COPIES..=TSPL_MAX_COPIES).contains(&copies) {
+        return Err(code("BITMAP_COPIES_OUT_OF_RANGE"));
+    }
+    // Width is byte-exact so dots (bytes×8) divide evenly into whole mm.
+    let width_mm = width_bytes;
+    let height_mm = height_rows.div_ceil(DOTS_PER_MM as usize);
+    let mut job: Vec<u8> = Vec::new();
+    for line in [
+        format!("SIZE {width_mm} mm,{height_mm} mm"),
+        format!("GAP {},0", media.gap_mm),
+        format!("DENSITY {}", media.density),
+        format!("SPEED {}", media.speed),
+        "DIRECTION 1".to_string(),
+        "CLS".to_string(),
+        format!("BITMAP {x},{y},{width_bytes},{height_rows},0,"),
+    ] {
+        job.extend_from_slice(line.as_bytes());
+        if !line.starts_with("BITMAP ") {
+            job.extend_from_slice(b"\r\n");
+        }
+    }
+    job.extend_from_slice(data);
+    job.extend_from_slice(format!("\r\nPRINT 1,{copies}").as_bytes());
+    Ok(job)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1431,5 +1514,141 @@ mod tests {
         let text =
             String::from_utf8(render_ticket_80mm(&owner_ticket()).expect("ok")).expect("ascii");
         assert!(text.ends_with("PRINT 1,1"));
+    }
+
+    // BRK-101 BITMAP pins (TEXT path is DEAD — raster only).
+
+    #[test]
+    fn bitmap_job_is_byte_exact_on_a_two_byte_fixture() {
+        let data = [0xAA_u8, 0x55_u8];
+        let job = render_bitmap_job(&TsplMediaSetup::default(), 0, 0, 2, 1, &data, 1)
+            .expect("fixture renders");
+        let mut expected: Vec<u8> = Vec::new();
+        expected.extend_from_slice(
+            b"SIZE 2 mm,1 mm\r\nGAP 3,0\r\nDENSITY 8\r\nSPEED 4\r\nDIRECTION 1\r\nCLS\r\nBITMAP 0,0,2,1,0,",
+        );
+        expected.extend_from_slice(&data);
+        expected.extend_from_slice(b"\r\nPRINT 1,1");
+        assert_eq!(job, expected, "raster job byte-exact");
+        assert!(
+            !job.windows(8).any(|w| w == b"CODEPAGE"),
+            "zero text bytes: no CODEPAGE anywhere"
+        );
+    }
+
+    #[test]
+    fn bitmap_job_ignores_the_temporary_probe_switch() {
+        let data = [0xAA_u8, 0x55_u8];
+        let plain =
+            render_bitmap_job(&TsplMediaSetup::default(), 0, 0, 2, 1, &data, 1).expect("renders");
+        for mode in [
+            TsplProbeMode::NoCodepage,
+            TsplProbeMode::AsciiOnly,
+            TsplProbeMode::Font1Only,
+        ] {
+            let media = TsplMediaSetup {
+                probe_mode: mode,
+                ..TsplMediaSetup::default()
+            };
+            let probed = render_bitmap_job(&media, 0, 0, 2, 1, &data, 1).expect("renders");
+            assert_eq!(probed, plain, "probe mode has no effect on raster jobs");
+        }
+    }
+
+    #[test]
+    fn bitmap_job_refuses_bad_geometry_copies_and_blank_frames() {
+        let media = TsplMediaSetup::default();
+        let bad = |name: &str| DomainError::InvalidCanonicalString(name.to_string());
+        // Length mismatch.
+        assert_eq!(
+            render_bitmap_job(&media, 0, 0, 2, 1, &[0xAA], 1).expect_err("short"),
+            bad("BITMAP_LENGTH_MISMATCH")
+        );
+        // Zero dimension.
+        assert_eq!(
+            render_bitmap_job(&media, 0, 0, 0, 1, &[], 1).expect_err("zero width"),
+            bad("BITMAP_DIMENSIONS_MUST_BE_POSITIVE")
+        );
+        // Too wide: 81 bytes = 648 dots > 640.
+        assert_eq!(
+            render_bitmap_job(&media, 0, 0, 81, 1, &[0xAA; 81], 1).expect_err("wide"),
+            bad("BITMAP_WIDTH_TOO_WIDE")
+        );
+        // Too tall.
+        assert_eq!(
+            render_bitmap_job(
+                &media,
+                0,
+                0,
+                1,
+                BITMAP_MAX_HEIGHT_DOTS + 1,
+                &[0xAA; BITMAP_MAX_HEIGHT_DOTS + 1],
+                1
+            )
+            .expect_err("tall"),
+            bad("BITMAP_TOO_TALL")
+        );
+        // Too large: 81 x 1638 would be 132678 > 131072 — but the width cap
+        // fires first (648 dots > 640); the total cap is defense-in-depth
+        // for future cap changes. Pin the implied ceiling instead: the
+        // largest legal frame (80 x 1638 = 131040 B) renders.
+        assert_eq!(
+            render_bitmap_job(&media, 0, 0, 81, 1638, &[0xAA; 81 * 1638], 1).expect_err("huge"),
+            bad("BITMAP_WIDTH_TOO_WIDE")
+        );
+        let mut max = vec![0xAA_u8; 80 * BITMAP_MAX_HEIGHT_DOTS];
+        max[0] = 0x55;
+        // Implied ceiling pinned by the render below: the largest legal
+        // frame (80 x 1638 = 131040 B) stays under the 128 KiB total cap.
+        render_bitmap_job(&media, 0, 0, 80, BITMAP_MAX_HEIGHT_DOTS, &max, 1)
+            .expect("max geometry renders");
+        // All-white and all-black frames rejected (anti-blank guard).
+        assert_eq!(
+            render_bitmap_job(&media, 0, 0, 2, 1, &[0x00, 0x00], 1).expect_err("white"),
+            bad("BITMAP_BLANK_IMAGE")
+        );
+        assert_eq!(
+            render_bitmap_job(&media, 0, 0, 2, 1, &[0xFF, 0xFF], 1).expect_err("black"),
+            bad("BITMAP_BLANK_IMAGE")
+        );
+        // Copies out of range.
+        assert_eq!(
+            render_bitmap_job(&media, 0, 0, 2, 1, &[0xAA, 0x55], 0).expect_err("zero copies"),
+            bad("BITMAP_COPIES_OUT_OF_RANGE")
+        );
+        assert_eq!(
+            render_bitmap_job(&media, 0, 0, 2, 1, &[0xAA, 0x55], 100).expect_err("100 copies"),
+            bad("BITMAP_COPIES_OUT_OF_RANGE")
+        );
+        // Negative origin.
+        assert_eq!(
+            render_bitmap_job(&media, -1, 0, 2, 1, &[0xAA, 0x55], 1).expect_err("neg x"),
+            bad("BITMAP_ORIGIN_MUST_BE_NON_NEGATIVE")
+        );
+    }
+
+    #[test]
+    fn bitmap_job_carries_label_and_ticket_geometry() {
+        // 40x20 mm label: 40 bytes x 160 rows = 6400 B.
+        let mut label = vec![0xAA_u8; 40 * 160];
+        label[0] = 0x55;
+        let job = render_bitmap_job(&TsplMediaSetup::default(), 0, 0, 40, 160, &label, 2)
+            .expect("label geometry");
+        let head = String::from_utf8(job[..40].to_vec()).expect("header ascii");
+        assert!(
+            head.starts_with("SIZE 40 mm,20 mm\r\n"),
+            "label size, got: {head}"
+        );
+        assert!(job.ends_with(b"\r\nPRINT 1,2"), "copies ride PRINT");
+        // 80 mm ticket, 84 mm tall: 80 bytes x 672 rows = 53760 B.
+        let mut ticket = vec![0xAA_u8; 80 * 672];
+        ticket[0] = 0x55;
+        let job = render_bitmap_job(&TsplMediaSetup::default(), 0, 0, 80, 672, &ticket, 1)
+            .expect("ticket geometry");
+        let head = String::from_utf8(job[..40].to_vec()).expect("header ascii");
+        assert!(
+            head.starts_with("SIZE 80 mm,84 mm\r\n"),
+            "ticket size, got: {head}"
+        );
     }
 }

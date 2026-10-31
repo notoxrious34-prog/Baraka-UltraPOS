@@ -21,9 +21,10 @@ pub use transport::{
     TRANSPORT_SPOOLER,
 };
 pub use tspl::{
-    parse_tspl_probe_mode, render_label_40x20, render_ticket_80mm, validate_tspl_density,
-    validate_tspl_gap_mm, validate_tspl_speed, TsplCaptionLang, TsplLabel, TsplMediaSetup,
-    TsplProbeMode, TsplTicket, TsplTicketLine, TsplTicketTotals, DOTS_PER_MM, LABEL_HEIGHT_DOTS,
+    parse_tspl_probe_mode, render_bitmap_job, render_label_40x20, render_ticket_80mm,
+    validate_tspl_density, validate_tspl_gap_mm, validate_tspl_speed, TsplCaptionLang, TsplLabel,
+    TsplMediaSetup, TsplProbeMode, TsplTicket, TsplTicketLine, TsplTicketTotals, BITMAP_MAX_BYTES,
+    BITMAP_MAX_HEIGHT_DOTS, BITMAP_MAX_WIDTH_DOTS, DOTS_PER_MM, LABEL_HEIGHT_DOTS,
     LABEL_WIDTH_DOTS, TICKET_WIDTH_DOTS, TSPL_CODEPAGE_LINE, TSPL_DENSITY_DEFAULT,
     TSPL_DENSITY_MAX, TSPL_GAP_MM_DEFAULT, TSPL_GAP_MM_MAX, TSPL_MAX_COPIES, TSPL_MIN_COPIES,
     TSPL_PROBE_MODE_DEFAULT, TSPL_SPEED_DEFAULT, TSPL_SPEED_MAX, TSPL_SPEED_MIN,

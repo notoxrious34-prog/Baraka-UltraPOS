@@ -18,9 +18,9 @@
 
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
-    format_centimes_plain, format_qty_plain, render_label_40x20, render_ticket_80mm,
-    TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine, TsplTicketTotals,
-    TRANSPORT_SPOOLER,
+    format_centimes_plain, format_qty_plain, render_bitmap_job, render_label_40x20,
+    render_ticket_80mm, TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine,
+    TsplTicketTotals, TRANSPORT_SPOOLER,
 };
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{DocumentId, DocumentLanguage};
@@ -303,4 +303,62 @@ fn pick_name(
         .clone()
         .or_else(|| second.clone())
         .unwrap_or_else(|| fallback.to_string())
+}
+
+/// Silent raster-only print (BRK-101 — TEXT path is DEAD, owner all-red).
+/// Same auth seam as the `print_tspl_*` use-cases: POS sell permission +
+/// spooler transport required; opaque packed pixels in, spooler bytes out.
+/// NO infrastructure change — the existing
+/// [`PrinterTransportPort::send_raster`] moves the bytes.
+pub struct PrintRawBitmapUseCase<'a, S, T>
+where
+    S: ?Sized,
+    T: ?Sized,
+{
+    settings: &'a S,
+    transport: &'a T,
+}
+
+impl<'a, S, T> PrintRawBitmapUseCase<'a, S, T>
+where
+    S: PrinterSettingsPort + ?Sized,
+    T: PrinterTransportPort + ?Sized,
+{
+    /// Wire the use case to its ports.
+    pub fn new(settings: &'a S, transport: &'a T) -> Self {
+        Self {
+            settings,
+            transport,
+        }
+    }
+
+    /// Validate, render the raster job, and spool it. All caps enforced
+    /// pre-send by [`render_bitmap_job`] — the transport only ever sees a
+    /// fully validated job (never truncated, never blank).
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        pixels: &[u8],
+        width_bytes: usize,
+        height_rows: usize,
+        copies: u32,
+    ) -> Result<TsplPrintOutcome, ApplicationError> {
+        if !session.role.has_permission(Permission::PosSell) {
+            return Err(ApplicationError::Unauthorized);
+        }
+        require_spooler_transport(self.settings)?;
+        let bytes = render_bitmap_job(
+            &media_from_settings(self.settings)?,
+            0,
+            0,
+            width_bytes,
+            height_rows,
+            pixels,
+            copies,
+        )?;
+        self.transport.send_raster(&bytes)?;
+        Ok(TsplPrintOutcome {
+            bytes_sent: bytes.len(),
+        })
+    }
 }

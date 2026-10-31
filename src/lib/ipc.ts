@@ -1385,6 +1385,20 @@ export type PrinterTransport = 'serial' | 'spooler';
 /** Ticket render mode (mirrors printer.ticket_render_mode, ADR-104). */
 export type TicketRenderMode = 'escpos' | 'graphique';
 
+/**
+ * TSPL diagnostic probe mode (BRK-100 TEMPORARY-DIAGNOSTIC wire spelling;
+ * remove with the switch in the lock-in task). Only these four spellings are
+ * ever constructed or sent — invalid values never reach the IPC layer.
+ */
+export type TsplProbeMode = 'normal' | 'no_codepage' | 'ascii_only' | 'font1_only';
+
+/** Parse unknown wire input; unknown spellings fall back to `normal`. */
+function toTsplProbeMode(raw: unknown): TsplProbeMode {
+  return raw === 'no_codepage' || raw === 'ascii_only' || raw === 'font1_only'
+    ? raw
+    : 'normal';
+}
+
 export interface PrinterSettings {
   serialPort: string;
   serialBaud: number;
@@ -1393,6 +1407,8 @@ export interface PrinterSettings {
   transport: PrinterTransport;
   queueName: string;
   ticketRenderMode: TicketRenderMode;
+  /** TEMPORARY-DIAGNOSTIC probe mode (BRK-100 — remove in lock-in). */
+  tsplProbeMode: TsplProbeMode;
 }
 
 function toTicketRenderMode(raw: unknown): TicketRenderMode {
@@ -1422,10 +1438,13 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     ticketRenderMode: toTicketRenderMode(
       (wire as { ticket_render_mode?: unknown }).ticket_render_mode,
     ),
+    tsplProbeMode: toTsplProbeMode(
+      (wire as { tspl_probe_mode?: unknown }).tspl_probe_mode,
+    ),
   };
 }
 
-/** Persist serial port + baud + paper width + transport selection (ADMIN only server-side). */
+/** Persist serial port + baud + paper width + transport + render mode + TEMPORARY probe mode (ADMIN only server-side). */
 export async function ipcUpdatePrinterSettings(
   sessionToken: string,
   serialPort: string,
@@ -1434,6 +1453,8 @@ export async function ipcUpdatePrinterSettings(
   transport: PrinterTransport = 'serial',
   queueName = '',
   ticketRenderMode?: TicketRenderMode | null,
+  // TEMPORARY-DIAGNOSTIC (BRK-100 — remove in lock-in): null/absent keeps stored mode.
+  tsplProbeMode?: TsplProbeMode | null,
 ): Promise<PrinterSettings> {
   const wire = await call<{
     serial_port: string;
@@ -1443,6 +1464,7 @@ export async function ipcUpdatePrinterSettings(
     transport: string;
     queue_name: string;
     ticket_render_mode: string;
+    tspl_probe_mode: string;
   }>("printer_update_settings", {
     request: {
       session_token: sessionToken,
@@ -1453,6 +1475,8 @@ export async function ipcUpdatePrinterSettings(
       queue_name: queueName,
       // null/absent keeps the stored mode server-side (BRK-090 None-keeps).
       ticket_render_mode: ticketRenderMode ?? null,
+      // TEMPORARY-DIAGNOSTIC: typed union — invalid spellings unconstructible.
+      tspl_probe_mode: tsplProbeMode ?? null,
     },
   });
   return {
@@ -1463,6 +1487,7 @@ export async function ipcUpdatePrinterSettings(
     transport: wire.transport === 'spooler' ? 'spooler' : 'serial',
     queueName: typeof wire.queue_name === 'string' ? wire.queue_name : '',
     ticketRenderMode: toTicketRenderMode(wire.ticket_render_mode),
+    tsplProbeMode: toTsplProbeMode(wire.tspl_probe_mode),
   };
 }
 

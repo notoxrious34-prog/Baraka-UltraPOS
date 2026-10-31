@@ -21,6 +21,7 @@ import {
   type PrinterTransport,
   type TestPrintLanguage,
   type TicketRenderMode,
+  type TsplProbeMode,
 } from "@/lib/ipc";
 import { PrinterIcon, DocumentsIcon, SettingsIcon } from "@/components/icons";
 import {
@@ -35,6 +36,21 @@ interface PrinterSettingsTabProps {
   sessionToken: string;
 }
 
+// TEMPORARY-DIAGNOSTIC (BRK-100 — remove in lock-in): label/note keys per mode.
+const PROBE_LABEL_KEYS = {
+  normal: "settings.tsplProbeNormal",
+  no_codepage: "settings.tsplProbeNoCodepage",
+  ascii_only: "settings.tsplProbeAsciiOnly",
+  font1_only: "settings.tsplProbeFont1Only",
+} as const;
+
+const PROBE_NOTE_KEYS = {
+  normal: "settings.tsplProbeNoteNormal",
+  no_codepage: "settings.tsplProbeNoteNoCodepage",
+  ascii_only: "settings.tsplProbeNoteAsciiOnly",
+  font1_only: "settings.tsplProbeNoteFont1Only",
+} as const;
+
 export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabProps): ReactElement {
   const hasPermission = useSessionStore((state) => state.hasPermission);
   const canSaveSettings = hasPermission("MANAGE_PRINTER_SETTINGS");
@@ -45,6 +61,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   const [transport, setTransport] = useState<PrinterTransport>("serial");
   const [renderMode, setRenderMode] = useState<TicketRenderMode>("escpos");
   const [queueName, setQueueName] = useState("");
+  // TEMPORARY-DIAGNOSTIC (BRK-100 — remove in lock-in): probe switch state.
+  const [probeMode, setProbeMode] = useState<TsplProbeMode>("normal");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<TestPrintLanguage | null>(null);
@@ -61,6 +79,7 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           setTransport(settings.transport);
           setRenderMode(settings.ticketRenderMode);
           setQueueName(settings.queueName);
+          setProbeMode(settings.tsplProbeMode);
           setLoading(false);
         }
       })
@@ -95,6 +114,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
         transport,
         trimmedQueue,
         renderMode,
+        // TEMPORARY-DIAGNOSTIC (BRK-100): typed union — invalid unselectable.
+        probeMode,
       );
       setSerialPort(settings.serialPort);
       setSerialBaud(settings.serialBaud);
@@ -102,6 +123,7 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
       setTransport(settings.transport);
       setRenderMode(settings.ticketRenderMode);
       setQueueName(settings.queueName);
+      setProbeMode(settings.tsplProbeMode);
       setNotice({ tone: "success", text: t(locale, "settings.saved") });
     } catch (failure) {
       setNotice({ tone: "error", text: String(failure) });
@@ -198,6 +220,42 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
       <p className="text-xs text-slate-500 dark:text-slate-400">
         {t(locale, "settings.ticketRenderHelp")}
       </p>
+      {/* TEMPORARY-DIAGNOSTIC probe switch (BRK-100 — remove in lock-in). */}
+      <div className="rounded border-2 border-dashed border-amber-500 p-2 dark:border-amber-400">
+        <p className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="rounded bg-amber-500 px-1.5 py-0.5 text-xs font-black text-slate-950">
+            {t(locale, "settings.tsplProbeBadge")}
+          </span>
+          <span className="font-bold">{t(locale, "settings.tsplProbeTitle")}</span>
+        </p>
+        <div
+          role="group"
+          aria-label={t(locale, "settings.tsplProbeTitle")}
+          className="mt-2 grid grid-cols-2 gap-1 rounded border border-slate-300 p-1 dark:border-slate-600"
+        >
+          {(Object.keys(PROBE_LABEL_KEYS) as TsplProbeMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={probeMode === mode}
+              onClick={() => {
+                setProbeMode(mode);
+              }}
+              className={transportButton(probeMode === mode)}
+            >
+              <span>{t(locale, PROBE_LABEL_KEYS[mode])}</span>
+            </button>
+          ))}
+        </div>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {t(locale, PROBE_NOTE_KEYS[probeMode])}
+        </p>
+        {probeMode === "ascii_only" && (
+          <p className="mt-1 rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+            {t(locale, "settings.tsplProbeAsciiWarning")}
+          </p>
+        )}
+      </div>
       {transport === "serial" ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">

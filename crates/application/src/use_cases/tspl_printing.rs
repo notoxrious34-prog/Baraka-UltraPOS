@@ -19,7 +19,8 @@
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
     format_centimes_plain, format_qty_plain, render_label_40x20, render_ticket_80mm,
-    TsplCaptionLang, TsplLabel, TsplTicket, TsplTicketLine, TsplTicketTotals, TRANSPORT_SPOOLER,
+    TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine, TsplTicketTotals,
+    TRANSPORT_SPOOLER,
 };
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{DocumentId, DocumentLanguage};
@@ -51,6 +52,20 @@ where
             DomainError::TsplTransportRequiresSpooler,
         ))
     }
+}
+
+/// Load the stored TSPL media setup (defaults when keys are absent; the
+/// renderer re-validates — out-of-range stored values reject loudly there).
+fn media_from_settings<P>(settings: &P) -> Result<TsplMediaSetup, ApplicationError>
+where
+    P: PrinterSettingsPort + ?Sized,
+{
+    let stored = settings.get_printer_settings()?;
+    Ok(TsplMediaSetup {
+        gap_mm: stored.tspl_gap_mm,
+        density: stored.tspl_density,
+        speed: stored.tspl_speed,
+    })
 }
 
 /// Silent 40x20 mm shelf-label print (brand + name + price + Code128).
@@ -106,6 +121,7 @@ where
             currency_text: "DZD",
             barcode,
             copies,
+            media: media_from_settings(self.settings)?,
         })?;
         self.transport.send_raster(&bytes)?;
         Ok(TsplPrintOutcome {
@@ -245,6 +261,7 @@ where
                 payment_method: &payment_label,
             },
             footer: &identity.ticket_footer_message,
+            media: media_from_settings(self.settings)?,
         };
         let bytes = render_ticket_80mm(&ticket)?;
         self.transport.send_raster(&bytes)?;

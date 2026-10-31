@@ -44,8 +44,11 @@
 //!   (TSC TSPL reference metrics); scale 2 doubles the glyph box.
 //! - `TEXT x,y,"F",0,1,1,"..."`, `BARCODE x,y,"128",h,1,0,2,2,"..."`,
 //!   `PRINT 1,n` (1 set, n copies), `PRINT 1,1` (single ticket).
-//! - `DIRECTION 1` (forward feed). No `GAP` emitted: the printer's
-//!   calibrated media gap applies (DSN-098 owns media setup).
+//! - `DIRECTION 1` (forward feed). Every job carries a self-describing
+//!   media preamble (BRK-099, AUD-045): SIZE → GAP → DENSITY → SPEED →
+//!   CODEPAGE → DIRECTION → CLS. Label gap defaults to 3 mm STARTING
+//!   VALUE (OWNER-VERIFY with a ruler); ticket jobs declare `GAP 0,0`
+//!   (continuous). No NVRAM luck.
 //! - TSPL core has NO printer-agnostic cut command: no cut bytes are
 //!   emitted by design. Physical cut relies on the printer's auto-cut
 //!   configuration (deferred to owner hardware verification).
@@ -74,6 +77,110 @@ pub const TICKET_WIDTH_DOTS: i64 = 640;
 pub const TSPL_MIN_COPIES: u32 = 1;
 /// Copies ceiling (PRINT m,n single-byte field discipline, stated).
 pub const TSPL_MAX_COPIES: u32 = 99;
+
+/// Label inter-label gap default in mm — STARTING VALUE, OWNER-VERIFY with
+/// a ruler against the 40x20 liner (BRK-099). The measured value wins once
+/// collected; this default never silently becomes truth.
+pub const TSPL_GAP_MM_DEFAULT: u32 = 3;
+/// Label gap ceiling in mm (die-cut desktop stock never exceeds this).
+pub const TSPL_GAP_MM_MAX: u32 = 10;
+/// Print density default (TSC 0..=15 scale, mid-dark for direct-thermal).
+pub const TSPL_DENSITY_DEFAULT: u8 = 8;
+/// Print density ceiling (TSC scale maximum).
+pub const TSPL_DENSITY_MAX: u8 = 15;
+/// Print speed default, inch/sec (conservative for 203 dpi text+barcode).
+pub const TSPL_SPEED_DEFAULT: u8 = 4;
+/// Print speed floor, inch/sec.
+pub const TSPL_SPEED_MIN: u8 = 1;
+/// Print speed ceiling, inch/sec (XP-410B class maximum).
+pub const TSPL_SPEED_MAX: u8 = 6;
+/// Fixed charset declaration. UTF-8 — NOT 437: our TEXT bytes ARE UTF-8
+/// (French accents are multibyte; CP437 would render them as mojibake),
+/// and UTF-8 keeps Arabic codepoint-accurate (unshaped per AUD-045 —
+/// trial 4 decides the BITMAP fallback). Printer acceptance is
+/// OWNER-VERIFY: if the XP-410B rejects the line, drop to no-CODEPAGE.
+pub const TSPL_CODEPAGE_LINE: &str = "CODEPAGE UTF-8";
+
+/// Self-describing media setup carried by every silent job — no NVRAM luck
+/// (BRK-099, AUD-045). Label jobs use the stored gap; ticket jobs force
+/// gap 0 (`GAP 0,0` = declared continuous).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TsplMediaSetup {
+    /// Inter-label gap in mm, 0..=10 (`0` = continuous, ticket only).
+    pub gap_mm: u32,
+    /// Print density, 0..=15.
+    pub density: u8,
+    /// Print speed in inch/sec, 1..=6.
+    pub speed: u8,
+}
+
+impl Default for TsplMediaSetup {
+    fn default() -> Self {
+        Self {
+            gap_mm: TSPL_GAP_MM_DEFAULT,
+            density: TSPL_DENSITY_DEFAULT,
+            speed: TSPL_SPEED_DEFAULT,
+        }
+    }
+}
+
+/// Reject a label gap outside 0..=10 mm.
+pub fn validate_tspl_gap_mm(gap_mm: u32) -> Result<(), DomainError> {
+    if gap_mm > TSPL_GAP_MM_MAX {
+        return Err(DomainError::InvalidCanonicalString(
+            "TSPL_GAP_MM_OUT_OF_RANGE".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Reject a density outside the 0..=15 TSC scale.
+pub fn validate_tspl_density(density: u8) -> Result<(), DomainError> {
+    if density > TSPL_DENSITY_MAX {
+        return Err(DomainError::InvalidCanonicalString(
+            "TSPL_DENSITY_OUT_OF_RANGE".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// Reject a speed outside 1..=6 inch/sec.
+pub fn validate_tspl_speed(speed: u8) -> Result<(), DomainError> {
+    if !(TSPL_SPEED_MIN..=TSPL_SPEED_MAX).contains(&speed) {
+        return Err(DomainError::InvalidCanonicalString(
+            "TSPL_SPEED_OUT_OF_RANGE".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+impl TsplMediaSetup {
+    /// Reject any out-of-range field (codes quoted, never silent clamps).
+    pub fn validate(&self) -> Result<(), DomainError> {
+        validate_tspl_gap_mm(self.gap_mm)?;
+        validate_tspl_density(self.density)?;
+        validate_tspl_speed(self.speed)?;
+        Ok(())
+    }
+}
+
+/// Emit the self-describing preamble in pinned order:
+/// SIZE → GAP → DENSITY → SPEED → CODEPAGE → DIRECTION → CLS.
+fn push_media_preamble(
+    out: &mut Vec<String>,
+    size_line: &str,
+    media: &TsplMediaSetup,
+) -> Result<(), DomainError> {
+    media.validate()?;
+    out.push(size_line.to_string());
+    out.push(format!("GAP {},0", media.gap_mm));
+    out.push(format!("DENSITY {}", media.density));
+    out.push(format!("SPEED {}", media.speed));
+    out.push(TSPL_CODEPAGE_LINE.to_string());
+    out.push("DIRECTION 1".to_string());
+    out.push("CLS".to_string());
+    Ok(())
+}
 
 /// Assumed bitmap font widths in dots (TSC TSPL reference) — see module
 /// docs. Heights are captured in the PITCH_* line pitches below.
@@ -120,6 +227,8 @@ pub struct TsplLabel<'a> {
     pub barcode: &'a str,
     /// Copies, 1..=99 (enforced in `PRINT 1,n`, never by resending).
     pub copies: u32,
+    /// Media identity for the self-describing preamble (validated).
+    pub media: TsplMediaSetup,
 }
 
 /// Caption language for the ticket static labels.
@@ -181,6 +290,9 @@ pub struct TsplTicket<'a> {
     pub totals: TsplTicketTotals<'a>,
     /// Footer message (empty lines skipped).
     pub footer: &'a str,
+    /// Media identity for the self-describing preamble (validated;
+    /// gap is forced to 0 = continuous for tickets).
+    pub media: TsplMediaSetup,
 }
 
 /// Static captions per language (Arabic shaping caveat: see module docs).
@@ -336,9 +448,7 @@ pub fn render_label_40x20(label: &TsplLabel<'_>) -> Result<Vec<u8>, DomainError>
     let price_chars = ((LABEL_WIDTH_DOTS - 16) / (FONT_3_W * 2)) as usize;
 
     let mut out = Vec::new();
-    out.push("SIZE 40 mm,20 mm".to_string());
-    out.push("DIRECTION 1".to_string());
-    out.push("CLS".to_string());
+    push_media_preamble(&mut out, "SIZE 40 mm,20 mm", &label.media)?;
     // Brand micro-line (collapses when blank).
     let brand = truncate_to_width(label.brand_text.trim(), brand_chars);
     if !brand.is_empty() {
@@ -643,9 +753,13 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
 
     let height_mm = (y + DOTS_PER_MM - 1) / DOTS_PER_MM;
     let mut out = Vec::new();
-    out.push(format!("SIZE 80 mm,{height_mm} mm"));
-    out.push("DIRECTION 1".to_string());
-    out.push("CLS".to_string());
+    // Continuous stock declares zero gap (no-gap form, self-describing);
+    // density/speed ride the stored setup like labels.
+    let continuous = TsplMediaSetup {
+        gap_mm: 0,
+        ..ticket.media
+    };
+    push_media_preamble(&mut out, &format!("SIZE 80 mm,{height_mm} mm"), &continuous)?;
     out.extend(body);
     out.push("PRINT 1,1".to_string());
     Ok(out.join("\r\n").into_bytes())
@@ -679,6 +793,7 @@ mod tests {
             currency_text: "DZD",
             barcode: "VIS-001",
             copies,
+            media: TsplMediaSetup::default(),
         }
     }
 
@@ -689,6 +804,10 @@ mod tests {
         assert_eq!(
             text,
             "SIZE 40 mm,20 mm\r\n\
+             GAP 3,0\r\n\
+             DENSITY 8\r\n\
+             SPEED 4\r\n\
+             CODEPAGE UTF-8\r\n\
              DIRECTION 1\r\n\
              CLS\r\n\
              TEXT 100,2,\"1\",0,1,1,\"BARAKA ULTRAPOS\"\r\n\
@@ -831,18 +950,21 @@ mod tests {
                 payment_method: "CASH",
             },
             footer: "Merci",
+            media: TsplMediaSetup::default(),
         }
     }
 
     #[test]
-    fn ticket_bytes_pin_size_gapless_barcode_and_copies() {
+    fn ticket_bytes_pin_size_media_preamble_and_copies() {
         let text = String::from_utf8(render_ticket_80mm(&owner_ticket()).expect("renders"))
             .expect("ascii");
         // Cursor math: 8 + 32 + 20 + 20 + 20 + 10 + 28 + 20×3 + 10 + 20
         //   + 28 + 20 + 20 + 10 + 28×4 + 56 + 20×2 + 8 + 64 + 4 + 20 + 4
         //   + 20 + 20 + 16 = 670 dots → ceil(670/8) = 84 mm.
-        assert!(text.starts_with("SIZE 80 mm,84 mm\r\nDIRECTION 1\r\nCLS\r\n"));
-        assert!(!text.contains("GAP"), "gapless: no GAP command emitted");
+        // Continuous stock declares the no-gap form: GAP 0,0.
+        assert!(text.starts_with(
+            "SIZE 80 mm,84 mm\r\nGAP 0,0\r\nDENSITY 8\r\nSPEED 4\r\nCODEPAGE UTF-8\r\nDIRECTION 1\r\nCLS\r\n"
+        ));
         assert!(
             !text.contains("CUT"),
             "no printer-specific cut command emitted"
@@ -952,6 +1074,84 @@ mod tests {
         let text = String::from_utf8(render_ticket_80mm(&ticket).expect("ok")).expect("ascii");
         assert!(text.contains("1 x 5.00 = 5.00"));
         assert!(!text.contains("remise"), "no badge on legacy rows");
+    }
+
+    #[test]
+    fn preamble_order_is_pinned_byte_for_byte() {
+        let bytes = render_label_40x20(&owner_label(1)).expect("label renders");
+        let text = String::from_utf8(bytes).expect("tspl is ascii-clean");
+        let head: Vec<&str> = text.split("\r\n").take(7).collect();
+        assert_eq!(
+            head,
+            [
+                "SIZE 40 mm,20 mm",
+                "GAP 3,0",
+                "DENSITY 8",
+                "SPEED 4",
+                "CODEPAGE UTF-8",
+                "DIRECTION 1",
+                "CLS",
+            ],
+            "preamble order: SIZE → GAP → DENSITY → SPEED → CODEPAGE → DIRECTION → CLS"
+        );
+    }
+
+    #[test]
+    fn media_defaults_are_owner_verify_starting_values() {
+        // OWNER-VERIFY: gap 3 mm is a starting value — the owner measures
+        // the 40x20 liner with a ruler and the measured value wins.
+        let media = TsplMediaSetup::default();
+        assert_eq!(media.gap_mm, TSPL_GAP_MM_DEFAULT);
+        assert_eq!(media.gap_mm, 3);
+        assert_eq!(media.density, TSPL_DENSITY_DEFAULT);
+        assert_eq!(media.speed, TSPL_SPEED_DEFAULT);
+        media.validate().expect("defaults validate");
+    }
+
+    #[test]
+    fn media_bounds_reject_loudly() {
+        assert_eq!(
+            validate_tspl_gap_mm(11).expect_err("gap 11 rejected"),
+            DomainError::InvalidCanonicalString("TSPL_GAP_MM_OUT_OF_RANGE".to_string())
+        );
+        assert_eq!(
+            validate_tspl_density(16).expect_err("density 16 rejected"),
+            DomainError::InvalidCanonicalString("TSPL_DENSITY_OUT_OF_RANGE".to_string())
+        );
+        for bad_speed in [0u8, 7u8] {
+            assert_eq!(
+                validate_tspl_speed(bad_speed).expect_err("speed rejected"),
+                DomainError::InvalidCanonicalString("TSPL_SPEED_OUT_OF_RANGE".to_string()),
+                "speed {bad_speed}"
+            );
+        }
+        // Bounds also reject through the renderer (never silent clamps).
+        let bad = TsplLabel {
+            media: TsplMediaSetup {
+                gap_mm: 11,
+                ..TsplMediaSetup::default()
+            },
+            ..owner_label(1)
+        };
+        assert!(
+            render_label_40x20(&bad).is_err(),
+            "gap 11 rejected in bytes"
+        );
+        // Edges validate: gap 0 (continuous) and maxima.
+        TsplMediaSetup {
+            gap_mm: 0,
+            density: 15,
+            speed: 6,
+        }
+        .validate()
+        .expect("edges validate");
+        TsplMediaSetup {
+            gap_mm: 10,
+            density: 0,
+            speed: 1,
+        }
+        .validate()
+        .expect("edges validate");
     }
 
     #[test]

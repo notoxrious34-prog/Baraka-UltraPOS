@@ -1086,6 +1086,12 @@ pub struct PrinterSettingsDto {
     /// Ticket render mode ("escpos" default, "graphique" for OS-graphics
     /// tickets, ADR-104).
     pub ticket_render_mode: String,
+    /// TSPL label inter-label gap in mm (default 3, OWNER-VERIFY ruler).
+    pub tspl_gap_mm: u32,
+    /// TSPL print density, 0..=15 (default 8).
+    pub tspl_density: u8,
+    /// TSPL print speed in inch/sec, 1..=6 (default 4).
+    pub tspl_speed: u8,
 }
 
 /// Serial printer configuration update.
@@ -1110,6 +1116,15 @@ pub struct UpdatePrinterSettingsRequest {
     /// stored mode).
     #[serde(default)]
     pub ticket_render_mode: Option<String>,
+    /// TSPL label gap in mm (0..=10; absent keeps stored gap).
+    #[serde(default)]
+    pub tspl_gap_mm: Option<u32>,
+    /// TSPL print density (0..=15; absent keeps stored density).
+    #[serde(default)]
+    pub tspl_density: Option<u8>,
+    /// TSPL print speed in inch/sec (1..=6; absent keeps stored speed).
+    #[serde(default)]
+    pub tspl_speed: Option<u8>,
 }
 
 // Store identity + diagnostics wire types ---------------------------------

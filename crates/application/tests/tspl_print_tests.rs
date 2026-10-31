@@ -18,6 +18,7 @@ use baraka_application::use_cases::tspl_printing::{PrintTsplLabelUseCase, PrintT
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
 use baraka_domain::inventory::WarehouseId;
+use baraka_domain::printing::TsplMediaSetup;
 use baraka_domain::role::Role;
 use baraka_domain::sales::{
     Document, DocumentId, DocumentItem, DocumentItemView, DocumentLanguage, DocumentStatus,
@@ -36,6 +37,7 @@ fn session_with(role: Role) -> SessionContext {
 
 struct FakeSettings {
     transport: String,
+    media: TsplMediaSetup,
 }
 
 impl PrinterSettingsPort for FakeSettings {
@@ -48,6 +50,9 @@ impl PrinterSettingsPort for FakeSettings {
             transport: self.transport.clone(),
             queue_name: "XP-410B".to_string(),
             ticket_render_mode: "graphique".to_string(),
+            tspl_gap_mm: self.media.gap_mm,
+            tspl_density: self.media.density,
+            tspl_speed: self.media.speed,
         })
     }
 
@@ -59,6 +64,15 @@ impl PrinterSettingsPort for FakeSettings {
         _transport: Option<&str>,
         _queue_name: Option<&str>,
         _ticket_render_mode: Option<&str>,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests: settings are read-only here");
+    }
+
+    fn update_tspl_media_settings(
+        &self,
+        _gap_mm: Option<u32>,
+        _density: Option<u8>,
+        _speed: Option<u8>,
     ) -> Result<(), ApplicationError> {
         panic!("out of scope for TSPL tests: settings are read-only here");
     }
@@ -320,6 +334,7 @@ impl DocumentRepository for FakeDocuments {
 fn spooler() -> FakeSettings {
     FakeSettings {
         transport: "spooler".to_string(),
+        media: TsplMediaSetup::default(),
     }
 }
 
@@ -351,10 +366,39 @@ fn label_spools_exact_bytes_and_reports_count() {
 }
 
 #[test]
+fn label_preamble_uses_stored_media_setup() {
+    let settings = FakeSettings {
+        transport: "spooler".to_string(),
+        media: TsplMediaSetup {
+            gap_mm: 7,
+            density: 12,
+            speed: 2,
+        },
+    };
+    let transport = FakeTransport::new();
+    PrintTsplLabelUseCase::new(&settings, &FakeIdentity, &transport)
+        .execute(
+            &session_with(Role::Caissier),
+            "Vis 8x40",
+            1_000,
+            "VIS-001",
+            1,
+        )
+        .expect("spooler label prints");
+    let payloads = transport.payloads();
+    let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
+    assert!(
+        text.starts_with("SIZE 40 mm,20 mm\r\nGAP 7,0\r\nDENSITY 12\r\nSPEED 2\r\nCODEPAGE UTF-8\r\nDIRECTION 1\r\nCLS\r\n"),
+        "stored media rides the preamble, order pinned"
+    );
+}
+
+#[test]
 fn label_rejects_non_spooler_transport_without_touching_the_queue() {
     for arm in ["serial", "escpos"] {
         let settings = FakeSettings {
             transport: arm.to_string(),
+            media: TsplMediaSetup::default(),
         };
         let transport = FakeTransport::new();
         let error = PrintTsplLabelUseCase::new(&settings, &FakeIdentity, &transport)
@@ -381,6 +425,7 @@ fn label_rejects_non_spooler_transport_without_touching_the_queue() {
 fn ticket_rejects_non_spooler_transport_without_touching_the_queue() {
     let settings = FakeSettings {
         transport: "serial".to_string(),
+        media: TsplMediaSetup::default(),
     };
     let transport = FakeTransport::new();
     let documents = FakeDocuments::ticket();

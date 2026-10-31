@@ -56,7 +56,7 @@ use baraka_application::use_cases::inventory::{
 use baraka_application::use_cases::printing::{GetPrintStatusUseCase, ReprintDocumentUseCase};
 use baraka_application::use_cases::printing::{
     GetPrinterSettingsUseCase, SaveStoreIdentityUseCase, TestPrintDeviceOutcome, TestPrintUseCase,
-    UpdatePrinterSettingsUseCase,
+    UpdatePrinterSettingsUseCase, UpdateTsplMediaSettingsUseCase,
 };
 use baraka_application::use_cases::purchases::{
     CreatePurchaseOrderUseCase, GetPurchaseDocumentUseCase, ReceiveGoodsUseCase,
@@ -3252,6 +3252,9 @@ pub fn printer_get_settings(
         transport: settings.transport,
         queue_name: settings.queue_name,
         ticket_render_mode: settings.ticket_render_mode,
+        tspl_gap_mm: settings.tspl_gap_mm,
+        tspl_density: settings.tspl_density,
+        tspl_speed: settings.tspl_speed,
     })
 }
 
@@ -3262,7 +3265,7 @@ pub fn printer_update_settings(
     request: UpdatePrinterSettingsRequest,
 ) -> Result<PrinterSettingsDto, String> {
     let session = require_session(&state, &request.session_token)?;
-    let settings = UpdatePrinterSettingsUseCase::new(state.printer_settings.as_ref())
+    let mut settings = UpdatePrinterSettingsUseCase::new(state.printer_settings.as_ref())
         .execute(
             &session,
             &request.serial_port,
@@ -3273,6 +3276,20 @@ pub fn printer_update_settings(
             request.ticket_render_mode.as_deref(),
         )
         .map_err(|error| error_code(&error))?;
+    // TSPL media rides a separate validated write (only when addressed).
+    if request.tspl_gap_mm.is_some()
+        || request.tspl_density.is_some()
+        || request.tspl_speed.is_some()
+    {
+        settings = UpdateTsplMediaSettingsUseCase::new(state.printer_settings.as_ref())
+            .execute(
+                &session,
+                request.tspl_gap_mm,
+                request.tspl_density,
+                request.tspl_speed,
+            )
+            .map_err(|error| error_code(&error))?;
+    }
     Ok(PrinterSettingsDto {
         serial_port: settings.serial_port,
         serial_baud: settings.serial_baud,
@@ -3281,6 +3298,9 @@ pub fn printer_update_settings(
         transport: settings.transport,
         queue_name: settings.queue_name,
         ticket_render_mode: settings.ticket_render_mode,
+        tspl_gap_mm: settings.tspl_gap_mm,
+        tspl_density: settings.tspl_density,
+        tspl_speed: settings.tspl_speed,
     })
 }
 

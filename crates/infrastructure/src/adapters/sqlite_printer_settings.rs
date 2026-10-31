@@ -58,6 +58,28 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
             })
             .unwrap_or(80);
         let width = baraka_domain::printing::PaperWidth::from_mm(mm);
+        let printing = baraka_domain::printing::TsplMediaSetup::default();
+        // TSPL media setup: absent keys read as defaults; out-of-range
+        // stored values fall back to defaults (validated on write, but
+        // never trusted on read — no silent clamps in the renderer).
+        let gap_mm = self
+            .read_key("tspl.label_gap_mm")
+            .and_then(|text| text.trim().parse::<u32>().ok())
+            .filter(|gap| *gap <= baraka_domain::printing::TSPL_GAP_MM_MAX)
+            .unwrap_or(printing.gap_mm);
+        let density = self
+            .read_key("tspl.print_density")
+            .and_then(|text| text.trim().parse::<u8>().ok())
+            .filter(|density| *density <= baraka_domain::printing::TSPL_DENSITY_MAX)
+            .unwrap_or(printing.density);
+        let speed = self
+            .read_key("tspl.print_speed")
+            .and_then(|text| text.trim().parse::<u8>().ok())
+            .filter(|speed| {
+                *speed >= baraka_domain::printing::TSPL_SPEED_MIN
+                    && *speed <= baraka_domain::printing::TSPL_SPEED_MAX
+            })
+            .unwrap_or(printing.speed);
         Ok(PrinterSettings {
             serial_port: self.read_key("printer.serial_port").unwrap_or_default(),
             serial_baud: baud,
@@ -80,6 +102,9 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
                         || value == baraka_domain::printing::TICKET_RENDER_GRAPHIQUE
                 })
                 .unwrap_or_else(|| baraka_domain::printing::TICKET_RENDER_ESC_POS.to_string()),
+            tspl_gap_mm: gap_mm,
+            tspl_density: density,
+            tspl_speed: speed,
         })
     }
 
@@ -120,11 +145,35 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         }
         run_transaction(&mut guard, |tx| {
             for (key, value) in &pairs {
-                tx.execute(
-                    "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, ?3)
-                     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
-                    rusqlite::params![key, value, stamp],
-                )?;
+                write_key(tx, key, value, &stamp)?;
+            }
+            Ok(())
+        })
+        .map_err(|_| store_failure())
+    }
+
+    fn update_tspl_media_settings(
+        &self,
+        gap_mm: Option<u32>,
+        density: Option<u8>,
+        speed: Option<u8>,
+    ) -> Result<(), ApplicationError> {
+        // `None` keeps the stored value; `Some` was validated upstream.
+        let mut guard = self.lock()?;
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let mut pairs: Vec<(&str, String)> = Vec::new();
+        if let Some(gap) = gap_mm {
+            pairs.push(("tspl.label_gap_mm", gap.to_string()));
+        }
+        if let Some(density) = density {
+            pairs.push(("tspl.print_density", density.to_string()));
+        }
+        if let Some(speed) = speed {
+            pairs.push(("tspl.print_speed", speed.to_string()));
+        }
+        run_transaction(&mut guard, |tx| {
+            for (key, value) in &pairs {
+                write_key(tx, key, value, &stamp)?;
             }
             Ok(())
         })

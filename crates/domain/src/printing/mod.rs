@@ -21,7 +21,10 @@ pub use transport::{
     TRANSPORT_SPOOLER,
 };
 pub use tspl::{
-    render_label_40x20, render_ticket_80mm, TsplCaptionLang, TsplLabel, TsplTicket, TsplTicketLine,
+    render_label_40x20, render_ticket_80mm, validate_tspl_density, validate_tspl_gap_mm,
+    validate_tspl_speed, TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine,
     TsplTicketTotals, DOTS_PER_MM, LABEL_HEIGHT_DOTS, LABEL_WIDTH_DOTS, TICKET_WIDTH_DOTS,
-    TSPL_MAX_COPIES, TSPL_MIN_COPIES,
+    TSPL_CODEPAGE_LINE, TSPL_DENSITY_DEFAULT, TSPL_DENSITY_MAX, TSPL_GAP_MM_DEFAULT,
+    TSPL_GAP_MM_MAX, TSPL_MAX_COPIES, TSPL_MIN_COPIES, TSPL_SPEED_DEFAULT, TSPL_SPEED_MAX,
+    TSPL_SPEED_MIN,
 };

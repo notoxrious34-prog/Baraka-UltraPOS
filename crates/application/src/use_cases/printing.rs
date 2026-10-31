@@ -483,3 +483,55 @@ where
         self.settings.get_printer_settings()
     }
 }
+
+/// Persist the TSPL media setup (TASK-BRK-099, ADMIN-gated).
+///
+/// `gap_mm` of `None` keeps the stored gap; `Some` must be 0..=10 mm.
+/// `density` of `None` keeps the stored density; `Some` must be 0..=15.
+/// `speed` of `None` keeps the stored speed; `Some` must be 1..=6 in/s.
+/// All rejected before any write. The gap default (3 mm) is a STARTING
+/// VALUE — OWNER-VERIFY with a ruler; the measured value wins.
+pub struct UpdateTsplMediaSettingsUseCase<'a, P>
+where
+    P: ?Sized,
+{
+    settings: &'a P,
+}
+
+impl<'a, P> UpdateTsplMediaSettingsUseCase<'a, P>
+where
+    P: crate::ports::PrinterSettingsPort + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(settings: &'a P) -> Self {
+        Self { settings }
+    }
+
+    /// Validate permission + bounds, then persist atomically.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        gap_mm: Option<u32>,
+        density: Option<u8>,
+        speed: Option<u8>,
+    ) -> Result<crate::ports::PrinterSettings, ApplicationError> {
+        if !session
+            .role
+            .has_permission(Permission::ManagePrinterSettings)
+        {
+            return Err(ApplicationError::Unauthorized);
+        }
+        if let Some(gap) = gap_mm {
+            baraka_domain::printing::validate_tspl_gap_mm(gap)?;
+        }
+        if let Some(density) = density {
+            baraka_domain::printing::validate_tspl_density(density)?;
+        }
+        if let Some(speed) = speed {
+            baraka_domain::printing::validate_tspl_speed(speed)?;
+        }
+        self.settings
+            .update_tspl_media_settings(gap_mm, density, speed)?;
+        self.settings.get_printer_settings()
+    }
+}

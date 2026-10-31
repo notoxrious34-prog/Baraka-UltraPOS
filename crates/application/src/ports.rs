@@ -1390,6 +1390,12 @@ pub struct PrinterSettings {
     pub queue_name: String,
     /// Ticket render mode: `"escpos"` (default) or `"graphique"` (ADR-104).
     pub ticket_render_mode: String,
+    /// TSPL label inter-label gap in mm (default 3, OWNER-VERIFY ruler).
+    pub tspl_gap_mm: u32,
+    /// TSPL print density, 0..=15 (default 8).
+    pub tspl_density: u8,
+    /// TSPL print speed in inch/sec, 1..=6 (default 4).
+    pub tspl_speed: u8,
 }
 
 /// Printer configuration port (`settings` table in infrastructure).
@@ -1408,6 +1414,17 @@ pub trait PrinterSettingsPort: Send + Sync {
         transport: Option<&str>,
         queue_name: Option<&str>,
         ticket_render_mode: Option<&str>,
+    ) -> Result<(), ApplicationError>;
+
+    /// Persist the TSPL media setup (ADMIN-gated upstream; `None` keeps the
+    /// stored value; `Some` values are validated upstream before any write).
+    /// Separate from `update_printer_settings` so existing callers keep
+    /// compiling untouched (BRK-099 minimal-churn extension).
+    fn update_tspl_media_settings(
+        &self,
+        gap_mm: Option<u32>,
+        density: Option<u8>,
+        speed: Option<u8>,
     ) -> Result<(), ApplicationError>;
 }
 

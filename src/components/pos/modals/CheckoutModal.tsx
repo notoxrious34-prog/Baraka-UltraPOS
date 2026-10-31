@@ -67,6 +67,8 @@ function ticketStrings(locale: Locale): TicketPrintStrings {
     change: t(locale, "ticket.change"),
     payment: t(locale, "ticket.payment"),
     footer: t(locale, "ticket.footer"),
+    depot: t(locale, "ticket.depot"),
+    discountBadge: t(locale, "ticket.discountBadge"),
   };
 }
 
@@ -366,6 +368,14 @@ export function CheckoutModal(): ReactElement {
               storeName: identity.storeName,
               storeAddress: identity.storeAddress,
               storePhone: identity.storePhone,
+              taxRows: [
+                { prefix: "NIF", value: identity.nif },
+                { prefix: "NIS", value: identity.nis },
+                { prefix: "RC", value: identity.rc },
+                { prefix: "AI", value: identity.ai },
+              ],
+              warehouseText: full.document.warehouse_id,
+              ownerFooter: identity.ticketFooterMessage,
               isReprint: false,
               strings: ticketStrings(language === "AR" ? "ar-DZ" : "fr-DZ"),
             },

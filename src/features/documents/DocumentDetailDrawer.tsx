@@ -101,13 +101,15 @@ export interface A4Identity {
   nis: string;
   rc: string;
   ai: string;
+  ticketFooterMessage: string;
 }
 
 /**
  * Pure A4 invoice/delivery-note sheet. Renders engine values verbatim;
  * sections without wire backing are omitted, never fabricated:
- * no per-line discount, no per-rate TVA breakdown, no totals-in-words,
- * no customer fiscal identifiers.
+ * no per-rate TVA breakdown, no totals-in-words,
+ * no customer fiscal identifiers. Discounted lines reuse the drawer
+ * per-unit badge (struck raw PU + net PU + badge).
  */
 export function DocumentA4Sheet(props: {
   locale: Locale;
@@ -175,6 +177,12 @@ export function DocumentA4Sheet(props: {
                   <bdi dir="ltr" className="a4-num">
                     <s>{fmtAmount(item.unit_price_centimes, locale)}</s>{" "}
                     {fmtAmount(item.discounted_unit_price_centimes, locale)}
+                    <span className="a4-badge">
+                      {t(locale, "documents.perUnitDiscount")}{" "}
+                      <bdi dir="ltr">
+                        {fmtAmount(item.discount_per_unit_centimes ?? "0", locale)}
+                      </bdi>
+                    </span>
                   </bdi>
                 ) : (
                   <bdi dir="ltr" className="a4-num">
@@ -513,6 +521,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
           nis: found.nis,
           rc: found.rc,
           ai: found.ai,
+          ticketFooterMessage: found.ticketFooterMessage,
         });
       })
       .catch(() => {
@@ -524,6 +533,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
           nis: "",
           rc: "",
           ai: "",
+          ticketFooterMessage: "",
         });
       });
   };
@@ -552,6 +562,8 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
       change: t(locale, "ticket.change"),
       payment: t(locale, "ticket.payment"),
       footer: t(locale, "ticket.footer"),
+      depot: t(locale, "ticket.depot"),
+      discountBadge: t(locale, "ticket.discountBadge"),
     };
     const dispatchWith = (id: A4Identity): void => {
       printTicketDocument(
@@ -584,7 +596,15 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
               storeName: id.storeName,
               storeAddress: id.storeAddress,
               storePhone: id.storePhone,
+              taxRows: [
+                { prefix: "NIF", value: id.nif },
+                { prefix: "NIS", value: id.nis },
+                { prefix: "RC", value: id.rc },
+                { prefix: "AI", value: id.ai },
+              ],
+              warehouseText: snapshot.document.warehouse_id,
               isReprint: true,
+              ownerFooter: id.ticketFooterMessage,
               strings,
             },
           ),
@@ -606,6 +626,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
           nis: found.nis,
           rc: found.rc,
           ai: found.ai,
+          ticketFooterMessage: found.ticketFooterMessage,
         });
       })
       .catch(() => {
@@ -617,6 +638,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
           nis: "",
           rc: "",
           ai: "",
+          ticketFooterMessage: "",
         });
       });
   };
@@ -769,6 +791,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
               nis: "",
               rc: "",
               ai: "",
+              ticketFooterMessage: "",
             }
           }
           createdAt={document.created_at}

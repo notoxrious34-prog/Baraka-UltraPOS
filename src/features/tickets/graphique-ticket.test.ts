@@ -23,6 +23,7 @@ const WIRE_LINES = [
     unit: "Sac",
     unitPrice: "85000",
     lineTotal: "170000",
+    discountPerUnit: null,
   },
   {
     designation: "Fer Ø12",
@@ -31,6 +32,7 @@ const WIRE_LINES = [
     unit: "Barre",
     unitPrice: "120000",
     lineTotal: "180000",
+    discountPerUnit: null,
   },
 ];
 
@@ -41,6 +43,8 @@ function baseArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
     storePhone: "0555123456",
     documentNumber: "T-2026-000123",
     createdAt: "2026-10-24 14:03",
+    taxRows: [],
+    warehouseText: "",
     language: "FR",
     lines: WIRE_LINES,
     subtotalHt: "350000",
@@ -50,6 +54,7 @@ function baseArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
     changeAmount: "40000",
     paymentLabel: "Espèces",
     isReprint: false,
+    ownerFooter: "",
     strings: {
       title: "Ticket de caisse",
       reprintMark: "DUPLICATA",
@@ -64,6 +69,8 @@ function baseArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
       change: "Rendu",
       payment: "Paiement",
       footer: "Merci de votre visite",
+      depot: "Dépôt",
+      discountBadge: "remise",
     },
     ...overrides,
   };
@@ -174,6 +181,9 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
       storeName: "S",
       storeAddress: "",
       storePhone: "",
+      taxRows: [],
+      warehouseText: "",
+      ownerFooter: "",
       isReprint: false,
       strings: baseArgs().strings,
     });
@@ -185,6 +195,9 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
       storeName: "S",
       storeAddress: "",
       storePhone: "",
+      taxRows: [],
+      warehouseText: "",
+      ownerFooter: "",
       isReprint: true,
       strings: baseArgs().strings,
     });
@@ -198,6 +211,9 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
       storeName: "S",
       storeAddress: "",
       storePhone: "",
+      taxRows: [],
+      warehouseText: "",
+      ownerFooter: "",
       isReprint: false,
       strings: baseArgs().strings,
     });
@@ -212,6 +228,9 @@ describe("per-unit price mapping (DSN-097)", () => {
     storeName: "S",
     storeAddress: "",
     storePhone: "",
+    taxRows: [],
+    warehouseText: "",
+    ownerFooter: "",
     isReprint: false,
     strings: baseArgs().strings,
   };

@@ -9,6 +9,7 @@
  */
 
 import { formatMoney, formatQty } from "@/lib/money";
+import { generateCode128Svg } from "@/lib/barcode-128";
 import type { Locale } from "@/types/pos";
 
 /** 80mm roll width (receipt printers; driver paper size must match). */
@@ -22,6 +23,8 @@ export interface TicketPrintLine {
   unit: string;
   unitPrice: string;
   lineTotal: string;
+  /** Stored per-unit discount centimes (`null` = legacy line, no badge). */
+  discountPerUnit: string | null;
 }
 
 /** Localised chrome strings (caller passes t() values for its locale). */
@@ -39,14 +42,22 @@ export interface TicketPrintStrings {
   change: string;
   payment: string;
   footer: string;
+  /** Depot meta label (`Dépôt` / `المستودع`). */
+  depot: string;
+  /** Per-line badge word (`remise` / `خصم`), amount follows. */
+  discountBadge: string;
 }
 
 export interface TicketPrintArgs {
   storeName: string;
   storeAddress: string;
   storePhone: string;
+  /** Tax-id rows (`{ prefix: "NIF", value: "…" }`); blank values collapse. */
+  taxRows: Array<{ prefix: string; value: string }>;
   documentNumber: string;
   createdAt: string;
+  /** Selling warehouse identifier (stored verbatim); blank collapses. */
+  warehouseText: string;
   language: "AR" | "FR";
   lines: TicketPrintLine[];
   subtotalHt: string;
@@ -56,6 +67,8 @@ export interface TicketPrintArgs {
   changeAmount: string;
   paymentLabel: string;
   isReprint: boolean;
+  /** Owner footer message (stored verbatim); blank collapses. */
+  ownerFooter: string;
   strings: TicketPrintStrings;
 }
 
@@ -117,6 +130,12 @@ export interface TicketWireOptions {
   storeName: string;
   storeAddress: string;
   storePhone: string;
+  /** Tax-id rows; blank values collapse in the template. */
+  taxRows: Array<{ prefix: string; value: string }>;
+  /** Selling warehouse identifier (stored verbatim). */
+  warehouseText: string;
+  /** Owner footer message (stored verbatim). */
+  ownerFooter: string;
   isReprint: boolean;
   strings: TicketPrintStrings;
 }
@@ -147,6 +166,9 @@ export function ticketArgsFromWire(
       // both verbatim, zero arithmetic in the template layer.
       unitPrice: item.discountedUnitPriceCentimes ?? item.unitPriceCentimes,
       lineTotal: item.lineTtcCentimes,
+      // Stored per-unit discount rides through for the badge (`null` =
+      // legacy line, no badge) — never summed, never recomputed.
+      discountPerUnit: item.discountPerUnitCentimes,
     })),
     subtotalHt: wire.subtotalHt,
     tvaTotal: wire.tvaTotal,
@@ -154,19 +176,27 @@ export function ticketArgsFromWire(
     paidAmount: wire.paidAmount,
     changeAmount: wire.changeAmount,
     paymentLabel: wire.paymentLabel,
+    taxRows: opts.taxRows,
+    warehouseText: opts.warehouseText,
+    ownerFooter: opts.ownerFooter,
     isReprint: opts.isReprint,
     strings: opts.strings,
   };
 }
 
-/** Build the standalone 80mm ticket document. */
+/** Build the standalone 80mm ticket document (BRK-098 mirror order). */
 export function buildTicketPrintHtml(args: TicketPrintArgs): string {
   const rtl = args.language === "AR";
   const locale: Locale = rtl ? "ar-DZ" : "fr-DZ";
+  const badgeWord = escapeTicket(args.strings.discountBadge);
   const rows = args.lines
     .map(
       (line) =>
-        `<tr data-testid="ticket-line"><td class="des"><bdi dir="ltr">${escapeTicket(line.sku)}</bdi><br>${escapeTicket(line.designation)}</td>` +
+        `<tr data-testid="ticket-line"><td class="des"><bdi dir="ltr">${escapeTicket(line.sku)}</bdi><br>${escapeTicket(line.designation)}` +
+        (line.discountPerUnit === null
+          ? ""
+          : `<div class="badge" data-testid="ticket-badge">${badgeWord} <bdi dir="ltr">${escapeTicket(ticketMoney(line.discountPerUnit, locale))}</bdi></div>`) +
+        `</td>` +
         `<td class="num"><bdi dir="ltr">${escapeTicket(ticketQty(line.quantity))} ${escapeTicket(line.unit)}</bdi></td>` +
         `<td class="num"><bdi dir="ltr">${escapeTicket(ticketMoney(line.unitPrice, locale))}</bdi></td>` +
         `<td class="num"><bdi dir="ltr">${escapeTicket(ticketMoney(line.lineTotal, locale))}</bdi></td></tr>`,
@@ -175,6 +205,39 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
   const mark = args.isReprint
     ? `<div class="reprint">${escapeTicket(args.strings.reprintMark)}</div>`
     : "";
+  // Blank identity fields collapse (mirror of the TSPL blank-collapse rule).
+  const contactParts = [args.storeAddress.trim(), args.storePhone.trim()].filter(
+    (part) => part !== "",
+  );
+  const contact =
+    contactParts.length > 0
+      ? `<div class="meta">${contactParts
+          .map((part) => `<bdi dir="ltr">${escapeTicket(part)}</bdi>`)
+          .join(" · ")}</div>`
+      : "";
+  const taxParts = args.taxRows
+    .filter((row) => row.value.trim() !== "")
+    .map((row) => `${escapeTicket(row.prefix)}: <bdi dir="ltr">${escapeTicket(row.value.trim())}</bdi>`);
+  const tax = taxParts.length > 0 ? `<div class="meta tax">${taxParts.join(" · ")}</div>` : "";
+  const depot =
+    args.warehouseText.trim() !== ""
+      ? `<div class="meta depot" data-testid="ticket-depot">${escapeTicket(args.strings.depot)}: <bdi dir="ltr">${escapeTicket(args.warehouseText.trim())}</bdi></div>`
+      : "";
+  // Doc-number Code128 with human-readable caption (quiet zones via CSS
+  // padding on white; never throws into the print dispatch).
+  let barcode = "";
+  try {
+    barcode =
+      `<div class="barcode" data-testid="ticket-barcode">` +
+      generateCode128Svg(args.documentNumber, { moduleWidth: 2, height: 48, includeText: true }) +
+      `</div>`;
+  } catch {
+    barcode = "";
+  }
+  const ownerFooter =
+    args.ownerFooter.trim() !== ""
+      ? `<div class="foot owner">${escapeTicket(args.ownerFooter.trim())}</div>`
+      : "";
   const style =
     `@page { size: ${TICKET_PAGE_WIDTH_MM}mm auto; margin: 0; }` +
     `html,body { margin: 0; padding: 0; }` +
@@ -190,13 +253,19 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
     `.ticket .totals { margin-top: 2mm; border-top: 1px dashed #000; padding-top: 1mm; }` +
     `.ticket .totals .row { display: flex; justify-content: space-between; }` +
     `.ticket .totals .grand { font-weight: bold; font-size: 12pt; }` +
-    `.ticket .foot { text-align: center; font-size: 8pt; margin-top: 2mm; }`;
+    `.ticket .badge { font-size: 7pt; font-weight: bold; margin-top: 0.5mm; }` +
+    `.ticket .barcode { background: #fff; padding: 3mm 6mm; margin: 2mm 0; }` +
+    `.ticket .barcode svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }` +
+    `.ticket .foot { text-align: center; font-size: 8pt; margin-top: 2mm; }` +
+    `.ticket .foot.owner { font-weight: bold; }`;
   return (
     `<!DOCTYPE html><html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "fr"}"><head><meta charset="utf-8">` +
     `<title>ticket</title><style>${style}</style></head><body>` +
     `<div class="ticket"><div class="shop">${escapeTicket(args.storeName)}</div>` +
-    `<div class="meta">${escapeTicket(args.storeAddress)} · <bdi dir="ltr">${escapeTicket(args.storePhone)}</bdi><br>` +
-    `<bdi dir="ltr">${escapeTicket(args.documentNumber)}</bdi> · <bdi dir="ltr">${escapeTicket(args.createdAt)}</bdi></div>` +
+    contact +
+    tax +
+    `<div class="meta"><bdi dir="ltr">${escapeTicket(args.documentNumber)}</bdi> · <bdi dir="ltr">${escapeTicket(args.createdAt)}</bdi></div>` +
+    depot +
     `<div class="meta">${escapeTicket(args.strings.title)}</div>${mark}` +
     `<table><thead><tr><th>${escapeTicket(args.strings.designation)}</th>` +
     `<th class="num">${escapeTicket(args.strings.qty)}</th>` +
@@ -208,7 +277,7 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
     `<div class="row grand"><span>${escapeTicket(args.strings.grandTotal)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.totalTtc, locale))}</bdi></span></div>` +
     `<div class="row"><span>${escapeTicket(args.strings.payment)} (${escapeTicket(args.paymentLabel)})</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.paidAmount, locale))}</bdi></span></div>` +
     `<div class="row"><span>${escapeTicket(args.strings.change)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.changeAmount, locale))}</bdi></span></div>` +
-    `</div><div class="foot">${escapeTicket(args.strings.footer)}</div></div></body></html>`
+    `</div>${barcode}${ownerFooter}<div class="foot">${escapeTicket(args.strings.footer)}</div></div></body></html>`
   );
 }
 

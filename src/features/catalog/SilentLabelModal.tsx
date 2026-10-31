@@ -17,8 +17,13 @@ export interface SilentLabelModalProps {
   token: string;
 }
 
-/** Printable-dot budget of the 40x20 TSPL label barcode band (engine parity). */
-export const SILENT_LABEL_BARCODE_DOTS = 304;
+/** Printable-dot budget of the 40x20 TSPL label barcode band (engine parity:
+ * 320 dots minus 20-dot quiet zones per side — payloads over 9 chars
+ * reject loudly instead of shrinking). */
+export const SILENT_LABEL_BARCODE_DOTS = 280;
+
+/** Engine payload ceiling (BRK-098 module budget: 11·n + 35 ≤ 140). */
+export const SILENT_LABEL_BARCODE_MAX_CHARS = 9;
 
 function formatDisplayName(product: CatalogProduct, locale: Locale): string {
   return locale === "ar-DZ" ? product.name_ar : product.name_fr;
@@ -32,9 +37,13 @@ function toIntOrNull(raw: string): number | null {
   return Number.parseInt(trimmed, 10);
 }
 
-/** Vector preview of the Code128 band (null when the payload is unencodable —
- * the silent send then surfaces the verbatim engine code). */
+/** Vector preview of the Code128 band (null when the payload is unencodable
+ * or over the 9-char engine budget — the silent send would reject loudly,
+ * so the modal guides instead of previewing a lie). */
 export function silentLabelPreviewSvg(source: string): string | null {
+  if (source.length > SILENT_LABEL_BARCODE_MAX_CHARS) {
+    return null;
+  }
   try {
     const moduleWidth = fitModuleWidth(source.length, SILENT_LABEL_BARCODE_DOTS, 2);
     return generateCode128Svg(source, { moduleWidth, height: 40, includeText: false });
@@ -59,6 +68,7 @@ export function SilentLabelModal({ product, isOpen, onClose, token }: SilentLabe
   const { priceCentimes, unitFr } = labelPriceUnit(product);
   const source = labelBarcodeSource(product);
   const previewSvg = silentLabelPreviewSvg(source);
+  const tooWide = source.length > SILENT_LABEL_BARCODE_MAX_CHARS;
 
   useEffect(() => {
     if (!isOpen) {
@@ -159,8 +169,17 @@ export function SilentLabelModal({ product, isOpen, onClose, token }: SilentLabe
                 {formatMoney(priceCentimes, locale)}
                 {unitFr === "" ? "" : ` / ${unitFr}`}
               </p>
-              {previewSvg !== null && (
+              {previewSvg !== null && !tooWide && (
                 <div className="w-full" dangerouslySetInnerHTML={{ __html: previewSvg }} />
+              )}
+              {tooWide && (
+                <p
+                  className="text-xs font-bold text-red-700 dark:text-red-300"
+                  data-testid="silent-label-too-wide"
+                  role="alert"
+                >
+                  {t(locale, "tspl.labelTooWide")}
+                </p>
               )}
               <p className="max-w-full font-mono text-[10px]" dir="ltr" title={source}>
                 {source}
@@ -215,7 +234,7 @@ export function SilentLabelModal({ product, isOpen, onClose, token }: SilentLabe
             type="button"
             data-testid="silent-label-send"
             onClick={() => void send()}
-            disabled={busy}
+            disabled={busy || tooWide}
             className="h-11 rounded-lg bg-accent-500 text-sm font-black text-slate-950 hover:bg-amber-400 disabled:opacity-60"
           >
             {busy ? t(locale, "tspl.sending") : t(locale, "tspl.sendLabels")}

@@ -36,6 +36,7 @@ const FULL_IDENTITY: A4Identity = {
   nis: "0987654321",
   rc: "16/00-1234567A25",
   ai: "1600123",
+  ticketFooterMessage: "",
 };
 
 function detailsWithLines(count: number, docType: string, number: string): DocumentDetailsWire {
@@ -107,7 +108,7 @@ describe("A4 sheet content (DSN-085)", () => {
       DocumentA4Sheet({
         locale: "ar-DZ",
         details: detailsWithLines(1, "BL", "BL-2026-0003"),
-        identity: { storeName: "", storeAddress: "", storePhone: "", nif: "", nis: "", rc: "", ai: "" }, createdAt: "2026-10-21T09:12:00",
+        identity: { storeName: "", storeAddress: "", storePhone: "", nif: "", nis: "", rc: "", ai: "", ticketFooterMessage: "" }, createdAt: "2026-10-21T09:12:00",
       }) as never,
     );
     expect(html).toContain("BL-2026-0003");
@@ -115,11 +116,25 @@ describe("A4 sheet content (DSN-085)", () => {
     expect(html).not.toContain("RC");
   });
 
-  it("never renders totals-in-words or discounts (engine provides none)", () => {
+  it("never renders totals-in-words", () => {
     const html = renderToStaticMarkup(
       DocumentA4Sheet({ locale: "fr-DZ", details: detailsWithLines(2, "FACTURE", "F-1"), identity: FULL_IDENTITY, createdAt: "2026-10-21T10:02:00" }) as never,
     );
     expect(html).not.toMatch(/en toutes lettres|بالحروف/);
+  });
+
+  it("reuses the per-unit badge on discounted A4 rows only (DSN-099)", () => {
+    const details = detailsWithLines(2, "FACTURE", "F-2");
+    const first = details.items[0];
+    if (first !== undefined) {
+      first.discount_per_unit_centimes = "100";
+      first.discounted_unit_price_centimes = "900";
+    }
+    const html = renderToStaticMarkup(
+      DocumentA4Sheet({ locale: "fr-DZ", details, identity: FULL_IDENTITY, createdAt: "2026-10-21T10:02:00" }) as never,
+    );
+    expect(html).toContain("a4-badge");
+    expect((html.match(/a4-badge/g) ?? []).length).toBe(1);
   });
 });
 

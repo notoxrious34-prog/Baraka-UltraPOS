@@ -223,7 +223,14 @@ fn push_media_preamble(
 ) -> Result<(), DomainError> {
     media.validate()?;
     out.push(size_line.to_string());
-    out.push(format!("GAP {},0", media.gap_mm));
+    if media.gap_mm == 0 {
+        // Continuous stock: the manual's no-gap form (no units).
+        out.push("GAP 0,0".to_string());
+    } else {
+        // Metric gap REQUIRES the mm suffix on both values (TSC manual:
+        // `GAP 3 mm,0 mm`). Bare `GAP 3,0` reads as 3 INCHES.
+        out.push(format!("GAP {} mm,0 mm", media.gap_mm));
+    }
     out.push(format!("DENSITY {}", media.density));
     out.push(format!("SPEED {}", media.speed));
     // P1 (BRK-100 TEMPORARY-DIAGNOSTIC): NoCodepage drops the CODEPAGE line;
@@ -940,7 +947,13 @@ pub fn render_bitmap_job(
     let mut job: Vec<u8> = Vec::new();
     for line in [
         format!("SIZE {width_mm} mm,{height_mm} mm"),
-        format!("GAP {},0", media.gap_mm),
+        if media.gap_mm == 0 {
+            // Continuous stock: the manual's no-gap form (no units).
+            "GAP 0,0".to_string()
+        } else {
+            // Metric gap REQUIRES the mm suffix (TSC manual: `GAP 3 mm,0 mm`).
+            format!("GAP {} mm,0 mm", media.gap_mm)
+        },
         format!("DENSITY {}", media.density),
         format!("SPEED {}", media.speed),
         "DIRECTION 1".to_string(),
@@ -996,7 +1009,7 @@ mod tests {
         assert_eq!(
             text,
             "SIZE 40 mm,20 mm\r\n\
-             GAP 3,0\r\n\
+             GAP 3 mm,0 mm\r\n\
              DENSITY 8\r\n\
              SPEED 4\r\n\
              CODEPAGE UTF-8\r\n\
@@ -1277,7 +1290,7 @@ mod tests {
             head,
             [
                 "SIZE 40 mm,20 mm",
-                "GAP 3,0",
+                "GAP 3 mm,0 mm",
                 "DENSITY 8",
                 "SPEED 4",
                 "CODEPAGE UTF-8",
@@ -1348,7 +1361,7 @@ mod tests {
             head,
             [
                 "SIZE 40 mm,20 mm",
-                "GAP 3,0",
+                "GAP 3 mm,0 mm",
                 "DENSITY 8",
                 "SPEED 4",
                 "DIRECTION 1",
@@ -1525,7 +1538,7 @@ mod tests {
             .expect("fixture renders");
         let mut expected: Vec<u8> = Vec::new();
         expected.extend_from_slice(
-            b"SIZE 2 mm,1 mm\r\nGAP 3,0\r\nDENSITY 8\r\nSPEED 4\r\nDIRECTION 1\r\nCLS\r\nBITMAP 0,0,2,1,0,",
+            b"SIZE 2 mm,1 mm\r\nGAP 3 mm,0 mm\r\nDENSITY 8\r\nSPEED 4\r\nDIRECTION 1\r\nCLS\r\nBITMAP 0,0,2,1,0,",
         );
         expected.extend_from_slice(&data);
         expected.extend_from_slice(b"\r\nPRINT 1,1");

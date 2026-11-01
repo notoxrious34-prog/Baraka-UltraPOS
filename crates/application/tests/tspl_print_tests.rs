@@ -394,7 +394,7 @@ fn label_preamble_uses_stored_media_setup() {
     let payloads = transport.payloads();
     let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
     assert!(
-        text.starts_with("SIZE 40 mm,20 mm\r\nGAP 7,0\r\nDENSITY 12\r\nSPEED 2\r\nCODEPAGE UTF-8\r\nDIRECTION 1\r\nCLS\r\n"),
+        text.starts_with("SIZE 40 mm,20 mm\r\nGAP 7 mm,0 mm\r\nDENSITY 12\r\nSPEED 2\r\nCODEPAGE UTF-8\r\nDIRECTION 1\r\nCLS\r\n"),
         "stored media rides the preamble, order pinned"
     );
 }
@@ -423,7 +423,7 @@ fn label_preamble_uses_stored_probe_mode() {
     let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
     assert!(
         text.starts_with(
-            "SIZE 40 mm,20 mm\r\nGAP 3,0\r\nDENSITY 8\r\nSPEED 4\r\nDIRECTION 1\r\nCLS\r\n"
+            "SIZE 40 mm,20 mm\r\nGAP 3 mm,0 mm\r\nDENSITY 8\r\nSPEED 4\r\nDIRECTION 1\r\nCLS\r\n"
         ),
         "stored NoCodepage drops CODEPAGE from spooled bytes"
     );

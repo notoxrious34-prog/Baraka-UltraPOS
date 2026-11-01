@@ -360,7 +360,7 @@ fn label_spools_exact_bytes_and_reports_count() {
     assert_eq!(payloads.len(), 1, "exactly one spooler submission");
     assert_eq!(outcome.bytes_sent, payloads[0].len());
     let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
-    assert!(text.starts_with("SIZE 40 mm,20 mm\r\n"));
+    assert!(text.starts_with("SIZE 40 mm, 20 mm\r\n"));
     // BRK-098 anatomy: brand micro-line from the identity wire, double-
     // height price + right-aligned currency, Code128 + human-readable.
     assert!(text.contains("\"BARAKA QUINCAILLERIE\""));
@@ -394,7 +394,7 @@ fn label_preamble_uses_stored_media_setup() {
     let payloads = transport.payloads();
     let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
     assert!(
-        text.starts_with("SIZE 40 mm,20 mm\r\nGAP 7 mm,0 mm\r\nDENSITY 12\r\nSPEED 2\r\nCODEPAGE UTF-8\r\nDIRECTION 1\r\nCLS\r\n"),
+        text.starts_with("SIZE 40 mm, 20 mm\r\nGAP 7 mm, 0 mm\r\nSET RIBBON OFF\r\nDIRECTION 0,0\r\nREFERENCE 0,0\r\nOFFSET 0 mm\r\nSET PEEL OFF\r\nSET CUTTER OFF\r\nSET TEAR ON\r\nCLS\r\n"),
         "stored media rides the preamble, order pinned"
     );
 }
@@ -423,9 +423,9 @@ fn label_preamble_uses_stored_probe_mode() {
     let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
     assert!(
         text.starts_with(
-            "SIZE 40 mm,20 mm\r\nGAP 3 mm,0 mm\r\nDENSITY 8\r\nSPEED 4\r\nDIRECTION 1\r\nCLS\r\n"
+            "SIZE 40 mm, 20 mm\r\nGAP 3 mm, 0 mm\r\nSET RIBBON OFF\r\nDIRECTION 0,0\r\nREFERENCE 0,0\r\nOFFSET 0 mm\r\nSET PEEL OFF\r\nSET CUTTER OFF\r\nSET TEAR ON\r\nCLS\r\n"
         ),
-        "stored NoCodepage drops CODEPAGE from spooled bytes"
+        "stored NoCodepage drops CODEPAGE from spooled bytes (vendor preamble carries none)"
     );
 }
 
@@ -442,7 +442,7 @@ fn raw_bitmap_spools_validated_bytes_and_rejects_before_send() {
     assert_eq!(payloads.len(), 1, "one job spooled");
     assert_eq!(outcome.bytes_sent, payloads[0].len());
     assert!(
-        payloads[0].starts_with(b"SIZE 2 mm,1 mm\r\n"),
+        payloads[0].starts_with(b"SIZE 2 mm, 1 mm\r\n"),
         "size from geometry"
     );
     assert!(

@@ -214,8 +214,14 @@ impl TsplMediaSetup {
     }
 }
 
-/// Emit the self-describing preamble in pinned order:
-/// SIZE → GAP → DENSITY → SPEED → CODEPAGE → DIRECTION → CLS.
+/// Emit the vendor-mirrored preamble in pinned order (Seagull ground truth,
+/// `Vendor-Test.prn` 594 B, 2026-11-01): SIZE → GAP → SET RIBBON OFF →
+/// DIRECTION 0,0 → REFERENCE 0,0 → OFFSET 0 mm → SET PEEL OFF →
+/// SET CUTTER OFF → SET TEAR ON → CLS. The vendor sends NO
+/// DENSITY/SPEED/CODEPAGE — the printer runs its calibrated NVRAM values;
+/// our overrides are no longer emitted (stored keys kept, unemitted).
+/// P1 NoCodepage is a preamble no-op now (nothing to drop); P2/P3 still
+/// fold TEXT payloads only.
 fn push_media_preamble(
     out: &mut Vec<String>,
     size_line: &str,
@@ -229,16 +235,15 @@ fn push_media_preamble(
     } else {
         // Metric gap REQUIRES the mm suffix on both values (TSC manual:
         // `GAP 3 mm,0 mm`). Bare `GAP 3,0` reads as 3 INCHES.
-        out.push(format!("GAP {} mm,0 mm", media.gap_mm));
+        out.push(format!("GAP {} mm, 0 mm", media.gap_mm));
     }
-    out.push(format!("DENSITY {}", media.density));
-    out.push(format!("SPEED {}", media.speed));
-    // P1 (BRK-100 TEMPORARY-DIAGNOSTIC): NoCodepage drops the CODEPAGE line;
-    // every other mode keeps it verbatim.
-    if media.probe_mode != TsplProbeMode::NoCodepage {
-        out.push(TSPL_CODEPAGE_LINE.to_string());
-    }
-    out.push("DIRECTION 1".to_string());
+    out.push("SET RIBBON OFF".to_string());
+    out.push("DIRECTION 0,0".to_string());
+    out.push("REFERENCE 0,0".to_string());
+    out.push("OFFSET 0 mm".to_string());
+    out.push("SET PEEL OFF".to_string());
+    out.push("SET CUTTER OFF".to_string());
+    out.push("SET TEAR ON".to_string());
     out.push("CLS".to_string());
     Ok(())
 }
@@ -543,7 +548,7 @@ pub fn render_label_40x20(label: &TsplLabel<'_>) -> Result<Vec<u8>, DomainError>
     let mut out = Vec::new();
     // TEMPORARY-DIAGNOSTIC (BRK-100): probe mode rides every TEXT line.
     let probe = label.media.probe_mode;
-    push_media_preamble(&mut out, "SIZE 40 mm,20 mm", &label.media)?;
+    push_media_preamble(&mut out, "SIZE 40 mm, 20 mm", &label.media)?;
     // Brand micro-line (collapses when blank).
     let brand = truncate_to_width(label.brand_text.trim(), brand_chars);
     if !brand.is_empty() {
@@ -875,7 +880,11 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         gap_mm: 0,
         ..ticket.media
     };
-    push_media_preamble(&mut out, &format!("SIZE 80 mm,{height_mm} mm"), &continuous)?;
+    push_media_preamble(
+        &mut out,
+        &format!("SIZE 80 mm, {height_mm} mm"),
+        &continuous,
+    )?;
     out.extend(body);
     out.push("PRINT 1,1".to_string());
     Ok(out.join("\r\n").into_bytes())
@@ -946,17 +955,23 @@ pub fn render_bitmap_job(
     let height_mm = height_rows.div_ceil(DOTS_PER_MM as usize);
     let mut job: Vec<u8> = Vec::new();
     for line in [
-        format!("SIZE {width_mm} mm,{height_mm} mm"),
+        format!("SIZE {width_mm} mm, {height_mm} mm"),
         if media.gap_mm == 0 {
             // Continuous stock: the manual's no-gap form (no units).
             "GAP 0,0".to_string()
         } else {
             // Metric gap REQUIRES the mm suffix (TSC manual: `GAP 3 mm,0 mm`).
-            format!("GAP {} mm,0 mm", media.gap_mm)
+            format!("GAP {} mm, 0 mm", media.gap_mm)
         },
-        format!("DENSITY {}", media.density),
-        format!("SPEED {}", media.speed),
-        "DIRECTION 1".to_string(),
+        // Vendor-mirrored init (Seagull ground truth): no DENSITY/SPEED/
+        // CODEPAGE — the printer runs its calibrated NVRAM values.
+        "SET RIBBON OFF".to_string(),
+        "DIRECTION 0,0".to_string(),
+        "REFERENCE 0,0".to_string(),
+        "OFFSET 0 mm".to_string(),
+        "SET PEEL OFF".to_string(),
+        "SET CUTTER OFF".to_string(),
+        "SET TEAR ON".to_string(),
         "CLS".to_string(),
         format!("BITMAP {x},{y},{width_bytes},{height_rows},0,"),
     ] {
@@ -1008,12 +1023,15 @@ mod tests {
         let text = String::from_utf8(bytes).expect("tspl is ascii-clean");
         assert_eq!(
             text,
-            "SIZE 40 mm,20 mm\r\n\
-             GAP 3 mm,0 mm\r\n\
-             DENSITY 8\r\n\
-             SPEED 4\r\n\
-             CODEPAGE UTF-8\r\n\
-             DIRECTION 1\r\n\
+            "SIZE 40 mm, 20 mm\r\n\
+             GAP 3 mm, 0 mm\r\n\
+             SET RIBBON OFF\r\n\
+             DIRECTION 0,0\r\n\
+             REFERENCE 0,0\r\n\
+             OFFSET 0 mm\r\n\
+             SET PEEL OFF\r\n\
+             SET CUTTER OFF\r\n\
+             SET TEAR ON\r\n\
              CLS\r\n\
              TEXT 100,2,\"1\",0,1,1,\"BARAKA ULTRAPOS\"\r\n\
              TEXT 8,16,\"2\",0,1,1,\"Vis 8x40\"\r\n\
@@ -1168,11 +1186,11 @@ mod tests {
         //   + 20 + 20 + 16 = 670 dots → ceil(670/8) = 84 mm.
         // Continuous stock declares the no-gap form: GAP 0,0.
         assert!(text.starts_with(
-            "SIZE 80 mm,84 mm\r\nGAP 0,0\r\nDENSITY 8\r\nSPEED 4\r\nCODEPAGE UTF-8\r\nDIRECTION 1\r\nCLS\r\n"
+            "SIZE 80 mm, 84 mm\r\nGAP 0,0\r\nSET RIBBON OFF\r\nDIRECTION 0,0\r\nREFERENCE 0,0\r\nOFFSET 0 mm\r\nSET PEEL OFF\r\nSET CUTTER OFF\r\nSET TEAR ON\r\nCLS\r\n"
         ));
         assert!(
-            !text.contains("CUT"),
-            "no printer-specific cut command emitted"
+            !text.lines().any(|l| l == "CUT" || l.starts_with("CUT ")),
+            "no cut ACTION emitted (vendor SET CUTTER OFF only disables it)"
         );
         // Barcode: (13*11+35)*2 = 356 dots, centered x = (640-356)/2 = 142.
         assert!(text.contains("BARCODE 142,522,\"128\",64,1,0,2,2,\"T-2026-000123\""));
@@ -1260,7 +1278,7 @@ mod tests {
         assert!(!text.contains("\"Merci\""), "blank footer collapses");
         assert!(text.contains("Merci de votre visite"));
         // 4 collapsed rows × 20 dots: 670 − 80 = 590 → ceil(590/8) = 74 mm.
-        assert!(text.starts_with("SIZE 80 mm,74 mm\r\n"));
+        assert!(text.starts_with("SIZE 80 mm, 74 mm\r\n"));
     }
 
     #[test]
@@ -1285,19 +1303,22 @@ mod tests {
     fn preamble_order_is_pinned_byte_for_byte() {
         let bytes = render_label_40x20(&owner_label(1)).expect("label renders");
         let text = String::from_utf8(bytes).expect("tspl is ascii-clean");
-        let head: Vec<&str> = text.split("\r\n").take(7).collect();
+        let head: Vec<&str> = text.split("\r\n").take(10).collect();
         assert_eq!(
             head,
             [
-                "SIZE 40 mm,20 mm",
-                "GAP 3 mm,0 mm",
-                "DENSITY 8",
-                "SPEED 4",
-                "CODEPAGE UTF-8",
-                "DIRECTION 1",
+                "SIZE 40 mm, 20 mm",
+                "GAP 3 mm, 0 mm",
+                "SET RIBBON OFF",
+                "DIRECTION 0,0",
+                "REFERENCE 0,0",
+                "OFFSET 0 mm",
+                "SET PEEL OFF",
+                "SET CUTTER OFF",
+                "SET TEAR ON",
                 "CLS",
             ],
-            "preamble order: SIZE → GAP → DENSITY → SPEED → CODEPAGE → DIRECTION → CLS"
+            "preamble order: SIZE → GAP → RIBBON → DIRECTION → REFERENCE → OFFSET → PEEL → CUTTER → TEAR → CLS"
         );
     }
 
@@ -1356,18 +1377,22 @@ mod tests {
         };
         let text = String::from_utf8(render_label_40x20(&probed).expect("renders"))
             .expect("tspl is ascii-clean");
-        let head: Vec<&str> = text.split("\r\n").take(6).collect();
+        let head: Vec<&str> = text.split("\r\n").take(10).collect();
         assert_eq!(
             head,
             [
-                "SIZE 40 mm,20 mm",
-                "GAP 3 mm,0 mm",
-                "DENSITY 8",
-                "SPEED 4",
-                "DIRECTION 1",
+                "SIZE 40 mm, 20 mm",
+                "GAP 3 mm, 0 mm",
+                "SET RIBBON OFF",
+                "DIRECTION 0,0",
+                "REFERENCE 0,0",
+                "OFFSET 0 mm",
+                "SET PEEL OFF",
+                "SET CUTTER OFF",
+                "SET TEAR ON",
                 "CLS",
             ],
-            "P1: CODEPAGE absent, everything else pinned"
+            "P1: vendor preamble, no CODEPAGE anywhere"
         );
         assert!(!text.contains("CODEPAGE"), "no CODEPAGE anywhere");
     }
@@ -1538,7 +1563,7 @@ mod tests {
             .expect("fixture renders");
         let mut expected: Vec<u8> = Vec::new();
         expected.extend_from_slice(
-            b"SIZE 2 mm,1 mm\r\nGAP 3 mm,0 mm\r\nDENSITY 8\r\nSPEED 4\r\nDIRECTION 1\r\nCLS\r\nBITMAP 0,0,2,1,0,",
+            b"SIZE 2 mm, 1 mm\r\nGAP 3 mm, 0 mm\r\nSET RIBBON OFF\r\nDIRECTION 0,0\r\nREFERENCE 0,0\r\nOFFSET 0 mm\r\nSET PEEL OFF\r\nSET CUTTER OFF\r\nSET TEAR ON\r\nCLS\r\nBITMAP 0,0,2,1,0,",
         );
         expected.extend_from_slice(&data);
         expected.extend_from_slice(b"\r\nPRINT 1,1");
@@ -1649,7 +1674,7 @@ mod tests {
             .expect("label geometry");
         let head = String::from_utf8(job[..40].to_vec()).expect("header ascii");
         assert!(
-            head.starts_with("SIZE 40 mm,20 mm\r\n"),
+            head.starts_with("SIZE 40 mm, 20 mm\r\n"),
             "label size, got: {head}"
         );
         assert!(job.ends_with(b"\r\nPRINT 1,2"), "copies ride PRINT");
@@ -1660,7 +1685,7 @@ mod tests {
             .expect("ticket geometry");
         let head = String::from_utf8(job[..40].to_vec()).expect("header ascii");
         assert!(
-            head.starts_with("SIZE 80 mm,84 mm\r\n"),
+            head.starts_with("SIZE 80 mm, 84 mm\r\n"),
             "ticket size, got: {head}"
         );
     }

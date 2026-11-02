@@ -348,7 +348,7 @@ dependencies = [
 
 [[package]]
 name = "baraka-application"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "baraka-domain",
  "chrono",
@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "baraka-commands"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "baraka-application",
  "baraka-domain",
@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "baraka-domain"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "chrono",
  "serde",
@@ -385,7 +385,7 @@ dependencies = [
 
 [[package]]
 name = "baraka-infrastructure"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "ab_glyph",
  "argon2",
@@ -4365,7 +4365,7 @@ dependencies = [
 
 [[package]]
 name = "spooler-raw"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "windows",
 ]
@@ -5269,7 +5269,7 @@ dependencies = [
 
 [[package]]
 name = "ultrapos"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "baraka-application",
  "baraka-commands",

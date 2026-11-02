@@ -48,6 +48,16 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Read release notes
+        id: notes
+        shell: bash
+        run: |
+          {
+            echo "body<<EOF"
+            cat RELEASE_NOTES.md
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build, sign and publish
         uses: tauri-apps/tauri-action@v0
         env:
@@ -57,7 +67,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Baraka UltraPOS ${{ github.ref_name }}"
-          releaseBody: "Stable release ${{ github.ref_name }}. Full Arabic notes in the release description."
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           args: --target x86_64-pc-windows-msvc

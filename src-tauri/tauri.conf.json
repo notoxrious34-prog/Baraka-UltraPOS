@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Baraka UltraPOS",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "identifier": "com.baraka.ultrapos",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -48,7 +48,7 @@
       "endpoints": [
         "https://github.com/notoxrious34-prog/Baraka-UltraPOS/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk4MDI5MTUzMTQ0NDhCRDEKUldUUmkwUVVVNUVDbUFCejRPb245QjZZYjZQWVVBZU8xWGtteUgzUFlKdGo2SVE5eS9jVzdhN0kK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI3OUZCQkUyMjVDNzlCQUEKUldTcW04Y2w0cnVmdDZYQXBMS21xS2huNFg4ZnRqRG1vcmlzbDI5ejZRUFB1cisxclVNWEJUbm0K"
     }
   }
 }

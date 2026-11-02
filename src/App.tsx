@@ -15,6 +15,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useAppViewStore, type AppView } from "@/stores/app-view-store";
 import { useThemeStore } from "@/stores/theme-store";
+import { useUpdateCenterStore } from "@/stores/update-center-store";
 import { PosShell } from "@/components/pos/PosShell";
 import {
   CatalogIcon,
@@ -316,6 +317,12 @@ export default function App(): ReactElement {
   // Restore the persisted theme preference on startup (TASK-DSN-065).
   useEffect(() => {
     useThemeStore.getState().initTheme();
+  }, []);
+
+  // Silent update probe once per launch (auto mode only): every failure
+  // stays silent — offline-first means the shop never waits on a network.
+  useEffect(() => {
+    void useUpdateCenterStore.getState().checkSilently();
   }, []);
 
   return <AppShell view={view} onSelectView={setView} />;

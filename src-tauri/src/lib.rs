@@ -85,6 +85,9 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
+        // Auto-update (GitHub Releases): signature-checked, dialog-free —
+        // all UX lives in the Settings Update Center.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             // ADR-049: the SQLite file lives in the OS-standard per-user
             // application data directory (Tauri official path API), under

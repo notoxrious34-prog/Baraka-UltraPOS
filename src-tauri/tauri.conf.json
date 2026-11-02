@@ -31,6 +31,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "windows": {
       "webviewInstallMode": { "type": "offlineInstaller", "silent": true },
@@ -38,6 +39,16 @@
         "languages": ["French", "English"],
         "displayLanguageSelector": false
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": false,
+      "endpoints": [
+        "https://github.com/notoxrious34-prog/Baraka-UltraPOS/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk4MDI5MTUzMTQ0NDhCRDEKUldUUmkwUVVVNUVDbUFCejRPb245QjZZYjZQWVVBZU8xWGtteUgzUFlKdGo2SVE5eS9jVzdhN0kK"
     }
   }
 }

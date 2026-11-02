@@ -16,6 +16,7 @@ import { StarterPackSettingsTab } from "./StarterPackSettingsTab";
 import { DataExchangeSettingsTab } from "./DataExchangeSettingsTab";
 import { PrinterSettingsTab } from "./PrinterSettingsTab";
 import { BackupSettingsTab } from "./BackupSettingsTab";
+import { UpdateCenterTab } from "./UpdateCenterTab";
 import { FiscalSettingsTab } from "./FiscalSettingsTab";
 import { AboutTab } from "./AboutTab";
 
@@ -27,6 +28,7 @@ export type SettingsTab =
   | "printer"
   | "fiscal"
   | "backups"
+  | "update"
   | "about";
 
 interface TabEntry {
@@ -91,6 +93,13 @@ const ICON_FISCAL = sidebarIcon(
     <path d="M12 8v8" />
   </>,
 );
+const ICON_UPDATE = sidebarIcon(
+  <>
+    <path d="M12 3v12" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M4 21h16" />
+  </>,
+);
 const ICON_BACKUPS = sidebarIcon(
   <>
     <path d="M12 3 5 6v5c0 5 3.5 8 7 10 3.5-2 7-5 7-10V6l-7-3Z" />
@@ -151,6 +160,7 @@ const GROUPS: TabGroup[] = [
     headerKey: "settings.groupSystem",
     tabs: [
       { id: "backups", labelKey: "settings.tabBackups", icon: ICON_BACKUPS, managePermissions: ["SYSTEM_SETTINGS_MANAGE"] },
+      { id: "update", labelKey: "settings.tabUpdate", icon: ICON_UPDATE, managePermissions: ["SYSTEM_SETTINGS_MANAGE"] },
       { id: "about", labelKey: "settings.tabAbout", icon: ICON_ABOUT, managePermissions: [] },
     ],
   },
@@ -201,6 +211,8 @@ export function SettingsModule(): ReactElement {
         return <FiscalSettingsTab locale={locale} sessionToken={token} />;
       case "backups":
         return <BackupSettingsTab locale={locale} sessionToken={token} />;
+      case "update":
+        return <UpdateCenterTab locale={locale} sessionToken={token} />;
       case "about":
         return <AboutTab locale={locale} />;
     }

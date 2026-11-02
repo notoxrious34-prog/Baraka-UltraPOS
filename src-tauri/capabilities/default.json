@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Baseline capability: allow the frontend to call typed core commands.",
   "windows": ["main"],
-  "permissions": []
+  "permissions": ["core:app:default", "updater:default"]
 }

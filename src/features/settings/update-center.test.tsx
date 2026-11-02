@@ -40,6 +40,7 @@ const TAB_KEYS = [
   "update.signatureTitle",
   "update.restoreNote",
   "update.offline",
+  "update.noRelease",
   "update.dismiss",
   "update.backupDone",
 ] as const;

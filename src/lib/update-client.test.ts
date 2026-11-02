@@ -148,6 +148,7 @@ describe("mapCheckError", () => {
   it("maps network shapes to offline and keeps the rest verbatim", () => {
     expect(mapCheckError(new TypeError("Failed to fetch"))).toBe("UPDATE_OFFLINE");
     expect(mapCheckError(new Error("net::ERR_INTERNET_DISCONNECTED"))).toBe("UPDATE_OFFLINE");
+    expect(mapCheckError(new Error("HTTP 404 Not Found"))).toBe("UPDATE_NO_RELEASE");
     expect(mapCheckError(new Error("UPDATE_SIGNATURE_INVALID"))).toBe("UPDATE_SIGNATURE_INVALID");
     expect(mapCheckError("weird")).toBe("weird");
   });

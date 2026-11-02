@@ -194,7 +194,11 @@ export function UpdateCenterTab({ locale, sessionToken }: UpdateCenterTabProps):
 
       {phase === "error" && errorCode !== null ? (
         <p className="shrink-0 rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">
-          {errorCode === "UPDATE_OFFLINE" ? t(locale, "update.offline") : errorCode}
+          {errorCode === "UPDATE_OFFLINE"
+            ? t(locale, "update.offline")
+            : errorCode === "UPDATE_NO_RELEASE"
+              ? t(locale, "update.noRelease")
+              : errorCode}
         </p>
       ) : null}
 

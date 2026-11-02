@@ -81,9 +81,14 @@ export const UPDATE_SIGNING_FINGERPRINT = "dW50cnVzdGVkIGNvbW1lbnQ6";
 export type UpdateCheckFn = () => Promise<Update | null>;
 export type UpdateBackupFn = (sessionToken: string) => Promise<BackupMetadata>;
 
-/** Network-shaped failures map to OFFLINE; everything else surfaces verbatim. */
+/** Network-shaped failures map to OFFLINE; an empty channel (HTTP 404 on the
+ *  `latest.json` URL — no release published yet, or channel URL to verify)
+ *  maps to NO_RELEASE; everything else surfaces verbatim. */
 export function mapCheckError(failure: unknown): string {
   const text = failure instanceof Error ? failure.message : String(failure);
+  if (/404|not found|introuvable|non trouv[ée]/i.test(text)) {
+    return "UPDATE_NO_RELEASE";
+  }
   if (/network|net::|internet|disconnected|dns|offline|fetch|ENOTFOUND|ECONNRESET|ETIMEDOUT|timed out|Load failed/i.test(text)) {
     return "UPDATE_OFFLINE";
   }

@@ -70,4 +70,7 @@ jobs:
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
+          # Single-bundle shop (NSIS only): pin the updater JSON to the setup.exe
+          # artifact even if a WiX target is ever added later.
+          updaterJsonPreferNsis: true
           args: --target x86_64-pc-windows-msvc

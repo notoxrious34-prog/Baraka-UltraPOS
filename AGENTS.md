@@ -1,9 +1,9 @@
 # AGENTS.md - Executor entry point (Baraka UltraPOS)
 
-Status: Executor Constitution v2.1. It supersedes CONSTITUTION_OF_EXECUTOR.md v1.0.0 and the previous AGENTS.md (both archived in docs/architecture/archive/). Full text: docs/architecture/EXECUTOR-CONSTITUTION-v2.md (read it in full when a task says so). The rules below ALWAYS apply.
+Status: Sovereign Unified Constitution v3.1 (ratified by TASK-REL-019). It supersedes Executor Constitution v2.1 (archived at docs/architecture/archive/EXECUTOR-CONSTITUTION-v2.1.md) and all v1 documents. Full text: docs/architecture/SOVEREIGN_CONSTITUTION_v3.0.md (read it in full when a task says so). The rules below ALWAYS apply.
 
 ## 1. Authority and obedience
-- Tasks come from the Master Architect and are named TASK-AUD-NNN (read-only audit), TASK-BRK-NNN (engine), TASK-DSN-NNN (presentation), TASK-REL-NNN (release, drills, documents). Execute EXACTLY the task: its scope, its paths, its acceptance criteria. Do not improvise outside scope.
+- Tasks come from the Master Architect and are named TASK-AUD-NNN (read-only audit), TASK-BRK-NNN (engine), TASK-DSN-NNN (presentation), TASK-REL-NNN (release, drills, documents). Under the Bicameral protocol (Sovereign v3.1 §1.3), the Owner may also issue high-level directives or approve a proposed task queue; you then formulate the self-contained TASK-* specifications yourself and execute them one at a time in dependency order. Execute EXACTLY the task: its scope, its paths, its acceptance criteria. Do not improvise outside scope.
 - Precedence: task text > this file > older documents. If the task contradicts a repository fact, or is ambiguous, stop that part, state the conflict in the report, and continue independent parts. Never guess.
 - Completeness check: if the task block looks truncated (cut mid-sentence, or REPORT FORMAT or HANDOFF CLAUSE missing), STOP and reply exactly: TASK INCOMPLETE - TRUNCATION DETECTED.
 - Never execute the same task id twice without an explicit RE-RUN order. Continuations (-C1, -C2) are explicit orders.
@@ -20,7 +20,7 @@ Status: Executor Constitution v2.1. It supersedes CONSTITUTION_OF_EXECUTOR.md v1
 - SQLite: WAL, synchronous=FULL, foreign_keys=ON, busy_timeout=5000. Offline-first absolute.
 - Money = i64 centimes (Money type); quantities and factors fixed-point 10^4. NO floats in financial paths. IPC carries money and quantities as canonical strings; the frontend converts with bigint; never parseFloat or Number for money. All rounding is in the domain (ROUND_HALF_UP, i128 intermediates, overflow error).
 - Layers: Presentation -> Application -> Domain -> Infrastructure. React never touches SQL and never computes financial totals. Authorization is decided in Rust use cases; UI gating is convenience only.
-- Migrations are append-only. NEVER edit, re-save, or reformat an existing migration (SHA-256 checksums are verified at startup; CRLF/LF changes break existing databases). New schema = new numbered migration (0014+) plus a data-preservation test on a COPY of a real database.
+- Migrations are append-only. NEVER edit, re-save, or reformat an existing migration (SHA-256 checksums are verified at startup; CRLF/LF changes break existing databases). New schema = new numbered migration (0019+) plus a data-preservation test on a COPY of a real database.
 - .gitattributes is `* -text`. Never change it.
 
 ## 4. Prohibitions

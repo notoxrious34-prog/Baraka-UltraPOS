@@ -29,6 +29,14 @@ function formatDisplayName(product: CatalogProduct, locale: Locale): string {
   return locale === "ar-DZ" ? product.name_ar : product.name_fr;
 }
 
+/** Label copy count only — never money. The `/^\d+$/` guard rejects signs,
+ * decimals, and exponents before parsing, so no float path can reach a
+ * financial value; prices travel separately as integer centimes
+ * (`priceCentimes`). The stepper clamps to `[TSPL_COPIES_MIN,
+ * TSPL_COPIES_MAX]`; the send path passes the parsed value through and
+ * the domain rejects out-of-range copies loudly
+ * (`TsplCopiesOutOfRange`, `tspl.rs:523`), so no silent misprint.
+ * (TASK-DSN-101: AUD-049 Phase-1 documentation.) */
 function toIntOrNull(raw: string): number | null {
   const trimmed = raw.trim();
   if (!/^\d+$/.test(trimmed)) {

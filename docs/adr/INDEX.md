@@ -118,4 +118,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-106 | Live-startup newer-database guard: read-only probe + downgrade refusal (TASK-BRK-104) | ACCEPTED |
 
-Next free id: ADR-107.
+| ADR-107 | Content Security Policy for the Tauri webview (TASK-BRK-105) | ACCEPTED |
+
+Next free id: ADR-108.

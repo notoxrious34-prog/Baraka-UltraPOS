@@ -29,7 +29,7 @@ use baraka_infrastructure::persistence::connection::{
 use baraka_infrastructure::persistence::data_dir::{
     prepare_data_dir, resolve_data_dir, DataDirError, DATA_DIR_ENV,
 };
-use baraka_infrastructure::persistence::migration::run_migrations;
+use baraka_infrastructure::persistence::migration::{probe_newer_database, run_migrations};
 use baraka_infrastructure::persistence::terminal_context::resolve_device_id;
 use baraka_infrastructure::printing::capture::CaptureDevice;
 use baraka_infrastructure::printing::rasterizer::EscPosRasterizer;
@@ -114,6 +114,12 @@ pub fn run() {
                 open_connection(&db_path).map_err(|error| startup_error("database open", error))?;
             run_migrations(&mut conn)
                 .map_err(|error| startup_error("database migration", error))?;
+            // TASK-BRK-104 / ADR-106: refuse a database last written by a
+            // newer binary (downgrade attempt). The probe runs after
+            // migrations succeed and never writes: a future schema version
+            // aborts launch here instead of opening an unreadable database.
+            probe_newer_database(&conn)
+                .map_err(|error| startup_error("database version", error))?;
             // Section 34 startup protocol: resolve the sovereign terminal identifier
             // after schema verification and before UI initialization. The same value
             // serves as origin_device_id and terminal_id system-wide.

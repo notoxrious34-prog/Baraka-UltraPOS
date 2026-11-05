@@ -116,6 +116,50 @@ pub const MIGRATIONS: &[EmbeddedMigration] = &[
     },
 ];
 
+/// This binary's migration horizon: the newest schema version it understands.
+pub fn supported_schema_version() -> i64 {
+    MIGRATIONS.len() as i64
+}
+
+/// Probe whether the database was written by a newer binary (TASK-BRK-104).
+///
+/// Pure read-only probe: inspects `MAX(version)` in `schema_migrations`
+/// and refuses (`DatabaseNewerThanBinary`) when the recorded version
+/// exceeds [`supported_schema_version`]. A missing table or an empty
+/// bookkeeping table passes (nothing newer exists yet).
+///
+/// This is deliberately SEPARATE from [`run_migrations`], which stays
+/// tolerant of unknown future rows (pinned by
+/// `downgrade_guard_probe_future_version_is_deterministic`): migration
+/// never destroys data, while startup refuses to operate on a schema it
+/// cannot understand.
+pub fn probe_newer_database(conn: &Connection) -> Result<(), InfrastructureError> {
+    // A database without bookkeeping cannot be newer than this binary.
+    let table_count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'",
+        [],
+        |row| row.get(0),
+    )?;
+    if table_count == 0 {
+        return Ok(());
+    }
+    // `MAX` over an empty table yields one NULL row: `Option<i64>` maps it
+    // to `None` (nothing recorded, nothing newer).
+    let recorded: Option<i64> =
+        conn.query_row("SELECT MAX(version) FROM schema_migrations", [], |row| {
+            row.get(0)
+        })?;
+    match recorded {
+        Some(found) if found > supported_schema_version() => {
+            Err(InfrastructureError::DatabaseNewerThanBinary {
+                found,
+                supported: supported_schema_version(),
+            })
+        }
+        _ => Ok(()),
+    }
+}
+
 /// SHA-256 hex digest of `input` (pure Rust, no extra dependency).
 pub fn checksum_of(input: &str) -> String {
     sha256_hex(input.as_bytes())

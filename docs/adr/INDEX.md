@@ -116,4 +116,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-105 | Silent TSPL printing for the single XP-410B (ticket 80mm + label 40×20, button-triggered) | ACCEPTED |
 
-Next free id: ADR-106.
+| ADR-106 | Live-startup newer-database guard: read-only probe + downgrade refusal (TASK-BRK-104) | ACCEPTED |
+
+Next free id: ADR-107.

@@ -81,6 +81,7 @@ pub(crate) fn map_engine_error(error: InfrastructureError) -> ApplicationError {
         InfrastructureError::Migration(message) => map_sentinel(&message),
         InfrastructureError::BusyTimeout(_)
         | InfrastructureError::ChecksumMismatch { .. }
+        | InfrastructureError::DatabaseNewerThanBinary { .. }
         | InfrastructureError::Config(_) => store_failure(),
     }
 }

@@ -33,6 +33,15 @@ pub enum InfrastructureError {
         /// Checksum of the currently embedded script.
         found: String,
     },
+    /// The database was last written by a newer binary (downgrade attempt).
+    /// Recorded schema version exceeds this binary's migration horizon.
+    #[error("database schema version {found} is newer than this binary supports ({supported})")]
+    DatabaseNewerThanBinary {
+        /// Maximum version recorded in the database's bookkeeping table.
+        found: i64,
+        /// This binary's migration horizon (`MIGRATIONS.len()`).
+        supported: i64,
+    },
     /// Transient busy/locked retries exhausted without success.
     #[error("transient lock retries exhausted after {0} attempts")]
     BusyTimeout(u32),

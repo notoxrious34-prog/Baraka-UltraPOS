@@ -122,4 +122,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-108 | Split `dto.rs` into 12 domain modules, pure motion (TASK-BRK-106) | ACCEPTED |
 
-Next free id: ADR-109.
+| ADR-109 | Split `ipc.rs` into 13 domain modules, pure motion (TASK-BRK-107) | ACCEPTED |
+
+Next free id: ADR-110.

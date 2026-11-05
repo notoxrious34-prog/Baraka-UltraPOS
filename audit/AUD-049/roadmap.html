@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head><meta charset="utf-8">
+<style>
+*{box-sizing:border-box}
+body{font-family:inherit;color:var(--foreground);font-size:14px;line-height:1.7}
+h2{font-size:17px;margin:14px 0 8px}
+.grid{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--border);border-radius:8px;padding:6px 12px;background:var(--card)}
+.chip b{font-size:16px}
+.phase{border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin:8px 0;background:var(--card)}
+.phase h3{margin:0 0 4px;font-size:15px}
+.phase h3 .n{display:inline-block;min-width:26px;text-align:center;border-radius:6px;background:var(--accent);color:#fff;margin-left:8px;padding:0 6px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+th,td{border:1px solid var(--border);padding:5px 8px;text-align:right}
+th{background:var(--card)}
+.gap{color:var(--accent);font-weight:bold}
+small{color:var(--muted-foreground)}
+</style>
+</head>
+<body>
+<h2>خارطة طريق Baraka UltraPOS — ما بعد AUD-049</h2>
+<div class="grid">
+<div class="chip">الطبقات <b>A</b></div>
+<div class="chip">المال <b>A+</b></div>
+<div class="chip">الهجرات <b>A+</b></div>
+<div class="chip">الواجهة <b>A+</b></div>
+<div class="chip">البحث FTS5 <b>A</b></div>
+<div class="chip">المحدّث <b>B+</b></div>
+<div class="chip">نظافة git <b>B</b></div>
+</div>
+<div class="phase"><h3><span class="n">1</span>إغلاق هندسي (أسبوع)</h3>
+حارس newer-DB الحي + اختبار انحدار <span class="gap">(الثغرة الوحيدة)</span> · تفعيل CSP · بوابات G1–G7 خضراء</div>
+<div class="phase"><h3><span class="n">2</span>إصدار v1.1.0 (مالك + CI)</h3>
+الوسم موجود (2026-11-02) · قبول التجريبية ← دفع ← إثبات <small>latest.json + ‎.sig</small> ← حذف المفتاح الخاص ← قرار فرع الأمان</div>
+<div class="phase"><h3><span class="n">3</span>صيانة وتقسية</h3>
+تقسيم <small>ipc.rs / dto.rs</small> نطاقياً · البوابة البصرية الكاملة · بذارة 300 صنف</div>
+<div class="phase"><h3><span class="n">4</span>بوابات المالك</h3>
+طابعة 58/80mm حقيقية · اعتماد محاسب TVA/تمغة · قرار تشفير القرص · ثم الإعلان</div>
+<h2>طابور المهام المقترح</h2>
+<table>
+<tr><th>#</th><th>المهمة</th><th>النوع</th><th>يعتمد على</th></tr>
+<tr><td>1</td><td>حارس newer-DB الحي + اختبار</td><td>BRK</td><td>—</td></tr>
+<tr><td>2</td><td>تفعيل CSP + G1–G7</td><td>BRK/DSN</td><td>—</td></tr>
+<tr><td>3</td><td>حكم التجريبية + إثبات CI</td><td>REL + مالك</td><td>—</td></tr>
+<tr><td>4</td><td>حذف المفتاح + تنظيف الفرع</td><td>REL + مالك</td><td>3</td></tr>
+<tr><td>5</td><td>تقسيم ipc/dto</td><td>BRK</td><td>3</td></tr>
+<tr><td>6</td><td>بوابة بصرية + بذارة</td><td>DSN</td><td>3</td></tr>
+</table>
+<small>الأرقام: 1270 ملفاً · Rust ‏72,844 سطراً · TS ‏53,575 · ‏100 أمر IPC · ‏18 هجرة · ‏593 اختبار Rust · ‏972 Vitest · ‏244 التزاماً</small>
+</body>
+</html>

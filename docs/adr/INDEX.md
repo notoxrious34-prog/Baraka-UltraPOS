@@ -120,4 +120,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-107 | Content Security Policy for the Tauri webview (TASK-BRK-105) | ACCEPTED |
 
-Next free id: ADR-108.
+| ADR-108 | Split `dto.rs` into 12 domain modules, pure motion (TASK-BRK-106) | ACCEPTED |
+
+Next free id: ADR-109.

@@ -296,6 +296,7 @@ pub fn run() {
             baraka_commands::ipc::printer_get_settings,
             baraka_commands::ipc::printer_update_settings,
             baraka_commands::ipc::printer_test_print,
+            baraka_commands::ipc::printer_test_tspl_label,
             baraka_commands::ipc::store_identity_get,
             baraka_commands::ipc::store_identity_save,
             baraka_commands::ipc::fiscal_settings_get,

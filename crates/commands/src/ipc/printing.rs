@@ -8,7 +8,7 @@ use baraka_application::use_cases::printing::{
 };
 use baraka_application::use_cases::sales::{GetFiscalSettingsUseCase, UpdateFiscalSettingsUseCase};
 use baraka_application::use_cases::tspl_printing::{
-    PrintRawBitmapUseCase, PrintTsplLabelUseCase, PrintTsplTicketUseCase,
+    PrintRawBitmapUseCase, PrintTsplLabelUseCase, PrintTsplTestLabelUseCase, PrintTsplTicketUseCase,
 };
 use baraka_domain::role::Permission;
 
@@ -16,7 +16,7 @@ use crate::dto::{
     DecodeSummaryDto, FiscalSettingsDto, PreviewLineDto, PrintStatusResponse, PrinterSettingsDto,
     RawBitmapRequest, ReprintRequest, ReprintResponse, SaveStoreIdentityRequest, StoreIdentityDto,
     StoreIdentityResponse, TestPrintRequest, TestPrintResponse, TsplLabelRequest,
-    TsplPrintResponse, TsplTicketRequest, UpdateFiscalSettingsRequestDto,
+    TsplPrintResponse, TsplTestLabelRequest, TsplTicketRequest, UpdateFiscalSettingsRequestDto,
     UpdatePrinterSettingsRequest,
 };
 
@@ -149,6 +149,31 @@ pub fn print_raw_bitmap(
         request.height_rows as usize,
         request.copies,
     )
+    .map_err(|error| error_code(&error))?;
+    Ok(TsplPrintResponse {
+        bytes_sent: outcome.bytes_sent,
+    })
+}
+
+/// `printer_test_tspl_label` command: fixed-content 40x20 mm TSPL self-test
+/// (TASK-PRT-01).
+///
+/// Button-triggered only, spooler transport only — no dialog, no preview.
+/// Same production renderer as shelf labels with the STORED media + probe
+/// mode, so a TSPL-only printer that silently eats the ESC/POS ticket test
+/// gets a truthful answer here. ADMIN seam (`SystemSettingsManage`).
+#[tauri::command(rename_all = "snake_case")]
+pub fn printer_test_tspl_label(
+    state: tauri::State<'_, AppState>,
+    request: TsplTestLabelRequest,
+) -> Result<TsplPrintResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let outcome = PrintTsplTestLabelUseCase::new(
+        state.printer_settings.as_ref(),
+        state.store_identity.as_ref(),
+        state.printer_transport.as_ref(),
+    )
+    .execute(&session)
     .map_err(|error| error_code(&error))?;
     Ok(TsplPrintResponse {
         bytes_sent: outcome.bytes_sent,

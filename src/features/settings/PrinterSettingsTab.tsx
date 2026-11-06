@@ -20,6 +20,7 @@ import {
   ipcGetPrinterSettings,
   ipcUpdatePrinterSettings,
   printingTestPrint,
+  printingTestTsplLabel,
   type PrinterTransport,
   type TestPrintLanguage,
   type TicketRenderMode,
@@ -72,7 +73,7 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   const [probeMode, setProbeMode] = useState<TsplProbeMode>("normal");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState<TestPrintLanguage | null>(null);
+  const [testing, setTesting] = useState<TestPrintLanguage | "tspl" | null>(null);
   const [notice, setNotice] = useState<{ tone: TestPrintTone; text: string } | null>(null);
 
   useEffect(() => {
@@ -169,6 +170,27 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
     try {
       const result = await printingTestPrint(language);
       setNotice(resolveTestPrintNotice(locale, result));
+    } catch (failure) {
+      setNotice({ tone: "error", text: String(failure) });
+    } finally {
+      setTesting(null);
+    }
+  }
+
+  // TASK-PRT-01: the ESC/POS ticket test is silently eaten by TSPL-only
+  // printers — this button speaks the production label renderer instead.
+  async function handleTestTsplLabel(): Promise<void> {
+    if (!canTestPrint) {
+      return;
+    }
+    setTesting("tspl");
+    setNotice(null);
+    try {
+      const result = await printingTestTsplLabel();
+      setNotice({
+        tone: "success",
+        text: `${t(locale, "settings.testPrintTsplSent")} — ${result.bytesSent} o`,
+      });
     } catch (failure) {
       setNotice({ tone: "error", text: String(failure) });
     } finally {
@@ -451,6 +473,17 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
             className="rounded bg-slate-200 px-3 py-1.5 text-sm font-bold hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:hover:bg-slate-600"
           >
             {testing === "ar" ? t(locale, "settings.testing") : t(locale, "settings.testPrintAr")}
+          </button>
+          <button
+            type="button"
+            disabled={testing !== null || !canTestPrint}
+            title={canTestPrint ? undefined : t(locale, "settings.printerManageReservedGuidance")}
+            onClick={() => {
+              void handleTestTsplLabel();
+            }}
+            className="rounded bg-slate-200 px-3 py-1.5 text-sm font-bold hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:hover:bg-slate-600"
+          >
+            {testing === "tspl" ? t(locale, "settings.testing") : t(locale, "settings.testPrintTsplLabel")}
           </button>
         </div>
       </fieldset>

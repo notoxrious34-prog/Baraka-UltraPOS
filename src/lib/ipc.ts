@@ -1719,6 +1719,22 @@ export async function printingTestPrint(language: TestPrintLanguage): Promise<Te
   };
 }
 
+/**
+ * Fixed-content 40x20 mm TSPL self-test (TASK-PRT-01 — LIVE-2026-11-06).
+ * Session only on the wire; content, media and probe mode come from
+ * storage. Use this — never the ESC/POS ticket test — on TSPL printers.
+ */
+export interface TsplTestLabelResult {
+  bytesSent: number;
+}
+
+export async function printingTestTsplLabel(): Promise<TsplTestLabelResult> {
+  const wire = await call<{ bytes_sent: number }>("printer_test_tspl_label", {
+    request: {},
+  });
+  return { bytesSent: wire.bytes_sent };
+}
+
 export type { Locale };
 
 // Cash session bridge (TASK-BRK-010) ------------------------------------

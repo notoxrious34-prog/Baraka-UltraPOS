@@ -16,6 +16,7 @@ import {
   getStoreIdentity,
   ipcUpdatePrinterSettings,
   printingTestPrint,
+  printingTestTsplLabel,
   saveStoreIdentity,
 } from "@/lib/ipc";
 import { useSessionStore } from "@/stores/session-store";
@@ -205,6 +206,32 @@ describe("VT-03 printingTestPrint", () => {
   it("a classified device error code propagates as a typed error", async () => {
     invokeMock.mockRejectedValueOnce("PRINTER_UNAVAILABLE");
     await expect(printingTestPrint("fr")).rejects.toBe("PRINTER_UNAVAILABLE");
+  });
+});
+
+describe("VT-05 printerTestTsplLabel (TASK-PRT-01)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fakeTauriWindow();
+    primeSession();
+  });
+  afterEach(() => {
+    clearTauriWindow();
+  });
+
+  it("sends session only and maps bytes_sent", async () => {
+    invokeMock.mockResolvedValueOnce({ bytes_sent: 347 });
+    const result = await printingTestTsplLabel();
+    expect(invokeMock).toHaveBeenCalledWith("printer_test_tspl_label", {
+      session_token: "tok-idn-1",
+      request: { session_token: "tok-idn-1" },
+    });
+    expect(result).toEqual({ bytesSent: 347 });
+  });
+
+  it("a transport error propagates as a typed code", async () => {
+    invokeMock.mockRejectedValueOnce("TSPL_TRANSPORT_REQUIRES_SPOOLER");
+    await expect(printingTestTsplLabel()).rejects.toBe("TSPL_TRANSPORT_REQUIRES_SPOOLER");
   });
 });
 

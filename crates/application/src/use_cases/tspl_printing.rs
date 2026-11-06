@@ -362,3 +362,62 @@ where
         })
     }
 }
+
+/// Fixed-content 40x20 mm TSPL self-test (TASK-PRT-01 — LIVE-2026-11-06).
+/// The ticket `Test d'impression` speaks ESC/POS and is silently eaten by
+/// TSPL-only printers; this command speaks the SAME production renderer
+/// (`render_label_40x20`) with the STORED media + probe mode, so the test
+/// answers exactly "will my current configuration print". ASCII-only
+/// payload by construction (Arabic coverage rides TASK-PRT-02 bitmaps).
+/// ADMIN seam (`SystemSettingsManage`), spooler transport required.
+pub struct PrintTsplTestLabelUseCase<'a, S, I, T>
+where
+    S: ?Sized,
+    I: ?Sized,
+    T: ?Sized,
+{
+    settings: &'a S,
+    identity: &'a I,
+    transport: &'a T,
+}
+
+impl<'a, S, I, T> PrintTsplTestLabelUseCase<'a, S, I, T>
+where
+    S: PrinterSettingsPort + ?Sized,
+    I: StoreIdentityPort + ?Sized,
+    T: PrinterTransportPort + ?Sized,
+{
+    /// Wire the use case to its ports.
+    pub fn new(settings: &'a S, identity: &'a I, transport: &'a T) -> Self {
+        Self {
+            settings,
+            identity,
+            transport,
+        }
+    }
+
+    /// Validate, render the fixed self-test label, and spool one copy.
+    pub fn execute(&self, session: &SessionContext) -> Result<TsplPrintOutcome, ApplicationError> {
+        if !session
+            .role
+            .has_permission(Permission::SystemSettingsManage)
+        {
+            return Err(ApplicationError::Unauthorized);
+        }
+        require_spooler_transport(self.settings)?;
+        let identity = self.identity.load_identity()?;
+        let bytes = render_label_40x20(&TsplLabel {
+            brand_text: &identity.store_name,
+            name: "TEST BARAKA",
+            price_text: "100,00",
+            currency_text: "DZD",
+            barcode: "123456",
+            copies: 1,
+            media: media_from_settings(self.settings)?,
+        })?;
+        self.transport.send_raster(&bytes)?;
+        Ok(TsplPrintOutcome {
+            bytes_sent: bytes.len(),
+        })
+    }
+}

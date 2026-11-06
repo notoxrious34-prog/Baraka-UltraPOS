@@ -576,7 +576,8 @@ pub struct LabelBitmap {
 pub fn label_text_plan(label: &TsplLabel<'_>) -> Vec<LabelTextLine> {
     // 8-dot right margin: the die-cut edge clips anything past x=304
     // (photo-verified LIVE-2026-11-06: "DZD" sliced at x=312).
-    let right_edge = LABEL_WIDTH_DOTS - 16;
+    // Professional inset: 3 mm safe margin for dispensing tolerance.
+    let right_edge = LABEL_WIDTH_DOTS - 24;
     let brand_chars = ((LABEL_WIDTH_DOTS - 16) / FONT_1_W) as usize;
     let name_chars = ((LABEL_WIDTH_DOTS - 16) / FONT_2_W) as usize;
     let price_chars = ((LABEL_WIDTH_DOTS - 16) / (FONT_3_W * 2)) as usize;
@@ -809,7 +810,9 @@ pub fn render_label_40x20_mixed(
             let (font, scale) = match line.slot {
                 LabelTextSlot::Brand | LabelTextSlot::Currency | LabelTextSlot::Human => ("1", 1),
                 LabelTextSlot::NameLine1 | LabelTextSlot::NameLine2 => ("2", 1),
-                LabelTextSlot::Price => ("3", 2),
+                // Native 32x48 face: same geometry as "3"x2 but crisp
+                // (no scaler stair-steps on the price curves).
+                LabelTextSlot::Price => ("5", 1),
             };
             push_text(
                 &mut text_out,
@@ -1281,8 +1284,8 @@ mod tests {
              CLS\r\n\
              TEXT 100,2,\"1\",0,1,1,\"BARAKA ULTRAPOS\"\r\n\
              TEXT 8,16,\"2\",0,1,1,\"Vis 8x40\"\r\n\
-             TEXT 8,58,\"3\",0,2,2,\"10.00\"\r\n\
-             TEXT 280,94,\"1\",0,1,1,\"DZD\"\r\n\
+             TEXT 8,58,\"5\",0,1,1,\"10.00\"\r\n\
+             TEXT 272,94,\"1\",0,1,1,\"DZD\"\r\n\
              BARCODE 8,106,\"128\",38,0,0,2,2,\"VIS-001\"\r\n\
              TEXT 132,146,\"1\",0,1,1,\"VIS-001\"\r\n\
              PRINT 1,3\r\n"

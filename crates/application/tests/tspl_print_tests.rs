@@ -361,10 +361,10 @@ fn label_spools_exact_bytes_and_reports_count() {
     assert_eq!(outcome.bytes_sent, payloads[0].len());
     let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
     assert!(text.starts_with("SIZE 40 mm, 20 mm\r\n"));
-    // BRK-098 anatomy: brand micro-line from the identity wire, double-
-    // height price + right-aligned currency, Code128 + human-readable.
+    // BRK-098 anatomy: brand micro-line from the identity wire, native
+    // 32x48 price + right-aligned currency, Code128 + human-readable.
     assert!(text.contains("\"BARAKA QUINCAILLERIE\""));
-    assert!(text.contains("TEXT 8,58,\"3\",0,2,2,\"10.00\""));
+    assert!(text.contains("TEXT 8,58,\"5\",0,1,1,\"10.00\""));
     assert!(text.contains("\"DZD\""));
     assert!(text.contains("BARCODE 8,106,\"128\",38,0,0,2,2,\"VIS-001\""));
     assert!(text.ends_with("PRINT 1,3\r\n"));

@@ -15,7 +15,8 @@ use baraka_application::ports::{
     StoreIdentityPort, StoredPayment,
 };
 use baraka_application::use_cases::tspl_printing::{
-    PrintRawBitmapUseCase, PrintTsplLabelUseCase, PrintTsplTicketUseCase,
+    PrintRawBitmapUseCase, PrintTsplLabelUseCase, PrintTsplTestTicketUseCase,
+    PrintTsplTicketUseCase,
 };
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
@@ -798,4 +799,43 @@ fn label_ascii_path_never_touches_rasterer() {
     })
     .expect("domain renders");
     assert_eq!(payloads[0], expected, "ascii bytes pinned");
+}
+
+// TASK-PRT-03: the ticket self-test speaks the production 80 mm renderer
+// with stored media — fixed ASCII payload, one spooler submission, and a
+// non-ADMIN session is rejected before any byte is rendered.
+#[test]
+fn test_ticket_spools_fixed_ascii_ticket_and_reports_count() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let outcome = PrintTsplTestTicketUseCase::new(&settings, &transport)
+        .execute(&session_with(Role::Admin))
+        .expect("spooler ticket self-test prints");
+    let payloads = transport.payloads();
+    assert_eq!(payloads.len(), 1, "exactly one spooler submission");
+    assert_eq!(outcome.bytes_sent, payloads[0].len());
+    let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
+    assert!(text.contains("\"BARAKA\""), "fixed store brand");
+    assert!(text.contains("TEST-000001"), "fixed ticket number");
+    assert!(text.contains("ARTICLE TEST 2"), "both fixed lines ride");
+    assert!(
+        text.ends_with("\r\n"),
+        "job terminated (TASK-PRT-01 CRLF law)"
+    );
+}
+
+#[test]
+fn test_ticket_rejects_non_admin_before_render() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let result = PrintTsplTestTicketUseCase::new(&settings, &transport)
+        .execute(&session_with(Role::Caissier));
+    assert!(
+        matches!(result, Err(ApplicationError::Unauthorized)),
+        "ticket self-test is an ADMIN seam"
+    );
+    assert!(
+        transport.payloads().is_empty(),
+        "nothing spooled on refusal"
+    );
 }

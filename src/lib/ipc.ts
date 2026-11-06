@@ -1735,6 +1735,22 @@ export async function printingTestTsplLabel(): Promise<TsplTestLabelResult> {
   return { bytesSent: wire.bytes_sent };
 }
 
+/**
+ * Fixed-content 80 mm TSPL ticket self-test (TASK-PRT-03).
+ * Session only on the wire; content, media and probe mode come from
+ * storage. Same production renderer as sale tickets.
+ */
+export interface TsplTestTicketResult {
+  bytesSent: number;
+}
+
+export async function printingTestTsplTicket(): Promise<TsplTestTicketResult> {
+  const wire = await call<{ bytes_sent: number }>("printer_test_tspl_ticket", {
+    request: {},
+  });
+  return { bytesSent: wire.bytes_sent };
+}
+
 export type { Locale };
 
 // Cash session bridge (TASK-BRK-010) ------------------------------------

@@ -8,7 +8,8 @@ use baraka_application::use_cases::printing::{
 };
 use baraka_application::use_cases::sales::{GetFiscalSettingsUseCase, UpdateFiscalSettingsUseCase};
 use baraka_application::use_cases::tspl_printing::{
-    PrintRawBitmapUseCase, PrintTsplLabelUseCase, PrintTsplTestLabelUseCase, PrintTsplTicketUseCase,
+    PrintRawBitmapUseCase, PrintTsplLabelUseCase, PrintTsplTestLabelUseCase,
+    PrintTsplTestTicketUseCase, PrintTsplTicketUseCase,
 };
 use baraka_domain::role::Permission;
 
@@ -16,8 +17,8 @@ use crate::dto::{
     DecodeSummaryDto, FiscalSettingsDto, PreviewLineDto, PrintStatusResponse, PrinterSettingsDto,
     RawBitmapRequest, ReprintRequest, ReprintResponse, SaveStoreIdentityRequest, StoreIdentityDto,
     StoreIdentityResponse, TestPrintRequest, TestPrintResponse, TsplLabelRequest,
-    TsplPrintResponse, TsplTestLabelRequest, TsplTicketRequest, UpdateFiscalSettingsRequestDto,
-    UpdatePrinterSettingsRequest,
+    TsplPrintResponse, TsplTestLabelRequest, TsplTestTicketRequest, TsplTicketRequest,
+    UpdateFiscalSettingsRequestDto, UpdatePrinterSettingsRequest,
 };
 
 /// `documents_get_print_status` command: latest outbox state for a document.
@@ -170,6 +171,31 @@ pub fn printer_test_tspl_label(
 ) -> Result<TsplPrintResponse, String> {
     let session = require_session(&state, &request.session_token)?;
     let outcome = PrintTsplTestLabelUseCase::new(
+        state.printer_settings.as_ref(),
+        state.printer_transport.as_ref(),
+    )
+    .execute(&session)
+    .map_err(|error| error_code(&error))?;
+    Ok(TsplPrintResponse {
+        bytes_sent: outcome.bytes_sent,
+    })
+}
+
+/// `printer_test_tspl_ticket` command: fixed-content 80 mm TSPL ticket
+/// self-test (TASK-PRT-03).
+///
+/// Button-triggered only, spooler transport only — no dialog, no preview.
+/// Same production renderer as sale tickets (`render_ticket_80mm`) with the
+/// STORED media + probe mode, so a TSPL-only printer that silently eats the
+/// ESC/POS ticket test gets a truthful answer here. ADMIN seam
+/// (`SystemSettingsManage`).
+#[tauri::command(rename_all = "snake_case")]
+pub fn printer_test_tspl_ticket(
+    state: tauri::State<'_, AppState>,
+    request: TsplTestTicketRequest,
+) -> Result<TsplPrintResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let outcome = PrintTsplTestTicketUseCase::new(
         state.printer_settings.as_ref(),
         state.printer_transport.as_ref(),
     )

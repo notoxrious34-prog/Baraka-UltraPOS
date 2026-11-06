@@ -67,6 +67,14 @@ pub struct TsplTestLabelRequest {
     pub session_token: String,
 }
 
+/// Fixed-content 80 mm TSPL ticket self-test request (TASK-PRT-03).
+/// Session only — content, media and probe mode all come from storage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TsplTestTicketRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+}
+
 /// Silent raster-only print request (button-triggered, spooler only, BRK-101).
 /// Pixels are 1-bit rows, MSB-first, left-to-right (see render_bitmap_job);
 /// caps enforced pre-send, never truncated.

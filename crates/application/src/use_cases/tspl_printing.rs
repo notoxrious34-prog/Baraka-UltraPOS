@@ -483,3 +483,93 @@ where
         })
     }
 }
+
+/// The ticket `Test d'impression` speaks ESC/POS and is silently eaten by
+/// TSPL-only printers; this command speaks the SAME production renderer
+/// (`render_ticket_80mm`) with the STORED media + probe mode, so the test
+/// answers exactly "will my current ticket configuration print".
+/// ASCII-only payload by construction (Arabic coverage rides TASK-PRT-02
+/// bitmaps). ADMIN seam (`SystemSettingsManage`), spooler transport required.
+pub struct PrintTsplTestTicketUseCase<'a, S, T>
+where
+    S: ?Sized,
+    T: ?Sized,
+{
+    settings: &'a S,
+    transport: &'a T,
+}
+
+impl<'a, S, T> PrintTsplTestTicketUseCase<'a, S, T>
+where
+    S: PrinterSettingsPort + ?Sized,
+    T: PrinterTransportPort + ?Sized,
+{
+    /// Wire the use case to its ports.
+    pub fn new(settings: &'a S, transport: &'a T) -> Self {
+        Self {
+            settings,
+            transport,
+        }
+    }
+
+    /// Validate, render the fixed self-test ticket, and spool one copy.
+    pub fn execute(&self, session: &SessionContext) -> Result<TsplPrintOutcome, ApplicationError> {
+        if !session
+            .role
+            .has_permission(Permission::SystemSettingsManage)
+        {
+            return Err(ApplicationError::Unauthorized);
+        }
+        require_spooler_transport(self.settings)?;
+        // Fixed ASCII payload by design: byte-identical on every machine
+        // (store identity is owner data and may carry non-ASCII bytes that
+        // this printer class silently rejects).
+        let lines = [
+            TsplTicketLine {
+                sku: "TEST-001",
+                designation: "ARTICLE TEST",
+                quantity_text: "2",
+                unit_text: "PCS",
+                unit_price_text: "100,00",
+                line_total_text: "200,00",
+                discount_text: None,
+            },
+            TsplTicketLine {
+                sku: "TEST-002",
+                designation: "ARTICLE TEST 2",
+                quantity_text: "1",
+                unit_text: "PCS",
+                unit_price_text: "50,00",
+                line_total_text: "50,00",
+                discount_text: None,
+            },
+        ];
+        let bytes = render_ticket_80mm(&TsplTicket {
+            store_name: "BARAKA",
+            store_address: "ALGER",
+            store_phone: "0000",
+            tax_rows: &[],
+            number: "TEST-000001",
+            created_at: "2026-01-01T00:00:00.000Z",
+            cashier_text: "TEST",
+            warehouse_text: "DEP-01",
+            captions: TsplCaptionLang::French,
+            lines: &lines,
+            totals: TsplTicketTotals {
+                subtotal_ht: "250,00",
+                global_discount: "0,00",
+                tva: "47,50",
+                total_ttc: "297,50",
+                paid: "300,00",
+                change: "2,50",
+                payment_method: "CASH",
+            },
+            footer: "TICKET TEST",
+            media: media_from_settings(self.settings)?,
+        })?;
+        self.transport.send_raster(&bytes)?;
+        Ok(TsplPrintOutcome {
+            bytes_sent: bytes.len(),
+        })
+    }
+}

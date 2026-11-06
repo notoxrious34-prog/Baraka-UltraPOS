@@ -73,9 +73,10 @@ describe("conditional fields (COM iff serial, queue iff spooler)", () => {
     const branchAt = TAB_SRC.indexOf('{transport === "serial" ? (');
     const paperAt = TAB_SRC.indexOf("settings.paperWidth", branchAt);
     const guideAt = TAB_SRC.indexOf("printerComGuideTitle", branchAt);
-    // Paper width renders after the conditional block, before the guide box.
+    // TASK-PRT-05 layout: connection card (branch + guide), then the ticket
+    // card hosting paper width — the guide now precedes paper width.
     expect(paperAt).toBeGreaterThan(branchAt);
-    expect(guideAt).toBeGreaterThan(paperAt);
+    expect(paperAt).toBeGreaterThan(guideAt);
   });
 
   it("isolates the queue name LTR and never clears the hidden arm", () => {

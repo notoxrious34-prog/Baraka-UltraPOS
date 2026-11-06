@@ -12,7 +12,7 @@
  * integers only (plain counts, never money), backend re-validates.
  */
 
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { t } from "@/lib/i18n";
 import { useSessionStore } from "@/stores/session-store";
 import type { Locale } from "@/types/pos";
@@ -53,6 +53,35 @@ const PROBE_NOTE_KEYS = {
   ascii_only: "settings.tsplProbeNoteAsciiOnly",
   font1_only: "settings.tsplProbeNoteFont1Only",
 } as const;
+
+// TASK-PRT-05: numbered section card — title + description + body.
+function Section({
+  index,
+  title,
+  desc,
+  children,
+}: {
+  index: string;
+  title: string;
+  desc: string;
+  children: ReactNode;
+}): ReactElement {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/40">
+      <div className="flex items-baseline gap-2">
+        <span
+          aria-hidden="true"
+          className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-black tabular-nums dark:bg-slate-700"
+        >
+          {index}
+        </span>
+        <h2 className="text-sm font-black">{title}</h2>
+      </div>
+      <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{desc}</p>
+      <div className="mt-3 flex flex-col gap-3">{children}</div>
+    </section>
+  );
+}
 
 export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabProps): ReactElement {
   const hasPermission = useSessionStore((state) => state.hasPermission);
@@ -209,8 +238,59 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   if (loading) {
     return <p className="p-4 text-sm text-slate-500">{t(locale, "settings.loading")}</p>;
   }
+
+  // TASK-PRT-05: live summary chips — effective config at a glance.
+  const connectionValue =
+    transport === "serial"
+      ? `${t(locale, "settings.printerTransportSerial")} · ${serialPort === "" ? "—" : serialPort}`
+      : `${t(locale, "settings.printerTransportSpooler")} · ${queueName.trim() === "" ? "—" : queueName.trim()}`;
+  const ticketValue = `${t(locale, renderMode === "escpos" ? "settings.ticketRenderEscpos" : "settings.ticketRenderGraphique")} · ${paperWidthMm} mm`;
+  const labelValue =
+    transport === "spooler" ? `${tsplGapMm} / ${tsplDensity} / ${tsplSpeed} mm` : "—";
+  const labelIndex = "04";
+  const testsIndex = transport === "spooler" ? "05" : "04";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+      <header>
+        <h1 className="text-base font-black">{t(locale, "settings.tabPrinter")}</h1>
+        <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+          {t(locale, "settings.printerPageSubtitle")}
+        </p>
+      </header>
+
+      <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/40">
+          <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {t(locale, "settings.summaryConnection")}
+          </dt>
+          <dd className="mt-0.5 truncate text-sm font-black" title={connectionValue}>
+            {connectionValue}
+          </dd>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/40">
+          <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {t(locale, "settings.summaryTicket")}
+          </dt>
+          <dd className="mt-0.5 truncate text-sm font-black" title={ticketValue}>
+            {ticketValue}
+          </dd>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900/40">
+          <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {t(locale, "settings.summaryLabel")}
+          </dt>
+          <dd className="mt-0.5 truncate text-sm font-black tabular-nums" title={labelValue}>
+            {labelValue}
+          </dd>
+        </div>
+      </dl>
+
+      <Section
+        index="01"
+        title={t(locale, "settings.sectionConnection")}
+        desc={t(locale, "settings.sectionConnectionDesc")}
+      >
       <div
         role="group"
         aria-label={t(locale, "settings.printerTransportTitle")}
@@ -238,73 +318,6 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           <PrinterIcon className="h-4 w-4" />
           <span>{t(locale, "settings.printerTransportSpooler")}</span>
         </button>
-      </div>
-      <div
-        role="group"
-        aria-label={t(locale, "settings.ticketRenderTitle")}
-        className="flex gap-1 rounded border border-slate-300 p-1 dark:border-slate-600"
-      >
-        <button
-          type="button"
-          aria-pressed={renderMode === "escpos"}
-          onClick={() => {
-            setRenderMode("escpos");
-          }}
-          className={transportButton(renderMode === "escpos")}
-        >
-          <DocumentsIcon className="h-4 w-4" />
-          <span>{t(locale, "settings.ticketRenderEscpos")}</span>
-        </button>
-        <button
-          type="button"
-          aria-pressed={renderMode === "graphique"}
-          onClick={() => {
-            setRenderMode("graphique");
-          }}
-          className={transportButton(renderMode === "graphique")}
-        >
-          <PrinterIcon className="h-4 w-4" />
-          <span>{t(locale, "settings.ticketRenderGraphique")}</span>
-        </button>
-      </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400">
-        {t(locale, "settings.ticketRenderHelp")}
-      </p>
-      {/* TEMPORARY-DIAGNOSTIC probe switch (BRK-100 — remove in lock-in). */}
-      <div className="rounded border-2 border-dashed border-amber-500 p-2 dark:border-amber-400">
-        <p className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="rounded bg-amber-500 px-1.5 py-0.5 text-xs font-black text-slate-950">
-            {t(locale, "settings.tsplProbeBadge")}
-          </span>
-          <span className="font-bold">{t(locale, "settings.tsplProbeTitle")}</span>
-        </p>
-        <div
-          role="group"
-          aria-label={t(locale, "settings.tsplProbeTitle")}
-          className="mt-2 grid grid-cols-2 gap-1 rounded border border-slate-300 p-1 dark:border-slate-600"
-        >
-          {(Object.keys(PROBE_LABEL_KEYS) as TsplProbeMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              aria-pressed={probeMode === mode}
-              onClick={() => {
-                setProbeMode(mode);
-              }}
-              className={transportButton(probeMode === mode)}
-            >
-              <span>{t(locale, PROBE_LABEL_KEYS[mode])}</span>
-            </button>
-          ))}
-        </div>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          {t(locale, PROBE_NOTE_KEYS[probeMode])}
-        </p>
-        {probeMode === "ascii_only" && (
-          <p className="mt-1 rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
-            {t(locale, "settings.tsplProbeAsciiWarning")}
-          </p>
-        )}
       </div>
       {transport === "serial" ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -358,29 +371,120 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           </span>
         </label>
       )}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-bold">{t(locale, "settings.paperWidth")}</span>
-          <select
-            className={inputClass}
-            value={paperWidthMm}
-            disabled={saving}
-            onChange={(event) => {
-              setPaperWidthMm(Number(event.target.value));
-            }}
-          >
-            <option value={80}>{t(locale, "settings.paperWidth80")}</option>
-            <option value={58}>{t(locale, "settings.paperWidth58")}</option>
-          </select>
-        </label>
+      <div className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800/50">
+        <p className="font-black">{t(locale, "settings.printerComGuideTitle")}</p>
+        <ul className="mt-1 list-disc space-y-1 ps-5 text-slate-600 dark:text-slate-300">
+          <li>{t(locale, "settings.printerComGuideCom")}</li>
+          <li>{t(locale, "settings.printerComGuideUsb")}</li>
+          <li>{t(locale, "settings.printerComGuideTransport")}</li>
+        </ul>
       </div>
+      </Section>
+
+      <Section
+        index="02"
+        title={t(locale, "settings.sectionTicket")}
+        desc={t(locale, "settings.sectionTicketDesc")}
+      >
+      <div
+        role="group"
+        aria-label={t(locale, "settings.ticketRenderTitle")}
+        className="flex gap-1 rounded border border-slate-300 p-1 dark:border-slate-600"
+      >
+        <button
+          type="button"
+          aria-pressed={renderMode === "escpos"}
+          onClick={() => {
+            setRenderMode("escpos");
+          }}
+          className={transportButton(renderMode === "escpos")}
+        >
+          <DocumentsIcon className="h-4 w-4" />
+          <span>{t(locale, "settings.ticketRenderEscpos")}</span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={renderMode === "graphique"}
+          onClick={() => {
+            setRenderMode("graphique");
+          }}
+          className={transportButton(renderMode === "graphique")}
+        >
+          <PrinterIcon className="h-4 w-4" />
+          <span>{t(locale, "settings.ticketRenderGraphique")}</span>
+        </button>
+      </div>
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        {t(locale, "settings.ticketRenderHelp")}
+      </p>
+      <label className="flex max-w-xs flex-col gap-1 text-sm">
+        <span className="font-bold">{t(locale, "settings.paperWidth")}</span>
+        <select
+          className={inputClass}
+          value={paperWidthMm}
+          disabled={saving}
+          onChange={(event) => {
+            setPaperWidthMm(Number(event.target.value));
+          }}
+        >
+          <option value={80}>{t(locale, "settings.paperWidth80")}</option>
+          <option value={58}>{t(locale, "settings.paperWidth58")}</option>
+        </select>
+      </label>
+      </Section>
+
+      <Section
+        index="03"
+        title={t(locale, "settings.sectionDiag")}
+        desc={t(locale, "settings.sectionDiagDesc")}
+      >
+      {/* TEMPORARY-DIAGNOSTIC probe switch (BRK-100 — remove in lock-in). */}
+      <div className="rounded border-2 border-dashed border-amber-500 p-2 dark:border-amber-400">
+        <p className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="rounded bg-amber-500 px-1.5 py-0.5 text-xs font-black text-slate-950">
+            {t(locale, "settings.tsplProbeBadge")}
+          </span>
+          <span className="font-bold">{t(locale, "settings.tsplProbeTitle")}</span>
+        </p>
+        <div
+          role="group"
+          aria-label={t(locale, "settings.tsplProbeTitle")}
+          className="mt-2 grid grid-cols-2 gap-1 rounded border border-slate-300 p-1 dark:border-slate-600"
+        >
+          {(Object.keys(PROBE_LABEL_KEYS) as TsplProbeMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={probeMode === mode}
+              onClick={() => {
+                setProbeMode(mode);
+              }}
+              className={transportButton(probeMode === mode)}
+            >
+              <span>{t(locale, PROBE_LABEL_KEYS[mode])}</span>
+            </button>
+          ))}
+        </div>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {t(locale, PROBE_NOTE_KEYS[probeMode])}
+        </p>
+        {probeMode === "ascii_only" && (
+          <p className="mt-1 rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+            {t(locale, "settings.tsplProbeAsciiWarning")}
+          </p>
+        )}
+      </div>
+      </Section>
+
       {transport === "spooler" ? (
-        <fieldset className="grid grid-cols-1 gap-3 rounded border border-slate-300 p-3 md:grid-cols-3 dark:border-slate-600">
-          <legend className="px-1 text-sm font-black">
-            {t(locale, "settings.tsplMediaTitle")}
-          </legend>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-bold">{t(locale, "settings.tsplGapMm")}</span>
+        <Section
+          index={labelIndex}
+          title={t(locale, "settings.sectionLabel")}
+          desc={t(locale, "settings.sectionLabelDesc")}
+        >
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-bold">{t(locale, "settings.tsplGapMm")}</span>
             <bdi dir="ltr" className="contents">
               <input
                 className={`${inputClass} tabular-nums`}
@@ -424,16 +528,9 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
               />
             </bdi>
           </label>
-        </fieldset>
+        </div>
+        </Section>
       ) : null}
-      <div className="rounded border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/50">
-        <p className="font-black">{t(locale, "settings.printerComGuideTitle")}</p>
-        <ul className="mt-1 list-disc space-y-1 ps-5 text-slate-600 dark:text-slate-300">
-          <li>{t(locale, "settings.printerComGuideCom")}</li>
-          <li>{t(locale, "settings.printerComGuideUsb")}</li>
-          <li>{t(locale, "settings.printerComGuideTransport")}</li>
-        </ul>
-      </div>
       <div>
         <button
           type="button"
@@ -447,11 +544,20 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           {saving ? t(locale, "settings.saving") : t(locale, "settings.save")}
         </button>
       </div>
-      <fieldset className="rounded border border-slate-200 p-3 dark:border-slate-700">
-        <legend className="px-1 text-xs font-bold text-slate-500">
-          {t(locale, "settings.testPrintTitle")}
-        </legend>
-        <div className="flex flex-wrap gap-2">
+
+      <Section
+        index={testsIndex}
+        title={t(locale, "settings.sectionTests")}
+        desc={t(locale, "settings.sectionTestsDesc")}
+      >
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-2.5 dark:border-slate-700">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black">{t(locale, "settings.testPrintFr")}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {t(locale, "settings.testFrHelp")}
+              </p>
+            </div>
           <button
             type="button"
             disabled={testing !== null || !canTestPrint}
@@ -459,10 +565,18 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
             onClick={() => {
               void handleTestPrint("fr");
             }}
-            className="rounded bg-slate-200 px-3 py-1.5 text-sm font-bold hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:hover:bg-slate-600"
+            className="shrink-0 rounded bg-slate-200 px-3 py-1.5 text-sm font-bold hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:hover:bg-slate-600"
           >
             {testing === "fr" ? t(locale, "settings.testing") : t(locale, "settings.testPrintFr")}
           </button>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-2.5 dark:border-slate-700">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black">{t(locale, "settings.testPrintAr")}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {t(locale, "settings.testArHelp")}
+              </p>
+            </div>
           <button
             type="button"
             disabled={testing !== null || !canTestPrint}
@@ -470,23 +584,38 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
             onClick={() => {
               void handleTestPrint("ar");
             }}
-            className="rounded bg-slate-200 px-3 py-1.5 text-sm font-bold hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:hover:bg-slate-600"
+            className="shrink-0 rounded bg-slate-200 px-3 py-1.5 text-sm font-bold hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:hover:bg-slate-600"
           >
             {testing === "ar" ? t(locale, "settings.testing") : t(locale, "settings.testPrintAr")}
           </button>
+          </div>
+          <div className="rounded-lg border border-accent-500/50 p-2.5 dark:border-accent-400/40">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black">{t(locale, "settings.testPrintTsplLabel")}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t(locale, "settings.testTsplHelp")}
+                </p>
+              </div>
           <button
             type="button"
             disabled={testing !== null || !canTestPrint}
-            title={canTestPrint ? undefined : t(locale, "settings.printerManageReservedGuidance")}
+            title={
+              canTestPrint ? undefined : t(locale, "settings.printerManageReservedGuidance")
+            }
             onClick={() => {
               void handleTestTsplLabel();
             }}
-            className="rounded bg-slate-200 px-3 py-1.5 text-sm font-bold hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:hover:bg-slate-600"
+            className="shrink-0 rounded bg-accent-500 px-3 py-1.5 text-sm font-bold text-slate-950 hover:brightness-110 disabled:opacity-50"
           >
-            {testing === "tspl" ? t(locale, "settings.testing") : t(locale, "settings.testPrintTsplLabel")}
+            {testing === "tspl"
+              ? t(locale, "settings.testing")
+              : t(locale, "settings.testPrintTsplLabel")}
           </button>
+            </div>
+          </div>
         </div>
-      </fieldset>
+      </Section>
       {notice !== null && (
         <p
           className={`rounded px-2 py-1.5 text-sm font-bold ${testPrintToneClass(notice.tone)}`}

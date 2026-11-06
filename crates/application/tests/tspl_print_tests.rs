@@ -367,7 +367,7 @@ fn label_spools_exact_bytes_and_reports_count() {
     assert!(text.contains("TEXT 8,58,\"3\",0,2,2,\"10.00\""));
     assert!(text.contains("\"DZD\""));
     assert!(text.contains("BARCODE 8,106,\"128\",40,1,0,2,2,\"VIS-001\""));
-    assert!(text.ends_with("PRINT 1,3"));
+    assert!(text.ends_with("PRINT 1,3\r\n"));
 }
 
 #[test]
@@ -545,7 +545,7 @@ fn ticket_transcribes_discounted_and_legacy_lines_verbatim() {
     assert!(text.contains("Rendu: 0.00"));
     // Doc-number Code128 with human-readable number.
     assert!(text.contains("BARCODE"));
-    assert!(text.ends_with("PRINT 1,1"));
+    assert!(text.ends_with("PRINT 1,1\r\n"));
 }
 
 #[test]

@@ -585,7 +585,7 @@ pub fn render_label_40x20(label: &TsplLabel<'_>) -> Result<Vec<u8>, DomainError>
     );
     push_text(&mut out, human_x, 148, "1", 1, &human, probe);
     out.push(format!("PRINT 1,{}", label.copies));
-    Ok(out.join("\r\n").into_bytes())
+    Ok(format!("{}\r\n", out.join("\r\n")).into_bytes())
 }
 
 /// Render the 80 mm gapless ticket. Height is computed from content:
@@ -887,7 +887,7 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
     )?;
     out.extend(body);
     out.push("PRINT 1,1".to_string());
-    Ok(out.join("\r\n").into_bytes())
+    Ok(format!("{}\r\n", out.join("\r\n")).into_bytes())
 }
 
 /// BITMAP raster bounds (BRK-101; architect-verified TSC reference
@@ -981,7 +981,7 @@ pub fn render_bitmap_job(
         }
     }
     job.extend_from_slice(data);
-    job.extend_from_slice(format!("\r\nPRINT 1,{copies}").as_bytes());
+    job.extend_from_slice(format!("\r\nPRINT 1,{copies}\r\n").as_bytes());
     Ok(job)
 }
 
@@ -1039,7 +1039,7 @@ mod tests {
              TEXT 288,94,\"1\",0,1,1,\"DZD\"\r\n\
              BARCODE 8,106,\"128\",40,1,0,2,2,\"VIS-001\"\r\n\
              TEXT 132,148,\"1\",0,1,1,\"VIS-001\"\r\n\
-             PRINT 1,3"
+             PRINT 1,3\r\n"
         );
     }
 
@@ -1049,8 +1049,8 @@ mod tests {
             String::from_utf8(render_label_40x20(&owner_label(1)).expect("1")).expect("ascii");
         let many =
             String::from_utf8(render_label_40x20(&owner_label(99)).expect("99")).expect("ascii");
-        assert!(one.ends_with("PRINT 1,1"));
-        assert!(many.ends_with("PRINT 1,99"));
+        assert!(one.ends_with("PRINT 1,1\r\n"));
+        assert!(many.ends_with("PRINT 1,99\r\n"));
         assert_eq!(many.matches("BARCODE").count(), 1);
         assert_eq!(
             render_label_40x20(&owner_label(0)).expect_err("0 rejected"),
@@ -1194,7 +1194,7 @@ mod tests {
         );
         // Barcode: (13*11+35)*2 = 356 dots, centered x = (640-356)/2 = 142.
         assert!(text.contains("BARCODE 142,522,\"128\",64,1,0,2,2,\"T-2026-000123\""));
-        assert!(text.ends_with("PRINT 1,1"));
+        assert!(text.ends_with("PRINT 1,1\r\n"));
         assert_eq!(text.matches("BARCODE").count(), 1);
     }
 
@@ -1551,7 +1551,24 @@ mod tests {
     fn ticket_copy_count_is_always_single_print() {
         let text =
             String::from_utf8(render_ticket_80mm(&owner_ticket()).expect("ok")).expect("ascii");
-        assert!(text.ends_with("PRINT 1,1"));
+        assert!(text.ends_with("PRINT 1,1\r\n"));
+    }
+
+    // TASK-PRT-01 (LIVE-2026-11-06): the XP-410B silently discards any job
+    // whose final line is not CRLF-terminated — every renderer must emit
+    // the trailing newline, never a bare final command.
+    #[test]
+    fn all_tspl_jobs_end_with_crlf() {
+        let label =
+            String::from_utf8(render_label_40x20(&owner_label(1)).expect("label")).expect("ascii");
+        assert!(label.ends_with("\r\n"), "label job must end with CRLF");
+        let ticket =
+            String::from_utf8(render_ticket_80mm(&owner_ticket()).expect("ticket")).expect("ascii");
+        assert!(ticket.ends_with("\r\n"), "ticket job must end with CRLF");
+        let data = [0xAA_u8, 0x55_u8];
+        let job = render_bitmap_job(&TsplMediaSetup::default(), 0, 0, 2, 1, &data, 1)
+            .expect("bitmap renders");
+        assert!(job.ends_with(b"\r\n"), "bitmap job must end with CRLF");
     }
 
     // BRK-101 BITMAP pins (TEXT path is DEAD — raster only).
@@ -1566,7 +1583,7 @@ mod tests {
             b"SIZE 2 mm, 1 mm\r\nGAP 3 mm, 0 mm\r\nSET RIBBON OFF\r\nDIRECTION 0,0\r\nREFERENCE 0,0\r\nOFFSET 0 mm\r\nSET PEEL OFF\r\nSET CUTTER OFF\r\nSET TEAR ON\r\nCLS\r\nBITMAP 0,0,2,1,0,",
         );
         expected.extend_from_slice(&data);
-        expected.extend_from_slice(b"\r\nPRINT 1,1");
+        expected.extend_from_slice(b"\r\nPRINT 1,1\r\n");
         assert_eq!(job, expected, "raster job byte-exact");
         assert!(
             !job.windows(8).any(|w| w == b"CODEPAGE"),
@@ -1677,7 +1694,7 @@ mod tests {
             head.starts_with("SIZE 40 mm, 20 mm\r\n"),
             "label size, got: {head}"
         );
-        assert!(job.ends_with(b"\r\nPRINT 1,2"), "copies ride PRINT");
+        assert!(job.ends_with(b"\r\nPRINT 1,2\r\n"), "copies ride PRINT");
         // 80 mm ticket, 84 mm tall: 80 bytes x 672 rows = 53760 B.
         let mut ticket = vec![0xAA_u8; 80 * 672];
         ticket[0] = 0x55;

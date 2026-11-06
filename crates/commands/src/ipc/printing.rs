@@ -170,7 +170,6 @@ pub fn printer_test_tspl_label(
     let session = require_session(&state, &request.session_token)?;
     let outcome = PrintTsplTestLabelUseCase::new(
         state.printer_settings.as_ref(),
-        state.store_identity.as_ref(),
         state.printer_transport.as_ref(),
     )
     .execute(&session)

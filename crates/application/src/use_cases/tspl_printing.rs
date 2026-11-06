@@ -370,28 +370,24 @@ where
 /// answers exactly "will my current configuration print". ASCII-only
 /// payload by construction (Arabic coverage rides TASK-PRT-02 bitmaps).
 /// ADMIN seam (`SystemSettingsManage`), spooler transport required.
-pub struct PrintTsplTestLabelUseCase<'a, S, I, T>
+pub struct PrintTsplTestLabelUseCase<'a, S, T>
 where
     S: ?Sized,
-    I: ?Sized,
     T: ?Sized,
 {
     settings: &'a S,
-    identity: &'a I,
     transport: &'a T,
 }
 
-impl<'a, S, I, T> PrintTsplTestLabelUseCase<'a, S, I, T>
+impl<'a, S, T> PrintTsplTestLabelUseCase<'a, S, T>
 where
     S: PrinterSettingsPort + ?Sized,
-    I: StoreIdentityPort + ?Sized,
     T: PrinterTransportPort + ?Sized,
 {
     /// Wire the use case to its ports.
-    pub fn new(settings: &'a S, identity: &'a I, transport: &'a T) -> Self {
+    pub fn new(settings: &'a S, transport: &'a T) -> Self {
         Self {
             settings,
-            identity,
             transport,
         }
     }
@@ -405,9 +401,11 @@ where
             return Err(ApplicationError::Unauthorized);
         }
         require_spooler_transport(self.settings)?;
-        let identity = self.identity.load_identity()?;
+        // Fixed ASCII brand by design: the self-test must be byte-identical
+        // on every machine (the store name is owner data and may carry
+        // non-ASCII bytes that this printer class silently rejects).
         let bytes = render_label_40x20(&TsplLabel {
-            brand_text: &identity.store_name,
+            brand_text: "BARAKA",
             name: "TEST BARAKA",
             price_text: "100,00",
             currency_text: "DZD",

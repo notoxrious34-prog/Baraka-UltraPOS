@@ -1430,6 +1430,10 @@ export interface PrinterSettings {
   ticketRenderMode: TicketRenderMode;
   /** TEMPORARY-DIAGNOSTIC probe mode (BRK-100 — remove in lock-in). */
   tsplProbeMode: TsplProbeMode;
+  /** TSPL media (LIVE-2026-11-06): gap mm 0..10, density 0..15, speed 1..6. */
+  tsplGapMm: number;
+  tsplDensity: number;
+  tsplSpeed: number;
 }
 
 function toTicketRenderMode(raw: unknown): TicketRenderMode {
@@ -1445,6 +1449,9 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     paper_width_mm: number;
     transport?: string;
     queue_name?: string;
+    tspl_gap_mm?: number;
+    tspl_density?: number;
+    tspl_speed?: number;
   }
   const wire = await call<SettingsWire>("printer_get_settings", {
     session_token: sessionToken,
@@ -1462,6 +1469,9 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     tsplProbeMode: toTsplProbeMode(
       (wire as { tspl_probe_mode?: unknown }).tspl_probe_mode,
     ),
+    tsplGapMm: typeof wire.tspl_gap_mm === "number" ? wire.tspl_gap_mm : 3,
+    tsplDensity: typeof wire.tspl_density === "number" ? wire.tspl_density : 8,
+    tsplSpeed: typeof wire.tspl_speed === "number" ? wire.tspl_speed : 4,
   };
 }
 
@@ -1476,6 +1486,10 @@ export async function ipcUpdatePrinterSettings(
   ticketRenderMode?: TicketRenderMode | null,
   // TEMPORARY-DIAGNOSTIC (BRK-100 — remove in lock-in): null/absent keeps stored mode.
   tsplProbeMode?: TsplProbeMode | null,
+  // TSPL media (LIVE-2026-11-06): null/absent keeps the stored value.
+  tsplGapMm?: number | null,
+  tsplDensity?: number | null,
+  tsplSpeed?: number | null,
 ): Promise<PrinterSettings> {
   const wire = await call<{
     serial_port: string;
@@ -1486,6 +1500,9 @@ export async function ipcUpdatePrinterSettings(
     queue_name: string;
     ticket_render_mode: string;
     tspl_probe_mode: string;
+    tspl_gap_mm: number;
+    tspl_density: number;
+    tspl_speed: number;
   }>("printer_update_settings", {
     request: {
       session_token: sessionToken,
@@ -1498,6 +1515,9 @@ export async function ipcUpdatePrinterSettings(
       ticket_render_mode: ticketRenderMode ?? null,
       // TEMPORARY-DIAGNOSTIC: typed union — invalid spellings unconstructible.
       tspl_probe_mode: tsplProbeMode ?? null,
+      tspl_gap_mm: tsplGapMm ?? null,
+      tspl_density: tsplDensity ?? null,
+      tspl_speed: tsplSpeed ?? null,
     },
   });
   return {
@@ -1509,6 +1529,9 @@ export async function ipcUpdatePrinterSettings(
     queueName: typeof wire.queue_name === 'string' ? wire.queue_name : '',
     ticketRenderMode: toTicketRenderMode(wire.ticket_render_mode),
     tsplProbeMode: toTsplProbeMode(wire.tspl_probe_mode),
+    tsplGapMm: wire.tspl_gap_mm,
+    tsplDensity: wire.tspl_density,
+    tsplSpeed: wire.tspl_speed,
   };
 }
 

@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import {
   getStoreIdentity,
+  ipcUpdatePrinterSettings,
   printingTestPrint,
   saveStoreIdentity,
 } from "@/lib/ipc";
@@ -204,5 +205,56 @@ describe("VT-03 printingTestPrint", () => {
   it("a classified device error code propagates as a typed error", async () => {
     invokeMock.mockRejectedValueOnce("PRINTER_UNAVAILABLE");
     await expect(printingTestPrint("fr")).rejects.toBe("PRINTER_UNAVAILABLE");
+  });
+});
+
+describe("VT-04 updatePrinterSettings TSPL media (LIVE-2026-11-06)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fakeTauriWindow();
+    primeSession();
+  });
+  afterEach(() => {
+    clearTauriWindow();
+  });
+
+  it("passes gap/density/speed on the wire and maps the stored media back", async () => {
+    invokeMock.mockResolvedValueOnce({
+      serial_port: "",
+      serial_baud: 9600,
+      paper_width_dots: 576,
+      paper_width_mm: 80,
+      transport: "spooler",
+      queue_name: "XP-410B",
+      ticket_render_mode: "escpos",
+      tspl_probe_mode: "normal",
+      tspl_gap_mm: 2,
+      tspl_density: 8,
+      tspl_speed: 4,
+    });
+    const settings = await ipcUpdatePrinterSettings(
+      "tok-idn-1",
+      "",
+      9600,
+      80,
+      "spooler",
+      "XP-410B",
+      "escpos",
+      "normal",
+      2,
+      8,
+      4,
+    );
+    expect(invokeMock).toHaveBeenCalledWith("printer_update_settings", {
+      session_token: "tok-idn-1",
+      request: expect.objectContaining({
+        tspl_gap_mm: 2,
+        tspl_density: 8,
+        tspl_speed: 4,
+      }),
+    });
+    expect(settings.tsplGapMm).toBe(2);
+    expect(settings.tsplDensity).toBe(8);
+    expect(settings.tsplSpeed).toBe(4);
   });
 });

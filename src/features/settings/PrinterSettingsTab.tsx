@@ -8,6 +8,8 @@
  * fields; saving on the spooler arm with an empty queue is blocked with
  * an inline message (no IPC call). Both arms' stored values are kept
  * independently — switching never clears the other field.
+ * TSPL media (LIVE-2026-11-06): gap mm 0..10, density 0..15, speed 1..6 —
+ * integers only (plain counts, never money), backend re-validates.
  */
 
 import { useEffect, useState, type ReactElement } from "react";
@@ -61,6 +63,11 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   const [transport, setTransport] = useState<PrinterTransport>("serial");
   const [renderMode, setRenderMode] = useState<TicketRenderMode>("escpos");
   const [queueName, setQueueName] = useState("");
+  // LIVE-2026-11-06: TSPL media for the 40x20 label stock. Plain integer
+  // counts (digits only, backend re-validates ranges) — never money.
+  const [tsplGapMm, setTsplGapMm] = useState("3");
+  const [tsplDensity, setTsplDensity] = useState("8");
+  const [tsplSpeed, setTsplSpeed] = useState("4");
   // TEMPORARY-DIAGNOSTIC (BRK-100 — remove in lock-in): probe switch state.
   const [probeMode, setProbeMode] = useState<TsplProbeMode>("normal");
   const [loading, setLoading] = useState(true);
@@ -80,6 +87,9 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           setRenderMode(settings.ticketRenderMode);
           setQueueName(settings.queueName);
           setProbeMode(settings.tsplProbeMode);
+          setTsplGapMm(String(settings.tsplGapMm));
+          setTsplDensity(String(settings.tsplDensity));
+          setTsplSpeed(String(settings.tsplSpeed));
           setLoading(false);
         }
       })
@@ -105,6 +115,18 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
     }
     setSaving(true);
     setNotice(null);
+    // LIVE-2026-11-06: TSPL media are plain integer counts — digits only,
+    // clamped to the backend ranges (gap 0..10, density 0..15, speed 1..6).
+    const gap = /^\d+$/.test(tsplGapMm) ? Math.min(10, Number(tsplGapMm)) : NaN;
+    const density = /^\d+$/.test(tsplDensity) ? Math.min(15, Number(tsplDensity)) : NaN;
+    const speed = /^\d+$/.test(tsplSpeed)
+      ? Math.min(6, Math.max(1, Number(tsplSpeed)))
+      : NaN;
+    if (!Number.isInteger(gap) || !Number.isInteger(density) || !Number.isInteger(speed)) {
+      setSaving(false);
+      setNotice({ tone: "error", text: t(locale, "settings.tsplMediaRange") });
+      return;
+    }
     try {
       const settings = await ipcUpdatePrinterSettings(
         sessionToken,
@@ -116,6 +138,9 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
         renderMode,
         // TEMPORARY-DIAGNOSTIC (BRK-100): typed union — invalid unselectable.
         probeMode,
+        gap,
+        density,
+        speed,
       );
       setSerialPort(settings.serialPort);
       setSerialBaud(settings.serialBaud);
@@ -124,6 +149,9 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
       setRenderMode(settings.ticketRenderMode);
       setQueueName(settings.queueName);
       setProbeMode(settings.tsplProbeMode);
+      setTsplGapMm(String(settings.tsplGapMm));
+      setTsplDensity(String(settings.tsplDensity));
+      setTsplSpeed(String(settings.tsplSpeed));
       setNotice({ tone: "success", text: t(locale, "settings.saved") });
     } catch (failure) {
       setNotice({ tone: "error", text: String(failure) });
@@ -324,6 +352,58 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           </select>
         </label>
       </div>
+      {transport === "spooler" ? (
+        <fieldset className="grid grid-cols-1 gap-3 rounded border border-slate-300 p-3 md:grid-cols-3 dark:border-slate-600">
+          <legend className="px-1 text-sm font-black">
+            {t(locale, "settings.tsplMediaTitle")}
+          </legend>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-bold">{t(locale, "settings.tsplGapMm")}</span>
+            <bdi dir="ltr" className="contents">
+              <input
+                className={`${inputClass} tabular-nums`}
+                value={tsplGapMm}
+                disabled={saving}
+                inputMode="numeric"
+                onChange={(event) => {
+                  setTsplGapMm(event.target.value);
+                }}
+              />
+            </bdi>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {t(locale, "settings.tsplGapHelp")}
+            </span>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-bold">{t(locale, "settings.tsplDensity")}</span>
+            <bdi dir="ltr" className="contents">
+              <input
+                className={`${inputClass} tabular-nums`}
+                value={tsplDensity}
+                disabled={saving}
+                inputMode="numeric"
+                onChange={(event) => {
+                  setTsplDensity(event.target.value);
+                }}
+              />
+            </bdi>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-bold">{t(locale, "settings.tsplSpeed")}</span>
+            <bdi dir="ltr" className="contents">
+              <input
+                className={`${inputClass} tabular-nums`}
+                value={tsplSpeed}
+                disabled={saving}
+                inputMode="numeric"
+                onChange={(event) => {
+                  setTsplSpeed(event.target.value);
+                }}
+              />
+            </bdi>
+          </label>
+        </fieldset>
+      ) : null}
       <div className="rounded border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/50">
         <p className="font-black">{t(locale, "settings.printerComGuideTitle")}</p>
         <ul className="mt-1 list-disc space-y-1 ps-5 text-slate-600 dark:text-slate-300">

@@ -25,7 +25,7 @@ const readSrc = (...parts: string[]): string => readFileSync(join(ROOT, ...parts
 const SCREEN_SRC = readSrc("src", "features", "suppliers", "SupplierListScreen.tsx");
 const I18N_SRC = readSrc("src", "lib", "i18n.ts");
 const SUPPLIERS_RS = readSrc("crates", "application", "src", "use_cases", "suppliers.rs");
-const COMMANDS_RS = readSrc("crates", "commands", "src", "ipc.rs");
+const COMMANDS_RS = readSrc("crates", "commands", "src", "ipc", "suppliers.rs");
 const STORE_SRC = readSrc("src", "stores", "supplier-store.ts");
 
 function listSourceFiles(dir: string, out: string[]): void {

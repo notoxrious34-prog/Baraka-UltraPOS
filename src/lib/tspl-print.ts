@@ -26,6 +26,25 @@ export function validateTsplCopies(raw: unknown): number {
   return raw;
 }
 
+/**
+ * Clamp a UI copies value into 1..99 (DSN-102: garbage in the modal must
+ * never reach the throwing validator — the user gets a sane value, not
+ * an error card). Non-finite input floors to the minimum.
+ */
+export function clampTsplCopies(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return TSPL_COPIES_MIN;
+  }
+  const floored = Math.floor(raw);
+  if (floored < TSPL_COPIES_MIN) {
+    return TSPL_COPIES_MIN;
+  }
+  if (floored > TSPL_COPIES_MAX) {
+    return TSPL_COPIES_MAX;
+  }
+  return floored;
+}
+
 export interface TsplLabelInput {
   name: string;
   priceCentimes: string;

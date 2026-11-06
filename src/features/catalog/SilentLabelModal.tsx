@@ -4,7 +4,7 @@ import type { CatalogProduct, Locale } from "@/types/pos";
 import { formatMoney } from "@/lib/money";
 import { fitModuleWidth, generateCode128Svg } from "@/lib/barcode-128";
 import { usePosUiStore } from "@/stores/pos-ui-store";
-import { ipcPrintTsplLabel, TSPL_COPIES_MAX, TSPL_COPIES_MIN } from "@/lib/tspl-print";
+import { ipcPrintTsplLabel, TSPL_COPIES_MIN, TSPL_COPIES_MAX, clampTsplCopies } from "@/lib/tspl-print";
 import {
   labelBarcodeSource,
   labelPriceUnit,
@@ -120,13 +120,13 @@ export function SilentLabelModal({ product, isOpen, onClose, token }: SilentLabe
     setNotice(null);
     setFailure(null);
     try {
+      const count = clampTsplCopies(toIntOrNull(copiesRaw));
       const bytes = await ipcPrintTsplLabel(token, {
         name,
         priceCentimes,
         barcode: source,
-        copies: toIntOrNull(copiesRaw) ?? Number.NaN,
+        copies: count,
       });
-      const count = toIntOrNull(copiesRaw) ?? TSPL_COPIES_MIN;
       setNotice(
         t(locale, "tspl.labelsOk")
           .replace("{n}", String(count))

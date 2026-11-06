@@ -50,6 +50,17 @@ describe("silent-print surface (red until DSN-098 lands)", () => {
     expect(typeof facade.ipcPrintTsplTicket).toBe("function");
   });
 
+  it("clamps UI copies instead of throwing (DSN-102)", async () => {
+    const facade = await import("@/lib/tspl-print");
+    expect(facade.clampTsplCopies(1)).toBe(1);
+    expect(facade.clampTsplCopies(99)).toBe(99);
+    expect(facade.clampTsplCopies(0)).toBe(1);
+    expect(facade.clampTsplCopies(-4)).toBe(1);
+    expect(facade.clampTsplCopies(500)).toBe(99);
+    expect(facade.clampTsplCopies(Number.NaN)).toBe(1);
+    expect(facade.clampTsplCopies("12")).toBe(1);
+  });
+
   it("shares one spooler gate (ticket-print-path)", async () => {
     const gate = await import("@/lib/ticket-print-path");
     expect(gate.resolveTicketPrintPath({ transport: "spooler", renderMode: "graphique", documentType: "TICKET" })).toBe("silent-tspl");

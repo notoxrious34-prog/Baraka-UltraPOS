@@ -83,14 +83,22 @@ export type UpdateBackupFn = (sessionToken: string) => Promise<BackupMetadata>;
 
 /** Network-shaped failures map to OFFLINE; an empty channel (HTTP 404 on the
  *  `latest.json` URL — no release published yet, or channel URL to verify)
- *  maps to NO_RELEASE; everything else surfaces verbatim. */
+ *  maps to NO_RELEASE; everything else surfaces verbatim.
+ *
+ * LIVE-2026-11-06: the plugin surfaces a missing channel as a bare reqwest
+ * send error (`error sending request for url (...)`) with no status in the
+ * text, so the channel URL shape itself is the NO_RELEASE signal — checked
+ * AFTER the transport-failure rule so genuine offline stays OFFLINE. */
 export function mapCheckError(failure: unknown): string {
   const text = failure instanceof Error ? failure.message : String(failure);
   if (/404|not found|introuvable|non trouv[ée]/i.test(text)) {
     return "UPDATE_NO_RELEASE";
   }
-  if (/network|net::|internet|disconnected|dns|offline|fetch|ENOTFOUND|ECONNRESET|ETIMEDOUT|timed out|Load failed/i.test(text)) {
+  if (/network|net::|internet|disconnected|dns|offline|fetch|ENOTFOUND|ECONNRESET|ETIMEDOUT|timed out|Load failed|trying to connect|connection refused|connection reset|failed to lookup/i.test(text)) {
     return "UPDATE_OFFLINE";
+  }
+  if (/releases\/latest\/download|latest\.json/i.test(text)) {
+    return "UPDATE_NO_RELEASE";
   }
   return text || "UPDATE_CHECK_FAILED";
 }

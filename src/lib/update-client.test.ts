@@ -149,6 +149,18 @@ describe("mapCheckError", () => {
     expect(mapCheckError(new TypeError("Failed to fetch"))).toBe("UPDATE_OFFLINE");
     expect(mapCheckError(new Error("net::ERR_INTERNET_DISCONNECTED"))).toBe("UPDATE_OFFLINE");
     expect(mapCheckError(new Error("HTTP 404 Not Found"))).toBe("UPDATE_NO_RELEASE");
+    // LIVE-2026-11-06: the plugin surfaces a missing channel as a bare
+    // reqwest send error with no status in the text — it must map quiet,
+    // never leak verbatim to the shop.
+    expect(
+      mapCheckError(
+        new Error(
+          "error sending request for url (https://github.com/notoxrious34-prog/Baraka-UltraPOS/releases/latest/download/latest.json)",
+        ),
+      ),
+    ).toBe("UPDATE_NO_RELEASE");
+    // Genuine transport failures keep the offline code.
+    expect(mapCheckError(new Error("error trying to connect: dns error"))).toBe("UPDATE_OFFLINE");
     expect(mapCheckError(new Error("UPDATE_SIGNATURE_INVALID"))).toBe("UPDATE_SIGNATURE_INVALID");
     expect(mapCheckError("weird")).toBe("weird");
   });

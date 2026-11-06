@@ -12,7 +12,8 @@ use baraka_application::ports::{
     FiscalSettingsPort, PasswordHasher, PrintJobRepository, PrinterSettingsPort,
     PrinterTransportPort, ProductRepository, PurchaseRepository, ReceiptRendererPort,
     ReportingRepository, ReturnRepository, SessionContext, SessionStore, SessionToken,
-    StockRepository, StoreIdentityPort, SupplierRepository, UserRepository, WarehouseRepository,
+    StockRepository, StoreIdentityPort, SupplierRepository, TsplLabelRasterPort, UserRepository,
+    WarehouseRepository,
 };
 use baraka_application::use_cases::catalog::{
     NewUnitInput, ProductDetail, ProductImportRepository, UnitUpsert,
@@ -72,6 +73,8 @@ pub struct AppState {
     pub printer_capture: Arc<dyn CaptureSink>,
     /// Receipt raster renderer.
     pub printer_renderer: Arc<dyn ReceiptRendererPort>,
+    /// Arabic-capable label line rasterer (PRT-02).
+    pub label_raster: Arc<dyn TsplLabelRasterPort>,
     /// Cash session engine.
     pub cash: Arc<dyn CashSessionRepository>,
     /// Supplier master-data and statement persistence.

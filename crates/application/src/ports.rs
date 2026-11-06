@@ -2422,3 +2422,47 @@ pub struct SupplierPaymentOutcome {
     /// Cash movement id (CASH payments only).
     pub cash_movement_id: Option<String>,
 }
+
+/// One pre-rasterized label TEXT line (PRT-02): row-major 1-bit pixels,
+/// MSB-first, each row padded to whole bytes — the `BITMAP` job packing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RasterLabelLine {
+    /// Row width in bytes (dots = `width_bytes` × 8).
+    pub width_bytes: usize,
+    /// Row count in dots.
+    pub height_rows: usize,
+    /// Packed rows, `width_bytes` × `height_rows` bytes.
+    pub data: Vec<u8>,
+}
+
+/// Arabic-capable label line rasterer (PRT-02: shaping + threshold in
+/// infrastructure; the use case only routes TEXT slots it cannot print).
+pub trait TsplLabelRasterPort: Send + Sync {
+    /// Shape `text` at `px` pixels and pack it into 1-bit rows fitting
+    /// `max_width_dots` × `max_height_dots` (shrink-to-fit, never clip).
+    fn rasterize_label_text(
+        &self,
+        text: &str,
+        px: f32,
+        max_width_dots: u32,
+        max_height_dots: u32,
+    ) -> Result<RasterLabelLine, ApplicationError>;
+}
+
+/// Default rasterer: no Arabic support — any bitmap slot fails LOUDLY
+/// instead of printing a dead label.
+pub struct NullLabelRaster;
+
+impl TsplLabelRasterPort for NullLabelRaster {
+    fn rasterize_label_text(
+        &self,
+        _text: &str,
+        _px: f32,
+        _max_width_dots: u32,
+        _max_height_dots: u32,
+    ) -> Result<RasterLabelLine, ApplicationError> {
+        Err(ApplicationError::Port(
+            "TSPL_LABEL_RASTER_UNAVAILABLE".to_string(),
+        ))
+    }
+}

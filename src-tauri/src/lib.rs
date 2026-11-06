@@ -32,6 +32,7 @@ use baraka_infrastructure::persistence::data_dir::{
 use baraka_infrastructure::persistence::migration::{probe_newer_database, run_migrations};
 use baraka_infrastructure::persistence::terminal_context::resolve_device_id;
 use baraka_infrastructure::printing::capture::CaptureDevice;
+use baraka_infrastructure::printing::label_raster::TsplLabelRasterer;
 use baraka_infrastructure::printing::rasterizer::EscPosRasterizer;
 use baraka_infrastructure::printing::transport_router::RoutingPrinterTransport;
 use baraka_infrastructure::printing::worker_thread::{spawn_print_worker, WorkerDeps};
@@ -168,6 +169,7 @@ pub fn run() {
                 printer_transport: transport.clone(),
                 printer_capture: Arc::new(CaptureDevice::from_db_path(&db_path)),
                 printer_renderer: renderer.clone(),
+                label_raster: Arc::new(TsplLabelRasterer),
                 cash: Arc::new(SqliteCashSessionRepository::new(Arc::clone(&db))),
                 suppliers: Arc::new(SqliteSupplierRepository::new(Arc::clone(&db))),
                 purchases: Arc::new(SqlitePurchaseRepository::new(Arc::clone(&db))),

@@ -6,6 +6,7 @@ pub mod blocks;
 pub mod capture;
 pub mod decode;
 pub mod font_cache;
+pub mod label_raster;
 pub mod rasterizer;
 pub mod shaping;
 pub mod transport_router;

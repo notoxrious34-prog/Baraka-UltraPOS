@@ -366,7 +366,7 @@ fn label_spools_exact_bytes_and_reports_count() {
     assert!(text.contains("\"BARAKA QUINCAILLERIE\""));
     assert!(text.contains("TEXT 8,58,\"3\",0,2,2,\"10.00\""));
     assert!(text.contains("\"DZD\""));
-    assert!(text.contains("BARCODE 8,106,\"128\",40,1,0,2,2,\"VIS-001\""));
+    assert!(text.contains("BARCODE 8,106,\"128\",38,0,0,2,2,\"VIS-001\""));
     assert!(text.ends_with("PRINT 1,3\r\n"));
 }
 
@@ -674,4 +674,128 @@ fn ticket_missing_document_surfaces_not_found() {
         .execute(&session_with(Role::Caissier), DocumentId::new())
         .expect_err("missing document rejected");
     assert!(matches!(error, ApplicationError::NotFound(_)));
+}
+
+// TASK-PRT-02: a deterministic fake rasterer — every text becomes one
+// solid row of `0xAA`-bytes (never blank, never oversized).
+struct FakeLabelRaster;
+
+impl baraka_application::ports::TsplLabelRasterPort for FakeLabelRaster {
+    fn rasterize_label_text(
+        &self,
+        text: &str,
+        _px: f32,
+        max_width_dots: u32,
+        _max_height_dots: u32,
+    ) -> Result<baraka_application::ports::RasterLabelLine, ApplicationError> {
+        let dots = (text.chars().count().max(1) * 8).min(max_width_dots as usize);
+        let width_bytes = dots.div_ceil(8);
+        Ok(baraka_application::ports::RasterLabelLine {
+            data: vec![0xAA; width_bytes],
+            width_bytes,
+            height_rows: 1,
+        })
+    }
+}
+
+// TASK-PRT-02: an Arabic name routes through the rasterer — one BITMAP
+// chunk per non-Latin line, every Latin line still TEXT.
+#[test]
+fn label_arabic_name_rasterizes_to_bitmap() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let outcome = PrintTsplLabelUseCase::new(&settings, &FakeIdentity, &transport)
+        .with_label_raster(&FakeLabelRaster)
+        .execute(
+            &session_with(Role::Admin),
+            "JILI ISPANA ابيض",
+            35_000,
+            "AR02",
+            1,
+        )
+        .expect("arabic label spools");
+    let payloads = transport.payloads();
+    assert_eq!(payloads.len(), 1);
+    assert_eq!(outcome.bytes_sent, payloads[0].len());
+    let bytes = &payloads[0];
+    assert!(
+        bytes.windows(b"BITMAP ".len()).any(|w| w == b"BITMAP "),
+        "arabic line travels as BITMAP"
+    );
+    assert!(
+        !bytes
+            .windows(b"TEXT 8,16,".len())
+            .any(|w| w == b"TEXT 8,16,"),
+        "rasterized name line leaves no TEXT behind"
+    );
+    assert!(bytes.ends_with(b"\r\nPRINT 1,1\r\n"), "tail intact");
+}
+
+// TASK-PRT-02: without a rasterer the Arabic label fails LOUDLY with the
+// stable code — never a silently-eaten dead label.
+#[test]
+fn label_arabic_name_without_rasterer_rejects_loudly() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let error = PrintTsplLabelUseCase::new(&settings, &FakeIdentity, &transport)
+        .execute(
+            &session_with(Role::Admin),
+            "JILI ISPANA ابيض",
+            35_000,
+            "AR02",
+            1,
+        )
+        .expect_err("arabic without rasterer rejects");
+    assert!(
+        matches!(
+            error,
+            ApplicationError::Port(ref code) if code == "TSPL_LABEL_RASTER_UNAVAILABLE"
+        ),
+        "stable loud code, got: {error:?}"
+    );
+    assert!(transport.payloads().is_empty(), "nothing spooled");
+}
+
+// TASK-PRT-02: the pure-ASCII path never touches the rasterer and stays
+// byte-identical to the domain renderer.
+#[test]
+fn label_ascii_path_never_touches_rasterer() {
+    use baraka_domain::printing::{render_label_40x20, TsplLabel};
+    struct PanicRaster;
+    impl baraka_application::ports::TsplLabelRasterPort for PanicRaster {
+        fn rasterize_label_text(
+            &self,
+            _text: &str,
+            _px: f32,
+            _max_width_dots: u32,
+            _max_height_dots: u32,
+        ) -> Result<baraka_application::ports::RasterLabelLine, ApplicationError> {
+            panic!("ascii path must not rasterize")
+        }
+    }
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    PrintTsplLabelUseCase::new(&settings, &FakeIdentity, &transport)
+        .with_label_raster(&PanicRaster)
+        .execute(
+            &session_with(Role::Admin),
+            "JILI ISPANA",
+            35_000,
+            "VIS-001",
+            1,
+        )
+        .expect("ascii label spools");
+    let payloads = transport.payloads();
+    assert_eq!(payloads.len(), 1);
+    let expected = render_label_40x20(&TsplLabel {
+        brand_text: "BARAKA QUINCAILLERIE",
+        name: "JILI ISPANA",
+        price_text: "350.00",
+        currency_text: "DZD",
+        barcode: "VIS-001",
+        copies: 1,
+        media: TsplMediaSetup::default(),
+    })
+    .expect("domain renders");
+    assert_eq!(payloads[0], expected, "ascii bytes pinned");
 }

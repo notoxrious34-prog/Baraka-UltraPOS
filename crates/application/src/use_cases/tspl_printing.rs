@@ -18,17 +18,18 @@
 
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
-    format_centimes_plain, format_qty_plain, render_bitmap_job, render_label_40x20,
-    render_ticket_80mm, TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine,
-    TsplTicketTotals, TRANSPORT_SPOOLER,
+    format_centimes_plain, format_qty_plain, label_text_needs_bitmap, label_text_plan,
+    render_bitmap_job, render_label_40x20, render_label_40x20_mixed, render_ticket_80mm,
+    LabelBitmap, LabelTextSlot, TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket,
+    TsplTicketLine, TsplTicketTotals, TRANSPORT_SPOOLER,
 };
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{DocumentId, DocumentLanguage};
 
 use crate::errors::ApplicationError;
 use crate::ports::{
-    DocumentRepository, PrinterSettingsPort, PrinterTransportPort, SessionContext,
-    StoreIdentityPort,
+    DocumentRepository, NullLabelRaster, PrinterSettingsPort, PrinterTransportPort, SessionContext,
+    StoreIdentityPort, TsplLabelRasterPort,
 };
 use crate::use_cases::sales::GetSaleUseCase;
 
@@ -73,29 +74,57 @@ where
 }
 
 /// Silent 40x20 mm shelf-label print (brand + name + price + Code128).
-pub struct PrintTsplLabelUseCase<'a, S, I, T>
+pub struct PrintTsplLabelUseCase<'a, S, I, T, R = NullLabelRaster>
 where
     S: ?Sized,
     I: ?Sized,
     T: ?Sized,
+    R: ?Sized,
 {
     settings: &'a S,
     identity: &'a I,
     transport: &'a T,
+    label_raster: &'a R,
 }
 
-impl<'a, S, I, T> PrintTsplLabelUseCase<'a, S, I, T>
+/// Shared no-rasterer behind every default-constructed label use case.
+static NULL_LABEL_RASTER: NullLabelRaster = NullLabelRaster;
+
+impl<'a, S, I, T> PrintTsplLabelUseCase<'a, S, I, T, NullLabelRaster>
 where
     S: PrinterSettingsPort + ?Sized,
     I: StoreIdentityPort + ?Sized,
     T: PrinterTransportPort + ?Sized,
 {
-    /// Wire the use case to its ports.
+    /// Wire the use case to its ports (no Arabic rasterer attached).
     pub fn new(settings: &'a S, identity: &'a I, transport: &'a T) -> Self {
         Self {
             settings,
             identity,
             transport,
+            label_raster: &NULL_LABEL_RASTER,
+        }
+    }
+}
+
+impl<'a, S, I, T, R> PrintTsplLabelUseCase<'a, S, I, T, R>
+where
+    S: PrinterSettingsPort + ?Sized,
+    I: StoreIdentityPort + ?Sized,
+    T: PrinterTransportPort + ?Sized,
+    R: TsplLabelRasterPort + ?Sized,
+{
+    /// Attach the Arabic-capable line rasterer (PRT-02); without it any
+    /// non-Latin TEXT slot fails LOUDLY instead of a dead label.
+    pub fn with_label_raster<Q>(self, raster: &'a Q) -> PrintTsplLabelUseCase<'a, S, I, T, Q>
+    where
+        Q: TsplLabelRasterPort + ?Sized,
+    {
+        PrintTsplLabelUseCase {
+            settings: self.settings,
+            identity: self.identity,
+            transport: self.transport,
+            label_raster: raster,
         }
     }
 
@@ -118,15 +147,50 @@ where
             ));
         }
         let identity = self.identity.load_identity()?;
-        let bytes = render_label_40x20(&TsplLabel {
+        let media = media_from_settings(self.settings)?;
+        let label = TsplLabel {
             brand_text: &identity.store_name,
             name,
             price_text: &format_centimes_plain(price_centimes),
             currency_text: "DZD",
             barcode,
             copies,
-            media: media_from_settings(self.settings)?,
-        })?;
+            media,
+        };
+        let bytes = if label_text_plan(&label)
+            .iter()
+            .any(|line| label_text_needs_bitmap(&line.text, label.media.probe_mode))
+        {
+            // PRT-02: at least one slot needs pixels — rasterize each
+            // non-Latin line at its TEXT cell size and emit the mixed job.
+            let mut bitmaps: Vec<(LabelTextSlot, LabelBitmap)> = Vec::new();
+            for line in label_text_plan(&label) {
+                if !label_text_needs_bitmap(&line.text, label.media.probe_mode) {
+                    continue;
+                }
+                let raster = self.label_raster.rasterize_label_text(
+                    &line.text,
+                    line.cell_h_dots as f32,
+                    u32::try_from(line.box_w_dots).map_err(|_| {
+                        ApplicationError::Port("TSPL_LABEL_BOX_TOO_WIDE".to_string())
+                    })?,
+                    u32::try_from(line.box_h_dots).map_err(|_| {
+                        ApplicationError::Port("TSPL_LABEL_BOX_TOO_TALL".to_string())
+                    })?,
+                )?;
+                bitmaps.push((
+                    line.slot,
+                    LabelBitmap {
+                        width_bytes: raster.width_bytes,
+                        height_rows: raster.height_rows,
+                        data: raster.data,
+                    },
+                ));
+            }
+            render_label_40x20_mixed(&label, &bitmaps)?
+        } else {
+            render_label_40x20(&label)?
+        };
         self.transport.send_raster(&bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),

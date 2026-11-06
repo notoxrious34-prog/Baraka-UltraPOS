@@ -87,6 +87,7 @@ pub fn print_tspl_label(
         state.store_identity.as_ref(),
         state.printer_transport.as_ref(),
     )
+    .with_label_raster(state.label_raster.as_ref())
     .execute(
         &session,
         request.name.trim(),

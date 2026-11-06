@@ -264,8 +264,9 @@ const BARCODE_NARROW_DOTS: usize = 2;
 const QUIET_ZONE_DOTS: i64 = 10 * BARCODE_NARROW_DOTS as i64;
 /// Ticket barcode height in dots (8.0 mm — see module math).
 const TICKET_BARCODE_HEIGHT: i64 = 64;
-/// Label barcode height in dots (5.0 mm — see module math).
-const LABEL_BARCODE_HEIGHT: i64 = 40;
+/// Label Code128 bar height: 38 dots leaves a 2-dot gap to the human
+/// line at y=146 (bars 106..144, text 146..158, 2-dot bottom margin).
+const LABEL_BARCODE_HEIGHT: i64 = 38;
 /// Maximum ticket barcode payload: 11·n + 35 modules must fit the media
 /// minus both quiet zones (640 − 2×20 = 600 dots → 300 modules → n ≤ 24).
 const TICKET_BARCODE_MAX_CHARS: usize =
@@ -518,8 +519,208 @@ const PITCH_F3_X2: i64 = 56;
 /// Ticket side margin.
 const TICKET_MARGIN_X: i64 = 16;
 
+/// Which TEXT line of the 40x20 label a bitmap replaces (PRT-02).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LabelTextSlot {
+    Brand,
+    NameLine1,
+    NameLine2,
+    Price,
+    Currency,
+    Human,
+}
+
+/// One printable TEXT line of the 40x20 label (PRT-02 plan; geometry is
+/// single-sourced here — the renderer and the bitmap path share it).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LabelTextLine {
+    /// Slot the line occupies (bitmap lookup key).
+    pub slot: LabelTextSlot,
+    /// Exact text the renderer would emit (truncated, sanitized).
+    pub text: String,
+    /// TEXT origin (a bitmap replacing the line bottom-aligns here).
+    pub x_dots: i64,
+    pub y_dots: i64,
+    /// Printer cell height × scale (bitmap bottom-align reference).
+    pub cell_h_dots: i64,
+    /// Bitmap box the raster port must fit (cell + diacritic pad).
+    pub box_w_dots: i64,
+    pub box_h_dots: i64,
+}
+
+/// TSC bitmap cell heights (dots): font "1" is 8x12, "2" is 12x20,
+/// "3" is 16x24 — confirmed by the label geometry itself (price at 2x24
+/// ends at y=106 where the barcode starts; human at 148+12 ends at the
+/// 160-dot bottom edge).
+const FONT_1_H: i64 = 12;
+const FONT_2_H: i64 = 20;
+const FONT_3_H: i64 = 24;
+/// Diacritic headroom for shaped Arabic (marks above/below the cell).
+const LABEL_BITMAP_PAD_DOTS: i64 = 4;
+
+/// Pre-rasterized 1-bit line replacing one TEXT slot (PRT-02): row-major,
+/// MSB-first, each row padded to whole bytes — the `BITMAP` job packing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LabelBitmap {
+    /// Row width in bytes (dots = `width_bytes` × 8).
+    pub width_bytes: usize,
+    /// Row count in dots.
+    pub height_rows: usize,
+    /// Packed rows, `width_bytes` × `height_rows` bytes.
+    pub data: Vec<u8>,
+}
+
+/// Layout the label TEXT lines (pure; truncation identical to the
+/// renderer — `render_label_40x20` and the mixed path share this plan).
+#[must_use]
+pub fn label_text_plan(label: &TsplLabel<'_>) -> Vec<LabelTextLine> {
+    // 8-dot right margin: the die-cut edge clips anything past x=304
+    // (photo-verified LIVE-2026-11-06: "DZD" sliced at x=312).
+    let right_edge = LABEL_WIDTH_DOTS - 16;
+    let brand_chars = ((LABEL_WIDTH_DOTS - 16) / FONT_1_W) as usize;
+    let name_chars = ((LABEL_WIDTH_DOTS - 16) / FONT_2_W) as usize;
+    let price_chars = ((LABEL_WIDTH_DOTS - 16) / (FONT_3_W * 2)) as usize;
+    let mut plan = Vec::new();
+    // Brand micro-line (collapses when blank).
+    let brand = truncate_to_width(label.brand_text.trim(), brand_chars);
+    if !brand.is_empty() {
+        let x = centered_x(
+            LABEL_WIDTH_DOTS,
+            text_dots(brand.chars().count(), FONT_1_W, 1),
+        );
+        plan.push(LabelTextLine {
+            slot: LabelTextSlot::Brand,
+            text: brand,
+            x_dots: x,
+            y_dots: 2,
+            cell_h_dots: FONT_1_H,
+            box_w_dots: i64::from(brand_chars as u32) * FONT_1_W,
+            box_h_dots: FONT_1_H + LABEL_BITMAP_PAD_DOTS,
+        });
+    }
+    // Designation: two lines max, second line marked "..." when cut.
+    let clean_name = sanitize_tspl_text(label.name.trim());
+    let first: String = clean_name.chars().take(name_chars).collect();
+    let rest: String = clean_name.chars().skip(name_chars).collect();
+    plan.push(LabelTextLine {
+        slot: LabelTextSlot::NameLine1,
+        text: first,
+        x_dots: 8,
+        y_dots: 16,
+        cell_h_dots: FONT_2_H,
+        box_w_dots: i64::from(name_chars as u32) * FONT_2_W,
+        box_h_dots: FONT_2_H + LABEL_BITMAP_PAD_DOTS,
+    });
+    if !rest.trim().is_empty() {
+        plan.push(LabelTextLine {
+            slot: LabelTextSlot::NameLine2,
+            text: truncate_to_width(&rest, name_chars),
+            x_dots: 8,
+            y_dots: 38,
+            cell_h_dots: FONT_2_H,
+            box_w_dots: i64::from(name_chars as u32) * FONT_2_W,
+            box_h_dots: FONT_2_H + LABEL_BITMAP_PAD_DOTS,
+        });
+    }
+    // Price double-height, currency right-aligned inside the price band.
+    let price = truncate_to_width(label.price_text.trim(), price_chars);
+    plan.push(LabelTextLine {
+        slot: LabelTextSlot::Price,
+        text: price,
+        x_dots: 8,
+        y_dots: 58,
+        cell_h_dots: FONT_3_H * 2,
+        box_w_dots: i64::from(price_chars as u32) * FONT_3_W * 2,
+        box_h_dots: FONT_3_H * 2 + LABEL_BITMAP_PAD_DOTS,
+    });
+    let currency = truncate_to_width(label.currency_text.trim(), brand_chars);
+    if !currency.is_empty() {
+        let x = right_x(right_edge, text_dots(currency.chars().count(), FONT_1_W, 1));
+        plan.push(LabelTextLine {
+            slot: LabelTextSlot::Currency,
+            text: currency,
+            x_dots: x,
+            y_dots: 94,
+            cell_h_dots: FONT_1_H,
+            box_w_dots: i64::from(brand_chars as u32) * FONT_1_W,
+            box_h_dots: FONT_1_H + LABEL_BITMAP_PAD_DOTS,
+        });
+    }
+    plan.push(LabelTextLine {
+        slot: LabelTextSlot::Human,
+        text: truncate_to_width(&sanitize_tspl_text(label.barcode), brand_chars),
+        x_dots: centered_x(
+            LABEL_WIDTH_DOTS,
+            text_dots(
+                truncate_to_width(&sanitize_tspl_text(label.barcode), brand_chars)
+                    .chars()
+                    .count(),
+                FONT_1_W,
+                1,
+            ),
+        ),
+        // 2-dot bottom margin: y=148 sat exactly on the die-cut edge and
+        // the last row printed half-clipped (photo-verified LIVE-2026-11-06).
+        y_dots: 146,
+        cell_h_dots: FONT_1_H,
+        box_w_dots: i64::from(brand_chars as u32) * FONT_1_W,
+        box_h_dots: FONT_1_H + LABEL_BITMAP_PAD_DOTS,
+    });
+    plan
+}
+
+/// Whether a label TEXT payload must travel as a bitmap (PRT-02): true
+/// when the printable-TEXT check would reject it. The raw-byte and
+/// lossy-fold probes never need bitmaps (they never reject TEXT).
+#[must_use]
+pub fn label_text_needs_bitmap(content: &str, probe: TsplProbeMode) -> bool {
+    match probe {
+        TsplProbeMode::NoCodepage | TsplProbeMode::AsciiOnly => false,
+        TsplProbeMode::Normal | TsplProbeMode::Font1Only => !content.chars().all(|c| {
+            c.is_ascii() || matches!(c, '\u{0080}'..='\u{024F}' | '\u{1E00}'..='\u{1EFF}')
+        }),
+    }
+}
+
+/// Reject a label TEXT payload the printer would silently eat (PRT-02):
+/// any scalar outside ASCII + Latin blocks, except in the raw-byte
+/// diagnostic probe. French accents ride `CODEPAGE UTF-8` (built-in
+/// glyphs); Arabic/CJK/emoji have no printer glyphs and must travel as
+/// a bitmap — failing LOUDLY here instead of a dead label.
+fn check_label_text_printable(content: &str, probe: TsplProbeMode) -> Result<(), DomainError> {
+    if probe == TsplProbeMode::NoCodepage {
+        return Ok(());
+    }
+    let emitted = if probe == TsplProbeMode::AsciiOnly {
+        ascii_probe_lossy(content)
+    } else {
+        content.to_string()
+    };
+    let printable = emitted
+        .chars()
+        .all(|c| c.is_ascii() || matches!(c, '\u{0080}'..='\u{024F}' | '\u{1E00}'..='\u{1EFF}'));
+    if printable {
+        Ok(())
+    } else {
+        Err(DomainError::InvalidCanonicalString(
+            "LABEL_TEXT_UNPRINTABLE".to_string(),
+        ))
+    }
+}
+
 /// Render the 40x20 mm label. Exact bytes are pinned in module tests.
 pub fn render_label_40x20(label: &TsplLabel<'_>) -> Result<Vec<u8>, DomainError> {
+    render_label_40x20_mixed(label, &[])
+}
+
+/// Render the 40x20 mm label with bitmap slots (PRT-02): every planned
+/// TEXT line whose slot has a bitmap is replaced by a `BITMAP` chunk at
+/// the line origin (bottom-aligned); all other lines emit TEXT unchanged,
+/// so an all-ASCII job is byte-identical to `render_label_40x20`.
+pub fn render_label_40x20_mixed(
+    label: &TsplLabel<'_>,
+    bitmaps: &[(LabelTextSlot, LabelBitmap)],
+) -> Result<Vec<u8>, DomainError> {
     if label.copies < TSPL_MIN_COPIES || label.copies > TSPL_MAX_COPIES {
         return Err(DomainError::TsplCopiesOutOfRange);
     }
@@ -538,54 +739,99 @@ pub fn render_label_40x20(label: &TsplLabel<'_>) -> Result<Vec<u8>, DomainError>
         // 11·n + 35 modules must fit 140 (quiet zones 20 dots per side).
         return Err(DomainError::TsplBarcodeTooWide);
     }
+    let code = |name: &str| DomainError::InvalidCanonicalString(name.to_string());
+    let mut seen = [false; 6];
+    for (slot, _) in bitmaps {
+        let index = *slot as usize;
+        if seen[index] {
+            return Err(code("LABEL_DUPLICATE_BITMAP_SLOT"));
+        }
+        seen[index] = true;
+    }
     let barcode = sanitize_tspl_text(label.barcode);
-    let right_edge = LABEL_WIDTH_DOTS - 8;
-
-    let brand_chars = ((LABEL_WIDTH_DOTS - 16) / FONT_1_W) as usize;
-    let name_chars = ((LABEL_WIDTH_DOTS - 16) / FONT_2_W) as usize;
-    let price_chars = ((LABEL_WIDTH_DOTS - 16) / (FONT_3_W * 2)) as usize;
-
-    let mut out = Vec::new();
-    // TEMPORARY-DIAGNOSTIC (BRK-100): probe mode rides every TEXT line.
     let probe = label.media.probe_mode;
-    push_media_preamble(&mut out, "SIZE 40 mm, 20 mm", &label.media)?;
-    // Brand micro-line (collapses when blank).
-    let brand = truncate_to_width(label.brand_text.trim(), brand_chars);
-    if !brand.is_empty() {
-        let x = centered_x(
-            LABEL_WIDTH_DOTS,
-            text_dots(brand.chars().count(), FONT_1_W, 1),
-        );
-        push_text(&mut out, x, 2, "1", 1, &brand, probe);
+    let mut head: Vec<String> = Vec::new();
+    push_media_preamble(&mut head, "SIZE 40 mm, 20 mm", &label.media)?;
+    let mut job: Vec<u8> = head.join("\r\n").into_bytes();
+    job.extend_from_slice(b"\r\n");
+    for line in &label_text_plan(label) {
+        if let Some((_, raster)) = bitmaps.iter().find(|(slot, _)| slot == &line.slot) {
+            if raster.data.len() != raster.width_bytes * raster.height_rows {
+                return Err(code("LABEL_BITMAP_LENGTH_MISMATCH"));
+            }
+            if raster.width_bytes == 0 || raster.height_rows == 0 {
+                return Err(code("BITMAP_DIMENSIONS_MUST_BE_POSITIVE"));
+            }
+            if raster
+                .width_bytes
+                .checked_mul(8)
+                .filter(|dots| *dots <= BITMAP_MAX_WIDTH_DOTS)
+                .is_none()
+            {
+                return Err(code("BITMAP_WIDTH_TOO_WIDE"));
+            }
+            if raster.height_rows > BITMAP_MAX_HEIGHT_DOTS {
+                return Err(code("BITMAP_TOO_TALL"));
+            }
+            if raster.data.iter().all(|byte| *byte == 0x00)
+                || raster.data.iter().all(|byte| *byte == 0xFF)
+            {
+                return Err(code("BITMAP_BLANK_IMAGE"));
+            }
+            let width_dots =
+                i64::try_from(raster.width_bytes * 8).map_err(|_| code("BITMAP_TOO_LARGE"))?;
+            let height_dots =
+                i64::try_from(raster.height_rows).map_err(|_| code("BITMAP_TOO_LARGE"))?;
+            if width_dots > line.box_w_dots || height_dots > line.box_h_dots {
+                return Err(code("LABEL_BITMAP_EXCEEDS_SLOT"));
+            }
+            // Bottom-align to the TEXT cell (taller rasters grow upward).
+            let bitmap_y = line.y_dots + line.cell_h_dots - height_dots;
+            if line.x_dots < 0
+                || bitmap_y < 0
+                || line.x_dots + width_dots > LABEL_WIDTH_DOTS
+                || bitmap_y + height_dots > LABEL_HEIGHT_DOTS
+            {
+                return Err(code("LABEL_BITMAP_OUT_OF_AREA"));
+            }
+            job.extend_from_slice(
+                format!(
+                    "BITMAP {},{},{},{},0,",
+                    line.x_dots, bitmap_y, raster.width_bytes, raster.height_rows
+                )
+                .as_bytes(),
+            );
+            job.extend_from_slice(&raster.data);
+            job.extend_from_slice(b"\r\n");
+        } else {
+            check_label_text_printable(&line.text, probe)?;
+            let mut text_out: Vec<String> = Vec::new();
+            let (font, scale) = match line.slot {
+                LabelTextSlot::Brand | LabelTextSlot::Currency | LabelTextSlot::Human => ("1", 1),
+                LabelTextSlot::NameLine1 | LabelTextSlot::NameLine2 => ("2", 1),
+                LabelTextSlot::Price => ("3", 2),
+            };
+            push_text(
+                &mut text_out,
+                line.x_dots,
+                line.y_dots,
+                font,
+                scale,
+                &line.text,
+                probe,
+            );
+            job.extend_from_slice(text_out.join("\r\n").as_bytes());
+            job.extend_from_slice(b"\r\n");
+        }
+        if line.slot == LabelTextSlot::Currency {
+            job.extend_from_slice(
+                format!("BARCODE 8,106,\"128\",{LABEL_BARCODE_HEIGHT},0,0,2,2,\"{barcode}\"\r\n")
+                    .as_bytes(),
+            );
+        }
     }
-    // Designation: two lines max, second line marked "..." when cut.
-    let clean_name = sanitize_tspl_text(label.name.trim());
-    let first: String = clean_name.chars().take(name_chars).collect();
-    let rest: String = clean_name.chars().skip(name_chars).collect();
-    push_text(&mut out, 8, 16, "2", 1, &first, probe);
-    if !rest.trim().is_empty() {
-        let second = truncate_to_width(&rest, name_chars);
-        push_text(&mut out, 8, 38, "2", 1, &second, probe);
-    }
-    // Price double-height, currency right-aligned inside the price band.
-    let price = truncate_to_width(label.price_text.trim(), price_chars);
-    push_text(&mut out, 8, 58, "3", 2, &price, probe);
-    let currency = truncate_to_width(label.currency_text.trim(), brand_chars);
-    if !currency.is_empty() {
-        let x = right_x(right_edge, text_dots(currency.chars().count(), FONT_1_W, 1));
-        push_text(&mut out, x, 94, "1", 1, &currency, probe);
-    }
-    out.push(format!(
-        "BARCODE 8,106,\"128\",{LABEL_BARCODE_HEIGHT},1,0,2,2,\"{barcode}\""
-    ));
-    let human = truncate_to_width(&barcode, brand_chars);
-    let human_x = centered_x(
-        LABEL_WIDTH_DOTS,
-        text_dots(human.chars().count(), FONT_1_W, 1),
-    );
-    push_text(&mut out, human_x, 148, "1", 1, &human, probe);
-    out.push(format!("PRINT 1,{}", label.copies));
-    Ok(format!("{}\r\n", out.join("\r\n")).into_bytes())
+    job.extend_from_slice(format!("PRINT 1,{}\r\n", label.copies).as_bytes());
+    Ok(job)
 }
 
 /// Render the 80 mm gapless ticket. Height is computed from content:
@@ -1036,9 +1282,9 @@ mod tests {
              TEXT 100,2,\"1\",0,1,1,\"BARAKA ULTRAPOS\"\r\n\
              TEXT 8,16,\"2\",0,1,1,\"Vis 8x40\"\r\n\
              TEXT 8,58,\"3\",0,2,2,\"10.00\"\r\n\
-             TEXT 288,94,\"1\",0,1,1,\"DZD\"\r\n\
-             BARCODE 8,106,\"128\",40,1,0,2,2,\"VIS-001\"\r\n\
-             TEXT 132,148,\"1\",0,1,1,\"VIS-001\"\r\n\
+             TEXT 280,94,\"1\",0,1,1,\"DZD\"\r\n\
+             BARCODE 8,106,\"128\",38,0,0,2,2,\"VIS-001\"\r\n\
+             TEXT 132,146,\"1\",0,1,1,\"VIS-001\"\r\n\
              PRINT 1,3\r\n"
         );
     }
@@ -1705,5 +1951,78 @@ mod tests {
             head.starts_with("SIZE 80 mm, 84 mm\r\n"),
             "ticket size, got: {head}"
         );
+    }
+
+    // TASK-PRT-02 RED: Arabic in a TEXT line must fail LOUDLY (the printer
+    // silently eats the whole job — never ship that silence upstream).
+    #[test]
+    fn label_arabic_text_rejects_loudly() {
+        let bad = |name: &str| DomainError::InvalidCanonicalString(name.to_string());
+        let label = TsplLabel {
+            name: "JILI ISPANA ابيض",
+            ..owner_label(1)
+        };
+        assert_eq!(
+            render_label_40x20(&label).expect_err("arabic name rejects"),
+            bad("LABEL_TEXT_UNPRINTABLE")
+        );
+        let brand = TsplLabel {
+            brand_text: "بركة",
+            ..owner_label(1)
+        };
+        assert_eq!(
+            render_label_40x20(&brand).expect_err("arabic brand rejects"),
+            bad("LABEL_TEXT_UNPRINTABLE")
+        );
+        // French accents ride CODEPAGE UTF-8 — still printable TEXT.
+        let french = TsplLabel {
+            name: "Clé à molette",
+            ..owner_label(1)
+        };
+        render_label_40x20(&french).expect("french accents print");
+    }
+
+    // TASK-PRT-02 RED: a bitmap slot replaces exactly one TEXT line; the
+    // job stays fully CRLF-terminated and byte-pinned elsewhere.
+    #[test]
+    fn label_mixed_bitmap_replaces_name_line() {
+        use super::{label_text_plan, render_label_40x20_mixed, LabelBitmap, LabelTextSlot};
+        let label = TsplLabel {
+            name: "JILI ISPANA ابيض",
+            ..owner_label(1)
+        };
+        let plan = label_text_plan(&label);
+        let l1 = plan
+            .iter()
+            .find(|line| line.slot == LabelTextSlot::NameLine1)
+            .expect("name line 1 planned");
+        assert_eq!(l1.x_dots, 8);
+        assert_eq!(l1.y_dots, 16);
+        let bytes = render_label_40x20_mixed(
+            &label,
+            &[(
+                LabelTextSlot::NameLine1,
+                LabelBitmap {
+                    width_bytes: 2,
+                    height_rows: 1,
+                    data: vec![0xAA, 0x55],
+                },
+            )],
+        )
+        .expect("mixed renders");
+        // BITMAP line present at the text origin (byte search — the chunk
+        // carries raw pixels, never UTF-8); the replaced TEXT line gone.
+        let bitmap_head = b"BITMAP 8,35,2,1,0,";
+        assert!(
+            bytes.windows(bitmap_head.len()).any(|w| w == bitmap_head),
+            "bitmap at bottom-aligned origin"
+        );
+        assert!(
+            !bytes
+                .windows(b"TEXT 8,16,".len())
+                .any(|w| w == b"TEXT 8,16,"),
+            "replaced TEXT line gone"
+        );
+        assert!(bytes.ends_with(b"\r\nPRINT 1,1\r\n"), "tail intact");
     }
 }

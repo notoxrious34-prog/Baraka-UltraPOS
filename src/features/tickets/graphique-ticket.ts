@@ -281,19 +281,36 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
   );
 }
 
-/** Dispatch the ticket through an isolated hidden iframe (DSN-083 pipeline). */
+/** Dispatch the ticket through an isolated hidden iframe (DSN-083 pipeline).
+ *
+ * TASK-PRT-04: the dispatch frame must never disturb the app layout —
+ * AGENTS.md bans `position: fixed` outside overlays, so the frame rides
+ * off-screen (`ticketPrintFrameStyle`) instead of a fixed zero box. The
+ * inner window alone is printed, so parking the element off-screen cannot
+ * affect the ticket. Spooler transports must never reach this dispatcher
+ * (CheckoutModal gates on `resolveTicketPrintPath` first).
+ */
+export function ticketPrintFrameStyle(): Record<string, string> {
+  return {
+    position: "absolute",
+    left: "-9999px",
+    top: "0",
+    width: "0",
+    height: "0",
+    border: "0",
+  };
+}
+
 export function printTicketDocument(docHtml: string): void {
   if (typeof document === "undefined") {
     return;
   }
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
-  frame.style.position = "fixed";
-  frame.style.right = "0";
-  frame.style.bottom = "0";
-  frame.style.width = "0";
-  frame.style.height = "0";
-  frame.style.border = "0";
+  const style = ticketPrintFrameStyle();
+  for (const [key, value] of Object.entries(style)) {
+    frame.style.setProperty(key, value);
+  }
   document.body.appendChild(frame);
   const cleanup = (): void => {
     if (frame.parentNode !== null) {

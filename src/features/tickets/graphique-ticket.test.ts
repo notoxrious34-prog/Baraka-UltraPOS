@@ -10,6 +10,7 @@ import {
   buildTicketPrintHtml,
   printTicketDocument,
   ticketArgsFromWire,
+  ticketPrintFrameStyle,
   TICKET_PAGE_WIDTH_MM,
   type TicketPrintArgs,
   type TicketWireDetails,
@@ -134,6 +135,24 @@ describe("print dispatch (label pipeline reuse)", () => {
 
   it("uses the 80mm page width constant", () => {
     expect(TICKET_PAGE_WIDTH_MM).toBe(80);
+  });
+
+  // TASK-PRT-04: the dispatch iframe must never disturb the app layout —
+  // AGENTS.md bans `position: fixed` outside overlays, so the frame rides
+  // off-screen (absolute) with zero area instead of a fixed zero box.
+  it("parks the dispatch iframe off-screen with zero area", () => {
+    expect(ticketPrintFrameStyle()).toEqual({
+      position: "absolute",
+      left: "-9999px",
+      top: "0",
+      width: "0",
+      height: "0",
+      border: "0",
+    });
+  });
+
+  it("is a no-op without a DOM (SSR/test safety)", () => {
+    expect(() => printTicketDocument("<html></html>")).not.toThrow();
   });
 });
 

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>DOC-001 — نماذج الوثائق (تقريبية)</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0d1117; color: #e6edf3; font-family: "Segoe UI", Tahoma, Arial, sans-serif; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #8b949e; font-size: 13px; margin-bottom: 20px; }
+  .warn { background: #3a2a00; border: 1px solid #9e6a03; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 4px; }
+  .card .tag { display: inline-block; font-size: 11px; border-radius: 20px; padding: 2px 10px; margin-bottom: 10px; }
+  .now { background: #1f3a5f; color: #9ecbff; }
+  .new { background: #1f4d2e; color: #9ee6a8; }
+  .paper { background: #fff; color: #000; border-radius: 6px; margin: 0 auto; }
+  /* ---- label 40x20 (ratio 2:1) ---- */
+  .label { width: 320px; height: 160px; padding: 2px 8px; text-align: center; font-family: monospace; position: relative; }
+  .label .brand { font-size: 11px; letter-spacing: 1px; }
+  .label .name { font-size: 19px; font-weight: bold; margin-top: 2px; }
+  .label .name .ar { display: inline-block; border: 1px dashed #666; font-size: 12px; padding: 0 4px; }
+  .label .price { font-size: 44px; font-weight: 900; line-height: 1; margin-top: 2px; }
+  .label .price.pix { font-family: "Courier New", monospace; letter-spacing: -2px; filter: contrast(0.85); }
+  .label .cur { position: absolute; top: 92px; font-size: 11px; font-weight: bold; }
+  .label .bars { margin: 4px auto 0; height: 38px; background: repeating-linear-gradient(90deg, #000 0 2px, #fff 2px 4px, #000 4px 5px, #fff 5px 9px); }
+  .label .code { font-size: 12px; letter-spacing: 6px; font-weight: bold; }
+  .dup { color: #000; opacity: .55; }
+  .note { font-size: 12px; color: #8b949e; margin-top: 10px; line-height: 1.8; }
+  .note b { color: #e6edf3; }
+  /* ---- ticket 80mm ---- */
+  .ticket { width: 300px; padding: 8px 10px; font-family: monospace; font-size: 12px; }
+  .ticket .c { text-align: center; }
+  .ticket .shop { font-size: 17px; font-weight: 900; }
+  .ticket hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
+  .ticket table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .ticket td:last-child, .ticket th:last-child { text-align: right; }
+  .ticket .tot { font-size: 14px; font-weight: bold; }
+  .ticket .grand { font-size: 22px; font-weight: 900; }
+  .ticket .grand.pix { letter-spacing: -1px; filter: contrast(0.85); }
+  .ticket .bars { height: 48px; background: repeating-linear-gradient(90deg, #000 0 2px, #fff 2px 5px, #000 5px 6px, #fff 6px 10px); margin-top: 6px; }
+  .strike { outline: 2px solid #f85149; outline-offset: 2px; }
+  .fix { outline: 2px solid #3fb950; outline-offset: 2px; }
+  footer { margin-top: 24px; color: #8b949e; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>DOC-001 — نماذج الوثائق المطبوعة</h1>
+<div class="sub">دراسة إعادة هندسة شكل الوثائق — Baraka UltraPOS v1.2.0</div>
+<div class="warn">نماذج تقريبية للعين فقط — <b>الحقيقة هي بايتات TSPL</b> (DOC-03 سيجعل المعاينة مُشتقة منها).</div>
+
+<div class="grid">
+  <!-- LABEL NOW -->
+  <div class="card">
+    <h2>ملصق 40×20 — الحالي (v1.2.0)</h2><span class="tag now">CURRENT</span>
+    <div class="paper label">
+      <div class="brand">BARAKA ULTRAPOS</div>
+      <div class="name">JILI ISPANA <span class="ar">نقطي ابيض</span></div>
+      <div class="price">350.00</div>
+      <div class="cur" style="left:34px">DZD</div>
+      <div class="bars" style="width:160px"></div>
+      <div class="code">AR02</div>
+    </div>
+    <div class="note">سليم بعد PRT-02: سطر بشري وحيد، عملة بهامش 3مم، سعر حاد، عربي نقطي، <b>بلا</b> عيوب معروفة في الهندسة.</div>
+  </div>
+
+  <!-- LABEL V2 -->
+  <div class="card">
+    <h2>ملصق 40×20 — المقترح (DOC-05)</h2><span class="tag new">PROPOSED v2</span>
+    <div class="paper label">
+      <div class="brand">BARAKA ULTRAPOS · DEP-01</div>
+      <div class="name">JILI ISPANA <span class="ar" style="font-size:15px">نقطي ابيض</span></div>
+      <div class="price">350.00 <span style="font-size:14px">DZD</span></div>
+      <div class="bars" style="width:150px"></div>
+      <div class="code">AR02</div>
+    </div>
+    <div class="note">التغييرات: العملة ملتحقة بالسعر (تُحرر سطراً) · صندوق عربي أكبر سطر واحد · المستودع في سطر المتجر. نفس البايتات-القابلة-للقياس.</div>
+  </div>
+
+  <!-- TICKET NOW -->
+  <div class="card">
+    <h2>تذكرة 80مم TSPL — الحالية</h2><span class="tag now">CURRENT</span>
+    <div class="paper ticket">
+      <div class="c shop">BARAKA</div>
+      <div class="c">ALGER · 0000</div>
+      <hr>
+      <div>T-2026-000123 · Caissier: TEST</div>
+      <hr>
+      <table><tr><td>ARTICLE TEST</td><td>2 × 100,00 = 200,00</td></tr></table>
+      <div style="text-align:right" class="tot">TOTAL TTC: 297,50</div>
+      <div class="c">PAYE (CASH): 300,00 · RENDU: 2,50</div>
+      <div class="bars strike"></div>
+      <div class="c dup">TEST-2026-000001 (تلقائي مكرر — T2)</div>
+      <div class="c">TEST-2026-000001</div>
+      <div class="c">TICKET TEST · Merci</div>
+    </div>
+    <div class="note">الثغرات المُثبتة: <b>T1</b> العربية تُرفض صمتاً · <b>T2</b> سطر بشري مكرر (محدد بالأحمر) · <b>T3</b> المجموع مبكسل · <b>T4</b> HT مكرر — بانتظار قرارك.</div>
+  </div>
+
+  <!-- TICKET V2 -->
+  <div class="card">
+    <h2>تذكرة 80مم TSPL — المقترحة (DOC-02)</h2><span class="tag new">PROPOSED v2</span>
+    <div class="paper ticket">
+      <div class="c shop">BARAKA</div>
+      <div class="c">ALGER · 0000 · NIF: … (بعد المحاسب)</div>
+      <hr>
+      <div>T-2026-000123 · 2026-01-01 · TEST · DEP-01</div>
+      <hr>
+      <table><tr><td>ARTICLE TEST <span style="border:1px solid #000;font-size:10px">نقطي عربي</span></td><td>2 × 100,00 = 200,00</td></tr></table>
+      <div style="text-align:right">Sous-total: 250,00 · TVA: 47,50</div>
+      <div style="text-align:right" class="grand fix">TOTAL: 297,50</div>
+      <div class="c">PAYE (CASH): 300,00 · RENDU: 2,50</div>
+      <div class="bars"></div>
+      <div class="c">TEST-2026-000001 (وحيد)</div>
+      <div class="c">TICKET TEST · Merci</div>
+    </div>
+    <div class="note">الإصلاحات: عربي نقطي (DOC-01) · سطر بشري وحيد · مجموع أصلي حاد · صف ضريبي واحد + قرار T4 · سطر قانوني اختياري.</div>
+  </div>
+</div>
+
+<footer>DOC-001 · التفاصيل الكاملة في <code>audit/DOC-001/REPORT.md</code> · البوابات: معاينة من البايتات (DOC-03) قبل أي تغيير هندسي.</footer>
+</body>
+</html>

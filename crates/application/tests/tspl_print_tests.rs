@@ -173,6 +173,7 @@ fn ticket_document() -> (Document, Vec<DocumentItemView>, Vec<StoredPayment>) {
         paid_amount_centimes: 3_200,
         change_amount_centimes: 0,
         payment_method: "CASH".to_string(),
+        template_version: baraka_domain::printing::TSPL_TICKET_TEMPLATE_VERSION,
         notes: None,
         created_at: chrono::Utc::now(),
         created_by: UserId::new(),
@@ -802,6 +803,28 @@ fn ticket_arabic_designation_without_rasterer_rejects_loudly() {
         matches!(
             error,
             ApplicationError::Port(ref code) if code == "TSPL_LABEL_RASTER_UNAVAILABLE"
+        ),
+        "stable loud code, got: {error:?}"
+    );
+    assert!(transport.payloads().is_empty(), "nothing spooled");
+}
+
+// DOC-04: the stored template version pins the reprint — a tampered or
+// future version rejects LOUDLY instead of silently drifting geometry.
+#[test]
+fn ticket_unknown_template_version_rejects_loudly_without_spooling() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let mut documents = FakeDocuments::ticket();
+    documents.document.template_version = 99;
+    let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
+        .execute(&session_with(Role::Caissier), documents.document.id)
+        .expect_err("unknown template rejects");
+    assert!(
+        matches!(
+            error,
+            ApplicationError::Validation(DomainError::InvalidCanonicalString(ref code))
+                if code == "TSPL_TEMPLATE_VERSION_UNKNOWN"
         ),
         "stable loud code, got: {error:?}"
     );

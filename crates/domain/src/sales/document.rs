@@ -246,6 +246,10 @@ pub struct Document {
     pub change_amount_centimes: i64,
     /// Primary payment method code, or `MIXED` / `UNPAID`.
     pub payment_method: String,
+    /// Print-template version stamped at creation (DOC-04): a reprint pins
+    /// this version so old documents keep old geometry forever. Legacy rows
+    /// (pre-migration-0019) read back as 1.
+    pub template_version: u32,
     /// Operator note, if any.
     pub notes: Option<String>,
     /// Capture instant.

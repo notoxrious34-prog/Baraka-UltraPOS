@@ -1343,8 +1343,36 @@ pub fn render_label_40x20_mixed(
     Ok(job)
 }
 
-/// Render the 80 mm gapless ticket. Height is computed from content:
-/// `SIZE 80 mm,H mm` with H = ceil(total_dots / 8).
+/// Print-template version stamped on every new document (DOC-04) and
+/// pinned on reprint: v1 is the renderer as of the DOC-01/DOC-02
+/// redesign. Future geometry changes bump this and add a dispatch branch;
+/// v1 stays frozen so old documents reprint byte-identical forever.
+pub const TSPL_TICKET_TEMPLATE_VERSION: u32 = 1;
+
+/// Render the 80 mm ticket with a pinned template version (DOC-04).
+pub fn render_ticket_80mm_versioned(
+    ticket: &TsplTicket<'_>,
+    template_version: u32,
+) -> Result<Vec<u8>, DomainError> {
+    render_ticket_80mm_mixed_versioned(ticket, &[], template_version)
+}
+
+/// Render the 80 mm ticket with bitmaps and a pinned template version
+/// (DOC-04): v1 is byte-identical to [`render_ticket_80mm_mixed`]; any
+/// unknown version rejects LOUDLY so a reprint can never silently drift.
+pub fn render_ticket_80mm_mixed_versioned(
+    ticket: &TsplTicket<'_>,
+    bitmaps: &[(usize, LabelBitmap)],
+    template_version: u32,
+) -> Result<Vec<u8>, DomainError> {
+    match template_version {
+        TSPL_TICKET_TEMPLATE_VERSION => render_ticket_80mm_mixed(ticket, bitmaps),
+        _ => Err(DomainError::InvalidCanonicalString(
+            "TSPL_TEMPLATE_VERSION_UNKNOWN".to_string(),
+        )),
+    }
+}
+
 /// Render the 80 mm gapless ticket. Height is computed from content:
 /// `SIZE 80 mm,H mm` with H = ceil(total_dots / 8).
 pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainError> {
@@ -2160,6 +2188,21 @@ mod tests {
         let text =
             String::from_utf8(render_ticket_80mm(&owner_ticket()).expect("ok")).expect("ascii");
         assert!(text.ends_with("PRINT 1,1\r\n"));
+    }
+
+    // DOC-04: the template version pins geometry — v1 is today's renderer
+    // byte-for-byte, anything else rejects LOUDLY (future v2 adds a branch
+    // here; v1 stays frozen so old reprints never change).
+    #[test]
+    fn ticket_template_version_dispatch_pins_v1_and_rejects_unknown() {
+        let pinned = render_ticket_80mm_versioned(&owner_ticket(), TSPL_TICKET_TEMPLATE_VERSION)
+            .expect("v1 renders");
+        let current = render_ticket_80mm(&owner_ticket()).expect("renders");
+        assert_eq!(pinned, current, "v1 is the current geometry");
+        assert_eq!(
+            render_ticket_80mm_versioned(&owner_ticket(), 99).expect_err("unknown rejects"),
+            DomainError::InvalidCanonicalString("TSPL_TEMPLATE_VERSION_UNKNOWN".to_string())
+        );
     }
 
     // TASK-PRT-01 (LIVE-2026-11-06): the XP-410B silently discards any job

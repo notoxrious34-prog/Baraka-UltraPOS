@@ -62,6 +62,7 @@ fn source_document(party: Option<String>) -> Document {
         paid_amount_centimes: 15_500,
         change_amount_centimes: 0,
         payment_method: "CASH".to_string(),
+        template_version: baraka_domain::printing::TSPL_TICKET_TEMPLATE_VERSION,
         notes: None,
         created_at: chrono::Utc::now(),
         created_by: UserId::new(),

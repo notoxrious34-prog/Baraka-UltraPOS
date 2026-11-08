@@ -1,4 +1,4 @@
-//! TASK-REL-054 drill: migration replay & data preservation 0001 -> 0018.
+//! TASK-REL-054 drill: migration replay & data preservation 0001 -> 0019.
 //!
 //! A merchant upgrading Baraka UltraPOS must never lose a centime, a stock
 //! unit, or a ledger entry. This suite proves the zero-data-loss invariant
@@ -9,15 +9,17 @@
 //!   admin user, categories, products, indebted customer, append-only
 //!   ledger entry, stock level, one finalized BL with item + payment) and
 //!   capture baseline aggregates.
-//! * Stage 2 — run the official [`run_migrations`] upgrade path to 0018
+//! * Stage 2 — run the official [`run_migrations`] upgrade path to 0019
 //!   (0016 adds the FTS5 `products_fts` index with in-transaction backfill;
 //!   0017 adds NULL-able `backups_log.file_size_bytes` + `trigger`;
-//!   0018 adds NULL-able `document_items.discount_per_unit_centimes`).
-//! * Stage 3 — assert byte-level parity: all 18 bookkeeping rows present
+//!   0018 adds NULL-able `document_items.discount_per_unit_centimes`;
+//!   0019 adds NOT NULL `documents.template_version` DEFAULT 1 — every
+//!   pre-DOC-04 row reads back as template v1, the geometry it printed).
+//! * Stage 3 — assert byte-level parity: all 19 bookkeeping rows present
 //!   with valid checksums, debt balance exactly 450,000 centimes, stock
 //!   untouched, documents/ledger untouched, 0014 nullability + 0015 tier
 //!   columns in their canonical shapes, plus FTS existence, consistency,
-//!   and legacy-row backfill proof.
+//!   legacy-row backfill proof, and 0019 template-version backfill proof.
 //! * Stage 4 — downgrade-guard probe: inject a fake future migration row
 //!   (version 9999) and prove the runner handles it deterministically
 //!   without wiping or corrupting data.
@@ -65,7 +67,7 @@ fn open_scratch(name: &str) -> ScratchDb {
 
 /// Apply migrations 0001..=0013 exactly as the runner would (DDL body +
 /// `schema_migrations` bookkeeping row), producing a faithful legacy v13
-/// database. Migrations 0014..=0018 are deliberately withheld: they are the
+/// database. Migrations 0014..=0019 are deliberately withheld: they are the
 /// upgrade under test.
 fn apply_legacy_migrations(conn: &mut Connection) {
     for migration in MIGRATIONS.iter().filter(|m| m.version <= 13) {
@@ -305,7 +307,7 @@ fn capture_baseline(conn: &Connection) -> Baseline {
     }
 }
 
-/// Build a legacy v13 database, seed it, and upgrade it to 0018 via the
+/// Build a legacy v13 database, seed it, and upgrade it to 0019 via the
 /// official runner. Shared by the replay test and the downgrade probe so
 /// each test owns an isolated scratch file.
 fn build_upgraded_db(name: &str) -> (ScratchDb, Baseline) {
@@ -315,22 +317,22 @@ fn build_upgraded_db(name: &str) -> (ScratchDb, Baseline) {
     let baseline = capture_baseline(&db.conn);
     assert_eq!(baseline.documents, 1, "exactly one seeded document");
     assert_eq!(baseline.customers, 2, "exactly two seeded customers");
-    run_migrations(&mut db.conn).expect("official upgrade 0013 -> 0018");
+    run_migrations(&mut db.conn).expect("official upgrade 0013 -> 0019");
     (db, baseline)
 }
 
 fn assert_parity(conn: &Connection, baseline: &Baseline) {
-    // All 17 migrations recorded, checksums non-empty and byte-identical to
+    // All 19 migrations recorded, checksums non-empty and byte-identical to
     // the embedded SQL (a changed byte would abort the runner on real DBs).
     let (count, max_version): (i64, i64) = conn
         .query_row(
-            "SELECT COUNT(*), MAX(version) FROM schema_migrations WHERE version BETWEEN 1 AND 18",
+            "SELECT COUNT(*), MAX(version) FROM schema_migrations WHERE version BETWEEN 1 AND 19",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .expect("migration bookkeeping readable");
-    assert_eq!(count, 18, "all 18 migrations recorded");
-    assert_eq!(max_version, 18, "schema at version 18");
+    assert_eq!(count, 19, "all 19 migrations recorded");
+    assert_eq!(max_version, 19, "schema at version 19");
     for migration in MIGRATIONS.iter() {
         let recorded: String = conn
             .query_row(
@@ -392,6 +394,16 @@ fn assert_parity(conn: &Connection, baseline: &Baseline) {
         )
         .expect("BL readable");
     assert_eq!(bl_ttc, baseline.bl_ttc, "BL total preserved");
+    // DOC-04: the pre-migration BL (seeded without the column) upgrades
+    // to template v1 — the geometry it was printed with — never NULL.
+    let bl_template: i64 = conn
+        .query_row(
+            "SELECT template_version FROM documents WHERE id = 'd-bl-01'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("BL template version readable");
+    assert_eq!(bl_template, 1, "legacy document pins template v1");
 
     // Row-count parity: nothing gained, nothing lost.
     for (table, expected) in [
@@ -581,11 +593,11 @@ fn downgrade_guard_probe_future_version_is_deterministic() {
     assert_eq!(future_name, "9999_future_schema.sql");
 
     // Data is byte-intact after the probe: full parity still holds
-    // (assert_parity scopes the bookkeeping check to versions 1..=18,
+    // (assert_parity scopes the bookkeeping check to versions 1..=19,
     // so the synthetic future row coexists without tripping it).
     assert_parity(&db.conn, &baseline);
 
-    // Re-running is idempotent: still Ok, still 19 rows (18 known + future).
+    // Re-running is idempotent: still Ok, still 20 rows (19 known + future).
     run_migrations(&mut db.conn).expect("second run after probe");
     let total: i64 = db
         .conn
@@ -593,5 +605,5 @@ fn downgrade_guard_probe_future_version_is_deterministic() {
             row.get(0)
         })
         .expect("total rows");
-    assert_eq!(total, 19, "18 known + 1 future row, no duplication");
+    assert_eq!(total, 20, "19 known + 1 future row, no duplication");
 }

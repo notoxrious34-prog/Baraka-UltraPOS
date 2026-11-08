@@ -261,6 +261,7 @@ fn seed_document(
                 paid_amount_centimes: 10_000,
                 change_amount_centimes: 0,
                 payment_method: "CASH".to_string(),
+                template_version: baraka_domain::printing::TSPL_TICKET_TEMPLATE_VERSION,
                 notes: None,
                 created_at: chrono::Utc::now(),
                 created_by: UserId::from(Uuid::parse_str(ACTOR_UUID).expect("uuid")),
@@ -791,6 +792,13 @@ fn restore_older_schema_backup_is_migrated() {
                 [],
             )
             .expect("drop v18 per-unit column");
+        }
+        if app_version >= 19 {
+            // Genuine v18 backups predate migration 0019, so the NOT NULL
+            // `documents.template_version` column must go, or replaying
+            // the ADD COLUMN migration fails the same way.
+            conn.execute("ALTER TABLE documents DROP COLUMN template_version;", [])
+                .expect("drop v19 template column");
         }
     }
     repoint_logged_hash(

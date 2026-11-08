@@ -94,6 +94,7 @@ fn map_document(row: &rusqlite::Row) -> Result<Document, rusqlite::Error> {
     let created_at_text: String = row.get(16)?;
     let created_by_text: String = row.get(17)?;
     let notes: Option<String> = row.get(18)?;
+    let template_version: i64 = row.get(19)?;
     Ok(Document {
         id: parse_document_id(&id_text)?,
         number,
@@ -117,6 +118,8 @@ fn map_document(row: &rusqlite::Row) -> Result<Document, rusqlite::Error> {
         paid_amount_centimes: paid,
         change_amount_centimes: change,
         payment_method,
+        template_version: u32::try_from(template_version)
+            .map_err(|_| rusqlite::Error::InvalidColumnName("template version".to_string()))?,
         notes,
         created_at: parse_stamp(&created_at_text)?,
         created_by: parse_user_id(&created_by_text)?,
@@ -191,7 +194,7 @@ fn map_payment(row: &rusqlite::Row) -> Result<StoredPayment, rusqlite::Error> {
     })
 }
 
-const DOCUMENT_COLUMNS: &str = "id, number, fiscal_year, type, party_id, warehouse_id, language, subtotal_ht_centimes, vat_total_centimes, global_discount_centimes, timbre_centimes, ttc_centimes, paid_amount_centimes, change_amount_centimes, payment_method, status, created_at, created_by, notes";
+const DOCUMENT_COLUMNS: &str = "id, number, fiscal_year, type, party_id, warehouse_id, language, subtotal_ht_centimes, vat_total_centimes, global_discount_centimes, timbre_centimes, ttc_centimes, paid_amount_centimes, change_amount_centimes, payment_method, status, created_at, created_by, notes, COALESCE(template_version, 1)";
 const ITEM_COLUMNS: &str = "id, document_id, product_id, unit_id, quantity_micro, quantity_base_micro, unit_price_centimes, discount_centimes, discount_per_unit_centimes, tva_rate_micro, line_ht_centimes, line_tva_centimes, line_ttc_centimes, cost_price_centimes, sort_order";
 
 fn insert_document_tx(
@@ -207,9 +210,9 @@ fn insert_document_tx(
           global_discount_centimes, timbre_centimes, rounding_centimes,
           ttc_centimes, paid_amount_centimes, change_amount_centimes,
           payment_method, status, created_at, created_by, revision,
-          origin_device_id, notes)
+          origin_device_id, notes, template_version)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10, ?11, ?12, 0,
-                 ?13, ?14, ?15, ?16, ?17, ?18, ?19, 1, ?20, ?21)",
+                 ?13, ?14, ?15, ?16, ?17, ?18, ?19, 1, ?20, ?21, ?22)",
         rusqlite::params![
             document.id.to_string(),
             document.number,
@@ -232,6 +235,7 @@ fn insert_document_tx(
             document.created_by.to_string(),
             origin_device_id,
             document.notes,
+            i64::from(document.template_version),
         ],
     )?;
     Ok(())

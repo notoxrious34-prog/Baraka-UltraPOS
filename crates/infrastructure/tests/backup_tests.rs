@@ -198,6 +198,7 @@ fn seed_document_with_line(
                 paid_amount_centimes: 10_000,
                 change_amount_centimes: 0,
                 payment_method: "CASH".to_string(),
+                template_version: baraka_domain::printing::TSPL_TICKET_TEMPLATE_VERSION,
                 notes: None,
                 created_at: chrono::Utc::now(),
                 created_by: UserId::from(Uuid::parse_str(ACTOR_UUID).expect("uuid")),

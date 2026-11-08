@@ -20,9 +20,9 @@ use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
     format_centimes_plain, format_qty_plain, label_barcode_geometry, label_text_needs_bitmap,
     label_text_plan, render_bitmap_job, render_label_40x20, render_label_40x20_mixed,
-    render_ticket_80mm, render_ticket_80mm_mixed, ticket_text_plan, LabelBarcodeGeometry,
-    LabelBitmap, LabelTextSlot, TicketOp, TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket,
-    TsplTicketLine, TsplTicketTotals, TRANSPORT_SPOOLER,
+    render_ticket_80mm, render_ticket_80mm_mixed_versioned, render_ticket_80mm_versioned,
+    ticket_text_plan, LabelBarcodeGeometry, LabelBitmap, LabelTextSlot, TicketOp, TsplCaptionLang,
+    TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine, TsplTicketTotals, TRANSPORT_SPOOLER,
 };
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{DocumentId, DocumentLanguage};
@@ -553,9 +553,9 @@ where
                     ));
                 }
             }
-            render_ticket_80mm_mixed(&ticket, &bitmaps)?
+            render_ticket_80mm_mixed_versioned(&ticket, &bitmaps, document.template_version)?
         } else {
-            render_ticket_80mm(&ticket)?
+            render_ticket_80mm_versioned(&ticket, document.template_version)?
         };
         self.transport.send_raster(&bytes)?;
         Ok(TsplPrintOutcome {

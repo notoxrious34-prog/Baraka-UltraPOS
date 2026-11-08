@@ -8,6 +8,7 @@
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
 use baraka_domain::inventory::WarehouseId;
+use baraka_domain::printing::TSPL_TICKET_TEMPLATE_VERSION;
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{
     price_document, CreditPolicy, CustomerId, CustomerTier, Document, DocumentId, DocumentItem,
@@ -803,6 +804,7 @@ where
             paid_amount_centimes: 0,
             change_amount_centimes: 0,
             payment_method: "UNPAID".to_string(),
+            template_version: TSPL_TICKET_TEMPLATE_VERSION,
             notes: input.notes.map(|note| note.trim().to_string()),
             created_at: now,
             created_by: session.user_id,

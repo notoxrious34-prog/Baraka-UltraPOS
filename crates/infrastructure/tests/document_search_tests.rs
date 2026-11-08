@@ -217,6 +217,7 @@ fn seed_document(
                 paid_amount_centimes: 0,
                 change_amount_centimes: 0,
                 payment_method: "UNPAID".to_string(),
+                template_version: baraka_domain::printing::TSPL_TICKET_TEMPLATE_VERSION,
                 notes: None,
                 created_at: chrono::Utc::now(),
                 created_by: user_id(GERANT_UUID),

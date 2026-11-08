@@ -114,6 +114,11 @@ pub const MIGRATIONS: &[EmbeddedMigration] = &[
         name: "0018_line_discount_per_unit.sql",
         sql: include_str!("../../migrations/0018_line_discount_per_unit.sql"),
     },
+    EmbeddedMigration {
+        version: 19,
+        name: "0019_document_template_version.sql",
+        sql: include_str!("../../migrations/0019_document_template_version.sql"),
+    },
 ];
 
 /// This binary's migration horizon: the newest schema version it understands.

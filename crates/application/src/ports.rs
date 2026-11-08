@@ -1396,6 +1396,10 @@ pub struct PrinterSettings {
     pub tspl_density: u8,
     /// TSPL print speed in inch/sec, 1..=6 (default 4).
     pub tspl_speed: u8,
+    /// TSPL calibration shift in mm, -5..=+5 (default 0; DOC-06 ruler loop).
+    pub tspl_offset_x_mm: i32,
+    /// TSPL calibration shift in mm on the feed axis (see `tspl_offset_x_mm`).
+    pub tspl_offset_y_mm: i32,
     /// TEMPORARY-DIAGNOSTIC TSPL probe mode wire spelling
     /// (`normal|no_codepage|ascii_only|font1_only`; default `normal`;
     /// BRK-100 — remove in the lock-in task).
@@ -1424,6 +1428,7 @@ pub trait PrinterSettingsPort: Send + Sync {
     /// stored value; `Some` values are validated upstream before any write).
     /// Separate from `update_printer_settings` so existing callers keep
     /// compiling untouched (BRK-099 minimal-churn extension).
+    #[allow(clippy::too_many_arguments)]
     fn update_tspl_media_settings(
         &self,
         gap_mm: Option<u32>,
@@ -1431,6 +1436,10 @@ pub trait PrinterSettingsPort: Send + Sync {
         speed: Option<u8>,
         // TEMPORARY-DIAGNOSTIC (BRK-100): `None` keeps the stored mode.
         probe_mode: Option<String>,
+        // DOC-06: `None` keeps the stored X shift; `Some` must be -5..=+5.
+        offset_x_mm: Option<i32>,
+        // DOC-06: `None` keeps the stored Y shift; `Some` must be -5..=+5.
+        offset_y_mm: Option<i32>,
     ) -> Result<(), ApplicationError>;
 }
 

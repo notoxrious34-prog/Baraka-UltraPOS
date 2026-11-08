@@ -17,6 +17,7 @@ import {
   ipcPreviewTsplLabel,
   ipcUpdatePrinterSettings,
   printingTestPrint,
+  printingTestTsplCalibration,
   printingTestTsplLabel,
   printingTestTsplTicket,
   saveStoreIdentity,
@@ -321,6 +322,34 @@ describe("VT-06 printerTestTsplTicket (TASK-PRT-03)", () => {
   });
 });
 
+describe("VT-08 printerTestTsplCalibration (DOC-06)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fakeTauriWindow();
+    primeSession();
+  });
+  afterEach(() => {
+    clearTauriWindow();
+  });
+
+  it("sends session only and maps bytes_sent", async () => {
+    invokeMock.mockResolvedValueOnce({ bytes_sent: 1217 });
+    const result = await printingTestTsplCalibration();
+    expect(invokeMock).toHaveBeenCalledWith("printer_test_tspl_calibration", {
+      session_token: "tok-idn-1",
+      request: { session_token: "tok-idn-1" },
+    });
+    expect(result).toEqual({ bytesSent: 1217 });
+  });
+
+  it("a transport error propagates as a typed code", async () => {
+    invokeMock.mockRejectedValueOnce("TSPL_TRANSPORT_REQUIRES_SPOOLER");
+    await expect(printingTestTsplCalibration()).rejects.toBe(
+      "TSPL_TRANSPORT_REQUIRES_SPOOLER",
+    );
+  });
+});
+
 describe("VT-04 updatePrinterSettings TSPL media (LIVE-2026-11-06)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -344,6 +373,8 @@ describe("VT-04 updatePrinterSettings TSPL media (LIVE-2026-11-06)", () => {
       tspl_gap_mm: 2,
       tspl_density: 8,
       tspl_speed: 4,
+      tspl_offset_x_mm: 1,
+      tspl_offset_y_mm: -1,
     });
     const settings = await ipcUpdatePrinterSettings(
       "tok-idn-1",
@@ -357,6 +388,8 @@ describe("VT-04 updatePrinterSettings TSPL media (LIVE-2026-11-06)", () => {
       2,
       8,
       4,
+      1,
+      -1,
     );
     expect(invokeMock).toHaveBeenCalledWith("printer_update_settings", {
       session_token: "tok-idn-1",
@@ -364,10 +397,14 @@ describe("VT-04 updatePrinterSettings TSPL media (LIVE-2026-11-06)", () => {
         tspl_gap_mm: 2,
         tspl_density: 8,
         tspl_speed: 4,
+        tspl_offset_x_mm: 1,
+        tspl_offset_y_mm: -1,
       }),
     });
     expect(settings.tsplGapMm).toBe(2);
     expect(settings.tsplDensity).toBe(8);
     expect(settings.tsplSpeed).toBe(4);
+    expect(settings.tsplOffsetXMm).toBe(1);
+    expect(settings.tsplOffsetYMm).toBe(-1);
   });
 });

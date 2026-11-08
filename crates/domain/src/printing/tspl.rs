@@ -94,6 +94,15 @@ pub const TSPL_SPEED_DEFAULT: u8 = 4;
 pub const TSPL_SPEED_MIN: u8 = 1;
 /// Print speed ceiling, inch/sec (XP-410B class maximum).
 pub const TSPL_SPEED_MAX: u8 = 6;
+/// Calibration range in mm — STARTING VALUES, OWNER-VERIFY with a ruler
+/// against the 40x20 liner (DOC-06, same posture as the gap default).
+/// ±5 mm keeps any label content printable; the renderer rejects LOUDLY
+/// past the media edge instead of clipping silently.
+pub const TSPL_CALIB_MM_MIN: i32 = -5;
+/// Calibration ceiling in mm (see [`TSPL_CALIB_MM_MIN`]).
+pub const TSPL_CALIB_MM_MAX: i32 = 5;
+/// Dots per mm at 203 dpi — the calibration step unit.
+pub const TSPL_DOTS_PER_MM: i64 = 8;
 /// Fixed charset declaration. UTF-8 — NOT 437: our TEXT bytes ARE UTF-8
 /// (French accents are multibyte; CP437 would render them as mojibake),
 /// and UTF-8 keeps Arabic codepoint-accurate (unshaped per AUD-045 —
@@ -159,6 +168,13 @@ pub struct TsplMediaSetup {
     pub density: u8,
     /// Print speed in inch/sec, 1..=6.
     pub speed: u8,
+    /// Calibration shift in mm, -5..=+5 per axis (DOC-06): applied in
+    /// software to every emitted label coordinate (both directions —
+    /// TSPL REFERENCE has no signed form and stays vendor-pinned).
+    /// Zero keeps every golden byte-identical.
+    pub offset_x_mm: i32,
+    /// Calibration shift in mm on the feed axis (see `offset_x_mm`).
+    pub offset_y_mm: i32,
     /// TEMPORARY-DIAGNOSTIC probe mode (BRK-100 — remove in lock-in).
     pub probe_mode: TsplProbeMode,
 }
@@ -169,6 +185,8 @@ impl Default for TsplMediaSetup {
             gap_mm: TSPL_GAP_MM_DEFAULT,
             density: TSPL_DENSITY_DEFAULT,
             speed: TSPL_SPEED_DEFAULT,
+            offset_x_mm: 0,
+            offset_y_mm: 0,
             probe_mode: TsplProbeMode::Normal,
         }
     }
@@ -204,13 +222,35 @@ pub fn validate_tspl_speed(speed: u8) -> Result<(), DomainError> {
     Ok(())
 }
 
+/// Reject a calibration shift outside -5..=+5 mm (DOC-06).
+pub fn validate_tspl_calib_mm(value_mm: i32) -> Result<(), DomainError> {
+    if !(TSPL_CALIB_MM_MIN..=TSPL_CALIB_MM_MAX).contains(&value_mm) {
+        return Err(DomainError::InvalidCanonicalString(
+            "TSPL_CALIB_MM_OUT_OF_RANGE".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 impl TsplMediaSetup {
     /// Reject any out-of-range field (codes quoted, never silent clamps).
     pub fn validate(&self) -> Result<(), DomainError> {
         validate_tspl_gap_mm(self.gap_mm)?;
         validate_tspl_density(self.density)?;
         validate_tspl_speed(self.speed)?;
+        validate_tspl_calib_mm(self.offset_x_mm)?;
+        validate_tspl_calib_mm(self.offset_y_mm)?;
         Ok(())
+    }
+
+    /// Calibration shift in dots (DOC-06): added to every emitted label
+    /// coordinate. Zero for the default setup (goldens unaffected).
+    #[must_use]
+    pub fn calibration_dots(&self) -> (i64, i64) {
+        (
+            i64::from(self.offset_x_mm) * TSPL_DOTS_PER_MM,
+            i64::from(self.offset_y_mm) * TSPL_DOTS_PER_MM,
+        )
     }
 }
 
@@ -961,6 +1001,38 @@ fn right_x(right_edge: i64, dots: i64) -> i64 {
     (right_edge - dots).max(0)
 }
 
+/// Monospace cell width of a label TEXT face (DOC-06 containment checks).
+fn label_face_width_dots(font: &str, scale: i64) -> i64 {
+    let cell = match font {
+        // Native 32x48 face: same geometry as "3"x2 (see the Price arm).
+        "5" => FONT_3_W * 2,
+        "2" => FONT_2_W,
+        "3" => FONT_3_W,
+        _ => FONT_1_W,
+    };
+    cell * scale
+}
+
+/// Reject a calibration-shifted TEXT line that leaves the 320x160 media
+/// (DOC-06): a shift is a correction, never a silent clip.
+fn check_calibrated_text(
+    x_dots: i64,
+    y_dots: i64,
+    width_dots: i64,
+    height_dots: i64,
+) -> Result<(), DomainError> {
+    if x_dots < 0
+        || y_dots < 0
+        || x_dots + width_dots > LABEL_WIDTH_DOTS
+        || y_dots + height_dots > LABEL_HEIGHT_DOTS
+    {
+        return Err(DomainError::InvalidCanonicalString(
+            "LABEL_CALIBRATION_OUT_OF_AREA".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Emit one TEXT command. TEMPORARY-DIAGNOSTIC (BRK-100): `Font1Only` forces
 /// face "1"; `AsciiOnly` folds the payload LOSSY (see `ascii_probe_lossy`).
 fn push_text(
@@ -1287,6 +1359,9 @@ pub fn render_label_40x20_mixed(
     let geometry = label_barcode_geometry(label.barcode)?;
     let (bx, by, bh) = (geometry.x_dots, geometry.y_dots, geometry.height_dots);
     let probe = label.media.probe_mode;
+    // DOC-06: software calibration — every emitted coordinate below is
+    // shifted; zero keeps the goldens byte-identical.
+    let (dx, dy) = label.media.calibration_dots();
     let mut head: Vec<String> = Vec::new();
     push_media_preamble(&mut head, "SIZE 40 mm, 20 mm", &label.media)?;
     let mut job: Vec<u8> = head.join("\r\n").into_bytes();
@@ -1324,17 +1399,18 @@ pub fn render_label_40x20_mixed(
             }
             // Bottom-align to the TEXT cell (taller rasters grow upward).
             let bitmap_y = line.y_dots + line.cell_h_dots - height_dots;
-            if line.x_dots < 0
-                || bitmap_y < 0
-                || line.x_dots + width_dots > LABEL_WIDTH_DOTS
-                || bitmap_y + height_dots > LABEL_HEIGHT_DOTS
+            let (sx, sby) = (line.x_dots + dx, bitmap_y + dy);
+            if sx < 0
+                || sby < 0
+                || sx + width_dots > LABEL_WIDTH_DOTS
+                || sby + height_dots > LABEL_HEIGHT_DOTS
             {
-                return Err(code("LABEL_BITMAP_OUT_OF_AREA"));
+                return Err(code("LABEL_CALIBRATION_OUT_OF_AREA"));
             }
             job.extend_from_slice(
                 format!(
                     "BITMAP {},{},{},{},0,",
-                    line.x_dots, bitmap_y, raster.width_bytes, raster.height_rows
+                    sx, sby, raster.width_bytes, raster.height_rows
                 )
                 .as_bytes(),
             );
@@ -1350,25 +1426,117 @@ pub fn render_label_40x20_mixed(
                 // (no scaler stair-steps on the price curves).
                 LabelTextSlot::Price => ("5", 1),
             };
-            push_text(
-                &mut text_out,
-                line.x_dots,
-                line.y_dots,
-                font,
-                scale,
-                &line.text,
-                probe,
-            );
+            let (sx, sy) = (line.x_dots + dx, line.y_dots + dy);
+            let width_dots = i64::try_from(line.text.chars().count()).unwrap_or(i64::MAX)
+                * label_face_width_dots(font, scale);
+            check_calibrated_text(sx, sy, width_dots, line.cell_h_dots)?;
+            push_text(&mut text_out, sx, sy, font, scale, &line.text, probe);
             job.extend_from_slice(text_out.join("\r\n").as_bytes());
             job.extend_from_slice(b"\r\n");
         }
         if line.slot == LabelTextSlot::Currency {
+            let (sbx, sby) = (bx + dx, by + dy);
+            if sbx < 0
+                || sby < 0
+                || sbx + geometry.width_dots > LABEL_WIDTH_DOTS
+                || sby + geometry.height_dots > LABEL_HEIGHT_DOTS
+            {
+                return Err(code("LABEL_CALIBRATION_OUT_OF_AREA"));
+            }
             job.extend_from_slice(
-                format!("BARCODE {bx},{by},\"128\",{bh},0,0,2,2,\"{barcode}\"\r\n").as_bytes(),
+                format!("BARCODE {sbx},{sby},\"128\",{bh},0,0,2,2,\"{barcode}\"\r\n").as_bytes(),
             );
         }
     }
     job.extend_from_slice(format!("PRINT 1,{}\r\n", label.copies).as_bytes());
+    Ok(job)
+}
+
+/// Render the 40x20 mm calibration pattern (DOC-06): a ruler-readable
+/// printout for the Printer page. Full-bleed border at the 320x160 media
+/// bounds, 1 mm ticks along the top edge (8 dots = 1 mm at 203 dpi),
+/// center crosshair, and self-documenting captions carrying the applied
+/// correction (`X±nMM Y±mMM`). Every element shifts WITH the calibration
+/// under test — the owner prints, measures the border inset with a ruler,
+/// and enters the correction; the next printout proves it.
+///
+/// Deliberately unchecked against the media bounds (unlike labels): a
+/// correction under test may push the border off-media, and that clip IS
+/// the measurement signal. `media.validate()` still rejects out-of-range
+/// calibration LOUDLY. ASCII-only payload by construction.
+pub fn render_calibration_pattern_40x20(media: &TsplMediaSetup) -> Result<Vec<u8>, DomainError> {
+    media.validate()?;
+    let (dx, dy) = media.calibration_dots();
+    let mut head: Vec<String> = Vec::new();
+    push_media_preamble(&mut head, "SIZE 40 mm, 20 mm", media)?;
+    let mut job: Vec<u8> = head.join("\r\n").into_bytes();
+    job.extend_from_slice(b"\r\n");
+    let mut emit = |line: String| {
+        job.extend_from_slice(line.as_bytes());
+        job.extend_from_slice(b"\r\n");
+    };
+    // Border at the media bounds (shifts with the calibration under test).
+    emit(format!(
+        "BOX {},{},{},{},2",
+        dx,
+        dy,
+        LABEL_WIDTH_DOTS - 1 + dx,
+        LABEL_HEIGHT_DOTS - 1 + dy
+    ));
+    // 1 mm ruler ticks along the top edge (long every 5 mm).
+    for mm in 1..40 {
+        let x = i64::from(mm) * TSPL_DOTS_PER_MM + dx;
+        let h = if mm % 5 == 0 { 8 } else { 4 };
+        emit(format!("BAR {x},{dy},1,{h}"));
+    }
+    // Center crosshair.
+    emit(format!(
+        "BOX {},{},{},{},1",
+        159 + dx,
+        dy,
+        160 + dx,
+        LABEL_HEIGHT_DOTS - 1 + dy
+    ));
+    emit(format!(
+        "BOX {},{},{},{},1",
+        dx,
+        79 + dy,
+        LABEL_WIDTH_DOTS - 1 + dx,
+        80 + dy
+    ));
+    // Self-documenting captions (ASCII-only: the pattern spools anywhere).
+    let mut text_out: Vec<String> = Vec::new();
+    push_text(
+        &mut text_out,
+        8 + dx,
+        16 + dy,
+        "1",
+        1,
+        "CALIBRATION",
+        media.probe_mode,
+    );
+    push_text(
+        &mut text_out,
+        8 + dx,
+        40 + dy,
+        "1",
+        1,
+        &format!("X{:+}MM Y{:+}MM", media.offset_x_mm, media.offset_y_mm),
+        media.probe_mode,
+    );
+    push_text(
+        &mut text_out,
+        8 + dx,
+        64 + dy,
+        "1",
+        1,
+        "40X20 RULER=MM",
+        media.probe_mode,
+    );
+    for line in text_out {
+        emit(line);
+    }
+    job.extend_from_slice(b"PRINT 1,1\r\n");
     Ok(job)
 }
 
@@ -1702,6 +1870,109 @@ mod tests {
              TEXT 132,146,\"1\",0,1,1,\"VIS-001\"\r\n\
              PRINT 1,3\r\n"
         );
+    }
+
+    fn offset_media(x: i32, y: i32) -> TsplMediaSetup {
+        TsplMediaSetup {
+            offset_x_mm: x,
+            offset_y_mm: y,
+            ..TsplMediaSetup::default()
+        }
+    }
+
+    /// DOC-06 RED: zero calibration is byte-identical to the golden above.
+    #[test]
+    fn calibration_zero_keeps_golden_bytes() {
+        let mut calibrated = owner_label(3);
+        calibrated.media = offset_media(0, 0);
+        let bytes = render_label_40x20(&calibrated).expect("zero calib renders");
+        let golden = render_label_40x20(&owner_label(3)).expect("golden renders");
+        assert_eq!(bytes, golden);
+    }
+
+    /// DOC-06 RED: (-1 mm, 0) shifts every emitted x coordinate -8 dots.
+    #[test]
+    fn calibration_shifts_every_label_coordinate() {
+        let mut calibrated = owner_label(1);
+        calibrated.media = offset_media(-1, 0);
+        let bytes = render_label_40x20(&calibrated).expect("shifted renders");
+        let text = String::from_utf8(bytes).expect("tspl is ascii-clean");
+        assert_eq!(
+            text,
+            "SIZE 40 mm, 20 mm\r\n\
+             GAP 3 mm, 0 mm\r\n\
+             SET RIBBON OFF\r\n\
+             DIRECTION 0,0\r\n\
+             REFERENCE 0,0\r\n\
+             OFFSET 0 mm\r\n\
+             SET PEEL OFF\r\n\
+             SET CUTTER OFF\r\n\
+             SET TEAR ON\r\n\
+             CLS\r\n\
+             TEXT 92,2,\"1\",0,1,1,\"BARAKA ULTRAPOS\"\r\n\
+             TEXT 0,16,\"2\",0,1,1,\"Vis 8x40\"\r\n\
+             TEXT 0,58,\"5\",0,1,1,\"10.00\"\r\n\
+             TEXT 264,94,\"1\",0,1,1,\"DZD\"\r\n\
+             BARCODE 0,106,\"128\",38,0,0,2,2,\"VIS-001\"\r\n\
+             TEXT 124,146,\"1\",0,1,1,\"VIS-001\"\r\n\
+             PRINT 1,1\r\n"
+        );
+    }
+
+    /// DOC-06 RED: a shift pushing content off the 320x160 area fails LOUDLY.
+    #[test]
+    fn calibration_past_the_edge_rejects_loudly() {
+        let mut calibrated = owner_label(1);
+        calibrated.media = offset_media(-5, 0);
+        let err = render_label_40x20(&calibrated).expect_err("must reject");
+        assert_eq!(
+            err,
+            DomainError::InvalidCanonicalString("LABEL_CALIBRATION_OUT_OF_AREA".to_string())
+        );
+        // Feed axis: the human line sits 2 dots above the die-cut edge.
+        let mut calibrated = owner_label(1);
+        calibrated.media = offset_media(0, 2);
+        let err = render_label_40x20(&calibrated).expect_err("must reject");
+        assert_eq!(
+            err,
+            DomainError::InvalidCanonicalString("LABEL_CALIBRATION_OUT_OF_AREA".to_string())
+        );
+    }
+
+    /// DOC-06 RED: out-of-range calibration values never reach the renderer.
+    #[test]
+    fn calibration_range_rejects_loudly() {
+        assert!(validate_tspl_calib_mm(5).is_ok());
+        assert!(validate_tspl_calib_mm(-5).is_ok());
+        assert!(validate_tspl_calib_mm(6).is_err());
+        assert!(validate_tspl_calib_mm(-6).is_err());
+    }
+
+    /// DOC-06 RED: the calibration pattern pins preamble, border, ruler and tail.
+    #[test]
+    fn calibration_pattern_pins_preamble_border_and_tail() {
+        let bytes =
+            render_calibration_pattern_40x20(&TsplMediaSetup::default()).expect("pattern renders");
+        let text = String::from_utf8(bytes).expect("tspl is ascii-clean");
+        assert!(text.starts_with("SIZE 40 mm, 20 mm\r\nGAP 3 mm, 0 mm\r\nSET RIBBON OFF\r\n"));
+        // Full-bleed border at the 320x160 media bounds (ruler reads the inset).
+        assert!(text.contains("BOX 0,0,319,159,2\r\n"));
+        // 1 mm ruler ticks along the top edge (8 dots = 1 mm at 203 dpi).
+        assert!(text.contains("BAR 8,0,1,4\r\n"));
+        assert!(text.contains("BAR 40,0,1,8\r\n"));
+        // The printout documents its own correction.
+        assert!(text.contains("\"X+0MM Y+0MM\""));
+        assert!(text.ends_with("PRINT 1,1\r\n"));
+    }
+
+    /// DOC-06 RED: the pattern shifts WITH the calibration under test.
+    #[test]
+    fn calibration_pattern_shifts_with_offsets() {
+        let media = offset_media(1, -1);
+        let bytes = render_calibration_pattern_40x20(&media).expect("pattern renders");
+        let text = String::from_utf8(bytes).expect("tspl is ascii-clean");
+        assert!(text.contains("BOX 8,-8,327,151,2\r\n"));
+        assert!(text.contains("\"X+1MM Y-1MM\""));
     }
 
     #[test]
@@ -2156,6 +2427,8 @@ mod tests {
             gap_mm: 0,
             density: 15,
             speed: 6,
+            offset_x_mm: 0,
+            offset_y_mm: 0,
             probe_mode: TsplProbeMode::Normal,
         }
         .validate()
@@ -2164,6 +2437,8 @@ mod tests {
             gap_mm: 10,
             density: 0,
             speed: 1,
+            offset_x_mm: 0,
+            offset_y_mm: 0,
             probe_mode: TsplProbeMode::Normal,
         }
         .validate()

@@ -19,10 +19,11 @@
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
     format_centimes_plain, format_qty_plain, label_barcode_geometry, label_text_needs_bitmap,
-    label_text_plan, render_bitmap_job, render_label_40x20, render_label_40x20_mixed,
-    render_ticket_80mm, render_ticket_80mm_mixed_versioned, render_ticket_80mm_versioned,
-    ticket_text_plan, LabelBarcodeGeometry, LabelBitmap, LabelTextSlot, TicketOp, TsplCaptionLang,
-    TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine, TsplTicketTotals, TRANSPORT_SPOOLER,
+    label_text_plan, render_bitmap_job, render_calibration_pattern_40x20, render_label_40x20,
+    render_label_40x20_mixed, render_ticket_80mm, render_ticket_80mm_mixed_versioned,
+    render_ticket_80mm_versioned, ticket_text_plan, LabelBarcodeGeometry, LabelBitmap,
+    LabelTextSlot, TicketOp, TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket,
+    TsplTicketLine, TsplTicketTotals, TRANSPORT_SPOOLER,
 };
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{DocumentId, DocumentLanguage};
@@ -70,6 +71,8 @@ where
         gap_mm: stored.tspl_gap_mm,
         density: stored.tspl_density,
         speed: stored.tspl_speed,
+        offset_x_mm: stored.tspl_offset_x_mm,
+        offset_y_mm: stored.tspl_offset_y_mm,
         probe_mode,
     })
 }
@@ -706,6 +709,50 @@ where
             copies: 1,
             media: media_from_settings(self.settings)?,
         })?;
+        self.transport.send_raster(&bytes)?;
+        Ok(TsplPrintOutcome {
+            bytes_sent: bytes.len(),
+        })
+    }
+}
+
+/// DOC-06 calibration pattern: renders the ruler-readable 40x20 pattern
+/// with the STORED media + calibration and spools one copy — the owner
+/// prints, measures the border inset with a ruler, and enters the
+/// correction on the Printer page. ASCII-only payload by construction.
+/// ADMIN seam (`SystemSettingsManage`), spooler transport required.
+pub struct PrintTsplCalibrationUseCase<'a, S, T>
+where
+    S: ?Sized,
+    T: ?Sized,
+{
+    settings: &'a S,
+    transport: &'a T,
+}
+
+impl<'a, S, T> PrintTsplCalibrationUseCase<'a, S, T>
+where
+    S: PrinterSettingsPort + ?Sized,
+    T: PrinterTransportPort + ?Sized,
+{
+    /// Wire the use case to its ports.
+    pub fn new(settings: &'a S, transport: &'a T) -> Self {
+        Self {
+            settings,
+            transport,
+        }
+    }
+
+    /// Validate, render the calibration pattern, and spool one copy.
+    pub fn execute(&self, session: &SessionContext) -> Result<TsplPrintOutcome, ApplicationError> {
+        if !session
+            .role
+            .has_permission(Permission::SystemSettingsManage)
+        {
+            return Err(ApplicationError::Unauthorized);
+        }
+        require_spooler_transport(self.settings)?;
+        let bytes = render_calibration_pattern_40x20(&media_from_settings(self.settings)?)?;
         self.transport.send_raster(&bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),

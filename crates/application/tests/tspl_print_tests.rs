@@ -15,8 +15,8 @@ use baraka_application::ports::{
     StoreIdentityPort, StoredPayment,
 };
 use baraka_application::use_cases::tspl_printing::{
-    PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplLabelUseCase,
-    PrintTsplTestTicketUseCase, PrintTsplTicketUseCase,
+    PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplCalibrationUseCase,
+    PrintTsplLabelUseCase, PrintTsplTestTicketUseCase, PrintTsplTicketUseCase,
 };
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
@@ -57,6 +57,8 @@ impl PrinterSettingsPort for FakeSettings {
             tspl_gap_mm: self.media.gap_mm,
             tspl_density: self.media.density,
             tspl_speed: self.media.speed,
+            tspl_offset_x_mm: self.media.offset_x_mm,
+            tspl_offset_y_mm: self.media.offset_y_mm,
             tspl_probe_mode: self.media.probe_mode.as_str().to_string(),
         })
     }
@@ -79,6 +81,8 @@ impl PrinterSettingsPort for FakeSettings {
         _density: Option<u8>,
         _speed: Option<u8>,
         _probe_mode: Option<String>,
+        _offset_x_mm: Option<i32>,
+        _offset_y_mm: Option<i32>,
     ) -> Result<(), ApplicationError> {
         panic!("out of scope for TSPL tests: settings are read-only here");
     }
@@ -380,6 +384,8 @@ fn label_preamble_uses_stored_media_setup() {
             gap_mm: 7,
             density: 12,
             speed: 2,
+            offset_x_mm: 0,
+            offset_y_mm: 0,
             probe_mode: TsplProbeMode::Normal,
         },
     };
@@ -1011,4 +1017,31 @@ fn test_ticket_rejects_non_admin_before_render() {
         transport.payloads().is_empty(),
         "nothing spooled on refusal"
     );
+}
+
+#[test]
+fn calibration_pattern_spools_with_stored_offsets() {
+    let settings = FakeSettings {
+        transport: "spooler".to_string(),
+        media: TsplMediaSetup {
+            gap_mm: 3,
+            density: 8,
+            speed: 4,
+            offset_x_mm: 1,
+            offset_y_mm: -1,
+            probe_mode: TsplProbeMode::Normal,
+        },
+    };
+    let transport = FakeTransport::new();
+    let outcome = PrintTsplCalibrationUseCase::new(&settings, &transport)
+        .execute(&session_with(Role::Admin))
+        .expect("calibration pattern spools");
+    assert!(outcome.bytes_sent > 0, "pattern job is non-empty");
+    let spooled = transport.payloads();
+    assert_eq!(spooled.len(), 1, "exactly one pattern job");
+    let text = String::from_utf8(spooled[0].clone()).expect("pattern is ascii-clean");
+    // The pattern shifts WITH the stored calibration under test.
+    assert!(text.contains("BOX 8,-8,327,151,2\r\n"), "border shifted");
+    assert!(text.contains("\"X+1MM Y-1MM\""), "self-documenting offsets");
+    assert!(text.ends_with("PRINT 1,1\r\n"), "single-copy tail");
 }

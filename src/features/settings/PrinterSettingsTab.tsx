@@ -22,6 +22,7 @@ import {
   printingTestPrint,
   printingTestTsplLabel,
   printingTestTsplTicket,
+  printingTestTsplCalibration,
   type PrinterTransport,
   type TestPrintLanguage,
   type TicketRenderMode,
@@ -99,11 +100,16 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   const [tsplGapMm, setTsplGapMm] = useState("3");
   const [tsplDensity, setTsplDensity] = useState("8");
   const [tsplSpeed, setTsplSpeed] = useState("4");
+  // DOC-06 calibration shifts in mm, -5..=+5 per axis (ruler loop).
+  const [tsplOffsetXMm, setTsplOffsetXMm] = useState("0");
+  const [tsplOffsetYMm, setTsplOffsetYMm] = useState("0");
   // TEMPORARY-DIAGNOSTIC (BRK-100 — remove in lock-in): probe switch state.
   const [probeMode, setProbeMode] = useState<TsplProbeMode>("normal");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState<TestPrintLanguage | "tspl" | "tspl-ticket" | null>(null);
+  const [testing, setTesting] = useState<
+    TestPrintLanguage | "tspl" | "tspl-ticket" | "calibration" | null
+  >(null);
   const [notice, setNotice] = useState<{ tone: TestPrintTone; text: string } | null>(null);
 
   useEffect(() => {
@@ -121,6 +127,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           setTsplGapMm(String(settings.tsplGapMm));
           setTsplDensity(String(settings.tsplDensity));
           setTsplSpeed(String(settings.tsplSpeed));
+          setTsplOffsetXMm(String(settings.tsplOffsetXMm));
+          setTsplOffsetYMm(String(settings.tsplOffsetYMm));
           setLoading(false);
         }
       })
@@ -153,7 +161,21 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
     const speed = /^\d+$/.test(tsplSpeed)
       ? Math.min(6, Math.max(1, Number(tsplSpeed)))
       : NaN;
-    if (!Number.isInteger(gap) || !Number.isInteger(density) || !Number.isInteger(speed)) {
+    // DOC-06 calibration: signed integers, -5..=+5 per axis — rejected
+    // LOUDLY, never clamped (a clamp would lie about the ruler reading).
+    const offsetX = /^-?\d+$/.test(tsplOffsetXMm) ? Number(tsplOffsetXMm) : NaN;
+    const offsetY = /^-?\d+$/.test(tsplOffsetYMm) ? Number(tsplOffsetYMm) : NaN;
+    if (
+      !Number.isInteger(gap) ||
+      !Number.isInteger(density) ||
+      !Number.isInteger(speed) ||
+      !Number.isInteger(offsetX) ||
+      offsetX < -5 ||
+      offsetX > 5 ||
+      !Number.isInteger(offsetY) ||
+      offsetY < -5 ||
+      offsetY > 5
+    ) {
       setSaving(false);
       setNotice({ tone: "error", text: t(locale, "settings.tsplMediaRange") });
       return;
@@ -172,6 +194,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
         gap,
         density,
         speed,
+        offsetX,
+        offsetY,
       );
       setSerialPort(settings.serialPort);
       setSerialBaud(settings.serialBaud);
@@ -183,6 +207,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
       setTsplGapMm(String(settings.tsplGapMm));
       setTsplDensity(String(settings.tsplDensity));
       setTsplSpeed(String(settings.tsplSpeed));
+      setTsplOffsetXMm(String(settings.tsplOffsetXMm));
+      setTsplOffsetYMm(String(settings.tsplOffsetYMm));
       setNotice({ tone: "success", text: t(locale, "settings.saved") });
     } catch (failure) {
       setNotice({ tone: "error", text: String(failure) });
@@ -247,6 +273,25 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
     }
   }
 
+  async function handleTestTsplCalibration(): Promise<void> {
+    if (!canTestPrint) {
+      return;
+    }
+    setTesting("calibration");
+    setNotice(null);
+    try {
+      const result = await printingTestTsplCalibration();
+      setNotice({
+        tone: "success",
+        text: `${t(locale, "settings.testPrintTsplCalibrationSent")} — ${result.bytesSent} o`,
+      });
+    } catch (failure) {
+      setNotice({ tone: "error", text: String(failure) });
+    } finally {
+      setTesting(null);
+    }
+  }
+
   const inputClass =
     "w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800";
   const transportButton = (active: boolean): string =>
@@ -266,7 +311,9 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
       : `${t(locale, "settings.printerTransportSpooler")} · ${queueName.trim() === "" ? "—" : queueName.trim()}`;
   const ticketValue = `${t(locale, renderMode === "escpos" ? "settings.ticketRenderEscpos" : "settings.ticketRenderGraphique")} · ${paperWidthMm} mm`;
   const labelValue =
-    transport === "spooler" ? `${tsplGapMm} / ${tsplDensity} / ${tsplSpeed} mm` : "—";
+    transport === "spooler"
+      ? `${tsplGapMm} / ${tsplDensity} / ${tsplSpeed} mm · X${tsplOffsetXMm} Y${tsplOffsetYMm}`
+      : "—";
   const labelIndex = "04";
   const testsIndex = transport === "spooler" ? "05" : "04";
 
@@ -548,6 +595,37 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
               />
             </bdi>
           </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-bold">{t(locale, "settings.tsplOffsetXMm")}</span>
+            <bdi dir="ltr" className="contents">
+              <input
+                className={`${inputClass} tabular-nums`}
+                value={tsplOffsetXMm}
+                disabled={saving}
+                inputMode="numeric"
+                onChange={(event) => {
+                  setTsplOffsetXMm(event.target.value);
+                }}
+              />
+            </bdi>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {t(locale, "settings.tsplCalibHelp")}
+            </span>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-bold">{t(locale, "settings.tsplOffsetYMm")}</span>
+            <bdi dir="ltr" className="contents">
+              <input
+                className={`${inputClass} tabular-nums`}
+                value={tsplOffsetYMm}
+                disabled={saving}
+                inputMode="numeric"
+                onChange={(event) => {
+                  setTsplOffsetYMm(event.target.value);
+                }}
+              />
+            </bdi>
+          </label>
         </div>
         </Section>
       ) : null}
@@ -656,6 +734,31 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
             {testing === "tspl-ticket"
               ? t(locale, "settings.testing")
               : t(locale, "settings.testPrintTsplTicket")}
+          </button>
+            </div>
+          </div>
+          <div className="rounded-lg border border-accent-500/50 p-2.5 dark:border-accent-400/40">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black">{t(locale, "settings.testPrintTsplCalibration")}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t(locale, "settings.testCalibrationHelp")}
+                </p>
+              </div>
+          <button
+            type="button"
+            disabled={testing !== null || !canTestPrint}
+            title={
+              canTestPrint ? undefined : t(locale, "settings.printerManageReservedGuidance")
+            }
+            onClick={() => {
+              void handleTestTsplCalibration();
+            }}
+            className="shrink-0 rounded bg-accent-500 px-3 py-1.5 text-sm font-bold text-slate-950 hover:brightness-110 disabled:opacity-50"
+          >
+            {testing === "calibration"
+              ? t(locale, "settings.testing")
+              : t(locale, "settings.testPrintTsplCalibration")}
           </button>
             </div>
           </div>

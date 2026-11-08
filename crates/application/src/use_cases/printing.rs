@@ -489,6 +489,7 @@ where
 /// `gap_mm` of `None` keeps the stored gap; `Some` must be 0..=10 mm.
 /// `density` of `None` keeps the stored density; `Some` must be 0..=15.
 /// `speed` of `None` keeps the stored speed; `Some` must be 1..=6 in/s.
+/// `offset_*_mm` of `None` keeps the stored shift; `Some` must be -5..=+5.
 /// All rejected before any write. The gap default (3 mm) is a STARTING
 /// VALUE — OWNER-VERIFY with a ruler; the measured value wins.
 pub struct UpdateTsplMediaSettingsUseCase<'a, P>
@@ -508,6 +509,7 @@ where
     }
 
     /// Validate permission + bounds, then persist atomically.
+    #[allow(clippy::too_many_arguments)]
     pub fn execute(
         &self,
         session: &SessionContext,
@@ -516,6 +518,8 @@ where
         speed: Option<u8>,
         // TEMPORARY-DIAGNOSTIC (BRK-100): validated spelling, never silent.
         probe_mode: Option<String>,
+        offset_x_mm: Option<i32>,
+        offset_y_mm: Option<i32>,
     ) -> Result<crate::ports::PrinterSettings, ApplicationError> {
         if !session
             .role
@@ -535,8 +539,21 @@ where
         if let Some(mode) = probe_mode.as_deref() {
             baraka_domain::printing::parse_tspl_probe_mode(mode)?;
         }
-        self.settings
-            .update_tspl_media_settings(gap_mm, density, speed, probe_mode)?;
+        // DOC-06 calibration: validated LOUDLY before any write.
+        if let Some(offset) = offset_x_mm {
+            baraka_domain::printing::validate_tspl_calib_mm(offset)?;
+        }
+        if let Some(offset) = offset_y_mm {
+            baraka_domain::printing::validate_tspl_calib_mm(offset)?;
+        }
+        self.settings.update_tspl_media_settings(
+            gap_mm,
+            density,
+            speed,
+            probe_mode,
+            offset_x_mm,
+            offset_y_mm,
+        )?;
         self.settings.get_printer_settings()
     }
 }

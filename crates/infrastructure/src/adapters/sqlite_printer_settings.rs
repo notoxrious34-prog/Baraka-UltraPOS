@@ -80,6 +80,24 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
                     && *speed <= baraka_domain::printing::TSPL_SPEED_MAX
             })
             .unwrap_or(printing.speed);
+        // DOC-06 calibration: signed mm per axis, -5..=+5; absent or
+        // out-of-range keys read as 0 (same posture as the media keys).
+        let offset_x_mm = self
+            .read_key("tspl.calib_offset_x_mm")
+            .and_then(|text| text.trim().parse::<i32>().ok())
+            .filter(|offset| {
+                *offset >= baraka_domain::printing::TSPL_CALIB_MM_MIN
+                    && *offset <= baraka_domain::printing::TSPL_CALIB_MM_MAX
+            })
+            .unwrap_or(0);
+        let offset_y_mm = self
+            .read_key("tspl.calib_offset_y_mm")
+            .and_then(|text| text.trim().parse::<i32>().ok())
+            .filter(|offset| {
+                *offset >= baraka_domain::printing::TSPL_CALIB_MM_MIN
+                    && *offset <= baraka_domain::printing::TSPL_CALIB_MM_MAX
+            })
+            .unwrap_or(0);
         Ok(PrinterSettings {
             serial_port: self.read_key("printer.serial_port").unwrap_or_default(),
             serial_baud: baud,
@@ -105,6 +123,8 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
             tspl_gap_mm: gap_mm,
             tspl_density: density,
             tspl_speed: speed,
+            tspl_offset_x_mm: offset_x_mm,
+            tspl_offset_y_mm: offset_y_mm,
             // TEMPORARY-DIAGNOSTIC (BRK-100): absent key reads as `normal`;
             // present-but-unknown spellings also read as `normal` here —
             // writes are validated LOUDLY upstream, so only a hand-edited
@@ -161,6 +181,7 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         .map_err(|_| store_failure())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn update_tspl_media_settings(
         &self,
         gap_mm: Option<u32>,
@@ -168,6 +189,8 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         speed: Option<u8>,
         // TEMPORARY-DIAGNOSTIC (BRK-100): `None` keeps the stored mode.
         probe_mode: Option<String>,
+        offset_x_mm: Option<i32>,
+        offset_y_mm: Option<i32>,
     ) -> Result<(), ApplicationError> {
         // `None` keeps the stored value; `Some` was validated upstream.
         let mut guard = self.lock()?;
@@ -184,6 +207,13 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         }
         if let Some(mode) = probe_mode {
             pairs.push(("tspl.probe_mode", mode));
+        }
+        // DOC-06 calibration: `None` keeps the stored shift.
+        if let Some(offset) = offset_x_mm {
+            pairs.push(("tspl.calib_offset_x_mm", offset.to_string()));
+        }
+        if let Some(offset) = offset_y_mm {
+            pairs.push(("tspl.calib_offset_y_mm", offset.to_string()));
         }
         run_transaction(&mut guard, |tx| {
             for (key, value) in &pairs {

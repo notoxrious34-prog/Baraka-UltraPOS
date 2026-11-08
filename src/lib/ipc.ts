@@ -1513,6 +1513,9 @@ export interface PrinterSettings {
   tsplGapMm: number;
   tsplDensity: number;
   tsplSpeed: number;
+  /** DOC-06 calibration shift in mm, -5..=+5 per axis (default 0). */
+  tsplOffsetXMm: number;
+  tsplOffsetYMm: number;
 }
 
 function toTicketRenderMode(raw: unknown): TicketRenderMode {
@@ -1531,6 +1534,8 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     tspl_gap_mm?: number;
     tspl_density?: number;
     tspl_speed?: number;
+    tspl_offset_x_mm?: number;
+    tspl_offset_y_mm?: number;
   }
   const wire = await call<SettingsWire>("printer_get_settings", {
     session_token: sessionToken,
@@ -1551,6 +1556,10 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     tsplGapMm: typeof wire.tspl_gap_mm === "number" ? wire.tspl_gap_mm : 3,
     tsplDensity: typeof wire.tspl_density === "number" ? wire.tspl_density : 8,
     tsplSpeed: typeof wire.tspl_speed === "number" ? wire.tspl_speed : 4,
+    tsplOffsetXMm:
+      typeof wire.tspl_offset_x_mm === "number" ? wire.tspl_offset_x_mm : 0,
+    tsplOffsetYMm:
+      typeof wire.tspl_offset_y_mm === "number" ? wire.tspl_offset_y_mm : 0,
   };
 }
 
@@ -1569,6 +1578,9 @@ export async function ipcUpdatePrinterSettings(
   tsplGapMm?: number | null,
   tsplDensity?: number | null,
   tsplSpeed?: number | null,
+  // DOC-06 calibration: null/absent keeps the stored shift.
+  tsplOffsetXMm?: number | null,
+  tsplOffsetYMm?: number | null,
 ): Promise<PrinterSettings> {
   const wire = await call<{
     serial_port: string;
@@ -1582,6 +1594,8 @@ export async function ipcUpdatePrinterSettings(
     tspl_gap_mm: number;
     tspl_density: number;
     tspl_speed: number;
+    tspl_offset_x_mm: number;
+    tspl_offset_y_mm: number;
   }>("printer_update_settings", {
     request: {
       session_token: sessionToken,
@@ -1597,6 +1611,8 @@ export async function ipcUpdatePrinterSettings(
       tspl_gap_mm: tsplGapMm ?? null,
       tspl_density: tsplDensity ?? null,
       tspl_speed: tsplSpeed ?? null,
+      tspl_offset_x_mm: tsplOffsetXMm ?? null,
+      tspl_offset_y_mm: tsplOffsetYMm ?? null,
     },
   });
   return {
@@ -1611,6 +1627,8 @@ export async function ipcUpdatePrinterSettings(
     tsplGapMm: wire.tspl_gap_mm,
     tsplDensity: wire.tspl_density,
     tsplSpeed: wire.tspl_speed,
+    tsplOffsetXMm: wire.tspl_offset_x_mm,
+    tsplOffsetYMm: wire.tspl_offset_y_mm,
   };
 }
 
@@ -1827,6 +1845,25 @@ export async function printingTestTsplTicket(): Promise<TsplTestTicketResult> {
   const wire = await call<{ bytes_sent: number }>("printer_test_tspl_ticket", {
     request: {},
   });
+  return { bytesSent: wire.bytes_sent };
+}
+
+/**
+ * DOC-06 calibration pattern (40x20 ruler printout).
+ * Session only on the wire; the pattern renders with the STORED media +
+ * calibration, one copy.
+ */
+export interface TsplCalibrationResult {
+  bytesSent: number;
+}
+
+export async function printingTestTsplCalibration(): Promise<TsplCalibrationResult> {
+  const wire = await call<{ bytes_sent: number }>(
+    "printer_test_tspl_calibration",
+    {
+      request: {},
+    },
+  );
   return { bytesSent: wire.bytes_sent };
 }
 

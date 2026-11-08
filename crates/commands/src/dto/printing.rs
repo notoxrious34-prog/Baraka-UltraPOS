@@ -119,6 +119,14 @@ pub struct TsplTestTicketRequest {
     pub session_token: String,
 }
 
+/// DOC-06 calibration pattern request. Session only — the pattern renders
+/// with the STORED media + calibration, one copy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TsplCalibrationRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+}
+
 /// Silent raster-only print request (button-triggered, spooler only, BRK-101).
 /// Pixels are 1-bit rows, MSB-first, left-to-right (see render_bitmap_job);
 /// caps enforced pre-send, never truncated.
@@ -171,6 +179,10 @@ pub struct PrinterSettingsDto {
     pub tspl_density: u8,
     /// TSPL print speed in inch/sec, 1..=6 (default 4).
     pub tspl_speed: u8,
+    /// DOC-06 calibration shift in mm, -5..=+5 (default 0).
+    pub tspl_offset_x_mm: i32,
+    /// DOC-06 calibration shift in mm on the feed axis (default 0).
+    pub tspl_offset_y_mm: i32,
     /// TEMPORARY-DIAGNOSTIC probe mode wire spelling (BRK-100).
     pub tspl_probe_mode: String,
 }
@@ -206,6 +218,12 @@ pub struct UpdatePrinterSettingsRequest {
     /// TSPL print speed in inch/sec (1..=6; absent keeps stored speed).
     #[serde(default)]
     pub tspl_speed: Option<u8>,
+    /// DOC-06 calibration X shift in mm (-5..=+5; absent keeps stored).
+    #[serde(default)]
+    pub tspl_offset_x_mm: Option<i32>,
+    /// DOC-06 calibration Y shift in mm (-5..=+5; absent keeps stored).
+    #[serde(default)]
+    pub tspl_offset_y_mm: Option<i32>,
     /// TEMPORARY-DIAGNOSTIC probe mode selector (BRK-100).
     #[serde(default)]
     pub tspl_probe_mode: Option<String>,

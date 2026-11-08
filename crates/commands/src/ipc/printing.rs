@@ -8,18 +8,19 @@ use baraka_application::use_cases::printing::{
 };
 use baraka_application::use_cases::sales::{GetFiscalSettingsUseCase, UpdateFiscalSettingsUseCase};
 use baraka_application::use_cases::tspl_printing::{
-    PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplLabelUseCase,
-    PrintTsplTestLabelUseCase, PrintTsplTestTicketUseCase, PrintTsplTicketUseCase,
+    PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplCalibrationUseCase,
+    PrintTsplLabelUseCase, PrintTsplTestLabelUseCase, PrintTsplTestTicketUseCase,
+    PrintTsplTicketUseCase,
 };
 use baraka_domain::role::Permission;
 
 use crate::dto::{
     DecodeSummaryDto, FiscalSettingsDto, PreviewLineDto, PrintStatusResponse, PrinterSettingsDto,
     RawBitmapRequest, ReprintRequest, ReprintResponse, SaveStoreIdentityRequest, StoreIdentityDto,
-    StoreIdentityResponse, TestPrintRequest, TestPrintResponse, TsplLabelPreviewRequest,
-    TsplLabelPreviewResponse, TsplLabelRequest, TsplPreviewLineDto, TsplPrintResponse,
-    TsplTestLabelRequest, TsplTestTicketRequest, TsplTicketRequest, UpdateFiscalSettingsRequestDto,
-    UpdatePrinterSettingsRequest,
+    StoreIdentityResponse, TestPrintRequest, TestPrintResponse, TsplCalibrationRequest,
+    TsplLabelPreviewRequest, TsplLabelPreviewResponse, TsplLabelRequest, TsplPreviewLineDto,
+    TsplPrintResponse, TsplTestLabelRequest, TsplTestTicketRequest, TsplTicketRequest,
+    UpdateFiscalSettingsRequestDto, UpdatePrinterSettingsRequest,
 };
 
 /// `documents_get_print_status` command: latest outbox state for a document.
@@ -229,6 +230,28 @@ pub fn printer_test_tspl_label(
     })
 }
 
+/// `printer_test_tspl_calibration` command: DOC-06 ruler pattern (40x20).
+///
+/// Button-triggered only, spooler transport only — no dialog, no preview.
+/// Renders the calibration pattern with the STORED media + calibration
+/// and spools one copy. ADMIN seam (`SystemSettingsManage`).
+#[tauri::command(rename_all = "snake_case")]
+pub fn printer_test_tspl_calibration(
+    state: tauri::State<'_, AppState>,
+    request: TsplCalibrationRequest,
+) -> Result<TsplPrintResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let outcome = PrintTsplCalibrationUseCase::new(
+        state.printer_settings.as_ref(),
+        state.printer_transport.as_ref(),
+    )
+    .execute(&session)
+    .map_err(|error| error_code(&error))?;
+    Ok(TsplPrintResponse {
+        bytes_sent: outcome.bytes_sent,
+    })
+}
+
 /// `printer_test_tspl_ticket` command: fixed-content 80 mm TSPL ticket
 /// self-test (TASK-PRT-03).
 ///
@@ -275,6 +298,8 @@ pub fn printer_get_settings(
         tspl_gap_mm: settings.tspl_gap_mm,
         tspl_density: settings.tspl_density,
         tspl_speed: settings.tspl_speed,
+        tspl_offset_x_mm: settings.tspl_offset_x_mm,
+        tspl_offset_y_mm: settings.tspl_offset_y_mm,
         // TEMPORARY-DIAGNOSTIC (BRK-100): probe switch wire.
         tspl_probe_mode: settings.tspl_probe_mode.clone(),
     })
@@ -303,6 +328,8 @@ pub fn printer_update_settings(
         || request.tspl_density.is_some()
         || request.tspl_speed.is_some()
         || request.tspl_probe_mode.is_some()
+        || request.tspl_offset_x_mm.is_some()
+        || request.tspl_offset_y_mm.is_some()
     {
         settings = UpdateTsplMediaSettingsUseCase::new(state.printer_settings.as_ref())
             .execute(
@@ -312,6 +339,8 @@ pub fn printer_update_settings(
                 request.tspl_speed,
                 // TEMPORARY-DIAGNOSTIC (BRK-100): validated spelling upstairs.
                 request.tspl_probe_mode,
+                request.tspl_offset_x_mm,
+                request.tspl_offset_y_mm,
             )
             .map_err(|error| error_code(&error))?;
     }
@@ -326,6 +355,8 @@ pub fn printer_update_settings(
         tspl_gap_mm: settings.tspl_gap_mm,
         tspl_density: settings.tspl_density,
         tspl_speed: settings.tspl_speed,
+        tspl_offset_x_mm: settings.tspl_offset_x_mm,
+        tspl_offset_y_mm: settings.tspl_offset_y_mm,
         // TEMPORARY-DIAGNOSTIC (BRK-100): probe switch wire.
         tspl_probe_mode: settings.tspl_probe_mode,
     })

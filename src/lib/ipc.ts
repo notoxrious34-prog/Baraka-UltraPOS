@@ -1256,6 +1256,14 @@ export interface DocumentDetailsWireResponse {
     /** Acting operator id, stored verbatim (DOC-05 engine cashier row). */
     created_by: string;
     payment_status: string;
+    /** Pinned layout version (DOC-04): v1 frozen, v2 DOC-07 redesign. */
+    template_version: number;
+    /** Resolved operator login name (DOC-07) — shown, never the raw id. */
+    created_by_name: string;
+    /** Resolved depot name (DOC-07) — same orphan contract. */
+    warehouse_name: string;
+    /** Wall-clock instant `DD/MM/YYYY HH:MM` (DOC-07) — shown as-is. */
+    created_at_display: string;
   };
   items: Array<{
     product_id: string;

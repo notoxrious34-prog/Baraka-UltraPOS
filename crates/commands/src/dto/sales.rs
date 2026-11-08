@@ -217,6 +217,17 @@ pub struct DocumentDto {
     pub created_by: String,
     /// Derived settlement state (`PAID`, `PARTIAL`, `UNPAID`).
     pub payment_status: String,
+    /// Pinned layout version (DOC-04): the OS printout picks v1 or v2 from
+    /// the stored document, never from the current binary.
+    pub template_version: u32,
+    /// Resolved operator login name (DOC-07) — the OS printout shows this,
+    /// never the raw `created_by` id (orphans keep the verbatim id).
+    pub created_by_name: String,
+    /// Resolved depot name (DOC-07) — same orphan contract as above.
+    pub warehouse_name: String,
+    /// Wall-clock instant `DD/MM/YYYY HH:MM` (DOC-07) — the OS printout
+    /// shows this, never the raw RFC3339 `created_at`.
+    pub created_at_display: String,
 }
 
 /// Stored document line view.

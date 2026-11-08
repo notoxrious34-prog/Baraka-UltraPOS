@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTicketPrintHtml,
+  buildTicketPrintHtmlV2,
   ticketArgsFromWire,
   type TicketPrintArgs,
   type TicketWireDetails,
@@ -44,6 +45,7 @@ function mirrorArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
     ],
     documentNumber: "T-2026-000123",
     createdAt: "2026-10-24 14:03",
+    templateVersion: 1,
     warehouseText: "11111111-2222-3333-4444-555555555555",
     cashierText: "user-1",
     language: "FR",
@@ -94,6 +96,8 @@ function mirrorArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
       footer: "Merci de votre visite",
       depot: "Dépôt",
       discountBadge: "remise",
+      article: "Article",
+      qtyPrice: "Qté x P.U",
     },
     ...overrides,
   };
@@ -298,6 +302,7 @@ describe("legacy-NULL lines keep the old format (raw PU, no badge)", () => {
     const wire: TicketWireDetails = {
       documentNumber: "T-9",
       createdAt: "2026-10-26",
+      templateVersion: 1,
       subtotalHt: "500",
       discountTotal: "0",
       tvaTotal: "0",
@@ -378,5 +383,67 @@ describe("mirror RTL (AR)", () => {
     expect(html).toContain('dir="ltr"');
     expect(html).toContain("المستودع:");
     expect(html).toContain("خصم <bdi");
+  });
+});
+
+describe("DOC-07 v2 mirror (owner redesign)", () => {
+  const v2Args = (): TicketPrintArgs => ({
+    ...mirrorArgs(),
+    templateVersion: 2,
+    createdAt: "07/11/2026 19:20",
+    cashierText: "Ahmed",
+    warehouseText: "Principal",
+    lines: [
+      {
+        designation: "MONCH ISPANA GRIS0958",
+        sku: "MONCH-001",
+        quantity: "10000",
+        unit: "PCS",
+        unitPrice: "53000",
+        lineTotal: "53000",
+        discountPerUnit: "0",
+      },
+    ],
+    subtotalHt: "131000",
+    discountTotal: "0",
+    tvaTotal: "0",
+    totalTtc: "131000",
+    paidAmount: "131000",
+    changeAmount: "0",
+    ownerFooter: "",
+    isReprint: true,
+  });
+
+  it("renders the v2 anatomy: one-line doc/crew, three columns, zero rows collapsed", () => {
+    const html = buildTicketPrintHtmlV2(v2Args());
+    // Wall-clock instant + resolved names, never ids or ISO.
+    expect(html).toContain("07/11/2026 19:20");
+    expect(html).not.toContain("T19:20");
+    expect(html).toContain("Caissier:");
+    expect(html).toContain("Ahmed");
+    expect(html).toContain("Principal");
+    // Three-column header.
+    expect(html).toContain("Article");
+    expect(html).toContain("Qté x P.U");
+    expect(html).toContain("Total");
+    // Indented detail + line total.
+    expect(html).toContain("1 PCS x 530.00");
+    expect(html).toContain("530.00");
+    // Zero badge / discount / TVA collapse; subtotal stays.
+    expect(html).not.toContain("ticket-badge");
+    expect(html).toContain("Sous-total");
+    expect(html).not.toContain("Remise totale");
+    expect(html).not.toContain(">TVA <");
+    // Framed reprint band + black grand-total band.
+    expect(html).toContain("*** DUPLICATA ***");
+    expect(html).toContain("reprint-band");
+    expect(html).toContain("TOTAL TTC");
+    expect(html).toContain("1310.00");
+  });
+
+  it("keeps v1 frozen: zero rows still render on the v1 builder", () => {
+    const html = buildTicketPrintHtml(mirrorArgs());
+    expect(html).toContain("Remise totale");
+    expect(html).toContain("TVA");
   });
 });

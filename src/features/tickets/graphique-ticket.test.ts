@@ -45,6 +45,7 @@ function baseArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
     storePhone: "0555123456",
     documentNumber: "T-2026-000123",
     createdAt: "2026-10-24 14:03",
+    templateVersion: 1,
     taxRows: [],
     warehouseText: "",
     language: "FR",
@@ -76,6 +77,8 @@ function baseArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
       footer: "Merci de votre visite",
       depot: "Dépôt",
       discountBadge: "remise",
+      article: "Article",
+      qtyPrice: "Qté x P.U",
     },
     ...overrides,
   };
@@ -163,6 +166,7 @@ describe("print dispatch (label pipeline reuse)", () => {
 describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
   const wire: TicketWireDetails = {
     documentNumber: "T-1",
+    templateVersion: 1,
     createdAt: "2026-10-24",
     subtotalHt: "350000",
     discountTotal: "0",
@@ -282,6 +286,7 @@ describe("per-unit price mapping (DSN-097)", () => {
   function detailsWith(item: ReturnType<typeof wireItem>): TicketWireDetails {
     return {
       documentNumber: "T-9",
+      templateVersion: 1,
       createdAt: "2026-10-26",
       subtotalHt: "3000",
       discountTotal: "300",

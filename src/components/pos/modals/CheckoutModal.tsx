@@ -45,6 +45,7 @@ import {
 import { evaluateStockGate } from "@/components/pos/modals/stock-gate";
 import {
   buildTicketPrintHtml,
+  buildTicketPrintHtmlV2,
   printTicketDocument,
   ticketArgsFromWire,
   type TicketPrintStrings,
@@ -71,6 +72,8 @@ function ticketStrings(locale: Locale): TicketPrintStrings {
     footer: t(locale, "ticket.footer"),
     depot: t(locale, "ticket.depot"),
     discountBadge: t(locale, "ticket.discountBadge"),
+    article: t(locale, "ticket.article"),
+    qtyPrice: t(locale, "ticket.qtyPrice"),
   };
 }
 
@@ -343,7 +346,8 @@ export function CheckoutModal(): ReactElement {
           const args = ticketArgsFromWire(
             {
               documentNumber: full.document.number,
-              createdAt: full.document.created_at,
+              createdAt: full.document.created_at_display,
+              templateVersion: full.document.template_version,
               subtotalHt: full.document.subtotal_ht_centimes,
               discountTotal: full.document.global_discount_centimes,
               tvaTotal: full.document.tva_total_centimes,
@@ -375,14 +379,18 @@ export function CheckoutModal(): ReactElement {
                 { prefix: "RC", value: identity.rc },
                 { prefix: "AI", value: identity.ai },
               ],
-              warehouseText: full.document.warehouse_id,
-              cashierText: full.document.created_by,
+              warehouseText: full.document.warehouse_name,
+              cashierText: full.document.created_by_name,
               ownerFooter: identity.ticketFooterMessage,
               isReprint: false,
               strings: ticketStrings(language === "AR" ? "ar-DZ" : "fr-DZ"),
             },
           );
-          const html = buildTicketPrintHtml(args);
+          // DOC-07: the pinned layout rides the stored document.
+          const html =
+            args.templateVersion === 2
+              ? buildTicketPrintHtmlV2(args)
+              : buildTicketPrintHtml(args);
           setTicketHtml(html);
           printTicketDocument(html);
         });

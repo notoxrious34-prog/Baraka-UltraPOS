@@ -18,12 +18,13 @@
 
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
-    format_centimes_plain, format_qty_plain, label_barcode_geometry, label_text_needs_bitmap,
-    label_text_plan, render_bitmap_job, render_calibration_pattern_40x20, render_label_40x20,
-    render_label_40x20_mixed, render_ticket_80mm, render_ticket_80mm_mixed_versioned,
-    render_ticket_80mm_versioned, ticket_text_plan, LabelBarcodeGeometry, LabelBitmap,
-    LabelTextSlot, TicketOp, TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket,
-    TsplTicketLine, TsplTicketTotals, TRANSPORT_SPOOLER,
+    format_centimes_plain, format_qty_plain, format_ticket_instant, label_barcode_geometry,
+    label_text_needs_bitmap, label_text_plan, render_bitmap_job, render_calibration_pattern_40x20,
+    render_label_40x20, render_label_40x20_mixed, render_ticket_80mm,
+    render_ticket_80mm_mixed_versioned, render_ticket_80mm_versioned, ticket_text_plan,
+    ticket_text_plan_v2, LabelBarcodeGeometry, LabelBitmap, LabelTextSlot, TicketOp,
+    TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine, TsplTicketTotals,
+    TRANSPORT_SPOOLER, TSPL_TICKET_TEMPLATE_VERSION_V1,
 };
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{DocumentId, DocumentLanguage};
@@ -31,7 +32,7 @@ use baraka_domain::sales::{DocumentId, DocumentLanguage};
 use crate::errors::ApplicationError;
 use crate::ports::{
     DocumentRepository, NullLabelRaster, PrinterSettingsPort, PrinterTransportPort, SessionContext,
-    StoreIdentityPort, TsplLabelRasterPort,
+    StoreIdentityPort, TsplLabelRasterPort, UserRepository, WarehouseRepository,
 };
 use crate::use_cases::sales::GetSaleUseCase;
 
@@ -357,55 +358,75 @@ where
 }
 
 /// Silent 80 mm ticket print (graphique content model, TSPL bytes).
-pub struct PrintTsplTicketUseCase<'a, D, S, I, T, R = NullLabelRaster>
+pub struct PrintTsplTicketUseCase<'a, D, S, I, T, U, W, R = NullLabelRaster>
 where
     D: ?Sized,
     S: ?Sized,
     I: ?Sized,
     T: ?Sized,
+    U: ?Sized,
+    W: ?Sized,
     R: ?Sized,
 {
     documents: &'a D,
     settings: &'a S,
     identity: &'a I,
     transport: &'a T,
+    users: &'a U,
+    warehouses: &'a W,
     ticket_raster: &'a R,
 }
 
 /// Shared no-rasterer behind every default-constructed ticket use case.
 static NULL_TICKET_RASTER: NullLabelRaster = NullLabelRaster;
 
-impl<'a, D, S, I, T> PrintTsplTicketUseCase<'a, D, S, I, T, NullLabelRaster>
+impl<'a, D, S, I, T, U, W> PrintTsplTicketUseCase<'a, D, S, I, T, U, W, NullLabelRaster>
 where
     D: DocumentRepository + ?Sized,
     S: PrinterSettingsPort + ?Sized,
     I: StoreIdentityPort + ?Sized,
     T: PrinterTransportPort + ?Sized,
+    U: UserRepository + ?Sized,
+    W: WarehouseRepository + ?Sized,
 {
     /// Wire the use case to its ports (no ticket rasterer attached).
-    pub fn new(documents: &'a D, settings: &'a S, identity: &'a I, transport: &'a T) -> Self {
+    pub fn new(
+        documents: &'a D,
+        settings: &'a S,
+        identity: &'a I,
+        transport: &'a T,
+        users: &'a U,
+        warehouses: &'a W,
+    ) -> Self {
         Self {
             documents,
             settings,
             identity,
             transport,
+            users,
+            warehouses,
             ticket_raster: &NULL_TICKET_RASTER,
         }
     }
 }
 
-impl<'a, D, S, I, T, R> PrintTsplTicketUseCase<'a, D, S, I, T, R>
+impl<'a, D, S, I, T, U, W, R> PrintTsplTicketUseCase<'a, D, S, I, T, U, W, R>
 where
     D: DocumentRepository + ?Sized,
     S: PrinterSettingsPort + ?Sized,
     I: StoreIdentityPort + ?Sized,
     T: PrinterTransportPort + ?Sized,
+    U: UserRepository + ?Sized,
+    W: WarehouseRepository + ?Sized,
     R: TsplLabelRasterPort + ?Sized,
 {
     /// Attach the bitmap rasterer (DOC-01): Arabic/CJK/emoji ticket lines
     /// ride BITMAP instead of silently dying as TEXT; without it any
     /// non-Latin line fails LOUDLY — never a dead ticket.
-    pub fn with_ticket_raster<Q>(self, raster: &'a Q) -> PrintTsplTicketUseCase<'a, D, S, I, T, Q>
+    pub fn with_ticket_raster<Q>(
+        self,
+        raster: &'a Q,
+    ) -> PrintTsplTicketUseCase<'a, D, S, I, T, U, W, Q>
     where
         Q: TsplLabelRasterPort + ?Sized,
     {
@@ -414,6 +435,8 @@ where
             settings: self.settings,
             identity: self.identity,
             transport: self.transport,
+            users: self.users,
+            warehouses: self.warehouses,
             ticket_raster: raster,
         }
     }
@@ -454,7 +477,12 @@ where
                 unit: pick_name(&view.unit_name_fr, &view.unit_name_ar, french, ""),
                 unit_price: format_centimes_plain(net_unit_price),
                 line_total: format_centimes_plain(item.line_ttc_centimes),
-                discount: item.discount_per_unit_centimes.map(format_centimes_plain),
+                // DOC-07: a zero per-unit discount collapses the badge —
+                // legacy NULL rows keep their raw price and no badge either.
+                discount: item
+                    .discount_per_unit_centimes
+                    .filter(|discount| *discount != 0)
+                    .map(format_centimes_plain),
             });
         }
         // Phase 2: borrow the owned strings into the pure renderer input.
@@ -477,19 +505,36 @@ where
             .map(|payment| payment.method_code.clone())
             .collect::<Vec<_>>()
             .join(" + ");
-        let created_at = document
-            .created_at
-            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let created_at = format_ticket_instant(
+            &document
+                .created_at
+                .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        );
         let subtotal_ht = format_centimes_plain(document.subtotal_ht_centimes);
         let global_discount = format_centimes_plain(document.global_discount_centimes);
         let tva = format_centimes_plain(document.vat_total_centimes);
         let total_ttc = format_centimes_plain(document.ttc_centimes);
         let paid = format_centimes_plain(document.paid_amount_centimes);
         let change = format_centimes_plain(document.change_amount_centimes);
-        // Cashier + depot ride the stored identifiers verbatim (no lookup
-        // port on this path — collapse, never invent).
-        let cashier_text = document.created_by.to_string();
-        let warehouse_text = document.warehouse_id.to_string();
+        // DOC-07: the ticket shows resolved display names, never raw
+        // identifiers — an orphaned reference (deleted user/warehouse)
+        // falls back to the stored id verbatim, never invented.
+        let cashier_text = self
+            .users
+            .find_user_by_id(document.created_by)
+            .map(|record| {
+                record
+                    .map(|user| user.username)
+                    .unwrap_or_else(|| document.created_by.to_string())
+            })?;
+        let warehouse_text = self
+            .warehouses
+            .get_by_id(document.warehouse_id)
+            .map(|warehouse| {
+                warehouse
+                    .map(|site| site.name)
+                    .unwrap_or_else(|| document.warehouse_id.to_string())
+            })?;
         let tax_rows = [
             ("NIF", identity.nif.as_str()),
             ("NIS", identity.nis.as_str()),
@@ -526,7 +571,13 @@ where
         };
         // DOC-01: route every non-Latin line through the bitmap rasterer
         // (same rule as shelf labels) — pure-TEXT jobs stay byte-identical.
-        let (ops, _) = ticket_text_plan(&ticket);
+        // The detection plan follows the pinned template (DOC-07): v1 docs
+        // keep the frozen geometry, anything newer rides v2.
+        let (ops, _) = if document.template_version == TSPL_TICKET_TEMPLATE_VERSION_V1 {
+            ticket_text_plan(&ticket)
+        } else {
+            ticket_text_plan_v2(&ticket)
+        };
         let needs_bitmap = ops.iter().any(|op| {
             matches!(op, TicketOp::Text(line) if label_text_needs_bitmap(&line.text, ticket.media.probe_mode))
         });

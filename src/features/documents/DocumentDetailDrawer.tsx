@@ -19,6 +19,7 @@ import {
 import { resolveTicketPrintPath } from "@/lib/ticket-print-path";
 import {
   buildTicketPrintHtml,
+  buildTicketPrintHtmlV2,
   printTicketDocument,
   ticketArgsFromWire,
   type TicketPrintStrings,
@@ -566,15 +567,18 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
       footer: t(locale, "ticket.footer"),
       depot: t(locale, "ticket.depot"),
       discountBadge: t(locale, "ticket.discountBadge"),
+      article: t(locale, "ticket.article"),
+      qtyPrice: t(locale, "ticket.qtyPrice"),
     };
     const dispatchWith = (id: A4Identity): void => {
-      printTicketDocument(
-        buildTicketPrintHtml(
-          ticketArgsFromWire(
-            {
-              documentNumber: snapshot.document.number,
-              createdAt: document.created_at,
-              subtotalHt: snapshot.document.subtotal_ht_centimes,
+      // DOC-07: the wire resolves display names + the wall-clock instant
+      // once — the template renders them verbatim, like the engine.
+      const args = ticketArgsFromWire(
+        {
+          documentNumber: snapshot.document.number,
+          createdAt: snapshot.document.created_at_display,
+          templateVersion: snapshot.document.template_version,
+          subtotalHt: snapshot.document.subtotal_ht_centimes,
               discountTotal: snapshot.document.global_discount_centimes,
               tvaTotal: snapshot.document.tva_total_centimes,
               totalTtc: snapshot.document.total_ttc_centimes,
@@ -605,15 +609,18 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
                 { prefix: "RC", value: id.rc },
                 { prefix: "AI", value: id.ai },
               ],
-              warehouseText: snapshot.document.warehouse_id,
-              cashierText: snapshot.document.created_by,
+              warehouseText: snapshot.document.warehouse_name,
+              cashierText: snapshot.document.created_by_name,
               isReprint: true,
               ownerFooter: id.ticketFooterMessage,
               strings,
             },
-          ),
-        ),
-      );
+          );
+          // DOC-07: the pinned layout rides the stored document — v1 keeps
+          // its frozen mirror, v2 the redesign.
+          printTicketDocument(
+            args.templateVersion === 2 ? buildTicketPrintHtmlV2(args) : buildTicketPrintHtml(args),
+          );
     };
     if (identity !== null) {
       dispatchWith(identity);

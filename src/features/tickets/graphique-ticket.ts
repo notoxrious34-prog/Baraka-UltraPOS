@@ -50,6 +50,10 @@ export interface TicketPrintStrings {
   depot: string;
   /** Per-line badge word (`remise` / `خصم`), amount follows. */
   discountBadge: string;
+  /** v2 three-column header, first segment (`Article` / `الصنف`). */
+  article: string;
+  /** v2 three-column header, middle segment (`Qté x P.U` / `الكمية × السعر`). */
+  qtyPrice: string;
 }
 
 export interface TicketPrintArgs {
@@ -75,6 +79,8 @@ export interface TicketPrintArgs {
   changeAmount: string;
   paymentLabel: string;
   isReprint: boolean;
+  /** Pinned layout version (DOC-04): the caller picks v1 or v2 builder. */
+  templateVersion: number;
   /** Owner footer message (stored verbatim); blank collapses. */
   ownerFooter: string;
   strings: TicketPrintStrings;
@@ -136,6 +142,8 @@ export interface TicketWireItem {
 export interface TicketWireDetails {
   documentNumber: string;
   createdAt: string;
+  /** Pinned layout version (DOC-04): 1 frozen, 2 DOC-07 redesign. */
+  templateVersion: number;
   subtotalHt: string;
   /** Stored global-discount figure (engine `Remise totale` row). */
   discountTotal: string;
@@ -206,6 +214,7 @@ export function ticketArgsFromWire(
     cashierText: opts.cashierText,
     ownerFooter: opts.ownerFooter,
     isReprint: opts.isReprint,
+    templateVersion: wire.templateVersion,
     strings: opts.strings,
   };
 }
@@ -310,6 +319,133 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
     `<div class="row grand"><span>${escapeTicket(args.strings.grandTotal)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.totalTtc))}</bdi></span></div>` +
     `<div class="row"><span>${escapeTicket(args.strings.payment)} (${escapeTicket(args.paymentLabel)})</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.paidAmount))}</bdi></span></div>` +
     `<div class="row"><span>${escapeTicket(args.strings.change)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.changeAmount))}</bdi></span></div>` +
+    `</div>${barcode}${ownerFooter}<div class="foot">${escapeTicket(args.strings.footer)}</div></div></body></html>`
+  );
+}
+
+/**
+ * DOC-07 v2 ticket: the owner receipt redesign, OS mirror of the TSPL v2
+ * engine plan (`ticket_text_plan_v2`) — same rows, same collapses, same
+ * emphasis. v1 (`buildTicketPrintHtml`) stays frozen for pre-v2 reprints.
+ *
+ * v2 deltas, in wire order: number + wall-clock instant on one row,
+ * cashier + depot on one row, `*** DUPLICATA ***` on a black band, the
+ * three-column header with indented detail rows, zero badge/discount/TVA
+ * rows collapsed, split totals captions, the grand total on a black
+ * REVERSE band between double rules, a 12 mm centered barcode.
+ */
+
+/** Centime-string zero test (wire carries plain `to_string()` figures). */
+function isZeroCentimes(centimes: string): boolean {
+  return /^-?0+$/.test(centimes.trim());
+}
+
+export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
+  const rtl = args.language === "AR";
+  const badgeWord = escapeTicket(args.strings.discountBadge);
+  const rows = args.lines
+    .map((line) => {
+      const badge =
+        line.discountPerUnit === null || isZeroCentimes(line.discountPerUnit)
+          ? ""
+          : `<tr data-testid="ticket-badge-row"><td colspan="3"><div class="badge" data-testid="ticket-badge">${badgeWord}: <bdi dir="ltr">${escapeTicket(ticketMoney(line.discountPerUnit))}</bdi></div></td></tr>`;
+      return (
+        `<tr data-testid="ticket-line"><td class="des" colspan="3">${escapeTicket(line.designation)}</td></tr>` +
+        `<tr data-testid="ticket-detail"><td></td>` +
+        `<td class="num"><bdi dir="ltr">${escapeTicket(ticketQty(line.quantity))} ${escapeTicket(line.unit)} x ${escapeTicket(ticketMoney(line.unitPrice))}</bdi></td>` +
+        `<td class="num"><bdi dir="ltr">${escapeTicket(ticketMoney(line.lineTotal))}</bdi></td></tr>` +
+        badge
+      );
+    })
+    .join("");
+  const mark = args.isReprint
+    ? `<div class="reprint-band">*** ${escapeTicket(args.strings.reprintMark)} ***</div>`
+    : "";
+  const contactParts = [args.storeAddress.trim(), args.storePhone.trim()].filter(
+    (part) => part !== "",
+  );
+  const contact =
+    contactParts.length > 0
+      ? `<div class="meta">${contactParts
+          .map((part) => `<bdi dir="ltr">${escapeTicket(part)}</bdi>`)
+          .join(" · ")}</div>`
+      : "";
+  const taxParts = args.taxRows
+    .filter((row) => row.value.trim() !== "")
+    .map(
+      (row) =>
+        `${escapeTicket(row.prefix)}: <bdi dir="ltr">${escapeTicket(row.value.trim())}</bdi>`,
+    );
+  const tax = taxParts.length > 0 ? `<div class="meta tax">${taxParts.join(" · ")}</div>` : "";
+  const crewLine =
+    `<div class="crew" data-testid="ticket-crew">` +
+    `<span data-testid="ticket-cashier">${escapeTicket(args.strings.cashier)}: <bdi dir="ltr">${escapeTicket(args.cashierText.trim())}</bdi></span>` +
+    `<span data-testid="ticket-depot">${escapeTicket(args.strings.depot)}: <bdi dir="ltr">${escapeTicket(args.warehouseText.trim())}</bdi></span>` +
+    `</div>`;
+  let barcode = "";
+  try {
+    barcode =
+      `<div class="barcode" data-testid="ticket-barcode">` +
+      generateCode128Svg(args.documentNumber, { moduleWidth: 1, height: 72, includeText: true }) +
+      `</div>`;
+  } catch {
+    barcode = "";
+  }
+  const ownerFooter =
+    args.ownerFooter.trim() !== ""
+      ? `<div class="foot owner">${escapeTicket(args.ownerFooter.trim())}</div>`
+      : "";
+  const totalsRow = (caption: string, figure: string) =>
+    `<div class="row"><span>${caption} :</span><span><bdi dir="ltr">${escapeTicket(figure)}</bdi></span></div>`;
+  const style =
+    `@page { size: ${TICKET_PAGE_WIDTH_MM}mm auto; margin: 0; }` +
+    `html,body { margin: 0; padding: 0; }` +
+    `.ticket { width: ${TICKET_PAGE_WIDTH_MM}mm; max-width: 100%; margin: 0 auto; padding: 2mm 6mm 2mm 3mm; ` +
+    `font-family: Arial, sans-serif; color: #000; background: #fff; font-size: 9pt; }` +
+    `.ticket .shop { text-align: center; font-weight: bold; font-size: 11pt; }` +
+    `.ticket .meta { text-align: center; font-size: 8pt; margin: 1mm 0; }` +
+    `.ticket .docline { display: flex; justify-content: space-between; font-size: 8pt; margin: 1mm 0; }` +
+    `.ticket .crew { display: flex; justify-content: space-between; gap: 2mm; font-size: 8pt; margin: 1mm 0; }` +
+    `.ticket .reprint-band { text-align: center; font-weight: bold; font-size: 12pt; ` +
+    `background: #000; color: #fff; margin: 2mm 0; padding: 1mm; }` +
+    `.ticket table { width: 100%; border-collapse: collapse; margin: 2mm 0; }` +
+    `.ticket th, .ticket td { padding: 1mm 0; vertical-align: top; text-align: start; }` +
+    `.ticket th.num, .ticket td.num { text-align: end; font-family: "Courier New", monospace; }` +
+    `.ticket .badge { font-size: 7pt; font-weight: bold; margin-top: 0.5mm; }` +
+    `.ticket .totals { margin-top: 2mm; border-top: 2px solid #000; padding-top: 1mm; }` +
+    `.ticket .totals .row { display: flex; justify-content: space-between; }` +
+    `.ticket .totals .grand { font-weight: bold; font-size: 12pt; background: #000; color: #fff; ` +
+    `border-top: 4px double #fff; border-bottom: 4px double #fff; padding: 1mm; margin: 1mm 0; }` +
+    `.ticket .barcode { background: #fff; padding: 3mm 6mm; margin: 2mm 0; }` +
+    `.ticket .barcode svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }` +
+    `.ticket .foot { text-align: center; font-size: 8pt; margin-top: 2mm; }` +
+    `.ticket .foot.owner { font-weight: bold; }`;
+  return (
+    `<!DOCTYPE html><html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "fr"}"><head><meta charset="utf-8">` +
+    `<title>ticket</title><style>${style}</style></head><body>` +
+    `<div class="ticket"><div class="shop">${escapeTicket(args.storeName)}</div>` +
+    contact +
+    tax +
+    `<div class="docline"><span><bdi dir="ltr">${escapeTicket(args.documentNumber)}</bdi></span><span><bdi dir="ltr">${escapeTicket(args.createdAt)}</bdi></span></div>` +
+    crewLine +
+    `<div class="meta">${escapeTicket(args.strings.title)}</div>${mark}` +
+    `<table><thead><tr><th>${escapeTicket(args.strings.article)}</th>` +
+    `<th class="num">${escapeTicket(args.strings.qtyPrice)}</th>` +
+    `<th class="num">${escapeTicket(args.strings.total)}</th></tr></thead><tbody>${rows}</tbody></table>` +
+    `<div class="totals">` +
+    totalsRow(escapeTicket(args.strings.subtotal), ticketMoney(args.subtotalHt)) +
+    (isZeroCentimes(args.discountTotal)
+      ? ""
+      : totalsRow(escapeTicket(args.strings.discountTotal), ticketMoney(args.discountTotal))) +
+    (isZeroCentimes(args.tvaTotal)
+      ? ""
+      : totalsRow(escapeTicket(args.strings.tva), ticketMoney(args.tvaTotal))) +
+    `<div class="row grand"><span>${escapeTicket(args.strings.grandTotal)} :</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.totalTtc))}</bdi></span></div>` +
+    totalsRow(
+      `${escapeTicket(args.strings.paid)} (${escapeTicket(args.paymentLabel)})`,
+      ticketMoney(args.paidAmount),
+    ) +
+    totalsRow(escapeTicket(args.strings.change), ticketMoney(args.changeAmount)) +
     `</div>${barcode}${ownerFooter}<div class="foot">${escapeTicket(args.strings.footer)}</div></div></body></html>`
   );
 }

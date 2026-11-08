@@ -169,6 +169,8 @@ pub fn print_tspl_ticket(
         state.printer_settings.as_ref(),
         state.store_identity.as_ref(),
         state.printer_transport.as_ref(),
+        state.users.as_ref(),
+        state.warehouses.as_ref(),
     )
     .with_ticket_raster(state.label_raster.as_ref())
     .execute(&session, id, request.is_reprint)

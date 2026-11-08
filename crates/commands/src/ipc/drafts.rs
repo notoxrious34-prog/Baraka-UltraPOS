@@ -151,6 +151,33 @@ pub fn sales_get(
                 baraka_domain::sales::PaymentStatus::Unpaid => "UNPAID",
             }
             .to_string(),
+            template_version: detail.document.template_version,
+            // DOC-07: the sale wire resolves display names + the wall-clock
+            // instant once, so every OS printout matches the engine bytes.
+            created_by_name: state
+                .users
+                .find_user_by_id(detail.document.created_by)
+                .map(|record| {
+                    record
+                        .map(|user| user.username)
+                        .unwrap_or_else(|| detail.document.created_by.to_string())
+                })
+                .unwrap_or_else(|_| detail.document.created_by.to_string()),
+            warehouse_name: state
+                .warehouses
+                .get_by_id(detail.document.warehouse_id)
+                .map(|warehouse| {
+                    warehouse
+                        .map(|site| site.name)
+                        .unwrap_or_else(|| detail.document.warehouse_id.to_string())
+                })
+                .unwrap_or_else(|_| detail.document.warehouse_id.to_string()),
+            created_at_display: baraka_domain::printing::format_ticket_instant(
+                &detail
+                    .document
+                    .created_at
+                    .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            ),
         },
         items: detail
             .items_view

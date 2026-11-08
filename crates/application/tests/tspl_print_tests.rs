@@ -9,10 +9,11 @@ use std::sync::Mutex;
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    ConvertBlToFactureCommand, ConvertBlToFactureResult, ConvertDevisToBlCommand,
-    ConvertDevisToBlResult, DocumentRepository, DocumentSearchFilter, DocumentSummary,
-    PrinterSettings, PrinterSettingsPort, PrinterTransportPort, SessionContext, SessionToken,
-    StoreIdentityPort, StoredPayment,
+    BootstrapFirstAdminCommand, ConvertBlToFactureCommand, ConvertBlToFactureResult,
+    ConvertDevisToBlCommand, ConvertDevisToBlResult, CreateUserInput, DeleteAudit,
+    DocumentRepository, DocumentSearchFilter, DocumentSummary, PrinterSettings,
+    PrinterSettingsPort, PrinterTransportPort, SessionContext, SessionToken, StoreIdentityPort,
+    StoredPayment, UpdateUserInput, UserRecord, UserRepository, WarehouseRepository,
 };
 use baraka_application::use_cases::tspl_printing::{
     PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplCalibrationUseCase,
@@ -20,7 +21,7 @@ use baraka_application::use_cases::tspl_printing::{
 };
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
-use baraka_domain::inventory::WarehouseId;
+use baraka_domain::inventory::{Warehouse, WarehouseCode, WarehouseId, WarehouseStockPresence};
 use baraka_domain::printing::TsplMediaSetup;
 use baraka_domain::printing::TsplProbeMode;
 use baraka_domain::role::Role;
@@ -28,6 +29,7 @@ use baraka_domain::sales::{
     Document, DocumentId, DocumentItem, DocumentItemView, DocumentLanguage, DocumentStatus,
     DocumentType,
 };
+use baraka_domain::user::User;
 use baraka_domain::user::UserId;
 
 fn session_with(role: Role) -> SessionContext {
@@ -152,6 +154,137 @@ impl StoreIdentityPort for FakeIdentity {
         _actor: &str,
         _action: &str,
         _detail: &str,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+}
+
+/// DOC-07: operator directory fake — `Some` resolves every id to one
+/// login name, `None` simulates the orphan (deleted user): the ticket
+/// falls back to the stored id verbatim.
+struct FakeUsers {
+    username: Option<String>,
+}
+
+impl UserRepository for FakeUsers {
+    fn find_by_username(&self, _username: &str) -> Result<Option<User>, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn record_login_failure(
+        &self,
+        _user_id: UserId,
+        _locked_until: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn reset_login_failures(&self, _user_id: UserId) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn get_password_hash(&self, _user_id: UserId) -> Result<String, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn get_pin_hash(&self, _user_id: UserId) -> Result<Option<String>, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn count_users(&self) -> Result<u64, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn bootstrap_first_admin(
+        &self,
+        _command: &BootstrapFirstAdminCommand,
+    ) -> Result<UserId, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn list_all_users(&self) -> Result<Vec<UserRecord>, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn find_user_by_id(&self, id: UserId) -> Result<Option<UserRecord>, ApplicationError> {
+        Ok(self.username.clone().map(|username| UserRecord {
+            id,
+            username,
+            role: Role::Caissier,
+            is_active: true,
+            has_pin: false,
+            created_at: "2026-01-01T00:00:00.000Z".to_string(),
+            updated_at: "2026-01-01T00:00:00.000Z".to_string(),
+        }))
+    }
+    fn create_user(&self, _input: &CreateUserInput) -> Result<UserRecord, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn update_user(&self, _input: &UpdateUserInput) -> Result<UserRecord, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn update_credentials(
+        &self,
+        _user_id: UserId,
+        _password_hash: Option<&str>,
+        _pin_hash: Option<&str>,
+        _updated_at: &str,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn count_active_admins(&self) -> Result<u64, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+}
+
+/// DOC-07: depot directory fake — same orphan contract as [`FakeUsers`].
+struct FakeWarehouses {
+    name: Option<String>,
+}
+
+impl WarehouseRepository for FakeWarehouses {
+    fn create_warehouse(
+        &self,
+        _warehouse: &Warehouse,
+        _origin_device_id: &str,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn get_by_id(&self, id: WarehouseId) -> Result<Option<Warehouse>, ApplicationError> {
+        Ok(self.name.clone().map(|name| Warehouse {
+            id,
+            code: WarehouseCode::new("PRINCIPAL").expect("fixture code"),
+            name,
+            is_active: true,
+        }))
+    }
+    fn get_by_code(&self, _code: &WarehouseCode) -> Result<Option<Warehouse>, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn list_active(&self) -> Result<Vec<Warehouse>, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn update_warehouse(
+        &self,
+        _id: WarehouseId,
+        _name: Option<&str>,
+        _is_active: Option<bool>,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn count_warehouse_references(&self, _id: WarehouseId) -> Result<u64, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn count_warehouse_nonzero_levels(&self, _id: WarehouseId) -> Result<u64, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn active_nonzero_level_counts(&self) -> Result<Vec<WarehouseStockPresence>, ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn hard_delete_warehouse(
+        &self,
+        _id: WarehouseId,
+        _audit: &DeleteAudit,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests");
+    }
+    fn set_warehouse_active(
+        &self,
+        _id: WarehouseId,
+        _active: bool,
+        _audit: &DeleteAudit,
     ) -> Result<(), ApplicationError> {
         panic!("out of scope for TSPL tests");
     }
@@ -507,9 +640,20 @@ fn ticket_rejects_non_spooler_transport_without_touching_the_queue() {
     };
     let transport = FakeTransport::new();
     let documents = FakeDocuments::ticket();
-    let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Caissier), documents.document.id, false)
-        .expect_err("non-spooler arm rejected");
+    let error = PrintTsplTicketUseCase::new(
+        &documents,
+        &settings,
+        &FakeIdentity,
+        &transport,
+        &FakeUsers {
+            username: Some("Ahmed".to_string()),
+        },
+        &FakeWarehouses {
+            name: Some("Principal".to_string()),
+        },
+    )
+    .execute(&session_with(Role::Caissier), documents.document.id, false)
+    .expect_err("non-spooler arm rejected");
     assert!(matches!(
         error,
         ApplicationError::Validation(DomainError::TsplTransportRequiresSpooler)
@@ -522,16 +666,28 @@ fn ticket_transcribes_discounted_and_legacy_lines_verbatim() {
     let settings = spooler();
     let transport = FakeTransport::new();
     let documents = FakeDocuments::ticket();
-    let outcome = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Caissier), documents.document.id, false)
-        .expect("spooler ticket prints");
+    let outcome = PrintTsplTicketUseCase::new(
+        &documents,
+        &settings,
+        &FakeIdentity,
+        &transport,
+        &FakeUsers {
+            username: Some("Ahmed".to_string()),
+        },
+        &FakeWarehouses {
+            name: Some("Principal".to_string()),
+        },
+    )
+    .execute(&session_with(Role::Caissier), documents.document.id, false)
+    .expect("spooler ticket prints");
     let payloads = transport.payloads();
     assert_eq!(payloads.len(), 1);
     assert_eq!(outcome.bytes_sent, payloads[0].len());
     let text = String::from_utf8(payloads[0].clone()).expect("bytes kept");
     assert!(text.starts_with("SIZE 80 mm,"));
-    // Per-unit line: stored net PU 900, never the raw 1000.
-    assert!(text.contains("3 Pièce x 9.00 = 27.00"));
+    // Per-unit line: stored net PU 900, never the raw 1000 — v2 splits
+    // the row (detail indented, net total on the right).
+    assert!(text.contains("3 Pièce x 9.00"));
     assert!(
         !text.contains("10.00"),
         "raw PU never leaks into a discounted line"
@@ -539,21 +695,27 @@ fn ticket_transcribes_discounted_and_legacy_lines_verbatim() {
     // Legacy NULL line: raw PU transcribed verbatim.
     assert!(text.contains("5.00"));
     // Per-unit discount badge (stored value), absent for legacy NULL rows.
-    assert!(text.contains("remise 1.00"));
-    // BRK-098 doc meta: cashier + depot ride the stored identifiers.
-    assert!(text.contains("Caissier: "));
-    assert!(text.contains("Depot: "));
+    assert!(text.contains("remise: 1.00"));
+    // DOC-07 doc meta: resolved names, never raw identifiers.
+    assert!(text.contains("Caissier: Ahmed"));
+    assert!(text.contains("Depot: Principal"));
+    // Wall-clock instant, never ISO.
+    assert!(text.contains("/"), "wall-clock instant, got:\n{text}");
     // Graphique-parity totals hierarchy + stored global discount row.
     // DOC-02 (owner 1.b): the duplicated HT row is gone — Sous-total stays.
-    assert!(text.contains("Sous-total: 32.00"));
+    // DOC-07: zero rows collapse.
+    assert!(text.contains("Sous-total :"));
     assert!(!text.contains("HT:"));
-    assert!(text.contains("Remise totale: 0.00"));
-    assert!(text.contains("TVA: 0.00"));
-    assert!(text.contains("TOTAL TTC: 32.00"));
-    assert!(text.contains("Payé (CASH): 32.00"));
-    assert!(text.contains("Rendu: 0.00"));
-    // Doc-number Code128 with human-readable number.
-    assert!(text.contains("BARCODE"));
+    assert!(!text.contains("Remise totale"));
+    assert!(!text.contains("TVA"));
+    assert!(text.contains(",\"3\",0,1,1,\"TOTAL TTC :"));
+    assert!(text.contains(",\"3\",0,1,1,\"32.00"));
+    assert!(!text.contains(",\"5\","), "no F5 slab");
+    assert!(text.contains("Payé (CASH) :"));
+    assert!(text.contains("Rendu :"));
+    assert!(text.contains("REVERSE "), "total rides a REVERSE band");
+    // Doc-number Code128 (12 mm, narrow bars) with human-readable number.
+    assert!(text.contains(",\"128\",96,0,0,1,2,"));
     assert!(text.ends_with("PRINT 1,1\r\n"));
 }
 
@@ -563,9 +725,20 @@ fn ticket_gate_reprint_document_but_label_allows_vendeur() {
     let transport = FakeTransport::new();
     let documents = FakeDocuments::ticket();
     // Vendeur lacks ReprintDocument: ticket refused before any read.
-    let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Vendeur), documents.document.id, false)
-        .expect_err("vendeur cannot print tickets");
+    let error = PrintTsplTicketUseCase::new(
+        &documents,
+        &settings,
+        &FakeIdentity,
+        &transport,
+        &FakeUsers {
+            username: Some("Ahmed".to_string()),
+        },
+        &FakeWarehouses {
+            name: Some("Principal".to_string()),
+        },
+    )
+    .execute(&session_with(Role::Vendeur), documents.document.id, false)
+    .expect_err("vendeur cannot print tickets");
     assert!(matches!(error, ApplicationError::Unauthorized));
     assert!(transport.payloads().is_empty());
     // Vendeur holds PosSell: shelf labels allowed.
@@ -679,9 +852,20 @@ fn ticket_missing_document_surfaces_not_found() {
     }
     let settings = spooler();
     let transport = FakeTransport::new();
-    let error = PrintTsplTicketUseCase::new(&EmptyDocuments, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Caissier), DocumentId::new(), false)
-        .expect_err("missing document rejected");
+    let error = PrintTsplTicketUseCase::new(
+        &EmptyDocuments,
+        &settings,
+        &FakeIdentity,
+        &transport,
+        &FakeUsers {
+            username: Some("Ahmed".to_string()),
+        },
+        &FakeWarehouses {
+            name: Some("Principal".to_string()),
+        },
+    )
+    .execute(&session_with(Role::Caissier), DocumentId::new(), false)
+    .expect_err("missing document rejected");
     assert!(matches!(error, ApplicationError::NotFound(_)));
 }
 
@@ -774,10 +958,21 @@ fn ticket_arabic_designation_rasterizes_to_bitmap() {
     let mut documents = FakeDocuments::ticket();
     documents.document.language = DocumentLanguage::Ar;
     documents.views[0].product_name_ar = Some("مسمار ابيض".to_string());
-    let outcome = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .with_ticket_raster(&FakeLabelRaster)
-        .execute(&session_with(Role::Admin), documents.document.id, false)
-        .expect("arabic ticket spools");
+    let outcome = PrintTsplTicketUseCase::new(
+        &documents,
+        &settings,
+        &FakeIdentity,
+        &transport,
+        &FakeUsers {
+            username: Some("Ahmed".to_string()),
+        },
+        &FakeWarehouses {
+            name: Some("Principal".to_string()),
+        },
+    )
+    .with_ticket_raster(&FakeLabelRaster)
+    .execute(&session_with(Role::Admin), documents.document.id, false)
+    .expect("arabic ticket spools");
     let payloads = transport.payloads();
     assert_eq!(payloads.len(), 1);
     assert_eq!(outcome.bytes_sent, payloads[0].len());
@@ -802,9 +997,20 @@ fn ticket_arabic_designation_without_rasterer_rejects_loudly() {
     let mut documents = FakeDocuments::ticket();
     documents.document.language = DocumentLanguage::Ar;
     documents.views[0].product_name_ar = Some("مسمار ابيض".to_string());
-    let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Admin), documents.document.id, false)
-        .expect_err("arabic without rasterer rejects");
+    let error = PrintTsplTicketUseCase::new(
+        &documents,
+        &settings,
+        &FakeIdentity,
+        &transport,
+        &FakeUsers {
+            username: Some("Ahmed".to_string()),
+        },
+        &FakeWarehouses {
+            name: Some("Principal".to_string()),
+        },
+    )
+    .execute(&session_with(Role::Admin), documents.document.id, false)
+    .expect_err("arabic without rasterer rejects");
     assert!(
         matches!(
             error,
@@ -822,9 +1028,20 @@ fn ticket_reprint_true_spools_duplicata_band() {
     let settings = spooler();
     let transport = FakeTransport::new();
     let documents = FakeDocuments::ticket();
-    let outcome = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Caissier), documents.document.id, true)
-        .expect("reprint spools");
+    let outcome = PrintTsplTicketUseCase::new(
+        &documents,
+        &settings,
+        &FakeIdentity,
+        &transport,
+        &FakeUsers {
+            username: Some("Ahmed".to_string()),
+        },
+        &FakeWarehouses {
+            name: Some("Principal".to_string()),
+        },
+    )
+    .execute(&session_with(Role::Caissier), documents.document.id, true)
+    .expect("reprint spools");
     assert_eq!(outcome.bytes_sent, transport.payloads()[0].len());
     let text = String::from_utf8(transport.payloads()[0].clone()).expect("bytes kept");
     assert!(text.contains("DUPLICATA"), "reprint carries the mark");
@@ -838,9 +1055,20 @@ fn ticket_unknown_template_version_rejects_loudly_without_spooling() {
     let transport = FakeTransport::new();
     let mut documents = FakeDocuments::ticket();
     documents.document.template_version = 99;
-    let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Caissier), documents.document.id, false)
-        .expect_err("unknown template rejects");
+    let error = PrintTsplTicketUseCase::new(
+        &documents,
+        &settings,
+        &FakeIdentity,
+        &transport,
+        &FakeUsers {
+            username: Some("Ahmed".to_string()),
+        },
+        &FakeWarehouses {
+            name: Some("Principal".to_string()),
+        },
+    )
+    .execute(&session_with(Role::Caissier), documents.document.id, false)
+    .expect_err("unknown template rejects");
     assert!(
         matches!(
             error,
@@ -1044,4 +1272,64 @@ fn calibration_pattern_spools_with_stored_offsets() {
     assert!(text.contains("BOX 8,-8,327,151,2\r\n"), "border shifted");
     assert!(text.contains("\"X+1MM Y-1MM\""), "self-documenting offsets");
     assert!(text.ends_with("PRINT 1,1\r\n"), "single-copy tail");
+}
+
+// DOC-07: an orphaned reference (deleted user/warehouse) falls back to the
+// stored id verbatim — never invented, never a failed reprint.
+#[test]
+fn ticket_orphan_references_fall_back_to_stored_ids() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let documents = FakeDocuments::ticket();
+    let outcome = PrintTsplTicketUseCase::new(
+        &documents,
+        &settings,
+        &FakeIdentity,
+        &transport,
+        &FakeUsers { username: None },
+        &FakeWarehouses { name: None },
+    )
+    .execute(&session_with(Role::Caissier), documents.document.id, false)
+    .expect("orphan ticket still spools");
+    assert_eq!(outcome.bytes_sent, transport.payloads()[0].len());
+    let text = String::from_utf8(transport.payloads()[0].clone()).expect("bytes kept");
+    assert!(
+        text.contains(&format!("Caissier: {}", documents.document.created_by)),
+        "stored user id verbatim, got:\n{text}"
+    );
+    assert!(
+        text.contains(&format!("Depot: {}", documents.document.warehouse_id)),
+        "stored warehouse id verbatim, got:\n{text}"
+    );
+}
+
+// DOC-07: a zero per-unit discount collapses the badge at transcription
+// (the use case maps Some(0) to no badge — paper saved, totals untouched).
+#[test]
+fn ticket_zero_per_unit_discount_prints_no_badge() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let mut documents = FakeDocuments::ticket();
+    documents.views[0].item.discount_per_unit_centimes = Some(0);
+    let outcome = PrintTsplTicketUseCase::new(
+        &documents,
+        &settings,
+        &FakeIdentity,
+        &transport,
+        &FakeUsers {
+            username: Some("Ahmed".to_string()),
+        },
+        &FakeWarehouses {
+            name: Some("Principal".to_string()),
+        },
+    )
+    .execute(&session_with(Role::Caissier), documents.document.id, false)
+    .expect("zero-discount ticket spools");
+    assert_eq!(outcome.bytes_sent, transport.payloads()[0].len());
+    let text = String::from_utf8(transport.payloads()[0].clone()).expect("bytes kept");
+    assert!(
+        !text.contains("remise"),
+        "zero badge collapses, got:\n{text}"
+    );
+    assert!(text.contains("27.00"), "net total untouched, got:\n{text}");
 }

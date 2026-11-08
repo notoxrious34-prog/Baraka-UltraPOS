@@ -537,9 +537,10 @@ fn ticket_transcribes_discounted_and_legacy_lines_verbatim() {
     assert!(text.contains("Caissier: "));
     assert!(text.contains("Depot: "));
     // Graphique-parity totals hierarchy + stored global discount row.
+    // DOC-02 (owner 1.b): the duplicated HT row is gone — Sous-total stays.
     assert!(text.contains("Sous-total: 32.00"));
+    assert!(!text.contains("HT:"));
     assert!(text.contains("Remise totale: 0.00"));
-    assert!(text.contains("HT: 32.00"));
     assert!(text.contains("TVA: 0.00"));
     assert!(text.contains("TOTAL TTC: 32.00"));
     assert!(text.contains("Payé (CASH): 32.00"));
@@ -746,6 +747,56 @@ fn label_arabic_name_without_rasterer_rejects_loudly() {
             "AR02",
             1,
         )
+        .expect_err("arabic without rasterer rejects");
+    assert!(
+        matches!(
+            error,
+            ApplicationError::Port(ref code) if code == "TSPL_LABEL_RASTER_UNAVAILABLE"
+        ),
+        "stable loud code, got: {error:?}"
+    );
+    assert!(transport.payloads().is_empty(), "nothing spooled");
+}
+
+// DOC-01: an Arabic ticket designation routes through the rasterer —
+// BITMAP chunks for non-Latin lines, Latin lines still TEXT, tail intact.
+#[test]
+fn ticket_arabic_designation_rasterizes_to_bitmap() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let mut documents = FakeDocuments::ticket();
+    documents.document.language = DocumentLanguage::Ar;
+    documents.views[0].product_name_ar = Some("مسمار ابيض".to_string());
+    let outcome = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
+        .with_ticket_raster(&FakeLabelRaster)
+        .execute(&session_with(Role::Admin), documents.document.id)
+        .expect("arabic ticket spools");
+    let payloads = transport.payloads();
+    assert_eq!(payloads.len(), 1);
+    assert_eq!(outcome.bytes_sent, payloads[0].len());
+    let bytes = &payloads[0];
+    assert!(
+        bytes.windows(b"BITMAP ".len()).any(|w| w == b"BITMAP "),
+        "arabic line travels as BITMAP"
+    );
+    assert!(
+        bytes.windows(b"TEXT ".len()).any(|w| w == b"TEXT "),
+        "latin lines (number, instant, cashier) stay TEXT"
+    );
+    assert!(bytes.ends_with(b"\r\nPRINT 1,1\r\n"), "tail intact");
+}
+
+// DOC-01: without a rasterer the Arabic ticket fails LOUDLY with the
+// stable code — never a silently-eaten dead ticket.
+#[test]
+fn ticket_arabic_designation_without_rasterer_rejects_loudly() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let mut documents = FakeDocuments::ticket();
+    documents.document.language = DocumentLanguage::Ar;
+    documents.views[0].product_name_ar = Some("مسمار ابيض".to_string());
+    let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
+        .execute(&session_with(Role::Admin), documents.document.id)
         .expect_err("arabic without rasterer rejects");
     assert!(
         matches!(

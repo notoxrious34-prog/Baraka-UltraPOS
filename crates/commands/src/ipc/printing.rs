@@ -122,6 +122,7 @@ pub fn print_tspl_ticket(
         state.store_identity.as_ref(),
         state.printer_transport.as_ref(),
     )
+    .with_ticket_raster(state.label_raster.as_ref())
     .execute(&session, id)
     .map_err(|error| error_code(&error))?;
     Ok(TsplPrintResponse {

@@ -20,8 +20,9 @@ use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
     format_centimes_plain, format_qty_plain, label_text_needs_bitmap, label_text_plan,
     render_bitmap_job, render_label_40x20, render_label_40x20_mixed, render_ticket_80mm,
-    LabelBitmap, LabelTextSlot, TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket,
-    TsplTicketLine, TsplTicketTotals, TRANSPORT_SPOOLER,
+    render_ticket_80mm_mixed, ticket_text_plan, LabelBitmap, LabelTextSlot, TicketOp,
+    TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine, TsplTicketTotals,
+    TRANSPORT_SPOOLER,
 };
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{DocumentId, DocumentLanguage};
@@ -199,33 +200,64 @@ where
 }
 
 /// Silent 80 mm ticket print (graphique content model, TSPL bytes).
-pub struct PrintTsplTicketUseCase<'a, D, S, I, T>
+pub struct PrintTsplTicketUseCase<'a, D, S, I, T, R = NullLabelRaster>
 where
     D: ?Sized,
     S: ?Sized,
     I: ?Sized,
     T: ?Sized,
+    R: ?Sized,
 {
     documents: &'a D,
     settings: &'a S,
     identity: &'a I,
     transport: &'a T,
+    ticket_raster: &'a R,
 }
 
-impl<'a, D, S, I, T> PrintTsplTicketUseCase<'a, D, S, I, T>
+/// Shared no-rasterer behind every default-constructed ticket use case.
+static NULL_TICKET_RASTER: NullLabelRaster = NullLabelRaster;
+
+impl<'a, D, S, I, T> PrintTsplTicketUseCase<'a, D, S, I, T, NullLabelRaster>
 where
     D: DocumentRepository + ?Sized,
     S: PrinterSettingsPort + ?Sized,
     I: StoreIdentityPort + ?Sized,
     T: PrinterTransportPort + ?Sized,
 {
-    /// Wire the use case to its ports.
+    /// Wire the use case to its ports (no ticket rasterer attached).
     pub fn new(documents: &'a D, settings: &'a S, identity: &'a I, transport: &'a T) -> Self {
         Self {
             documents,
             settings,
             identity,
             transport,
+            ticket_raster: &NULL_TICKET_RASTER,
+        }
+    }
+}
+
+impl<'a, D, S, I, T, R> PrintTsplTicketUseCase<'a, D, S, I, T, R>
+where
+    D: DocumentRepository + ?Sized,
+    S: PrinterSettingsPort + ?Sized,
+    I: StoreIdentityPort + ?Sized,
+    T: PrinterTransportPort + ?Sized,
+    R: TsplLabelRasterPort + ?Sized,
+{
+    /// Attach the bitmap rasterer (DOC-01): Arabic/CJK/emoji ticket lines
+    /// ride BITMAP instead of silently dying as TEXT; without it any
+    /// non-Latin line fails LOUDLY — never a dead ticket.
+    pub fn with_ticket_raster<Q>(self, raster: &'a Q) -> PrintTsplTicketUseCase<'a, D, S, I, T, Q>
+    where
+        Q: TsplLabelRasterPort + ?Sized,
+    {
+        PrintTsplTicketUseCase {
+            documents: self.documents,
+            settings: self.settings,
+            identity: self.identity,
+            transport: self.transport,
+            ticket_raster: raster,
         }
     }
 
@@ -331,7 +363,46 @@ where
             footer: &identity.ticket_footer_message,
             media: media_from_settings(self.settings)?,
         };
-        let bytes = render_ticket_80mm(&ticket)?;
+        // DOC-01: route every non-Latin line through the bitmap rasterer
+        // (same rule as shelf labels) — pure-TEXT jobs stay byte-identical.
+        let (ops, _) = ticket_text_plan(&ticket);
+        let needs_bitmap = ops.iter().any(|op| {
+            matches!(op, TicketOp::Text(line) if label_text_needs_bitmap(&line.text, ticket.media.probe_mode))
+        });
+        let bytes = if needs_bitmap {
+            let mut bitmaps: Vec<(usize, LabelBitmap)> = Vec::new();
+            let mut text_idx: usize = 0;
+            for op in &ops {
+                if let TicketOp::Text(line) = op {
+                    let idx = text_idx;
+                    text_idx += 1;
+                    if !label_text_needs_bitmap(&line.text, ticket.media.probe_mode) {
+                        continue;
+                    }
+                    let raster = self.ticket_raster.rasterize_label_text(
+                        &line.text,
+                        line.cell_h_dots as f32,
+                        u32::try_from(line.box_w_dots).map_err(|_| {
+                            ApplicationError::Port("TSPL_TICKET_BOX_TOO_WIDE".to_string())
+                        })?,
+                        u32::try_from(line.box_h_dots).map_err(|_| {
+                            ApplicationError::Port("TSPL_TICKET_BOX_TOO_TALL".to_string())
+                        })?,
+                    )?;
+                    bitmaps.push((
+                        idx,
+                        LabelBitmap {
+                            width_bytes: raster.width_bytes,
+                            height_rows: raster.height_rows,
+                            data: raster.data,
+                        },
+                    ));
+                }
+            }
+            render_ticket_80mm_mixed(&ticket, &bitmaps)?
+        } else {
+            render_ticket_80mm(&ticket)?
+        };
         self.transport.send_raster(&bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),

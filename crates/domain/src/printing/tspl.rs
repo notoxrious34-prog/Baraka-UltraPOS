@@ -366,7 +366,6 @@ pub struct TsplTicket<'a> {
 struct Captions {
     subtotal: &'static str,
     discount_total: &'static str,
-    ht: &'static str,
     tva: &'static str,
     total: &'static str,
     paid: &'static str,
@@ -383,7 +382,6 @@ fn captions(lang: TsplCaptionLang) -> Captions {
         TsplCaptionLang::French => Captions {
             subtotal: "Sous-total",
             discount_total: "Remise totale",
-            ht: "HT",
             tva: "TVA",
             total: "TOTAL TTC",
             paid: "Payé",
@@ -397,7 +395,6 @@ fn captions(lang: TsplCaptionLang) -> Captions {
         TsplCaptionLang::Arabic => Captions {
             subtotal: "المجموع الفرعي",
             discount_total: "الخصم الإجمالي",
-            ht: "صافي",
             tva: "الضريبة",
             total: "الإجمالي",
             paid: "المدفوع",
@@ -413,6 +410,475 @@ fn captions(lang: TsplCaptionLang) -> Captions {
 
 /// Make free text safe for a quoted TSPL field: `"` would break command
 /// framing (no escape exists) and CR/LF would inject commands.
+/// Ticket printer face (DOC-02): F5 is the native 32x48 face — same
+/// geometry the old scale-2 price occupied, but crisp.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TicketFace {
+    F1,
+    F2,
+    F3,
+    F5,
+}
+
+impl TicketFace {
+    fn face_str(self) -> &'static str {
+        match self {
+            TicketFace::F1 => "1",
+            TicketFace::F2 => "2",
+            TicketFace::F3 => "3",
+            TicketFace::F5 => "5",
+        }
+    }
+    fn scale(self) -> i64 {
+        1
+    }
+    #[allow(dead_code)]
+    fn cell_h(self) -> i64 {
+        match self {
+            TicketFace::F1 => FONT_1_H,
+            TicketFace::F2 => FONT_2_H,
+            TicketFace::F3 => FONT_3_H,
+            TicketFace::F5 => 48,
+        }
+    }
+}
+
+/// Logical ticket text slot (DOC-01): readability key — bitmap lookup
+/// is by LINE INDEX (dynamic rows), not by slot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TicketTextSlot {
+    StoreName,
+    Contact,
+    TaxRow,
+    DocNumber,
+    Instant,
+    Cashier,
+    Depot,
+    ColumnHeader,
+    LineName,
+    LineDetail,
+    LineBadge,
+    TotalsRow,
+    TotalTtc,
+    Payment,
+    Change,
+    Human,
+    Footer,
+    Thanks,
+}
+
+/// Horizontal anchoring for bitmap re-layout (DOC-01): a BITMAP is
+/// narrower than its TEXT cell, so centered/right lines re-anchor from
+/// the bitmap width instead of reusing the TEXT origin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TicketAlign {
+    Left,
+    Center,
+    Right,
+}
+
+/// One ticket text line (DOC-01): exact text the renderer would emit,
+/// TEXT origin, printer face, raster box, and alignment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TicketTextLine {
+    pub slot: TicketTextSlot,
+    pub text: String,
+    pub x_dots: i64,
+    pub y_dots: i64,
+    pub face: TicketFace,
+    pub cell_h_dots: i64,
+    pub box_w_dots: i64,
+    pub box_h_dots: i64,
+    pub align: TicketAlign,
+}
+
+/// Ticket layout op (DOC-01): text lines carry bitmaps, rules and the
+/// barcode pass through untouched.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TicketOp {
+    Text(TicketTextLine),
+    Rule(i64),
+    Barcode {
+        x_dots: i64,
+        y_dots: i64,
+        number: String,
+    },
+}
+
+/// Ticket layout plan (DOC-01 + DOC-02): ALL geometry lives here — the
+/// renderer only emits. Returns the ops plus the content end (dots) for
+/// the SIZE 80 mm computation.
+///
+/// DOC-02 deltas vs the v1 renderer: the duplicated HT row is gone
+/// (owner decision 1.b — Sous-total stays), TOTAL TTC uses the native
+/// F5 face, and the barcode drops its printer-generated human line
+/// (the TEXT line below stays the single source).
+pub fn ticket_text_plan(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
+    let mut ops: Vec<TicketOp> = Vec::new();
+    let mut y: i64 = 8;
+    let right_edge = TICKET_WIDTH_DOTS - TICKET_MARGIN_X;
+    let caps = captions(ticket.captions);
+    let narrow_chars = ((TICKET_WIDTH_DOTS - 2 * TICKET_MARGIN_X) / FONT_1_W) as usize;
+    let wide_chars = ((TICKET_WIDTH_DOTS - 2 * TICKET_MARGIN_X) / FONT_2_W) as usize;
+    let name_chars = ((TICKET_WIDTH_DOTS - 2 * TICKET_MARGIN_X) / FONT_3_W) as usize;
+    let total_chars = ((TICKET_WIDTH_DOTS - 2 * TICKET_MARGIN_X) / (FONT_3_W * 2)) as usize;
+    let inner_w = TICKET_WIDTH_DOTS - 2 * TICKET_MARGIN_X;
+
+    // Store block (blank fields collapse — never empty lines).
+    let store = truncate_to_width(ticket.store_name.trim(), name_chars);
+    if !store.is_empty() {
+        let dots = text_dots(store.chars().count(), FONT_3_W, 1);
+        ops.push(TicketOp::Text(TicketTextLine {
+            slot: TicketTextSlot::StoreName,
+            text: store,
+            x_dots: centered_x(TICKET_WIDTH_DOTS, dots),
+            y_dots: y,
+            face: TicketFace::F3,
+            cell_h_dots: FONT_3_H,
+            box_w_dots: inner_w,
+            box_h_dots: PITCH_F3,
+            align: TicketAlign::Center,
+        }));
+        y += PITCH_F3;
+    }
+    for line in [ticket.store_address, ticket.store_phone] {
+        let shown = truncate_to_width(line.trim(), narrow_chars);
+        if !shown.is_empty() {
+            let dots = text_dots(shown.chars().count(), FONT_1_W, 1);
+            ops.push(TicketOp::Text(TicketTextLine {
+                slot: TicketTextSlot::Contact,
+                text: shown,
+                x_dots: centered_x(TICKET_WIDTH_DOTS, dots),
+                y_dots: y,
+                face: TicketFace::F1,
+                cell_h_dots: FONT_1_H,
+                box_w_dots: inner_w,
+                box_h_dots: PITCH_F1,
+                align: TicketAlign::Center,
+            }));
+            y += PITCH_F1;
+        }
+    }
+    for (prefix, value) in ticket.tax_rows {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let joined = format!("{prefix}: {trimmed}");
+        let shown = truncate_to_width(&joined, narrow_chars);
+        let dots = text_dots(shown.chars().count(), FONT_1_W, 1);
+        ops.push(TicketOp::Text(TicketTextLine {
+            slot: TicketTextSlot::TaxRow,
+            text: shown,
+            x_dots: centered_x(TICKET_WIDTH_DOTS, dots),
+            y_dots: y,
+            face: TicketFace::F1,
+            cell_h_dots: FONT_1_H,
+            box_w_dots: inner_w,
+            box_h_dots: PITCH_F1,
+            align: TicketAlign::Center,
+        }));
+        y += PITCH_F1;
+    }
+    ops.push(TicketOp::Rule(y));
+    y += 10;
+    // Doc meta: number, capture instant, cashier, depot.
+    let number = sanitize_tspl_text(ticket.number);
+    let number_shown = truncate_to_width(&number, wide_chars);
+    ops.push(TicketOp::Text(TicketTextLine {
+        slot: TicketTextSlot::DocNumber,
+        text: number_shown,
+        x_dots: TICKET_MARGIN_X,
+        y_dots: y,
+        face: TicketFace::F2,
+        cell_h_dots: FONT_2_H,
+        box_w_dots: inner_w,
+        box_h_dots: PITCH_F2,
+        align: TicketAlign::Left,
+    }));
+    y += PITCH_F2;
+    let instant = sanitize_tspl_text(ticket.created_at);
+    let instant_shown = truncate_to_width(&instant[..instant.len().min(19)], narrow_chars);
+    ops.push(TicketOp::Text(TicketTextLine {
+        slot: TicketTextSlot::Instant,
+        text: instant_shown,
+        x_dots: TICKET_MARGIN_X,
+        y_dots: y,
+        face: TicketFace::F1,
+        cell_h_dots: FONT_1_H,
+        box_w_dots: inner_w,
+        box_h_dots: PITCH_F1,
+        align: TicketAlign::Left,
+    }));
+    y += PITCH_F1;
+    let cashier = format!(
+        "{}: {}",
+        caps.cashier_word,
+        sanitize_tspl_text(ticket.cashier_text)
+    );
+    let cashier_shown = truncate_to_width(&cashier, narrow_chars);
+    ops.push(TicketOp::Text(TicketTextLine {
+        slot: TicketTextSlot::Cashier,
+        text: cashier_shown,
+        x_dots: TICKET_MARGIN_X,
+        y_dots: y,
+        face: TicketFace::F1,
+        cell_h_dots: FONT_1_H,
+        box_w_dots: inner_w,
+        box_h_dots: PITCH_F1,
+        align: TicketAlign::Left,
+    }));
+    y += PITCH_F1;
+    let depot = format!(
+        "{}: {}",
+        caps.depot_word,
+        sanitize_tspl_text(ticket.warehouse_text)
+    );
+    let depot_shown = truncate_to_width(&depot, narrow_chars);
+    ops.push(TicketOp::Text(TicketTextLine {
+        slot: TicketTextSlot::Depot,
+        text: depot_shown,
+        x_dots: TICKET_MARGIN_X,
+        y_dots: y,
+        face: TicketFace::F1,
+        cell_h_dots: FONT_1_H,
+        box_w_dots: inner_w,
+        box_h_dots: PITCH_F1,
+        align: TicketAlign::Left,
+    }));
+    y += PITCH_F1;
+    ops.push(TicketOp::Rule(y));
+    y += 10;
+    // Column header.
+    let header = truncate_to_width(caps.column_header, narrow_chars);
+    ops.push(TicketOp::Text(TicketTextLine {
+        slot: TicketTextSlot::ColumnHeader,
+        text: header,
+        x_dots: TICKET_MARGIN_X,
+        y_dots: y,
+        face: TicketFace::F1,
+        cell_h_dots: FONT_1_H,
+        box_w_dots: inner_w,
+        box_h_dots: PITCH_F1,
+        align: TicketAlign::Left,
+    }));
+    y += PITCH_F1;
+    // Item rows.
+    for line in ticket.lines {
+        let designation = truncate_to_width(line.designation.trim(), wide_chars);
+        ops.push(TicketOp::Text(TicketTextLine {
+            slot: TicketTextSlot::LineName,
+            text: designation,
+            x_dots: TICKET_MARGIN_X,
+            y_dots: y,
+            face: TicketFace::F2,
+            cell_h_dots: FONT_2_H,
+            box_w_dots: inner_w,
+            box_h_dots: PITCH_F2,
+            align: TicketAlign::Left,
+        }));
+        y += PITCH_F2;
+        let detail = if line.unit_text.trim().is_empty() {
+            format!(
+                "{} x {} = {}",
+                sanitize_tspl_text(line.quantity_text),
+                sanitize_tspl_text(line.unit_price_text),
+                sanitize_tspl_text(line.line_total_text),
+            )
+        } else {
+            format!(
+                "{} {} x {} = {}",
+                sanitize_tspl_text(line.quantity_text),
+                sanitize_tspl_text(line.unit_text),
+                sanitize_tspl_text(line.unit_price_text),
+                sanitize_tspl_text(line.line_total_text),
+            )
+        };
+        let detail_shown = truncate_to_width(&detail, narrow_chars);
+        let detail_dots = text_dots(detail_shown.chars().count(), FONT_1_W, 1);
+        ops.push(TicketOp::Text(TicketTextLine {
+            slot: TicketTextSlot::LineDetail,
+            text: detail_shown,
+            x_dots: right_x(right_edge, detail_dots),
+            y_dots: y,
+            face: TicketFace::F1,
+            cell_h_dots: FONT_1_H,
+            box_w_dots: inner_w,
+            box_h_dots: PITCH_F1,
+            align: TicketAlign::Right,
+        }));
+        y += PITCH_F1;
+        if let Some(discount) = line.discount_text {
+            let badge = format!("{} {}", caps.discount_word, sanitize_tspl_text(discount));
+            let badge_shown = truncate_to_width(&badge, narrow_chars / 2);
+            let badge_dots = text_dots(badge_shown.chars().count(), FONT_1_W, 1);
+            ops.push(TicketOp::Text(TicketTextLine {
+                slot: TicketTextSlot::LineBadge,
+                text: badge_shown,
+                x_dots: right_x(right_edge, badge_dots),
+                y_dots: y,
+                face: TicketFace::F1,
+                cell_h_dots: FONT_1_H,
+                box_w_dots: inner_w,
+                box_h_dots: PITCH_F1,
+                align: TicketAlign::Right,
+            }));
+            y += PITCH_F1;
+        }
+    }
+    ops.push(TicketOp::Rule(y));
+    y += 10;
+    // Totals hierarchy (right-aligned); DOC-02: the duplicated HT row is
+    // gone (owner 1.b) — Sous-total stays the single HT figure.
+    let totals_rows = [
+        (
+            TicketTextSlot::TotalsRow,
+            caps.subtotal,
+            ticket.totals.subtotal_ht,
+        ),
+        (
+            TicketTextSlot::TotalsRow,
+            caps.discount_total,
+            ticket.totals.global_discount,
+        ),
+        (TicketTextSlot::TotalsRow, caps.tva, ticket.totals.tva),
+    ];
+    for (slot, caption, value) in totals_rows {
+        let row = format!("{caption}: {}", sanitize_tspl_text(value));
+        let shown = truncate_to_width(&row, wide_chars);
+        let dots = text_dots(shown.chars().count(), FONT_2_W, 1);
+        ops.push(TicketOp::Text(TicketTextLine {
+            slot,
+            text: shown,
+            x_dots: right_x(right_edge, dots),
+            y_dots: y,
+            face: TicketFace::F2,
+            cell_h_dots: FONT_2_H,
+            box_w_dots: inner_w,
+            box_h_dots: PITCH_F2,
+            align: TicketAlign::Right,
+        }));
+        y += PITCH_F2;
+    }
+    let total_row = format!(
+        "{}: {}",
+        caps.total,
+        sanitize_tspl_text(ticket.totals.total_ttc)
+    );
+    let total_shown = truncate_to_width(&total_row, total_chars);
+    let total_dots = text_dots(total_shown.chars().count(), FONT_3_W * 2, 1);
+    ops.push(TicketOp::Text(TicketTextLine {
+        slot: TicketTextSlot::TotalTtc,
+        text: total_shown,
+        x_dots: right_x(right_edge, total_dots),
+        y_dots: y,
+        face: TicketFace::F5,
+        cell_h_dots: 48,
+        box_w_dots: inner_w,
+        box_h_dots: PITCH_F3_X2,
+        align: TicketAlign::Right,
+    }));
+    y += PITCH_F3_X2;
+    // Payment block.
+    let payment = format!(
+        "{} ({}): {}",
+        caps.paid,
+        sanitize_tspl_text(ticket.totals.payment_method),
+        sanitize_tspl_text(ticket.totals.paid),
+    );
+    let payment_shown = truncate_to_width(&payment, narrow_chars);
+    let payment_dots = text_dots(payment_shown.chars().count(), FONT_1_W, 1);
+    ops.push(TicketOp::Text(TicketTextLine {
+        slot: TicketTextSlot::Payment,
+        text: payment_shown,
+        x_dots: right_x(right_edge, payment_dots),
+        y_dots: y,
+        face: TicketFace::F1,
+        cell_h_dots: FONT_1_H,
+        box_w_dots: inner_w,
+        box_h_dots: PITCH_F1,
+        align: TicketAlign::Right,
+    }));
+    y += PITCH_F1;
+    let change_row = format!(
+        "{}: {}",
+        caps.change,
+        sanitize_tspl_text(ticket.totals.change)
+    );
+    let change_shown = truncate_to_width(&change_row, narrow_chars);
+    let change_dots = text_dots(change_shown.chars().count(), FONT_1_W, 1);
+    ops.push(TicketOp::Text(TicketTextLine {
+        slot: TicketTextSlot::Change,
+        text: change_shown,
+        x_dots: right_x(right_edge, change_dots),
+        y_dots: y,
+        face: TicketFace::F1,
+        cell_h_dots: FONT_1_H,
+        box_w_dots: inner_w,
+        box_h_dots: PITCH_F1,
+        align: TicketAlign::Right,
+    }));
+    y += PITCH_F1;
+    // Doc-number barcode (centered, quiet zones >= 20 dots per side) with
+    // the human-readable number beneath (DOC-02: printer-generated line
+    // OFF — the TEXT line below stays the single source).
+    y += 8;
+    let barcode_dots = barcode_width_dots(number.chars().count()) as i64;
+    let barcode_x = centered_x(TICKET_WIDTH_DOTS, barcode_dots);
+    ops.push(TicketOp::Barcode {
+        x_dots: barcode_x,
+        y_dots: y,
+        number: number.clone(),
+    });
+    y += TICKET_BARCODE_HEIGHT + 4;
+    let human = truncate_to_width(&number, narrow_chars);
+    let human_dots = text_dots(human.chars().count(), FONT_1_W, 1);
+    ops.push(TicketOp::Text(TicketTextLine {
+        slot: TicketTextSlot::Human,
+        text: human,
+        x_dots: centered_x(TICKET_WIDTH_DOTS, human_dots),
+        y_dots: y,
+        face: TicketFace::F1,
+        cell_h_dots: FONT_1_H,
+        box_w_dots: inner_w,
+        box_h_dots: PITCH_F1,
+        align: TicketAlign::Center,
+    }));
+    y += PITCH_F1 + 4;
+    // Footer: owner message (collapses when blank) + constant thanks.
+    let footer = truncate_to_width(ticket.footer.trim(), narrow_chars);
+    if !footer.is_empty() {
+        let dots = text_dots(footer.chars().count(), FONT_1_W, 1);
+        ops.push(TicketOp::Text(TicketTextLine {
+            slot: TicketTextSlot::Footer,
+            text: footer,
+            x_dots: centered_x(TICKET_WIDTH_DOTS, dots),
+            y_dots: y,
+            face: TicketFace::F1,
+            cell_h_dots: FONT_1_H,
+            box_w_dots: inner_w,
+            box_h_dots: PITCH_F1,
+            align: TicketAlign::Center,
+        }));
+        y += PITCH_F1;
+    }
+    let thanks = truncate_to_width(caps.thanks, narrow_chars);
+    let thanks_dots = text_dots(thanks.chars().count(), FONT_1_W, 1);
+    ops.push(TicketOp::Text(TicketTextLine {
+        slot: TicketTextSlot::Thanks,
+        text: thanks,
+        x_dots: centered_x(TICKET_WIDTH_DOTS, thanks_dots),
+        y_dots: y,
+        face: TicketFace::F1,
+        cell_h_dots: FONT_1_H,
+        box_w_dots: inner_w,
+        box_h_dots: PITCH_F1,
+        align: TicketAlign::Center,
+    }));
+    y += PITCH_F1 + 16;
+    (ops, y)
+}
+
 fn sanitize_tspl_text(value: &str) -> String {
     value.replace('"', "'").replace(['\r', '\n'], " ")
 }
@@ -503,11 +969,6 @@ fn ascii_probe_lossy(content: &str) -> String {
         .chars()
         .map(|c| if c.is_ascii() { c } else { '?' })
         .collect()
-}
-
-/// Emit one solid rule across the full width (BAR, 2 dots high).
-fn push_rule(out: &mut Vec<String>, y: i64, media: i64) {
-    out.push(format!("BAR 0,{y},{media},2"));
 }
 
 /// Ticket line pitches in dots (font height + leading).
@@ -839,7 +1300,22 @@ pub fn render_label_40x20_mixed(
 
 /// Render the 80 mm gapless ticket. Height is computed from content:
 /// `SIZE 80 mm,H mm` with H = ceil(total_dots / 8).
+/// Render the 80 mm gapless ticket. Height is computed from content:
+/// `SIZE 80 mm,H mm` with H = ceil(total_dots / 8).
 pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainError> {
+    render_ticket_80mm_mixed(ticket, &[])
+}
+
+/// Render the 80 mm ticket with bitmap slots (DOC-01): every planned
+/// TEXT line carrying a bitmap (keyed by LINE INDEX — tickets have
+/// dynamic rows) is replaced by a `BITMAP` chunk re-anchored from its
+/// alignment (bottom-aligned to the TEXT cell, like labels); all other
+/// lines emit TEXT unchanged, so an all-TEXT job is byte-identical to
+/// `render_ticket_80mm`.
+pub fn render_ticket_80mm_mixed(
+    ticket: &TsplTicket<'_>,
+    bitmaps: &[(usize, LabelBitmap)],
+) -> Result<Vec<u8>, DomainError> {
     if ticket.number.trim().is_empty() {
         return Err(DomainError::InvalidCanonicalString(
             "TSPL_NUMBER_MUST_NOT_BE_EMPTY".to_string(),
@@ -850,293 +1326,127 @@ pub fn render_ticket_80mm(ticket: &TsplTicket<'_>) -> Result<Vec<u8>, DomainErro
         // 11·n + 35 modules must fit 300 (quiet zones 20 dots per side).
         return Err(DomainError::TsplBarcodeTooWide);
     }
-    let number = sanitize_tspl_text(ticket.number);
-    // TEMPORARY-DIAGNOSTIC (BRK-100): probe mode rides every TEXT line.
+    // Bitmap lookup is positional: duplicate indices would silently shadow.
+    for (i, (a, _)) in bitmaps.iter().enumerate() {
+        for (b, _) in &bitmaps[..i] {
+            if a == b {
+                return Err(DomainError::InvalidCanonicalString(
+                    "TICKET_DUPLICATE_BITMAP".to_string(),
+                ));
+            }
+        }
+    }
     let probe = ticket.media.probe_mode;
-    let barcode_dots = barcode_width_dots(number.chars().count()) as i64;
-    let barcode_x = centered_x(TICKET_WIDTH_DOTS, barcode_dots);
-    let right_edge = TICKET_WIDTH_DOTS - TICKET_MARGIN_X;
-    let caps = captions(ticket.captions);
-
-    let narrow_chars = ((TICKET_WIDTH_DOTS - 2 * TICKET_MARGIN_X) / FONT_1_W) as usize;
-    let wide_chars = ((TICKET_WIDTH_DOTS - 2 * TICKET_MARGIN_X) / FONT_2_W) as usize;
-    let name_chars = ((TICKET_WIDTH_DOTS - 2 * TICKET_MARGIN_X) / FONT_3_W) as usize;
-    let total_chars = ((TICKET_WIDTH_DOTS - 2 * TICKET_MARGIN_X) / (FONT_3_W * 2)) as usize;
-
-    let mut body: Vec<String> = Vec::new();
-    let mut y: i64 = 8;
-
-    // Store block (blank fields collapse — never empty lines).
-    let store = truncate_to_width(ticket.store_name.trim(), name_chars);
-    if !store.is_empty() {
-        let dots = text_dots(store.chars().count(), FONT_3_W, 1);
-        push_text(
-            &mut body,
-            centered_x(TICKET_WIDTH_DOTS, dots),
-            y,
-            "3",
-            1,
-            &store,
-            probe,
-        );
-        y += PITCH_F3;
-    }
-    for line in [ticket.store_address, ticket.store_phone] {
-        let shown = truncate_to_width(line.trim(), narrow_chars);
-        if !shown.is_empty() {
-            let dots = text_dots(shown.chars().count(), FONT_1_W, 1);
-            push_text(
-                &mut body,
-                centered_x(TICKET_WIDTH_DOTS, dots),
-                y,
-                "1",
-                1,
-                &shown,
-                probe,
-            );
-            y += PITCH_F1;
+    let (ops, end_y) = ticket_text_plan(ticket);
+    let code = |name: &str| DomainError::InvalidCanonicalString(name.to_string());
+    let mut body: Vec<u8> = Vec::new();
+    let mut text_idx: usize = 0;
+    for op in &ops {
+        match op {
+            TicketOp::Rule(y) => {
+                body.extend_from_slice(format!("BAR 0,{y},{TICKET_WIDTH_DOTS},2\r\n").as_bytes());
+            }
+            TicketOp::Barcode {
+                x_dots,
+                y_dots,
+                number,
+            } => {
+                body.extend_from_slice(
+                    format!(
+                        "BARCODE {x_dots},{y_dots},\"128\",{TICKET_BARCODE_HEIGHT},0,0,2,2,\"{number}\"\r\n"
+                    )
+                    .as_bytes(),
+                );
+            }
+            TicketOp::Text(line) => {
+                let idx = text_idx;
+                text_idx += 1;
+                if let Some((_, raster)) = bitmaps.iter().find(|(id, _)| *id == idx) {
+                    if raster.data.len() != raster.width_bytes * raster.height_rows {
+                        return Err(code("TICKET_BITMAP_LENGTH_MISMATCH"));
+                    }
+                    if raster.width_bytes == 0 || raster.height_rows == 0 {
+                        return Err(code("BITMAP_DIMENSIONS_MUST_BE_POSITIVE"));
+                    }
+                    if raster
+                        .width_bytes
+                        .checked_mul(8)
+                        .filter(|dots| *dots <= BITMAP_MAX_WIDTH_DOTS)
+                        .is_none()
+                    {
+                        return Err(code("BITMAP_WIDTH_TOO_WIDE"));
+                    }
+                    if raster.height_rows > BITMAP_MAX_HEIGHT_DOTS {
+                        return Err(code("BITMAP_TOO_TALL"));
+                    }
+                    if raster.data.iter().all(|byte| *byte == 0x00)
+                        || raster.data.iter().all(|byte| *byte == 0xFF)
+                    {
+                        return Err(code("BITMAP_BLANK_IMAGE"));
+                    }
+                    let width_dots = i64::try_from(raster.width_bytes * 8)
+                        .map_err(|_| code("BITMAP_TOO_LARGE"))?;
+                    let height_dots =
+                        i64::try_from(raster.height_rows).map_err(|_| code("BITMAP_TOO_LARGE"))?;
+                    if width_dots > line.box_w_dots || height_dots > line.box_h_dots {
+                        return Err(code("TICKET_BITMAP_EXCEEDS_SLOT"));
+                    }
+                    // Bottom-align to the TEXT cell (taller rasters grow upward).
+                    let bitmap_y = line.y_dots + line.cell_h_dots - height_dots;
+                    // Re-anchor from the bitmap width (TEXT x assumed full cell).
+                    let bitmap_x = match line.align {
+                        TicketAlign::Left => line.x_dots,
+                        TicketAlign::Center => (TICKET_WIDTH_DOTS - width_dots) / 2,
+                        TicketAlign::Right => (TICKET_WIDTH_DOTS - TICKET_MARGIN_X) - width_dots,
+                    };
+                    if bitmap_x < 0 || bitmap_y < 0 || bitmap_x + width_dots > TICKET_WIDTH_DOTS {
+                        return Err(code("TICKET_BITMAP_OUT_OF_AREA"));
+                    }
+                    body.extend_from_slice(
+                        format!(
+                            "BITMAP {bitmap_x},{bitmap_y},{},{},0,",
+                            raster.width_bytes, raster.height_rows
+                        )
+                        .as_bytes(),
+                    );
+                    body.extend_from_slice(&raster.data);
+                    body.extend_from_slice(b"\r\n");
+                } else {
+                    let mut text_out: Vec<String> = Vec::new();
+                    push_text(
+                        &mut text_out,
+                        line.x_dots,
+                        line.y_dots,
+                        line.face.face_str(),
+                        line.face.scale(),
+                        &line.text,
+                        probe,
+                    );
+                    body.extend_from_slice(text_out.join("\r\n").as_bytes());
+                    body.extend_from_slice(b"\r\n");
+                }
+            }
         }
     }
-    for (prefix, value) in ticket.tax_rows {
-        let trimmed = value.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let joined = format!("{prefix}: {trimmed}");
-        let shown = truncate_to_width(&joined, narrow_chars);
-        let dots = text_dots(shown.chars().count(), FONT_1_W, 1);
-        push_text(
-            &mut body,
-            centered_x(TICKET_WIDTH_DOTS, dots),
-            y,
-            "1",
-            1,
-            &shown,
-            probe,
-        );
-        y += PITCH_F1;
-    }
-    push_rule(&mut body, y, TICKET_WIDTH_DOTS);
-    y += 10;
-    // Doc meta: number, capture instant, cashier, depot.
-    let number_shown = truncate_to_width(&number, wide_chars);
-    push_text(&mut body, TICKET_MARGIN_X, y, "2", 1, &number_shown, probe);
-    y += PITCH_F2;
-    let instant = sanitize_tspl_text(ticket.created_at);
-    let instant_shown = truncate_to_width(&instant[..instant.len().min(19)], narrow_chars);
-    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &instant_shown, probe);
-    y += PITCH_F1;
-    let cashier = format!(
-        "{}: {}",
-        caps.cashier_word,
-        sanitize_tspl_text(ticket.cashier_text)
-    );
-    let cashier_shown = truncate_to_width(&cashier, narrow_chars);
-    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &cashier_shown, probe);
-    y += PITCH_F1;
-    let depot = format!(
-        "{}: {}",
-        caps.depot_word,
-        sanitize_tspl_text(ticket.warehouse_text)
-    );
-    let depot_shown = truncate_to_width(&depot, narrow_chars);
-    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &depot_shown, probe);
-    y += PITCH_F1;
-    push_rule(&mut body, y, TICKET_WIDTH_DOTS);
-    y += 10;
-    // Column header.
-    let header = truncate_to_width(caps.column_header, narrow_chars);
-    push_text(&mut body, TICKET_MARGIN_X, y, "1", 1, &header, probe);
-    y += PITCH_F1;
-    // Item rows.
-    for line in ticket.lines {
-        let designation = truncate_to_width(line.designation.trim(), wide_chars);
-        push_text(&mut body, TICKET_MARGIN_X, y, "2", 1, &designation, probe);
-        y += PITCH_F2;
-        let detail = if line.unit_text.trim().is_empty() {
-            format!(
-                "{} x {} = {}",
-                sanitize_tspl_text(line.quantity_text),
-                sanitize_tspl_text(line.unit_price_text),
-                sanitize_tspl_text(line.line_total_text),
-            )
-        } else {
-            format!(
-                "{} {} x {} = {}",
-                sanitize_tspl_text(line.quantity_text),
-                sanitize_tspl_text(line.unit_text),
-                sanitize_tspl_text(line.unit_price_text),
-                sanitize_tspl_text(line.line_total_text),
-            )
-        };
-        let detail_shown = truncate_to_width(&detail, narrow_chars);
-        let detail_dots = text_dots(detail_shown.chars().count(), FONT_1_W, 1);
-        push_text(
-            &mut body,
-            right_x(right_edge, detail_dots),
-            y,
-            "1",
-            1,
-            &detail_shown,
-            probe,
-        );
-        y += PITCH_F1;
-        if let Some(discount) = line.discount_text {
-            let badge = format!("{} {}", caps.discount_word, sanitize_tspl_text(discount));
-            let badge_shown = truncate_to_width(&badge, narrow_chars / 2);
-            let badge_dots = text_dots(badge_shown.chars().count(), FONT_1_W, 1);
-            push_text(
-                &mut body,
-                right_x(right_edge, badge_dots),
-                y,
-                "1",
-                1,
-                &badge_shown,
-                probe,
-            );
-            y += PITCH_F1;
-        }
-    }
-    push_rule(&mut body, y, TICKET_WIDTH_DOTS);
-    y += 10;
-    // Totals hierarchy (right-aligned), TOTAL TTC emphasized double-height.
-    let totals_rows = [
-        (caps.subtotal, ticket.totals.subtotal_ht),
-        (caps.discount_total, ticket.totals.global_discount),
-        (caps.ht, ticket.totals.subtotal_ht),
-        (caps.tva, ticket.totals.tva),
-    ];
-    for (caption, value) in totals_rows {
-        let row = format!("{caption}: {}", sanitize_tspl_text(value));
-        let shown = truncate_to_width(&row, wide_chars);
-        let dots = text_dots(shown.chars().count(), FONT_2_W, 1);
-        push_text(
-            &mut body,
-            right_x(right_edge, dots),
-            y,
-            "2",
-            1,
-            &shown,
-            probe,
-        );
-        y += PITCH_F2;
-    }
-    let total_row = format!(
-        "{}: {}",
-        caps.total,
-        sanitize_tspl_text(ticket.totals.total_ttc)
-    );
-    let total_shown = truncate_to_width(&total_row, total_chars);
-    let total_dots = text_dots(total_shown.chars().count(), FONT_3_W, 2);
-    push_text(
-        &mut body,
-        right_x(right_edge, total_dots),
-        y,
-        "3",
-        2,
-        &total_shown,
-        probe,
-    );
-    y += PITCH_F3_X2;
-    // Payment block.
-    let payment = format!(
-        "{} ({}): {}",
-        caps.paid,
-        sanitize_tspl_text(ticket.totals.payment_method),
-        sanitize_tspl_text(ticket.totals.paid),
-    );
-    let payment_shown = truncate_to_width(&payment, narrow_chars);
-    let payment_dots = text_dots(payment_shown.chars().count(), FONT_1_W, 1);
-    push_text(
-        &mut body,
-        right_x(right_edge, payment_dots),
-        y,
-        "1",
-        1,
-        &payment_shown,
-        probe,
-    );
-    y += PITCH_F1;
-    let change_row = format!(
-        "{}: {}",
-        caps.change,
-        sanitize_tspl_text(ticket.totals.change)
-    );
-    let change_shown = truncate_to_width(&change_row, narrow_chars);
-    let change_dots = text_dots(change_shown.chars().count(), FONT_1_W, 1);
-    push_text(
-        &mut body,
-        right_x(right_edge, change_dots),
-        y,
-        "1",
-        1,
-        &change_shown,
-        probe,
-    );
-    y += PITCH_F1;
-    // Doc-number barcode (centered, quiet zones >= 20 dots per side) with
-    // the human-readable number beneath.
-    y += 8;
-    body.push(format!(
-        "BARCODE {barcode_x},{y},\"128\",{TICKET_BARCODE_HEIGHT},1,0,2,2,\"{number}\""
-    ));
-    y += TICKET_BARCODE_HEIGHT + 4;
-    let human = truncate_to_width(&number, narrow_chars);
-    let human_dots = text_dots(human.chars().count(), FONT_1_W, 1);
-    push_text(
-        &mut body,
-        centered_x(TICKET_WIDTH_DOTS, human_dots),
-        y,
-        "1",
-        1,
-        &human,
-        probe,
-    );
-    y += PITCH_F1 + 4;
-    // Footer: owner message (collapses when blank) + constant thanks.
-    let footer = truncate_to_width(ticket.footer.trim(), narrow_chars);
-    if !footer.is_empty() {
-        let dots = text_dots(footer.chars().count(), FONT_1_W, 1);
-        push_text(
-            &mut body,
-            centered_x(TICKET_WIDTH_DOTS, dots),
-            y,
-            "1",
-            1,
-            &footer,
-            probe,
-        );
-        y += PITCH_F1;
-    }
-    let thanks = truncate_to_width(caps.thanks, narrow_chars);
-    let thanks_dots = text_dots(thanks.chars().count(), FONT_1_W, 1);
-    push_text(
-        &mut body,
-        centered_x(TICKET_WIDTH_DOTS, thanks_dots),
-        y,
-        "1",
-        1,
-        &thanks,
-        probe,
-    );
-    y += PITCH_F1 + 16;
 
-    let height_mm = (y + DOTS_PER_MM - 1) / DOTS_PER_MM;
-    let mut out = Vec::new();
+    let height_mm = (end_y + DOTS_PER_MM - 1) / DOTS_PER_MM;
     // Continuous stock declares zero gap (no-gap form, self-describing);
     // density/speed ride the stored setup like labels.
     let continuous = TsplMediaSetup {
         gap_mm: 0,
         ..ticket.media
     };
+    let mut head: Vec<String> = Vec::new();
     push_media_preamble(
-        &mut out,
+        &mut head,
         &format!("SIZE 80 mm, {height_mm} mm"),
         &continuous,
     )?;
-    out.extend(body);
-    out.push("PRINT 1,1".to_string());
-    Ok(format!("{}\r\n", out.join("\r\n")).into_bytes())
+    let mut job: Vec<u8> = head.join("\r\n").into_bytes();
+    job.extend_from_slice(b"\r\n");
+    job.extend_from_slice(&body);
+    job.extend_from_slice(b"PRINT 1,1\r\n");
+    Ok(job)
 }
 
 /// BITMAP raster bounds (BRK-101; architect-verified TSC reference
@@ -1431,18 +1741,19 @@ mod tests {
         let text = String::from_utf8(render_ticket_80mm(&owner_ticket()).expect("renders"))
             .expect("ascii");
         // Cursor math: 8 + 32 + 20 + 20 + 20 + 10 + 28 + 20×3 + 10 + 20
-        //   + 28 + 20 + 20 + 10 + 28×4 + 56 + 20×2 + 8 + 64 + 4 + 20 + 4
-        //   + 20 + 20 + 16 = 670 dots → ceil(670/8) = 84 mm.
+        //   + 28 + 20 + 20 + 10 + 28×3 + 56 + 20×2 + 8 + 64 + 4 + 20 + 4
+        //   + 20 + 20 + 16 = 642 dots (DOC-02: HT row removed) → ceil(642/8) = 81 mm.
         // Continuous stock declares the no-gap form: GAP 0,0.
         assert!(text.starts_with(
-            "SIZE 80 mm, 84 mm\r\nGAP 0,0\r\nSET RIBBON OFF\r\nDIRECTION 0,0\r\nREFERENCE 0,0\r\nOFFSET 0 mm\r\nSET PEEL OFF\r\nSET CUTTER OFF\r\nSET TEAR ON\r\nCLS\r\n"
+            "SIZE 80 mm, 81 mm\r\nGAP 0,0\r\nSET RIBBON OFF\r\nDIRECTION 0,0\r\nREFERENCE 0,0\r\nOFFSET 0 mm\r\nSET PEEL OFF\r\nSET CUTTER OFF\r\nSET TEAR ON\r\nCLS\r\n"
         ));
         assert!(
             !text.lines().any(|l| l == "CUT" || l.starts_with("CUT ")),
             "no cut ACTION emitted (vendor SET CUTTER OFF only disables it)"
         );
         // Barcode: (13*11+35)*2 = 356 dots, centered x = (640-356)/2 = 142.
-        assert!(text.contains("BARCODE 142,522,\"128\",64,1,0,2,2,\"T-2026-000123\""));
+        // DOC-02: printer-generated human line OFF (single TEXT source below).
+        assert!(text.contains("BARCODE 142,494,\"128\",64,0,0,2,2,\"T-2026-000123\""));
         assert!(text.ends_with("PRINT 1,1\r\n"));
         assert_eq!(text.matches("BARCODE").count(), 1);
     }
@@ -1475,14 +1786,14 @@ mod tests {
             find("BAR 0,296,640,2"),
             find("Sous-total: 27.00"),
             find("Remise totale: 0.00"),
-            find("HT: 27.00"),
+            // DOC-02 (owner 1.b): HT row removed — Sous-total stays.
             find("TVA: 0.00"),
-            find("TEXT 112,418,\"3\",0,2,2,\"TOTAL TTC: 27.00\""),
+            find("TEXT 112,390,\"5\",0,1,1,\"TOTAL TTC: 27.00\""),
             find("Payé (CASH): 27.00"),
             find("Rendu: 0.00"),
-            find("BARCODE 142,522"),
-            find("TEXT 268,590,\"1\",0,1,1,\"T-2026-000123\""),
-            find("TEXT 300,614,\"1\",0,1,1,\"Merci\""),
+            find("BARCODE 142,494"),
+            find("TEXT 268,562,\"1\",0,1,1,\"T-2026-000123\""),
+            find("TEXT 300,586,\"1\",0,1,1,\"Merci\""),
             find("Merci de votre visite"),
         ];
         assert!(
@@ -1505,7 +1816,8 @@ mod tests {
         );
         assert!(text.contains("Sous-total: 27.00"));
         assert!(text.contains("Remise totale: 0.00"));
-        assert!(text.contains("HT: 27.00"));
+        // DOC-02 (owner 1.b): the duplicated HT row is gone.
+        assert!(!text.contains("HT:"));
         assert!(text.contains("TVA: 0.00"));
         assert!(text.contains("TOTAL TTC: 27.00"));
         assert!(text.contains("Payé (CASH): 27.00"));
@@ -1527,7 +1839,7 @@ mod tests {
         assert!(!text.contains("\"Merci\""), "blank footer collapses");
         assert!(text.contains("Merci de votre visite"));
         // 4 collapsed rows × 20 dots: 670 − 80 = 590 → ceil(590/8) = 74 mm.
-        assert!(text.starts_with("SIZE 80 mm, 74 mm\r\n"));
+        assert!(text.starts_with("SIZE 80 mm, 71 mm\r\n"));
     }
 
     #[test]
@@ -1784,7 +2096,9 @@ mod tests {
             String::from_utf8(render_ticket_80mm(&ticket).expect("renders")).expect("utf8 kept");
         assert!(text.contains("المجموع الفرعي: 27.00"));
         assert!(text.contains("الخصم الإجمالي: 0.00"));
-        assert!(text.contains("صافي: 27.00"));
+        // DOC-02 (owner 1.b): the duplicated HT row is gone — Sous-total
+        // stays the single HT figure.
+        assert!(!text.contains("صافي:"));
         assert!(text.contains("الضريبة: 0.00"));
         assert!(text.contains("الإجمالي: 27.00"));
         assert!(text.contains("المدفوع (CASH): 27.00"));

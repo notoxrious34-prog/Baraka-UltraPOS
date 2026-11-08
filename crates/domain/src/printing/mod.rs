@@ -22,11 +22,13 @@ pub use transport::{
 };
 pub use tspl::{
     label_text_needs_bitmap, label_text_plan, parse_tspl_probe_mode, render_bitmap_job,
-    render_label_40x20, render_label_40x20_mixed, render_ticket_80mm, validate_tspl_density,
-    validate_tspl_gap_mm, validate_tspl_speed, LabelBitmap, LabelTextLine, LabelTextSlot,
-    TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplProbeMode, TsplTicket, TsplTicketLine,
-    TsplTicketTotals, BITMAP_MAX_BYTES, BITMAP_MAX_HEIGHT_DOTS, BITMAP_MAX_WIDTH_DOTS, DOTS_PER_MM,
-    LABEL_HEIGHT_DOTS, LABEL_WIDTH_DOTS, TICKET_WIDTH_DOTS, TSPL_CODEPAGE_LINE,
-    TSPL_DENSITY_DEFAULT, TSPL_DENSITY_MAX, TSPL_GAP_MM_DEFAULT, TSPL_GAP_MM_MAX, TSPL_MAX_COPIES,
-    TSPL_MIN_COPIES, TSPL_PROBE_MODE_DEFAULT, TSPL_SPEED_DEFAULT, TSPL_SPEED_MAX, TSPL_SPEED_MIN,
+    render_label_40x20, render_label_40x20_mixed, render_ticket_80mm, render_ticket_80mm_mixed,
+    ticket_text_plan, validate_tspl_density, validate_tspl_gap_mm, validate_tspl_speed,
+    LabelBitmap, LabelTextLine, LabelTextSlot, TicketAlign, TicketFace, TicketOp, TicketTextLine,
+    TicketTextSlot, TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplProbeMode, TsplTicket,
+    TsplTicketLine, TsplTicketTotals, BITMAP_MAX_BYTES, BITMAP_MAX_HEIGHT_DOTS,
+    BITMAP_MAX_WIDTH_DOTS, DOTS_PER_MM, LABEL_HEIGHT_DOTS, LABEL_WIDTH_DOTS, TICKET_WIDTH_DOTS,
+    TSPL_CODEPAGE_LINE, TSPL_DENSITY_DEFAULT, TSPL_DENSITY_MAX, TSPL_GAP_MM_DEFAULT,
+    TSPL_GAP_MM_MAX, TSPL_MAX_COPIES, TSPL_MIN_COPIES, TSPL_PROBE_MODE_DEFAULT, TSPL_SPEED_DEFAULT,
+    TSPL_SPEED_MAX, TSPL_SPEED_MIN,
 };

@@ -1018,6 +1018,78 @@ export async function ipcPrintTsplLabel(
   return wire.bytes_sent;
 }
 
+/** Engine 40x20 label preview input (mirrors TsplLabelPreviewRequest; price as canonical centime string). */
+export interface TsplLabelPreviewJob {
+  name: string;
+  priceCentimes: string;
+  barcode: string;
+}
+
+/** One engine preview line (mirrors TsplPreviewLineDto). */
+export interface TsplPreviewLine {
+  slot: string;
+  text: string;
+  x: number;
+  y: number;
+  cellH: number;
+}
+
+/** Engine 40x20 label preview (mirrors TsplLabelPreviewResponse). */
+export interface TsplLabelPreview {
+  lines: TsplPreviewLine[];
+  barcodeX: number;
+  barcodeY: number;
+  barcodeWidth: number;
+  barcodeHeight: number;
+  jobLen: number;
+}
+
+interface TsplPreviewLineWire {
+  slot: string;
+  text: string;
+  x: number;
+  y: number;
+  cell_h: number;
+}
+
+interface TsplLabelPreviewWire {
+  lines: TsplPreviewLineWire[];
+  barcode_x: number;
+  barcode_y: number;
+  barcode_width: number;
+  barcode_height: number;
+  job_len: number;
+}
+
+/** Read-only engine plan for the 40x20 label (DOC-03) — the modal renders these lines verbatim. */
+export async function ipcPreviewTsplLabel(
+  sessionToken: string,
+  job: TsplLabelPreviewJob,
+): Promise<TsplLabelPreview> {
+  const wire = await call<TsplLabelPreviewWire>("preview_tspl_label", {
+    request: {
+      session_token: sessionToken,
+      name: job.name,
+      price_centimes: job.priceCentimes,
+      barcode: job.barcode,
+    },
+  });
+  return {
+    lines: wire.lines.map((line) => ({
+      slot: line.slot,
+      text: line.text,
+      x: line.x,
+      y: line.y,
+      cellH: line.cell_h,
+    })),
+    barcodeX: wire.barcode_x,
+    barcodeY: wire.barcode_y,
+    barcodeWidth: wire.barcode_width,
+    barcodeHeight: wire.barcode_height,
+    jobLen: wire.job_len,
+  };
+}
+
 /** Silent 80 mm ticket print (button-triggered, spooler only — never a dialog). */
 export async function ipcPrintTsplTicket(
   sessionToken: string,

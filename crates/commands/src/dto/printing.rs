@@ -59,6 +59,50 @@ pub struct TsplPrintResponse {
     pub bytes_sent: usize,
 }
 
+/// Engine 40x20 mm label preview request (DOC-03): read-only, session
+/// only — brand, media and probe mode all come from storage; price
+/// travels as integer centimes (never float).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TsplLabelPreviewRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Display name (single locale, chosen upstream).
+    pub name: String,
+    /// Selling price in integer centimes (canonical string — IPC money rule).
+    pub price_centimes: String,
+    /// Code128 payload (SKU/barcode).
+    pub barcode: String,
+}
+
+/// One engine preview line (DOC-03): exact text the renderer would
+/// spool, TEXT origin, printer cell — the modal renders these in order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TsplPreviewLineDto {
+    /// Engine slot (`brand` | `name1` | `name2` | `price` | `currency` | `human`).
+    pub slot: String,
+    /// Exact engine text.
+    pub text: String,
+    /// TEXT origin in dots.
+    pub x: i64,
+    pub y: i64,
+    /// Printer cell height in dots.
+    pub cell_h: i64,
+}
+
+/// Engine 40x20 mm label preview response (DOC-03).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TsplLabelPreviewResponse {
+    /// Plan lines in spool order.
+    pub lines: Vec<TsplPreviewLineDto>,
+    /// Engine barcode origin and size in dots.
+    pub barcode_x: i64,
+    pub barcode_y: i64,
+    pub barcode_width: i64,
+    pub barcode_height: i64,
+    /// Exact job length the print path would spool.
+    pub job_len: usize,
+}
+
 /// Fixed-content 40x20 mm TSPL self-test request (TASK-PRT-01).
 /// Session only — content, media and probe mode all come from storage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

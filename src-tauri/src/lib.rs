@@ -293,6 +293,7 @@ pub fn run() {
             baraka_commands::ipc::documents_get_print_status,
             baraka_commands::ipc::documents_reprint,
             baraka_commands::ipc::print_tspl_label,
+            baraka_commands::ipc::preview_tspl_label,
             baraka_commands::ipc::print_tspl_ticket,
             baraka_commands::ipc::print_raw_bitmap,
             baraka_commands::ipc::printer_get_settings,

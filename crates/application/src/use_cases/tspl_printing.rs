@@ -18,11 +18,11 @@
 
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
-    format_centimes_plain, format_qty_plain, label_text_needs_bitmap, label_text_plan,
-    render_bitmap_job, render_label_40x20, render_label_40x20_mixed, render_ticket_80mm,
-    render_ticket_80mm_mixed, ticket_text_plan, LabelBitmap, LabelTextSlot, TicketOp,
-    TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine, TsplTicketTotals,
-    TRANSPORT_SPOOLER,
+    format_centimes_plain, format_qty_plain, label_barcode_geometry, label_text_needs_bitmap,
+    label_text_plan, render_bitmap_job, render_label_40x20, render_label_40x20_mixed,
+    render_ticket_80mm, render_ticket_80mm_mixed, ticket_text_plan, LabelBarcodeGeometry,
+    LabelBitmap, LabelTextSlot, TicketOp, TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket,
+    TsplTicketLine, TsplTicketTotals, TRANSPORT_SPOOLER,
 };
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{DocumentId, DocumentLanguage};
@@ -195,6 +195,160 @@ where
         self.transport.send_raster(&bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),
+        })
+    }
+}
+
+/// One engine preview line (DOC-03): exact text, TEXT origin, cell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreviewLabelLine {
+    pub slot: LabelTextSlot,
+    pub text: String,
+    pub x_dots: i64,
+    pub y_dots: i64,
+    pub cell_h_dots: i64,
+}
+
+/// Engine label preview (DOC-03): the SAME plan the renderer spools —
+/// texts, order, barcode origin — plus the exact job length. The modal
+/// renders these lines instead of its own schematic strings, so the
+/// preview cannot drift from the printed bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TsplLabelPreview {
+    pub lines: Vec<PreviewLabelLine>,
+    pub barcode: LabelBarcodeGeometry,
+    pub job_len: usize,
+}
+
+/// Read-only 40x20 mm label preview (DOC-03): builds the identical
+/// `TsplLabel` the print path spools (brand from identity, `DZD`,
+/// single copy, stored media) and returns its plan. Arabic text rides
+/// the rasterer exactly like the print path — without one the preview
+/// rejects LOUDLY instead of previewing a job the printer would eat.
+pub struct PreviewTsplLabelUseCase<'a, S, I, R = NullLabelRaster>
+where
+    S: ?Sized,
+    I: ?Sized,
+    R: ?Sized,
+{
+    settings: &'a S,
+    identity: &'a I,
+    preview_raster: &'a R,
+}
+
+/// Shared no-rasterer behind every default-constructed preview use case.
+static NULL_PREVIEW_RASTER: NullLabelRaster = NullLabelRaster;
+
+impl<'a, S, I> PreviewTsplLabelUseCase<'a, S, I, NullLabelRaster>
+where
+    S: PrinterSettingsPort + ?Sized,
+    I: StoreIdentityPort + ?Sized,
+{
+    /// Wire the use case to its ports (no preview rasterer attached).
+    pub fn new(settings: &'a S, identity: &'a I) -> Self {
+        Self {
+            settings,
+            identity,
+            preview_raster: &NULL_PREVIEW_RASTER,
+        }
+    }
+}
+
+impl<'a, S, I, R> PreviewTsplLabelUseCase<'a, S, I, R>
+where
+    S: PrinterSettingsPort + ?Sized,
+    I: StoreIdentityPort + ?Sized,
+    R: TsplLabelRasterPort + ?Sized,
+{
+    /// Attach the bitmap rasterer (DOC-03): the preview renders the same
+    /// mixed job the printer eats, so the byte length predicts exactly.
+    pub fn with_preview_raster<Q>(&self, raster: &'a Q) -> PreviewTsplLabelUseCase<'a, S, I, Q>
+    where
+        Q: TsplLabelRasterPort + ?Sized,
+    {
+        PreviewTsplLabelUseCase {
+            settings: self.settings,
+            identity: self.identity,
+            preview_raster: raster,
+        }
+    }
+
+    /// Build the engine plan for (`name`, `price_centimes`, `barcode`)
+    /// and return it with the barcode origin and the exact job length.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        name: &str,
+        price_centimes: i64,
+        barcode: &str,
+    ) -> Result<TsplLabelPreview, ApplicationError> {
+        if !session.role.has_permission(Permission::PosSell) {
+            return Err(ApplicationError::Unauthorized);
+        }
+        if price_centimes < 0 {
+            return Err(ApplicationError::Validation(
+                DomainError::InvalidCanonicalString("TSPL_PRICE_MUST_BE_NON_NEGATIVE".to_string()),
+            ));
+        }
+        let identity = self.identity.load_identity()?;
+        let media = media_from_settings(self.settings)?;
+        // Identical construction to the print path (single copy preview).
+        let label = TsplLabel {
+            brand_text: &identity.store_name,
+            name,
+            price_text: &format_centimes_plain(price_centimes),
+            currency_text: "DZD",
+            barcode,
+            copies: 1,
+            media,
+        };
+        let plan = label_text_plan(&label);
+        let geometry = label_barcode_geometry(label.barcode)?;
+        let needs_bitmap = plan
+            .iter()
+            .any(|line| label_text_needs_bitmap(&line.text, label.media.probe_mode));
+        let job = if needs_bitmap {
+            let mut bitmaps: Vec<(LabelTextSlot, LabelBitmap)> = Vec::new();
+            for line in &plan {
+                if !label_text_needs_bitmap(&line.text, label.media.probe_mode) {
+                    continue;
+                }
+                let raster = self.preview_raster.rasterize_label_text(
+                    &line.text,
+                    line.cell_h_dots as f32,
+                    u32::try_from(line.box_w_dots).map_err(|_| {
+                        ApplicationError::Port("TSPL_LABEL_BOX_TOO_WIDE".to_string())
+                    })?,
+                    u32::try_from(line.box_h_dots).map_err(|_| {
+                        ApplicationError::Port("TSPL_LABEL_BOX_TOO_TALL".to_string())
+                    })?,
+                )?;
+                bitmaps.push((
+                    line.slot,
+                    LabelBitmap {
+                        width_bytes: raster.width_bytes,
+                        height_rows: raster.height_rows,
+                        data: raster.data,
+                    },
+                ));
+            }
+            render_label_40x20_mixed(&label, &bitmaps)?
+        } else {
+            render_label_40x20(&label)?
+        };
+        Ok(TsplLabelPreview {
+            lines: plan
+                .into_iter()
+                .map(|line| PreviewLabelLine {
+                    slot: line.slot,
+                    text: line.text,
+                    x_dots: line.x_dots,
+                    y_dots: line.y_dots,
+                    cell_h_dots: line.cell_h_dots,
+                })
+                .collect(),
+            barcode: geometry,
+            job_len: job.len(),
         })
     }
 }

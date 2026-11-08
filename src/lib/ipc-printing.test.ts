@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import {
   getStoreIdentity,
+  ipcPreviewTsplLabel,
   ipcUpdatePrinterSettings,
   printingTestPrint,
   printingTestTsplLabel,
@@ -233,6 +234,64 @@ describe("VT-05 printerTestTsplLabel (TASK-PRT-01)", () => {
   it("a transport error propagates as a typed code", async () => {
     invokeMock.mockRejectedValueOnce("TSPL_TRANSPORT_REQUIRES_SPOOLER");
     await expect(printingTestTsplLabel()).rejects.toBe("TSPL_TRANSPORT_REQUIRES_SPOOLER");
+  });
+});
+
+describe("VT-07 previewTsplLabel (DOC-03)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fakeTauriWindow();
+    primeSession();
+  });
+  afterEach(() => {
+    clearTauriWindow();
+  });
+
+  it("sends the preview request and maps lines verbatim", async () => {
+    invokeMock.mockResolvedValueOnce({
+      lines: [
+        { slot: "brand", text: "BARAKA", x: 136, y: 2, cell_h: 12 },
+        { slot: "name1", text: "JILI ISPANA", x: 8, y: 16, cell_h: 20 },
+        { slot: "price", text: "350.00", x: 8, y: 58, cell_h: 48 },
+        { slot: "currency", text: "DZD", x: 272, y: 94, cell_h: 12 },
+        { slot: "human", text: "AR02", x: 268, y: 146, cell_h: 12 },
+      ],
+      barcode_x: 8,
+      barcode_y: 106,
+      barcode_width: 124,
+      barcode_height: 38,
+      job_len: 361,
+    });
+    const result = await ipcPreviewTsplLabel("tok-idn-1", {
+      name: "JILI ISPANA",
+      priceCentimes: "35000",
+      barcode: "AR02",
+    });
+    expect(invokeMock).toHaveBeenCalledWith("preview_tspl_label", {
+      session_token: "tok-idn-1",
+      request: {
+        session_token: "tok-idn-1",
+        name: "JILI ISPANA",
+        price_centimes: "35000",
+        barcode: "AR02",
+      },
+    });
+    expect(result.lines).toHaveLength(5);
+    expect(result.lines[2]).toEqual({ slot: "price", text: "350.00", x: 8, y: 58, cellH: 48 });
+    expect(result).toMatchObject({
+      barcodeX: 8,
+      barcodeY: 106,
+      barcodeWidth: 124,
+      barcodeHeight: 38,
+      jobLen: 361,
+    });
+  });
+
+  it("a validation error propagates as a typed code", async () => {
+    invokeMock.mockRejectedValueOnce("TsplBarcodeTooWide");
+    await expect(
+      ipcPreviewTsplLabel("tok-idn-1", { name: "JILI ISPANA", priceCentimes: "35000", barcode: "WAY-TOO-LONG-12345" }),
+    ).rejects.toBe("TsplBarcodeTooWide");
   });
 });
 

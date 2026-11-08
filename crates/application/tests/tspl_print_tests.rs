@@ -15,8 +15,8 @@ use baraka_application::ports::{
     StoreIdentityPort, StoredPayment,
 };
 use baraka_application::use_cases::tspl_printing::{
-    PrintRawBitmapUseCase, PrintTsplLabelUseCase, PrintTsplTestTicketUseCase,
-    PrintTsplTicketUseCase,
+    PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplLabelUseCase,
+    PrintTsplTestTicketUseCase, PrintTsplTicketUseCase,
 };
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
@@ -806,6 +806,90 @@ fn ticket_arabic_designation_without_rasterer_rejects_loudly() {
         "stable loud code, got: {error:?}"
     );
     assert!(transport.payloads().is_empty(), "nothing spooled");
+}
+
+// DOC-03: the preview IS the engine plan — same lines, same order,
+// same exact texts; job_len predicts the spooled bytes byte-for-byte.
+#[test]
+fn label_preview_is_the_engine_plan() {
+    let settings = spooler();
+    let preview = PreviewTsplLabelUseCase::new(&settings, &FakeIdentity)
+        .execute(&session_with(Role::Admin), "JILI ISPANA", 35_000, "AR02")
+        .expect("latin preview renders");
+    let slots: Vec<&str> = preview
+        .lines
+        .iter()
+        .map(|line| line.slot.as_str())
+        .collect();
+    assert_eq!(slots, vec!["brand", "name1", "price", "currency", "human"]);
+    let texts: Vec<&str> = preview
+        .lines
+        .iter()
+        .map(|line| line.text.as_str())
+        .collect();
+    assert!(
+        texts.contains(&"350.00"),
+        "engine price spelling, got: {texts:?}"
+    );
+    assert!(texts.contains(&"DZD"));
+    assert_eq!(
+        (
+            preview.barcode.x_dots,
+            preview.barcode.y_dots,
+            preview.barcode.height_dots
+        ),
+        (8, 106, 38),
+        "engine barcode origin"
+    );
+    // Byte-identity proof: predicted length == the actual spooled job
+    // (same brand the identity port supplies — the print path's input).
+    let label = baraka_domain::printing::TsplLabel {
+        brand_text: "BARAKA QUINCAILLERIE",
+        name: "JILI ISPANA",
+        price_text: "350.00",
+        currency_text: "DZD",
+        barcode: "AR02",
+        copies: 1,
+        media: baraka_domain::printing::TsplMediaSetup::default(),
+    };
+    let job = baraka_domain::printing::render_label_40x20(&label).expect("renders");
+    assert_eq!(preview.job_len, job.len());
+}
+
+// DOC-03: Arabic preview preserves the verbatim text (the modal renders
+// it shaped); without a rasterer the preview rejects LOUDLY — it never
+// previews a job the printer would eat.
+#[test]
+fn label_preview_arabic_preserves_and_rejects_loudly() {
+    let settings = spooler();
+    let error = PreviewTsplLabelUseCase::new(&settings, &FakeIdentity)
+        .execute(
+            &session_with(Role::Admin),
+            "JILI ISPANA ابيض",
+            35_000,
+            "AR02",
+        )
+        .expect_err("arabic preview without rasterer rejects");
+    assert!(
+        matches!(
+            error,
+            ApplicationError::Port(ref code) if code == "TSPL_LABEL_RASTER_UNAVAILABLE"
+        ),
+        "stable loud code, got: {error:?}"
+    );
+    let preview = PreviewTsplLabelUseCase::new(&settings, &FakeIdentity)
+        .with_preview_raster(&FakeLabelRaster)
+        .execute(
+            &session_with(Role::Admin),
+            "JILI ISPANA ابيض",
+            35_000,
+            "AR02",
+        )
+        .expect("arabic preview renders with rasterer");
+    assert!(
+        preview.lines.iter().any(|line| line.text.contains("ابيض")),
+        "arabic text preserved verbatim"
+    );
 }
 
 // TASK-PRT-02: the pure-ASCII path never touches the rasterer and stays

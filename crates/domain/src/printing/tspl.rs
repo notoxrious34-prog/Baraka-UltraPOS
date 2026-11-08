@@ -991,6 +991,49 @@ pub enum LabelTextSlot {
     Human,
 }
 
+impl LabelTextSlot {
+    /// Stable wire spelling for previews and logs (DOC-03).
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LabelTextSlot::Brand => "brand",
+            LabelTextSlot::NameLine1 => "name1",
+            LabelTextSlot::NameLine2 => "name2",
+            LabelTextSlot::Price => "price",
+            LabelTextSlot::Currency => "currency",
+            LabelTextSlot::Human => "human",
+        }
+    }
+}
+
+/// Engine barcode placement on the 40x20 label (DOC-03): fixed origin,
+/// width from the validated Code128 payload. The preview and the
+/// renderer share this — one geometry, no drift.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LabelBarcodeGeometry {
+    pub x_dots: i64,
+    pub y_dots: i64,
+    pub width_dots: i64,
+    pub height_dots: i64,
+}
+
+/// Validate the payload and return the engine barcode geometry (DOC-03).
+/// Rejects LOUDLY on the same rules as the renderer (payload charset,
+/// 9-char module budget) — the preview never draws what won't spool.
+pub fn label_barcode_geometry(barcode: &str) -> Result<LabelBarcodeGeometry, DomainError> {
+    validate_code128_payload(barcode)?;
+    if barcode.chars().count() > LABEL_BARCODE_MAX_CHARS {
+        // 11·n + 35 modules must fit 140 (quiet zones 20 dots per side).
+        return Err(DomainError::TsplBarcodeTooWide);
+    }
+    Ok(LabelBarcodeGeometry {
+        x_dots: 8,
+        y_dots: 106,
+        width_dots: barcode_width_dots(barcode.chars().count()) as i64,
+        height_dots: LABEL_BARCODE_HEIGHT,
+    })
+}
+
 /// One printable TEXT line of the 40x20 label (PRT-02 plan; geometry is
 /// single-sourced here — the renderer and the bitmap path share it).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1211,6 +1254,9 @@ pub fn render_label_40x20_mixed(
         seen[index] = true;
     }
     let barcode = sanitize_tspl_text(label.barcode);
+    // Single-sourced geometry (DOC-03): the preview reads the same origin.
+    let geometry = label_barcode_geometry(label.barcode)?;
+    let (bx, by, bh) = (geometry.x_dots, geometry.y_dots, geometry.height_dots);
     let probe = label.media.probe_mode;
     let mut head: Vec<String> = Vec::new();
     push_media_preamble(&mut head, "SIZE 40 mm, 20 mm", &label.media)?;
@@ -1289,8 +1335,7 @@ pub fn render_label_40x20_mixed(
         }
         if line.slot == LabelTextSlot::Currency {
             job.extend_from_slice(
-                format!("BARCODE 8,106,\"128\",{LABEL_BARCODE_HEIGHT},0,0,2,2,\"{barcode}\"\r\n")
-                    .as_bytes(),
+                format!("BARCODE {bx},{by},\"128\",{bh},0,0,2,2,\"{barcode}\"\r\n").as_bytes(),
             );
         }
     }

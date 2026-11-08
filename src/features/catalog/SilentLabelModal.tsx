@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
 import type { CatalogProduct, Locale } from "@/types/pos";
-import { formatMoney } from "@/lib/money";
 import { fitModuleWidth, generateCode128Svg } from "@/lib/barcode-128";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { ipcPrintTsplLabel, TSPL_COPIES_MIN, TSPL_COPIES_MAX, clampTsplCopies } from "@/lib/tspl-print";
+import { ipcPreviewTsplLabel } from "@/lib/ipc";
+import type { TsplLabelPreview, TsplPreviewLine } from "@/lib/ipc";
 import {
   labelBarcodeSource,
   labelPriceUnit,
@@ -61,6 +62,70 @@ export function silentLabelPreviewSvg(source: string): string | null {
 }
 
 /**
+ * Engine-faithful 40x20 preview (DOC-03): renders the backend plan lines
+ * verbatim, in spool order — brand, names, price (`350.00` engine
+ * spelling, never locale `350,00`), currency, barcode band, human line.
+ * The unit (`/ Pièce`) is deliberately absent: the engine never prints
+ * it, so the preview must not show it either.
+ */
+export function SilentLabelPreviewView({
+  preview,
+  barcode,
+}: {
+  preview: TsplLabelPreview;
+  barcode: string;
+}) {
+  const svg = silentLabelPreviewSvg(barcode);
+  const humanAt = preview.lines.findIndex((line) => line.slot === "human");
+  const head = humanAt === -1 ? preview.lines : preview.lines.slice(0, humanAt);
+  const tail = humanAt === -1 ? [] : preview.lines.slice(humanAt);
+  return (
+    <>
+      {head.map((line, index) => (
+        <PreviewLine key={`${line.slot}-${index}`} line={line} />
+      ))}
+      {svg !== null && (
+        <div
+          className="w-full"
+          style={{ width: `${Math.min(100, (preview.barcodeWidth / 320) * 100)}%` }}
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      )}
+      {tail.map((line, index) => (
+        <PreviewLine key={`${line.slot}-tail-${index}`} line={line} />
+      ))}
+    </>
+  );
+}
+
+function PreviewLine({ line }: { line: TsplPreviewLine }) {
+  switch (line.slot) {
+    case "brand":
+      return <p className="max-w-full truncate text-[10px] font-bold text-slate-500">{line.text}</p>;
+    case "price":
+      return (
+        <p className="text-[15px] font-black leading-none text-slate-900" dir="ltr">
+          {line.text}
+        </p>
+      );
+    case "currency":
+      return (
+        <p className="self-end text-[10px] font-bold text-slate-700" dir="ltr">
+          {line.text}
+        </p>
+      );
+    case "human":
+      return (
+        <p className="max-w-full font-mono text-[10px] text-slate-900" dir="ltr" title={line.text}>
+          {line.text}
+        </p>
+      );
+    default:
+      return <p className="max-w-full truncate text-[11px] font-extrabold text-slate-900">{line.text}</p>;
+  }
+}
+
+/**
  * Silent 40x20 mm shelf-label modal (TASK-DSN-098): spooler-only TSPL,
  * button-triggered, never a dialog. Non-spooler transports keep the
  * frozen ProductLabelModal path (the caller branches before mounting).
@@ -73,10 +138,39 @@ export function SilentLabelModal({ product, isOpen, onClose, token }: SilentLabe
   const [failure, setFailure] = useState<string | null>(null);
 
   const name = formatDisplayName(product, locale);
-  const { priceCentimes, unitFr } = labelPriceUnit(product);
+  const { priceCentimes } = labelPriceUnit(product);
   const source = labelBarcodeSource(product);
-  const previewSvg = silentLabelPreviewSvg(source);
   const tooWide = source.length > SILENT_LABEL_BARCODE_MAX_CHARS;
+  const [enginePreview, setEnginePreview] = useState<TsplLabelPreview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  // DOC-03: the preview IS the backend plan — fetched per product/locale,
+  // never assembled locally (local strings would drift from the bytes).
+  useEffect(() => {
+    if (!isOpen || tooWide) {
+      setEnginePreview(null);
+      setPreviewError(null);
+      return;
+    }
+    let cancelled = false;
+    setEnginePreview(null);
+    setPreviewError(null);
+    ipcPreviewTsplLabel(token, { name, priceCentimes, barcode: source }).then(
+      (preview) => {
+        if (!cancelled) {
+          setEnginePreview(preview);
+        }
+      },
+      (error: unknown) => {
+        if (!cancelled) {
+          setPreviewError(error instanceof Error ? error.message : String(error));
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, product.product_id, locale, name, priceCentimes, source, tooWide, token]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -172,15 +266,7 @@ export function SilentLabelModal({ product, isOpen, onClose, token }: SilentLabe
               style={{ aspectRatio: "40 / 20" }}
               data-testid="silent-label-preview"
             >
-              <p className="max-w-full truncate text-[11px] font-extrabold">{name}</p>
-              <p className="text-[13px] font-black" dir="ltr">
-                {formatMoney(priceCentimes, locale)}
-                {unitFr === "" ? "" : ` / ${unitFr}`}
-              </p>
-              {previewSvg !== null && !tooWide && (
-                <div className="w-full" dangerouslySetInnerHTML={{ __html: previewSvg }} />
-              )}
-              {tooWide && (
+              {tooWide ? (
                 <p
                   className="text-xs font-bold text-red-700 dark:text-red-300"
                   data-testid="silent-label-too-wide"
@@ -188,10 +274,17 @@ export function SilentLabelModal({ product, isOpen, onClose, token }: SilentLabe
                 >
                   {t(locale, "tspl.labelTooWide")}
                 </p>
-              )}
-              <p className="max-w-full font-mono text-[10px]" dir="ltr" title={source}>
-                {source}
-              </p>
+              ) : previewError !== null ? (
+                <p
+                  className="text-xs font-bold text-red-700 dark:text-red-300"
+                  data-testid="silent-label-preview-error"
+                  role="alert"
+                >
+                  {translateBackendError(previewError, locale)}
+                </p>
+              ) : enginePreview !== null ? (
+                <SilentLabelPreviewView preview={enginePreview} barcode={source} />
+              ) : null}
             </div>
           </div>
           <div className="flex items-center justify-between gap-2">

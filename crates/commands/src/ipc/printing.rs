@@ -8,17 +8,18 @@ use baraka_application::use_cases::printing::{
 };
 use baraka_application::use_cases::sales::{GetFiscalSettingsUseCase, UpdateFiscalSettingsUseCase};
 use baraka_application::use_cases::tspl_printing::{
-    PrintRawBitmapUseCase, PrintTsplLabelUseCase, PrintTsplTestLabelUseCase,
-    PrintTsplTestTicketUseCase, PrintTsplTicketUseCase,
+    PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplLabelUseCase,
+    PrintTsplTestLabelUseCase, PrintTsplTestTicketUseCase, PrintTsplTicketUseCase,
 };
 use baraka_domain::role::Permission;
 
 use crate::dto::{
     DecodeSummaryDto, FiscalSettingsDto, PreviewLineDto, PrintStatusResponse, PrinterSettingsDto,
     RawBitmapRequest, ReprintRequest, ReprintResponse, SaveStoreIdentityRequest, StoreIdentityDto,
-    StoreIdentityResponse, TestPrintRequest, TestPrintResponse, TsplLabelRequest,
-    TsplPrintResponse, TsplTestLabelRequest, TsplTestTicketRequest, TsplTicketRequest,
-    UpdateFiscalSettingsRequestDto, UpdatePrinterSettingsRequest,
+    StoreIdentityResponse, TestPrintRequest, TestPrintResponse, TsplLabelPreviewRequest,
+    TsplLabelPreviewResponse, TsplLabelRequest, TsplPreviewLineDto, TsplPrintResponse,
+    TsplTestLabelRequest, TsplTestTicketRequest, TsplTicketRequest, UpdateFiscalSettingsRequestDto,
+    UpdatePrinterSettingsRequest,
 };
 
 /// `documents_get_print_status` command: latest outbox state for a document.
@@ -99,6 +100,52 @@ pub fn print_tspl_label(
     .map_err(|error| error_code(&error))?;
     Ok(TsplPrintResponse {
         bytes_sent: outcome.bytes_sent,
+    })
+}
+
+/// `preview_tspl_label` command: read-only engine plan for the 40x20 mm
+/// label (DOC-03) — same construction as the print path (brand from
+/// identity, `DZD`, stored media), no transport, no spool. The modal
+/// renders these lines instead of its own strings, so the preview is
+/// the printed bytes by construction. Arabic rides the shared rasterer;
+/// without one the preview rejects LOUDLY (never a false preview).
+#[tauri::command(rename_all = "snake_case")]
+pub fn preview_tspl_label(
+    state: tauri::State<'_, AppState>,
+    request: TsplLabelPreviewRequest,
+) -> Result<TsplLabelPreviewResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let price_centimes = parse_wire_int(&request.price_centimes, "price_centimes")
+        .map_err(|error| error_code(&error))?;
+    let preview = PreviewTsplLabelUseCase::new(
+        state.printer_settings.as_ref(),
+        state.store_identity.as_ref(),
+    )
+    .with_preview_raster(state.label_raster.as_ref())
+    .execute(
+        &session,
+        request.name.trim(),
+        price_centimes,
+        request.barcode.trim(),
+    )
+    .map_err(|error| error_code(&error))?;
+    Ok(TsplLabelPreviewResponse {
+        lines: preview
+            .lines
+            .into_iter()
+            .map(|line| TsplPreviewLineDto {
+                slot: line.slot.as_str().to_string(),
+                text: line.text,
+                x: line.x_dots,
+                y: line.y_dots,
+                cell_h: line.cell_h_dots,
+            })
+            .collect(),
+        barcode_x: preview.barcode.x_dots,
+        barcode_y: preview.barcode.y_dots,
+        barcode_width: preview.barcode.width_dots,
+        barcode_height: preview.barcode.height_dots,
+        job_len: preview.job_len,
     })
 }
 

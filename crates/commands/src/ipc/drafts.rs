@@ -135,10 +135,16 @@ pub fn sales_get(
             status: detail.document.status.code().to_string(),
             warehouse_id: detail.document.warehouse_id.to_string(),
             subtotal_ht_centimes: detail.document.subtotal_ht_centimes.to_string(),
+            global_discount_centimes: detail.document.global_discount_centimes.to_string(),
             tva_total_centimes: detail.document.vat_total_centimes.to_string(),
             total_ttc_centimes: detail.document.ttc_centimes.to_string(),
             paid_amount_centimes: detail.document.paid_amount_centimes.to_string(),
             change_amount_centimes: detail.document.change_amount_centimes.to_string(),
+            created_at: detail
+                .document
+                .created_at
+                .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            created_by: detail.document.created_by.to_string(),
             payment_status: match detail.payment_status {
                 baraka_domain::sales::PaymentStatus::Paid => "PAID",
                 baraka_domain::sales::PaymentStatus::Partial => "PARTIAL",

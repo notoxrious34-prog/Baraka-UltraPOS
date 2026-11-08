@@ -57,10 +57,12 @@ function ticketStrings(locale: Locale): TicketPrintStrings {
     title: t(locale, "ticket.title"),
     reprintMark: t(locale, "ticket.reprintMark"),
     designation: t(locale, "ticket.designation"),
+    cashier: t(locale, "ticket.cashier"),
     qty: t(locale, "ticket.qty"),
     price: t(locale, "ticket.price"),
     total: t(locale, "ticket.total"),
     subtotal: t(locale, "ticket.subtotal"),
+    discountTotal: t(locale, "ticket.discountTotal"),
     tva: t(locale, "ticket.tva"),
     grandTotal: t(locale, "ticket.grandTotal"),
     paid: t(locale, "ticket.paid"),
@@ -341,10 +343,9 @@ export function CheckoutModal(): ReactElement {
           const args = ticketArgsFromWire(
             {
               documentNumber: full.document.number,
-              createdAt: new Date().toLocaleString(
-                language === "AR" ? "ar-DZ" : "fr-DZ",
-              ),
+              createdAt: full.document.created_at,
               subtotalHt: full.document.subtotal_ht_centimes,
+              discountTotal: full.document.global_discount_centimes,
               tvaTotal: full.document.tva_total_centimes,
               totalTtc: full.document.total_ttc_centimes,
               paidAmount: full.document.paid_amount_centimes,
@@ -375,6 +376,7 @@ export function CheckoutModal(): ReactElement {
                 { prefix: "AI", value: identity.ai },
               ],
               warehouseText: full.document.warehouse_id,
+              cashierText: full.document.created_by,
               ownerFooter: identity.ticketFooterMessage,
               isReprint: false,
               strings: ticketStrings(language === "AR" ? "ar-DZ" : "fr-DZ"),
@@ -576,7 +578,7 @@ export function CheckoutModal(): ReactElement {
     setTsplState("sending");
     setTsplError(null);
     setTsplBytes(null);
-    ipcPrintTsplTicket(sessionToken, done.document_id)
+    ipcPrintTsplTicket(sessionToken, done.document_id, false)
       .then((bytes) => {
         setTsplBytes(bytes);
         setTsplState("ok");

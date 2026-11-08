@@ -415,11 +415,14 @@ where
         }
     }
 
-    /// Transcribe the stored document and spool one ticket.
+    /// Transcribe the stored document and spool one ticket. `is_reprint`
+    /// stamps the engine DUPLICATA band (DOC-05): the drawer passes true,
+    /// the post-sale original passes false — never inferred, never silent.
     pub fn execute(
         &self,
         session: &SessionContext,
         document_id: DocumentId,
+        is_reprint: bool,
     ) -> Result<TsplPrintOutcome, ApplicationError> {
         if !session.role.has_permission(Permission::ReprintDocument) {
             return Err(ApplicationError::Unauthorized);
@@ -515,6 +518,7 @@ where
                 payment_method: &payment_label,
             },
             footer: &identity.ticket_footer_message,
+            is_reprint,
             media: media_from_settings(self.settings)?,
         };
         // DOC-01: route every non-Latin line through the bitmap rasterer
@@ -790,6 +794,7 @@ where
                 payment_method: "CASH",
             },
             footer: "TICKET TEST",
+            is_reprint: false,
             media: media_from_settings(self.settings)?,
         })?;
         self.transport.send_raster(&bytes)?;

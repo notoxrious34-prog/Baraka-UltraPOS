@@ -357,6 +357,9 @@ pub struct TsplTicket<'a> {
     pub totals: TsplTicketTotals<'a>,
     /// Footer message (empty lines skipped).
     pub footer: &'a str,
+    /// Reprint stamp (DOC-05): when true the plan carries a DUPLICATA band
+    /// (FR TEXT, AR BITMAP) so a reprint can never pass as an original.
+    pub is_reprint: bool,
     /// Media identity for the self-describing preamble (validated;
     /// gap is forced to 0 = continuous for tickets).
     pub media: TsplMediaSetup,
@@ -375,6 +378,8 @@ struct Captions {
     discount_word: &'static str,
     depot_word: &'static str,
     cashier_word: &'static str,
+    /// Reprint band word (DOC-05): FR TEXT, AR BITMAP via the rasterer.
+    reprint_mark: &'static str,
 }
 
 fn captions(lang: TsplCaptionLang) -> Captions {
@@ -391,6 +396,7 @@ fn captions(lang: TsplCaptionLang) -> Captions {
             discount_word: "remise",
             depot_word: "Depot",
             cashier_word: "Caissier",
+            reprint_mark: "DUPLICATA",
         },
         TsplCaptionLang::Arabic => Captions {
             subtotal: "المجموع الفرعي",
@@ -404,6 +410,7 @@ fn captions(lang: TsplCaptionLang) -> Captions {
             discount_word: "خصم",
             depot_word: "المخزن",
             cashier_word: "الكاشير",
+            reprint_mark: "نسخة",
         },
     }
 }
@@ -454,6 +461,8 @@ pub enum TicketTextSlot {
     Instant,
     Cashier,
     Depot,
+    /// DUPLICATA band stamped on reprints only (DOC-05).
+    ReprintMark,
     ColumnHeader,
     LineName,
     LineDetail,
@@ -647,6 +656,26 @@ pub fn ticket_text_plan(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
         align: TicketAlign::Left,
     }));
     y += PITCH_F1;
+    // DOC-05: reprint stamp — a centered F3 band between depot and the
+    // first rule. French prints as TEXT; the Arabic word rides the
+    // rasterer (BITMAP via the mixed renderer, loud reject without one).
+    // Originals emit nothing here: byte-identical to the pre-mark goldens.
+    if ticket.is_reprint {
+        let mark = truncate_to_width(caps.reprint_mark, name_chars);
+        let mark_dots = text_dots(mark.chars().count(), FONT_3_W, 1);
+        ops.push(TicketOp::Text(TicketTextLine {
+            slot: TicketTextSlot::ReprintMark,
+            text: mark,
+            x_dots: centered_x(TICKET_WIDTH_DOTS, mark_dots),
+            y_dots: y,
+            face: TicketFace::F3,
+            cell_h_dots: FONT_3_H,
+            box_w_dots: inner_w,
+            box_h_dots: PITCH_F3,
+            align: TicketAlign::Center,
+        }));
+        y += PITCH_F3;
+    }
     ops.push(TicketOp::Rule(y));
     y += 10;
     // Column header.
@@ -1805,6 +1834,7 @@ mod tests {
                 payment_method: "CASH",
             },
             footer: "Merci",
+            is_reprint: false,
             media: TsplMediaSetup::default(),
         }
     }
@@ -2203,6 +2233,47 @@ mod tests {
             render_ticket_80mm_versioned(&owner_ticket(), 99).expect_err("unknown rejects"),
             DomainError::InvalidCanonicalString("TSPL_TEMPLATE_VERSION_UNKNOWN".to_string())
         );
+    }
+
+    // DOC-05: a reprint is visibly a reprint — the engine stamps a
+    // DUPLICATA band (FR TEXT / AR BITMAP via the rasterer). Originals
+    // stay byte-identical to the pre-mark goldens (no band, no shift).
+    #[test]
+    fn ticket_reprint_mark_band_prints_duplicata_for_french() {
+        let mut ticket = owner_ticket();
+        ticket.is_reprint = true;
+        let text = String::from_utf8(render_ticket_80mm(&ticket).expect("renders")).expect("ascii");
+        assert!(
+            text.contains(",\"3\",0,1,1,\"DUPLICATA\""),
+            "F3 DUPLICATA band, got:\n{text}"
+        );
+        let depot_at = text.find("Depot:").expect("depot present");
+        let mark_at = text.find("DUPLICATA").expect("mark present");
+        let header_at = text.find("Qté x PU = Total").expect("header present");
+        assert!(
+            depot_at < mark_at && mark_at < header_at,
+            "band sits between depot and column header"
+        );
+        let plain = String::from_utf8(render_ticket_80mm(&owner_ticket()).expect("renders"))
+            .expect("ascii");
+        assert!(!plain.contains("DUPLICATA"), "originals carry no mark");
+    }
+
+    #[test]
+    fn ticket_reprint_mark_plan_carries_arabic_word_for_rasterer() {
+        let mut ticket = owner_ticket();
+        ticket.captions = TsplCaptionLang::Arabic;
+        ticket.is_reprint = true;
+        let (ops, _) = ticket_text_plan(&ticket);
+        let mark = ops
+            .iter()
+            .filter_map(|op| match op {
+                TicketOp::Text(line) if line.slot == TicketTextSlot::ReprintMark => Some(line),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(mark.len(), 1, "exactly one mark band");
+        assert_eq!(mark[0].text, "نسخة");
     }
 
     // TASK-PRT-01 (LIVE-2026-11-06): the XP-410B silently discards any job

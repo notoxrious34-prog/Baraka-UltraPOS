@@ -1094,9 +1094,10 @@ export async function ipcPreviewTsplLabel(
 export async function ipcPrintTsplTicket(
   sessionToken: string,
   documentId: string,
+  isReprint: boolean,
 ): Promise<number> {
   const wire = await call<TsplPrintWire>("print_tspl_ticket", {
-    request: { session_token: sessionToken, document_id: documentId },
+    request: { session_token: sessionToken, document_id: documentId, is_reprint: isReprint },
   });
   return wire.bytes_sent;
 }
@@ -1244,10 +1245,16 @@ export interface DocumentDetailsWireResponse {
     status: string;
     warehouse_id: string;
     subtotal_ht_centimes: string;
+    /** Stored global discount (DOC-05: engine `Remise totale` row). */
+    global_discount_centimes: string;
     tva_total_centimes: string;
     total_ttc_centimes: string;
     paid_amount_centimes: string;
     change_amount_centimes: string;
+    /** Capture instant, stored verbatim (DOC-05). */
+    created_at: string;
+    /** Acting operator id, stored verbatim (DOC-05 engine cashier row). */
+    created_by: string;
     payment_status: string;
   };
   items: Array<{

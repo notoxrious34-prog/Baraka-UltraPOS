@@ -552,10 +552,12 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
       title: t(locale, "ticket.title"),
       reprintMark: t(locale, "ticket.reprintMark"),
       designation: t(locale, "ticket.designation"),
+      cashier: t(locale, "ticket.cashier"),
       qty: t(locale, "ticket.qty"),
       price: t(locale, "ticket.price"),
       total: t(locale, "ticket.total"),
       subtotal: t(locale, "ticket.subtotal"),
+      discountTotal: t(locale, "ticket.discountTotal"),
       tva: t(locale, "ticket.tva"),
       grandTotal: t(locale, "ticket.grandTotal"),
       paid: t(locale, "ticket.paid"),
@@ -573,6 +575,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
               documentNumber: snapshot.document.number,
               createdAt: document.created_at,
               subtotalHt: snapshot.document.subtotal_ht_centimes,
+              discountTotal: snapshot.document.global_discount_centimes,
               tvaTotal: snapshot.document.tva_total_centimes,
               totalTtc: snapshot.document.total_ttc_centimes,
               paidAmount: snapshot.document.paid_amount_centimes,
@@ -603,6 +606,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
                 { prefix: "AI", value: id.ai },
               ],
               warehouseText: snapshot.document.warehouse_id,
+              cashierText: snapshot.document.created_by,
               isReprint: true,
               ownerFooter: id.ticketFooterMessage,
               strings,
@@ -667,7 +671,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
     setTsplState("sending");
     setTsplError(null);
     setTsplBytes(null);
-    ipcPrintTsplTicket(props.token, document.id)
+    ipcPrintTsplTicket(props.token, document.id, true)
       .then((bytes) => {
         setTsplBytes(bytes);
         setTsplState("ok");

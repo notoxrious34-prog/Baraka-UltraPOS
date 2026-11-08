@@ -143,6 +143,8 @@ pub struct TsplTicketRequest {
     pub session_token: String,
     /// Document id (UUID string).
     pub document_id: String,
+    /// Reprint stamp (DOC-05): true stamps the engine DUPLICATA band.
+    pub is_reprint: bool,
 }
 
 /// Serial printer configuration view.

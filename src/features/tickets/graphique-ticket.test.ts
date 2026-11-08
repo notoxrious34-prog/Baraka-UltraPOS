@@ -40,6 +40,7 @@ const WIRE_LINES = [
 function baseArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
   return {
     storeName: "Quincaillerie El Baraka",
+    cashierText: "user-1",
     storeAddress: "Rue des Frères, Alger",
     storePhone: "0555123456",
     documentNumber: "T-2026-000123",
@@ -49,6 +50,7 @@ function baseArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
     language: "FR",
     lines: WIRE_LINES,
     subtotalHt: "350000",
+    discountTotal: "0",
     tvaTotal: "10000",
     totalTtc: "360000",
     paidAmount: "400000",
@@ -63,12 +65,14 @@ function baseArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
       qty: "Qté",
       price: "P.U",
       total: "Total",
-      subtotal: "Sous-total HT",
+      subtotal: "Sous-total",
+      cashier: "Caissier",
+      discountTotal: "Remise totale",
       tva: "TVA",
       grandTotal: "TOTAL TTC",
       paid: "Encaissé",
       change: "Rendu",
-      payment: "Paiement",
+      payment: "Payé",
       footer: "Merci de votre visite",
       depot: "Dépôt",
       discountBadge: "remise",
@@ -83,14 +87,14 @@ describe("ticket template renders wire data verbatim", () => {
     expect(html).toContain("Quincaillerie El Baraka");
     expect(html).toContain("Ciment CPJ 50kg");
     expect(html).toContain("CIM-001");
-    expect(html).toContain("700,00");
-    expect(html).toContain("600,00");
+    expect(html).toContain("700.00");
+    expect(html).toContain("600.00");
     // Totals come from the wire: recomputing from lines must match the wire
     // (guard against a template that drifts from engine figures).
     const lineSum = WIRE_LINES.reduce((acc, line) => acc + Number(line.lineTotal), 0);
     expect(String(lineSum)).toBe("350000");
-    expect(html).toContain("500,00");
-    expect(html).toContain("400,00");
+    expect(html).toContain("3500.00");
+    expect(html).toContain("4000.00");
   });
 
   it("marks reprints DUPLICATA, clean sales carry no mark", () => {
@@ -161,6 +165,7 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
     documentNumber: "T-1",
     createdAt: "2026-10-24",
     subtotalHt: "350000",
+    discountTotal: "0",
     tvaTotal: "10000",
     totalTtc: "360000",
     paidAmount: "400000",
@@ -202,6 +207,7 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
       storePhone: "",
       taxRows: [],
       warehouseText: "",
+      cashierText: "user-1",
       ownerFooter: "",
       isReprint: false,
       strings: baseArgs().strings,
@@ -216,6 +222,7 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
       storePhone: "",
       taxRows: [],
       warehouseText: "",
+      cashierText: "user-1",
       ownerFooter: "",
       isReprint: true,
       strings: baseArgs().strings,
@@ -232,6 +239,7 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
       storePhone: "",
       taxRows: [],
       warehouseText: "",
+      cashierText: "user-1",
       ownerFooter: "",
       isReprint: false,
       strings: baseArgs().strings,
@@ -249,6 +257,7 @@ describe("per-unit price mapping (DSN-097)", () => {
     storePhone: "",
     taxRows: [],
     warehouseText: "",
+    cashierText: "user-1",
     ownerFooter: "",
     isReprint: false,
     strings: baseArgs().strings,
@@ -274,7 +283,8 @@ describe("per-unit price mapping (DSN-097)", () => {
     return {
       documentNumber: "T-9",
       createdAt: "2026-10-26",
-      subtotalHt: "2700",
+      subtotalHt: "3000",
+      discountTotal: "300",
       tvaTotal: "0",
       totalTtc: "2700",
       paidAmount: "2700",
@@ -297,14 +307,14 @@ describe("per-unit price mapping (DSN-097)", () => {
     expect(args.lines[0]?.unitPrice).toBe("900");
     expect(args.lines[0]?.lineTotal).toBe("2700");
     const html = buildTicketPrintHtml({ ...baseArgs(), lines: args.lines });
-    expect(html).toContain("9,00 DZD");
-    expect(html).not.toContain("10,00 DZD");
+    expect(html).toContain("9.00");
+    expect(html).not.toContain("10.00");
   });
 
   it("falls back to the raw PU for legacy lines (null per-unit)", () => {
     const args = ticketArgsFromWire(detailsWith(wireItem({})), OPTS);
     expect(args.lines[0]?.unitPrice).toBe("1000");
     const html = buildTicketPrintHtml({ ...baseArgs(), lines: args.lines });
-    expect(html).toContain("10,00 DZD");
+    expect(html).toContain("10.00");
   });
 });

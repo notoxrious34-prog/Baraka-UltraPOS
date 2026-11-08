@@ -8,9 +8,8 @@
  * (ProductLabelModal, DSN-083).
  */
 
-import { formatMoney, formatQty } from "@/lib/money";
+import { formatQty, isIntString } from "@/lib/money";
 import { generateCode128Svg } from "@/lib/barcode-128";
-import type { Locale } from "@/types/pos";
 
 /** 80mm roll width (receipt printers; driver paper size must match). */
 export const TICKET_PAGE_WIDTH_MM = 80;
@@ -30,12 +29,17 @@ export interface TicketPrintLine {
 /** Localised chrome strings (caller passes t() values for its locale). */
 export interface TicketPrintStrings {
   title: string;
+  /** Cashier row label (`Caissier` / `الكاشير`, engine parity). */
+  cashier: string;
   reprintMark: string;
   designation: string;
   qty: string;
   price: string;
   total: string;
   subtotal: string;
+  /** Remise totale row (DOC-05): the engine always prints it — omitting
+   * it was the OS/TSPL divergence. */
+  discountTotal: string;
   tva: string;
   grandTotal: string;
   paid: string;
@@ -58,9 +62,13 @@ export interface TicketPrintArgs {
   createdAt: string;
   /** Selling warehouse identifier (stored verbatim); blank collapses. */
   warehouseText: string;
+  /** Acting operator identifier (stored verbatim — engine cashier row). */
+  cashierText: string;
   language: "AR" | "FR";
   lines: TicketPrintLine[];
   subtotalHt: string;
+  /** Stored global-discount figure (engine `Remise totale` row). */
+  discountTotal: string;
   tvaTotal: string;
   totalTtc: string;
   paidAmount: string;
@@ -79,10 +87,22 @@ function escapeTicket(text: string): string {
     .replace(/>/g, "&gt;");
 }
 
-/** Display a centime-string figure in the ticket locale. */
-export function ticketMoney(centimes: string, locale: Locale): string {
+/** Display a centime-string figure in ENGINE spelling (DOC-05): plain
+ * ASCII `350.00`, no thousands grouping, dot separator — byte-identical
+ * to `format_centimes_plain`, the only spelling the printer emits. The
+ * locale comma (`350,00`) was the OS/TSPL divergence this unifies. */
+export function ticketMoney(centimes: string): string {
   try {
-    return formatMoney(centimes, locale);
+    const trimmed = centimes.trim();
+    if (!isIntString(trimmed)) {
+      return "…";
+    }
+    const value = BigInt(trimmed);
+    const negative = value < 0n;
+    const abs = negative ? -value : value;
+    const whole = (abs / 100n).toString();
+    const frac = (abs % 100n).toString().padStart(2, "0");
+    return `${negative ? "-" : ""}${whole}.${frac}`;
   } catch {
     return "…";
   }
@@ -117,6 +137,8 @@ export interface TicketWireDetails {
   documentNumber: string;
   createdAt: string;
   subtotalHt: string;
+  /** Stored global-discount figure (engine `Remise totale` row). */
+  discountTotal: string;
   tvaTotal: string;
   totalTtc: string;
   paidAmount: string;
@@ -134,6 +156,8 @@ export interface TicketWireOptions {
   taxRows: Array<{ prefix: string; value: string }>;
   /** Selling warehouse identifier (stored verbatim). */
   warehouseText: string;
+  /** Acting operator identifier (stored verbatim — engine cashier row). */
+  cashierText: string;
   /** Owner footer message (stored verbatim). */
   ownerFooter: string;
   isReprint: boolean;
@@ -171,6 +195,7 @@ export function ticketArgsFromWire(
       discountPerUnit: item.discountPerUnitCentimes,
     })),
     subtotalHt: wire.subtotalHt,
+    discountTotal: wire.discountTotal,
     tvaTotal: wire.tvaTotal,
     totalTtc: wire.totalTtc,
     paidAmount: wire.paidAmount,
@@ -178,6 +203,7 @@ export function ticketArgsFromWire(
     paymentLabel: wire.paymentLabel,
     taxRows: opts.taxRows,
     warehouseText: opts.warehouseText,
+    cashierText: opts.cashierText,
     ownerFooter: opts.ownerFooter,
     isReprint: opts.isReprint,
     strings: opts.strings,
@@ -187,7 +213,6 @@ export function ticketArgsFromWire(
 /** Build the standalone 80mm ticket document (BRK-098 mirror order). */
 export function buildTicketPrintHtml(args: TicketPrintArgs): string {
   const rtl = args.language === "AR";
-  const locale: Locale = rtl ? "ar-DZ" : "fr-DZ";
   const badgeWord = escapeTicket(args.strings.discountBadge);
   const rows = args.lines
     .map(
@@ -195,11 +220,11 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
         `<tr data-testid="ticket-line"><td class="des"><bdi dir="ltr">${escapeTicket(line.sku)}</bdi><br>${escapeTicket(line.designation)}` +
         (line.discountPerUnit === null
           ? ""
-          : `<div class="badge" data-testid="ticket-badge">${badgeWord} <bdi dir="ltr">${escapeTicket(ticketMoney(line.discountPerUnit, locale))}</bdi></div>`) +
+          : `<div class="badge" data-testid="ticket-badge">${badgeWord} <bdi dir="ltr">${escapeTicket(ticketMoney(line.discountPerUnit))}</bdi></div>`) +
         `</td>` +
         `<td class="num"><bdi dir="ltr">${escapeTicket(ticketQty(line.quantity))} ${escapeTicket(line.unit)}</bdi></td>` +
-        `<td class="num"><bdi dir="ltr">${escapeTicket(ticketMoney(line.unitPrice, locale))}</bdi></td>` +
-        `<td class="num"><bdi dir="ltr">${escapeTicket(ticketMoney(line.lineTotal, locale))}</bdi></td></tr>`,
+        `<td class="num"><bdi dir="ltr">${escapeTicket(ticketMoney(line.unitPrice))}</bdi></td>` +
+        `<td class="num"><bdi dir="ltr">${escapeTicket(ticketMoney(line.lineTotal))}</bdi></td></tr>`,
     )
     .join("");
   const mark = args.isReprint
@@ -222,6 +247,12 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
   const depot =
     args.warehouseText.trim() !== ""
       ? `<div class="meta depot" data-testid="ticket-depot">${escapeTicket(args.strings.depot)}: <bdi dir="ltr">${escapeTicket(args.warehouseText.trim())}</bdi></div>`
+      : "";
+  // Cashier row (DOC-05 engine parity): the operator id rides verbatim,
+  // never a display name — same collapse rule as the engine (blank hides).
+  const cashier =
+    args.cashierText.trim() !== ""
+      ? `<div class="meta" data-testid="ticket-cashier">${escapeTicket(args.strings.cashier)}: <bdi dir="ltr">${escapeTicket(args.cashierText.trim())}</bdi></div>`
       : "";
   // Doc-number Code128 with human-readable caption (quiet zones via CSS
   // padding on white; never throws into the print dispatch).
@@ -265,6 +296,7 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
     contact +
     tax +
     `<div class="meta"><bdi dir="ltr">${escapeTicket(args.documentNumber)}</bdi> · <bdi dir="ltr">${escapeTicket(args.createdAt)}</bdi></div>` +
+    cashier +
     depot +
     `<div class="meta">${escapeTicket(args.strings.title)}</div>${mark}` +
     `<table><thead><tr><th>${escapeTicket(args.strings.designation)}</th>` +
@@ -272,11 +304,12 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
     `<th class="num">${escapeTicket(args.strings.price)}</th>` +
     `<th class="num">${escapeTicket(args.strings.total)}</th></tr></thead><tbody>${rows}</tbody></table>` +
     `<div class="totals">` +
-    `<div class="row"><span>${escapeTicket(args.strings.subtotal)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.subtotalHt, locale))}</bdi></span></div>` +
-    `<div class="row"><span>${escapeTicket(args.strings.tva)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.tvaTotal, locale))}</bdi></span></div>` +
-    `<div class="row grand"><span>${escapeTicket(args.strings.grandTotal)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.totalTtc, locale))}</bdi></span></div>` +
-    `<div class="row"><span>${escapeTicket(args.strings.payment)} (${escapeTicket(args.paymentLabel)})</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.paidAmount, locale))}</bdi></span></div>` +
-    `<div class="row"><span>${escapeTicket(args.strings.change)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.changeAmount, locale))}</bdi></span></div>` +
+    `<div class="row"><span>${escapeTicket(args.strings.subtotal)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.subtotalHt))}</bdi></span></div>` +
+    `<div class="row"><span>${escapeTicket(args.strings.discountTotal)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.discountTotal))}</bdi></span></div>` +
+    `<div class="row"><span>${escapeTicket(args.strings.tva)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.tvaTotal))}</bdi></span></div>` +
+    `<div class="row grand"><span>${escapeTicket(args.strings.grandTotal)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.totalTtc))}</bdi></span></div>` +
+    `<div class="row"><span>${escapeTicket(args.strings.payment)} (${escapeTicket(args.paymentLabel)})</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.paidAmount))}</bdi></span></div>` +
+    `<div class="row"><span>${escapeTicket(args.strings.change)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.changeAmount))}</bdi></span></div>` +
     `</div>${barcode}${ownerFooter}<div class="foot">${escapeTicket(args.strings.footer)}</div></div></body></html>`
   );
 }

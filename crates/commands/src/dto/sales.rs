@@ -199,6 +199,9 @@ pub struct DocumentDto {
     pub warehouse_id: String,
     /// Subtotal HT.
     pub subtotal_ht_centimes: String,
+    /// Total global discount allocated (DOC-05: the engine `Remise totale`
+    /// row — the sale wire omitted it, so no OS printout could match).
+    pub global_discount_centimes: String,
     /// Total TVA.
     pub tva_total_centimes: String,
     /// Grand total.
@@ -207,6 +210,11 @@ pub struct DocumentDto {
     pub paid_amount_centimes: String,
     /// Change owed.
     pub change_amount_centimes: String,
+    /// Capture instant (RFC3339 millis, stored verbatim — DOC-05: the OS
+    /// printout must show the document instant, never the print instant).
+    pub created_at: String,
+    /// Acting operator id (stored verbatim — DOC-05: engine cashier row).
+    pub created_by: String,
     /// Derived settlement state (`PAID`, `PARTIAL`, `UNPAID`).
     pub payment_status: String,
 }

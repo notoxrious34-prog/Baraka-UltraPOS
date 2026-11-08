@@ -502,7 +502,7 @@ fn ticket_rejects_non_spooler_transport_without_touching_the_queue() {
     let transport = FakeTransport::new();
     let documents = FakeDocuments::ticket();
     let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Caissier), documents.document.id)
+        .execute(&session_with(Role::Caissier), documents.document.id, false)
         .expect_err("non-spooler arm rejected");
     assert!(matches!(
         error,
@@ -517,7 +517,7 @@ fn ticket_transcribes_discounted_and_legacy_lines_verbatim() {
     let transport = FakeTransport::new();
     let documents = FakeDocuments::ticket();
     let outcome = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Caissier), documents.document.id)
+        .execute(&session_with(Role::Caissier), documents.document.id, false)
         .expect("spooler ticket prints");
     let payloads = transport.payloads();
     assert_eq!(payloads.len(), 1);
@@ -558,7 +558,7 @@ fn ticket_gate_reprint_document_but_label_allows_vendeur() {
     let documents = FakeDocuments::ticket();
     // Vendeur lacks ReprintDocument: ticket refused before any read.
     let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Vendeur), documents.document.id)
+        .execute(&session_with(Role::Vendeur), documents.document.id, false)
         .expect_err("vendeur cannot print tickets");
     assert!(matches!(error, ApplicationError::Unauthorized));
     assert!(transport.payloads().is_empty());
@@ -674,7 +674,7 @@ fn ticket_missing_document_surfaces_not_found() {
     let settings = spooler();
     let transport = FakeTransport::new();
     let error = PrintTsplTicketUseCase::new(&EmptyDocuments, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Caissier), DocumentId::new())
+        .execute(&session_with(Role::Caissier), DocumentId::new(), false)
         .expect_err("missing document rejected");
     assert!(matches!(error, ApplicationError::NotFound(_)));
 }
@@ -770,7 +770,7 @@ fn ticket_arabic_designation_rasterizes_to_bitmap() {
     documents.views[0].product_name_ar = Some("مسمار ابيض".to_string());
     let outcome = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
         .with_ticket_raster(&FakeLabelRaster)
-        .execute(&session_with(Role::Admin), documents.document.id)
+        .execute(&session_with(Role::Admin), documents.document.id, false)
         .expect("arabic ticket spools");
     let payloads = transport.payloads();
     assert_eq!(payloads.len(), 1);
@@ -797,7 +797,7 @@ fn ticket_arabic_designation_without_rasterer_rejects_loudly() {
     documents.document.language = DocumentLanguage::Ar;
     documents.views[0].product_name_ar = Some("مسمار ابيض".to_string());
     let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Admin), documents.document.id)
+        .execute(&session_with(Role::Admin), documents.document.id, false)
         .expect_err("arabic without rasterer rejects");
     assert!(
         matches!(
@@ -809,6 +809,21 @@ fn ticket_arabic_designation_without_rasterer_rejects_loudly() {
     assert!(transport.payloads().is_empty(), "nothing spooled");
 }
 
+// DOC-05: the drawer reprint stamps the engine DUPLICATA band — a reprint
+// can never spool as a silent copy of the original.
+#[test]
+fn ticket_reprint_true_spools_duplicata_band() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let documents = FakeDocuments::ticket();
+    let outcome = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
+        .execute(&session_with(Role::Caissier), documents.document.id, true)
+        .expect("reprint spools");
+    assert_eq!(outcome.bytes_sent, transport.payloads()[0].len());
+    let text = String::from_utf8(transport.payloads()[0].clone()).expect("bytes kept");
+    assert!(text.contains("DUPLICATA"), "reprint carries the mark");
+}
+
 // DOC-04: the stored template version pins the reprint — a tampered or
 // future version rejects LOUDLY instead of silently drifting geometry.
 #[test]
@@ -818,7 +833,7 @@ fn ticket_unknown_template_version_rejects_loudly_without_spooling() {
     let mut documents = FakeDocuments::ticket();
     documents.document.template_version = 99;
     let error = PrintTsplTicketUseCase::new(&documents, &settings, &FakeIdentity, &transport)
-        .execute(&session_with(Role::Caissier), documents.document.id)
+        .execute(&session_with(Role::Caissier), documents.document.id, false)
         .expect_err("unknown template rejects");
     assert!(
         matches!(

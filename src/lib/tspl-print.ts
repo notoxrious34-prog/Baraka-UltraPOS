@@ -65,6 +65,7 @@ export function ipcPrintTsplLabel(
 export function ipcPrintTsplTicket(
   sessionToken: string,
   documentId: string,
+  isReprint: boolean,
 ): Promise<number> {
-  return bridgeTicket(sessionToken, documentId);
+  return bridgeTicket(sessionToken, documentId, isReprint);
 }

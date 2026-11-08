@@ -170,7 +170,7 @@ pub fn print_tspl_ticket(
         state.printer_transport.as_ref(),
     )
     .with_ticket_raster(state.label_raster.as_ref())
-    .execute(&session, id)
+    .execute(&session, id, request.is_reprint)
     .map_err(|error| error_code(&error))?;
     Ok(TsplPrintResponse {
         bytes_sent: outcome.bytes_sent,

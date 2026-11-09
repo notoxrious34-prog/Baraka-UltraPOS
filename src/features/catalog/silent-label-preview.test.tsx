@@ -10,14 +10,13 @@ import type { TsplLabelPreview } from "@/lib/ipc";
 function enginePreview(): TsplLabelPreview {
   return {
     lines: [
-      { slot: "brand", text: "BARAKA QUINCAILLERIE", x: 72, y: 2, cellH: 12 },
-      { slot: "name1", text: "JILI ISPANA", x: 8, y: 16, cellH: 20 },
-      { slot: "price", text: "350.00", x: 8, y: 58, cellH: 48 },
-      { slot: "currency", text: "DZD", x: 272, y: 94, cellH: 12 },
-      { slot: "human", text: "AR02", x: 268, y: 146, cellH: 12 },
+      { slot: "name1", text: "JILI ISPANA", x: 100, y: 16, cellH: 20 },
+      { slot: "price", text: "350.00", x: 88, y: 44, cellH: 32 },
+      { slot: "currency", text: "DZD", x: 280, y: 54, cellH: 12 },
+      { slot: "human", text: "AR02", x: 144, y: 132, cellH: 12 },
     ],
-    barcodeX: 8,
-    barcodeY: 106,
+    barcodeX: 81,
+    barcodeY: 86,
     barcodeWidth: 158,
     barcodeHeight: 38,
     jobLen: 361,
@@ -29,13 +28,23 @@ describe("SilentLabelPreviewView (DOC-03)", () => {
     const html = renderToStaticMarkup(
       <SilentLabelPreviewView preview={enginePreview()} barcode="AR02" />,
     );
-    for (const text of ["BARAKA QUINCAILLERIE", "JILI ISPANA", "350.00", "DZD", "AR02"]) {
+    for (const text of ["JILI ISPANA", "350.00", "DZD", "AR02"]) {
       expect(html).toContain(text);
     }
-    const order = ["BARAKA QUINCAILLERIE", "JILI ISPANA", "350.00", "DZD", "AR02"].map((t) =>
+    const order = ["JILI ISPANA", "350.00", "DZD", "AR02"].map((t) =>
       html.indexOf(t),
     );
     expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("mirrors the centered redesign: no brand, centered rows, smaller price", () => {
+    const html = renderToStaticMarkup(
+      <SilentLabelPreviewView preview={enginePreview()} barcode="AR02" />,
+    );
+    expect(html).not.toContain("BARAKA QUINCAILLERIE");
+    expect(html).toContain("text-[12px]");
+    expect(html).not.toContain("text-[15px]");
+    expect(html.match(/text-center/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
   it("uses the engine price spelling, never the locale one", () => {

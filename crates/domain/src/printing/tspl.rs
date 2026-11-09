@@ -69,6 +69,10 @@ use crate::errors::DomainError;
 pub const DOTS_PER_MM: i64 = 8;
 /// Label media width in dots (40 mm).
 pub const LABEL_WIDTH_DOTS: i64 = 320;
+/// 2 mm safe box on 40x20 mm (owner agreement L-margins): x 16..304.
+/// Everything prints inside; the die-cut edge never touches ink.
+pub const LABEL_SAFE_LEFT: i64 = 16;
+pub const LABEL_SAFE_WIDTH: i64 = 288;
 /// Label media height in dots (20 mm).
 pub const LABEL_HEIGHT_DOTS: i64 = 160;
 /// Ticket media width in dots (80 mm).
@@ -1739,8 +1743,10 @@ fn right_x(right_edge: i64, dots: i64) -> i64 {
 /// Monospace cell width of a label TEXT face (DOC-06 containment checks).
 fn label_face_width_dots(font: &str, scale: i64) -> i64 {
     let cell = match font {
-        // Native 32x48 face: same geometry as "3"x2 (see the Price arm).
+        // Native 32x48 face: same geometry as "3"x2 (see the old Price arm).
         "5" => FONT_3_W * 2,
+        // Redesign face: native 24x32 (agreement L2 — 4 mm price).
+        "4" => FONT_4_W,
         "2" => FONT_2_W,
         "3" => FONT_3_W,
         _ => FONT_1_W,
@@ -1868,10 +1874,13 @@ pub fn label_barcode_geometry(barcode: &str) -> Result<LabelBarcodeGeometry, Dom
         // 11·n + 35 modules must fit 140 (quiet zones 20 dots per side).
         return Err(DomainError::TsplBarcodeTooWide);
     }
+    let width_dots = barcode_width_dots(barcode.chars().count()) as i64;
     Ok(LabelBarcodeGeometry {
-        x_dots: 8,
-        y_dots: 106,
-        width_dots: barcode_width_dots(barcode.chars().count()) as i64,
+        // Centered in the 2 mm safe box (16..304), never at x=8.
+        x_dots: LABEL_SAFE_LEFT + centered_x(LABEL_SAFE_WIDTH, width_dots),
+        // Price bottom (44+32=76) + 10 dots of scanner air.
+        y_dots: 86,
+        width_dots,
         height_dots: LABEL_BARCODE_HEIGHT,
     })
 }
@@ -1925,97 +1934,79 @@ pub struct LabelBitmap {
 /// renderer — `render_label_40x20` and the mixed path share this plan).
 #[must_use]
 pub fn label_text_plan(label: &TsplLabel<'_>) -> Vec<LabelTextLine> {
-    // 8-dot right margin: the die-cut edge clips anything past x=304
-    // (photo-verified LIVE-2026-11-06: "DZD" sliced at x=312).
-    // Professional inset: 3 mm safe margin for dispensing tolerance.
-    let right_edge = LABEL_WIDTH_DOTS - 24;
-    let brand_chars = ((LABEL_WIDTH_DOTS - 16) / FONT_1_W) as usize;
-    let name_chars = ((LABEL_WIDTH_DOTS - 16) / FONT_2_W) as usize;
-    let price_chars = ((LABEL_WIDTH_DOTS - 16) / (FONT_3_W * 2)) as usize;
+    // 2 mm safe box: x 16..304 (owner agreement L-margins). Every element
+    // is centered; the die-cut edge never touches ink. Vertical budget
+    // (y 16..144 = 128 dots): name 20 + 8 + price 32 + 10 + bars 38 + 8
+    // + ref 12 = 128 — the box is exactly full, no room for a brand line
+    // (agreement L1: brand dropped).
+    let right_edge = LABEL_SAFE_LEFT + LABEL_SAFE_WIDTH;
+    // Small-face budget inside the safe box (288 / 8).
+    let small_chars = (LABEL_SAFE_WIDTH / FONT_1_W) as usize;
+    // Name: F2, single centered line (agreement L4 — no vertical room for
+    // a second row, so the overflow is cut at 24, documented).
+    let name_chars = (LABEL_SAFE_WIDTH / FONT_2_W) as usize;
+    // Price: F4 (agreement L2). Cap 9, not 7: a centered 9x24 row ends at
+    // x=268, still 12 dots clear of DZD at x=280 — while a 7-cap would eat
+    // the last digit of any price >= 10000.00 (deviation from the signed
+    // draft, proven by the collision math, flagged in the report).
+    let price_chars = 9usize;
     let mut plan = Vec::new();
-    // Brand micro-line (collapses when blank).
-    let brand = truncate_to_width(label.brand_text.trim(), brand_chars);
-    if !brand.is_empty() {
-        let x = centered_x(
-            LABEL_WIDTH_DOTS,
-            text_dots(brand.chars().count(), FONT_1_W, 1),
-        );
-        plan.push(LabelTextLine {
-            slot: LabelTextSlot::Brand,
-            text: brand,
-            x_dots: x,
-            y_dots: 2,
-            cell_h_dots: FONT_1_H,
-            box_w_dots: i64::from(brand_chars as u32) * FONT_1_W,
-            box_h_dots: FONT_1_H + LABEL_BITMAP_PAD_DOTS,
-        });
-    }
-    // Designation: two lines max, second line marked "..." when cut.
-    let clean_name = sanitize_tspl_text(label.name.trim());
-    let first: String = clean_name.chars().take(name_chars).collect();
-    let rest: String = clean_name.chars().skip(name_chars).collect();
+    // truncate_to_width marks the cut with "..." (never a silent loss).
+    let first = truncate_to_width(label.name.trim(), name_chars);
     plan.push(LabelTextLine {
         slot: LabelTextSlot::NameLine1,
-        text: first,
-        x_dots: 8,
+        text: first.clone(),
+        x_dots: LABEL_SAFE_LEFT
+            + centered_x(
+                LABEL_SAFE_WIDTH,
+                text_dots(first.chars().count(), FONT_2_W, 1),
+            ),
         y_dots: 16,
         cell_h_dots: FONT_2_H,
-        box_w_dots: i64::from(name_chars as u32) * FONT_2_W,
+        box_w_dots: LABEL_SAFE_WIDTH,
         box_h_dots: FONT_2_H + LABEL_BITMAP_PAD_DOTS,
     });
-    if !rest.trim().is_empty() {
-        plan.push(LabelTextLine {
-            slot: LabelTextSlot::NameLine2,
-            text: truncate_to_width(&rest, name_chars),
-            x_dots: 8,
-            y_dots: 38,
-            cell_h_dots: FONT_2_H,
-            box_w_dots: i64::from(name_chars as u32) * FONT_2_W,
-            box_h_dots: FONT_2_H + LABEL_BITMAP_PAD_DOTS,
-        });
-    }
-    // Price double-height, currency right-aligned inside the price band.
+    // Price F4 (4 mm — large, a step under the old 6 mm slab).
     let price = truncate_to_width(label.price_text.trim(), price_chars);
     plan.push(LabelTextLine {
         slot: LabelTextSlot::Price,
-        text: price,
-        x_dots: 8,
-        y_dots: 58,
-        cell_h_dots: FONT_3_H * 2,
-        box_w_dots: i64::from(price_chars as u32) * FONT_3_W * 2,
-        box_h_dots: FONT_3_H * 2 + LABEL_BITMAP_PAD_DOTS,
+        text: price.clone(),
+        x_dots: LABEL_SAFE_LEFT
+            + centered_x(
+                LABEL_SAFE_WIDTH,
+                text_dots(price.chars().count(), FONT_4_W, 1),
+            ),
+        y_dots: 44,
+        cell_h_dots: FONT_4_H,
+        box_w_dots: LABEL_SAFE_WIDTH,
+        box_h_dots: FONT_4_H + LABEL_BITMAP_PAD_DOTS,
     });
-    let currency = truncate_to_width(label.currency_text.trim(), brand_chars);
+    let currency = truncate_to_width(label.currency_text.trim(), small_chars);
     if !currency.is_empty() {
         let x = right_x(right_edge, text_dots(currency.chars().count(), FONT_1_W, 1));
         plan.push(LabelTextLine {
             slot: LabelTextSlot::Currency,
             text: currency,
             x_dots: x,
-            y_dots: 94,
+            y_dots: 54,
             cell_h_dots: FONT_1_H,
-            box_w_dots: i64::from(brand_chars as u32) * FONT_1_W,
+            box_w_dots: i64::from(small_chars as u32) * FONT_1_W,
             box_h_dots: FONT_1_H + LABEL_BITMAP_PAD_DOTS,
         });
     }
+    // Reference = the barcode payload, F1, centered above the bottom edge.
+    let human = truncate_to_width(&sanitize_tspl_text(label.barcode), small_chars);
     plan.push(LabelTextLine {
         slot: LabelTextSlot::Human,
-        text: truncate_to_width(&sanitize_tspl_text(label.barcode), brand_chars),
-        x_dots: centered_x(
-            LABEL_WIDTH_DOTS,
-            text_dots(
-                truncate_to_width(&sanitize_tspl_text(label.barcode), brand_chars)
-                    .chars()
-                    .count(),
-                FONT_1_W,
-                1,
+        text: human.clone(),
+        x_dots: LABEL_SAFE_LEFT
+            + centered_x(
+                LABEL_SAFE_WIDTH,
+                text_dots(human.chars().count(), FONT_1_W, 1),
             ),
-        ),
-        // 2-dot bottom margin: y=148 sat exactly on the die-cut edge and
-        // the last row printed half-clipped (photo-verified LIVE-2026-11-06).
-        y_dots: 146,
+        y_dots: 132,
         cell_h_dots: FONT_1_H,
-        box_w_dots: i64::from(brand_chars as u32) * FONT_1_W,
+        box_w_dots: i64::from(small_chars as u32) * FONT_1_W,
         box_h_dots: FONT_1_H + LABEL_BITMAP_PAD_DOTS,
     });
     plan
@@ -2168,9 +2159,8 @@ pub fn render_label_40x20_mixed(
             let (font, scale) = match line.slot {
                 LabelTextSlot::Brand | LabelTextSlot::Currency | LabelTextSlot::Human => ("1", 1),
                 LabelTextSlot::NameLine1 | LabelTextSlot::NameLine2 => ("2", 1),
-                // Native 32x48 face: same geometry as "3"x2 but crisp
-                // (no scaler stair-steps on the price curves).
-                LabelTextSlot::Price => ("5", 1),
+                // Redesign price: native 24x32 face (agreement L2).
+                LabelTextSlot::Price => ("4", 1),
             };
             let (sx, sy) = (line.x_dots + dx, line.y_dots + dy);
             let width_dots = i64::try_from(line.text.chars().count()).unwrap_or(i64::MAX)
@@ -2180,20 +2170,20 @@ pub fn render_label_40x20_mixed(
             job.extend_from_slice(text_out.join("\r\n").as_bytes());
             job.extend_from_slice(b"\r\n");
         }
-        if line.slot == LabelTextSlot::Currency {
-            let (sbx, sby) = (bx + dx, by + dy);
-            if sbx < 0
-                || sby < 0
-                || sbx + geometry.width_dots > LABEL_WIDTH_DOTS
-                || sby + geometry.height_dots > LABEL_HEIGHT_DOTS
-            {
-                return Err(code("LABEL_CALIBRATION_OUT_OF_AREA"));
-            }
-            job.extend_from_slice(
-                format!("BARCODE {sbx},{sby},\"128\",{bh},0,0,2,2,\"{barcode}\"\r\n").as_bytes(),
-            );
-        }
     }
+    // The symbol always spools (agreement L5: centered, quiet-zoned,
+    // decoupled from the currency row).
+    let (sbx, sby) = (bx + dx, by + dy);
+    if sbx < 0
+        || sby < 0
+        || sbx + geometry.width_dots > LABEL_WIDTH_DOTS
+        || sby + geometry.height_dots > LABEL_HEIGHT_DOTS
+    {
+        return Err(code("LABEL_CALIBRATION_OUT_OF_AREA"));
+    }
+    job.extend_from_slice(
+        format!("BARCODE {sbx},{sby},\"128\",{bh},0,0,2,2,\"{barcode}\"\r\n").as_bytes(),
+    );
     job.extend_from_slice(format!("PRINT 1,{}\r\n", label.copies).as_bytes());
     Ok(job)
 }
@@ -2736,12 +2726,11 @@ mod tests {
              SET CUTTER OFF\r\n\
              SET TEAR ON\r\n\
              CLS\r\n\
-             TEXT 100,2,\"1\",0,1,1,\"BARAKA ULTRAPOS\"\r\n\
-             TEXT 8,16,\"2\",0,1,1,\"Vis 8x40\"\r\n\
-             TEXT 8,58,\"5\",0,1,1,\"10.00\"\r\n\
-             TEXT 272,94,\"1\",0,1,1,\"DZD\"\r\n\
-             BARCODE 8,106,\"128\",38,0,0,2,2,\"VIS-001\"\r\n\
-             TEXT 132,146,\"1\",0,1,1,\"VIS-001\"\r\n\
+             TEXT 112,16,\"2\",0,1,1,\"Vis 8x40\"\r\n\
+             TEXT 100,44,\"4\",0,1,1,\"10.00\"\r\n\
+             TEXT 280,54,\"1\",0,1,1,\"DZD\"\r\n\
+             TEXT 132,132,\"1\",0,1,1,\"VIS-001\"\r\n\
+             BARCODE 48,86,\"128\",38,0,0,2,2,\"VIS-001\"\r\n\
              PRINT 1,3\r\n"
         );
     }
@@ -2783,12 +2772,11 @@ mod tests {
              SET CUTTER OFF\r\n\
              SET TEAR ON\r\n\
              CLS\r\n\
-             TEXT 92,2,\"1\",0,1,1,\"BARAKA ULTRAPOS\"\r\n\
-             TEXT 0,16,\"2\",0,1,1,\"Vis 8x40\"\r\n\
-             TEXT 0,58,\"5\",0,1,1,\"10.00\"\r\n\
-             TEXT 264,94,\"1\",0,1,1,\"DZD\"\r\n\
-             BARCODE 0,106,\"128\",38,0,0,2,2,\"VIS-001\"\r\n\
-             TEXT 124,146,\"1\",0,1,1,\"VIS-001\"\r\n\
+             TEXT 104,16,\"2\",0,1,1,\"Vis 8x40\"\r\n\
+             TEXT 92,44,\"4\",0,1,1,\"10.00\"\r\n\
+             TEXT 272,54,\"1\",0,1,1,\"DZD\"\r\n\
+             TEXT 124,132,\"1\",0,1,1,\"VIS-001\"\r\n\
+             BARCODE 40,86,\"128\",38,0,0,2,2,\"VIS-001\"\r\n\
              PRINT 1,1\r\n"
         );
     }
@@ -2796,16 +2784,20 @@ mod tests {
     /// DOC-06 RED: a shift pushing content off the 320x160 area fails LOUDLY.
     #[test]
     fn calibration_past_the_edge_rejects_loudly() {
-        let mut calibrated = owner_label(1);
+        let mut calibrated = TsplLabel {
+            name: "0123456789ABCDEFGHIJ0123",
+            ..owner_label(1)
+        };
         calibrated.media = offset_media(-5, 0);
         let err = render_label_40x20(&calibrated).expect_err("must reject");
         assert_eq!(
             err,
             DomainError::InvalidCanonicalString("LABEL_CALIBRATION_OUT_OF_AREA".to_string())
         );
-        // Feed axis: the human line sits 2 dots above the die-cut edge.
+        // Feed axis: the human line bottom sits at 132 + 12 = 144, so a
+        // +3 mm feed shift (144 + 24 = 168 > 160) fails loudly.
         let mut calibrated = owner_label(1);
-        calibrated.media = offset_media(0, 2);
+        calibrated.media = offset_media(0, 3);
         let err = render_label_40x20(&calibrated).expect_err("must reject");
         assert_eq!(
             err,
@@ -2869,14 +2861,13 @@ mod tests {
     }
 
     #[test]
-    fn label_brand_collapses_when_blank() {
-        let label = TsplLabel {
-            brand_text: "   ",
-            ..owner_label(1)
-        };
-        let text = String::from_utf8(render_label_40x20(&label).expect("ok")).expect("ascii");
-        assert!(!text.contains("BARAKA ULTRAPOS"), "blank brand collapses");
-        assert!(text.contains("TEXT 8,16,\"2\",0,1,1,\"Vis 8x40\""));
+    fn label_brand_never_prints_even_when_set() {
+        // Redesign agreement L1: the brand line is gone (no vertical room).
+        // A set brand is dropped, never rejected, never printed.
+        let text =
+            String::from_utf8(render_label_40x20(&owner_label(1)).expect("ok")).expect("ascii");
+        assert!(!text.contains("BARAKA ULTRAPOS"), "brand never prints");
+        assert!(text.contains("TEXT 112,16,\"2\",0,1,1,\"Vis 8x40\""));
     }
 
     #[test]
@@ -2914,14 +2905,19 @@ mod tests {
     }
 
     #[test]
-    fn label_designation_wraps_two_lines_and_truncates() {
+    fn label_designation_single_line_truncates_at_24() {
+        // Redesign agreement L4: one centered row, no second line.
         let label = TsplLabel {
             name: "0123456789ABCDEFGHIJ0123456789ABCDEFGHIJ0123456789AB",
             ..owner_label(1)
         };
         let text = String::from_utf8(render_label_40x20(&label).expect("ok")).expect("ascii");
-        assert!(text.contains("TEXT 8,16,\"2\",0,1,1,\"0123456789ABCDEFGHIJ01234\""));
-        assert!(text.contains("TEXT 8,38,\"2\",0,1,1,\"56789ABCDEFGHIJ0123456...\""));
+        assert!(text.contains("TEXT 16,16,\"2\",0,1,1,\"0123456789ABCDEFGHIJ0...\""));
+        assert!(!text.contains("TEXT 8,38,"), "no second name row");
+        assert!(
+            !text.contains("0123456789ABCDEFGHIJ0123456789AB"),
+            "overflow never leaks"
+        );
     }
 
     #[test]
@@ -2933,7 +2929,7 @@ mod tests {
         let text = String::from_utf8(render_label_40x20(&label).expect("renders")).expect("ascii");
         assert!(
             !text.contains("désignation encore"),
-            "full name must not leak past the two-line field"
+            "full name must not leak past the single-line field"
         );
         assert!(text.contains("..."), "truncation is marked");
         let quoted = TsplLabel {
@@ -3212,7 +3208,7 @@ mod tests {
         // print-vs-ignore, never beauty.
         assert_eq!(ascii_probe_lossy("café Üمر"), "caf? ???");
         let probed = TsplLabel {
-            brand_text: "café",
+            name: "café 8x40",
             media: TsplMediaSetup {
                 probe_mode: TsplProbeMode::AsciiOnly,
                 ..TsplMediaSetup::default()
@@ -3978,14 +3974,14 @@ mod tests {
             render_label_40x20(&label).expect_err("arabic name rejects"),
             bad("LABEL_TEXT_UNPRINTABLE")
         );
+        // The brand line is gone: an Arabic brand is dropped, not rejected.
         let brand = TsplLabel {
             brand_text: "بركة",
             ..owner_label(1)
         };
-        assert_eq!(
-            render_label_40x20(&brand).expect_err("arabic brand rejects"),
-            bad("LABEL_TEXT_UNPRINTABLE")
-        );
+        let brand_text =
+            String::from_utf8(render_label_40x20(&brand).expect("brand dropped")).expect("ascii");
+        assert!(!brand_text.contains("بركة"), "brand never prints");
         // French accents ride CODEPAGE UTF-8 — still printable TEXT.
         let french = TsplLabel {
             name: "Clé à molette",
@@ -4008,7 +4004,7 @@ mod tests {
             .iter()
             .find(|line| line.slot == LabelTextSlot::NameLine1)
             .expect("name line 1 planned");
-        assert_eq!(l1.x_dots, 8);
+        assert_eq!(l1.x_dots, 64);
         assert_eq!(l1.y_dots, 16);
         let bytes = render_label_40x20_mixed(
             &label,
@@ -4024,15 +4020,15 @@ mod tests {
         .expect("mixed renders");
         // BITMAP line present at the text origin (byte search — the chunk
         // carries raw pixels, never UTF-8); the replaced TEXT line gone.
-        let bitmap_head = b"BITMAP 8,35,2,1,0,";
+        let bitmap_head = b"BITMAP 64,35,2,1,0,";
         assert!(
             bytes.windows(bitmap_head.len()).any(|w| w == bitmap_head),
             "bitmap at bottom-aligned origin"
         );
         assert!(
             !bytes
-                .windows(b"TEXT 8,16,".len())
-                .any(|w| w == b"TEXT 8,16,"),
+                .windows(b"TEXT 64,16,".len())
+                .any(|w| w == b"TEXT 64,16,"),
             "replaced TEXT line gone"
         );
         assert!(bytes.ends_with(b"\r\nPRINT 1,1\r\n"), "tail intact");

@@ -104,7 +104,7 @@ function PreviewLine({ line }: { line: TsplPreviewLine }) {
       return <p className="max-w-full truncate text-[10px] font-bold text-slate-500">{line.text}</p>;
     case "price":
       return (
-        <p className="text-[15px] font-black leading-none text-slate-900" dir="ltr">
+        <p className="text-center text-[12px] font-black leading-none text-slate-900" dir="ltr">
           {line.text}
         </p>
       );
@@ -116,12 +116,12 @@ function PreviewLine({ line }: { line: TsplPreviewLine }) {
       );
     case "human":
       return (
-        <p className="max-w-full font-mono text-[10px] text-slate-900" dir="ltr" title={line.text}>
+        <p className="max-w-full text-center font-mono text-[10px] text-slate-900" dir="ltr" title={line.text}>
           {line.text}
         </p>
       );
     default:
-      return <p className="max-w-full truncate text-[11px] font-extrabold text-slate-900">{line.text}</p>;
+      return <p className="max-w-full truncate text-center text-[11px] font-extrabold text-slate-900">{line.text}</p>;
   }
 }
 

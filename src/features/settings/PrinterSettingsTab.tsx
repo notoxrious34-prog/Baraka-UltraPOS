@@ -23,6 +23,7 @@ import {
   printingTestTsplLabel,
   printingTestTsplTicket,
   printingTestTsplCalibration,
+  printingTestTsplTicketRuler,
   type PrinterTransport,
   type TestPrintLanguage,
   type TicketRenderMode,
@@ -108,7 +109,7 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<
-    TestPrintLanguage | "tspl" | "tspl-ticket" | "calibration" | null
+    TestPrintLanguage | "tspl" | "tspl-ticket" | "calibration" | "ticket-ruler" | null
   >(null);
   const [notice, setNotice] = useState<{ tone: TestPrintTone; text: string } | null>(null);
 
@@ -265,6 +266,25 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
       setNotice({
         tone: "success",
         text: `${t(locale, "settings.testPrintTsplTicketSent")} — ${result.bytesSent} o`,
+      });
+    } catch (failure) {
+      setNotice({ tone: "error", text: String(failure) });
+    } finally {
+      setTesting(null);
+    }
+  }
+
+  async function handleTestTsplTicketRuler(): Promise<void> {
+    if (!canTestPrint) {
+      return;
+    }
+    setTesting("ticket-ruler");
+    setNotice(null);
+    try {
+      const result = await printingTestTsplTicketRuler();
+      setNotice({
+        tone: "success",
+        text: `${t(locale, "settings.testPrintTsplTicketRulerSent")} — ${result.bytesSent} o`,
       });
     } catch (failure) {
       setNotice({ tone: "error", text: String(failure) });
@@ -734,6 +754,31 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
             {testing === "tspl-ticket"
               ? t(locale, "settings.testing")
               : t(locale, "settings.testPrintTsplTicket")}
+          </button>
+            </div>
+          </div>
+          <div className="rounded-lg border border-accent-500/50 p-2.5 dark:border-accent-400/40">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black">{t(locale, "settings.testPrintTsplTicketRuler")}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t(locale, "settings.testTicketRulerHelp")}
+                </p>
+              </div>
+          <button
+            type="button"
+            disabled={testing !== null || !canTestPrint}
+            title={
+              canTestPrint ? undefined : t(locale, "settings.printerManageReservedGuidance")
+            }
+            onClick={() => {
+              void handleTestTsplTicketRuler();
+            }}
+            className="shrink-0 rounded bg-accent-500 px-3 py-1.5 text-sm font-bold text-slate-950 hover:brightness-110 disabled:opacity-50"
+          >
+            {testing === "ticket-ruler"
+              ? t(locale, "settings.testing")
+              : t(locale, "settings.testPrintTsplTicketRuler")}
           </button>
             </div>
           </div>

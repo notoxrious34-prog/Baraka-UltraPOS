@@ -21,10 +21,10 @@ use baraka_domain::printing::{
     format_centimes_plain, format_qty_plain, format_ticket_instant, label_barcode_geometry,
     label_text_needs_bitmap, label_text_plan, render_bitmap_job, render_calibration_pattern_40x20,
     render_label_40x20, render_label_40x20_mixed, render_ticket_80mm,
-    render_ticket_80mm_mixed_versioned, render_ticket_80mm_versioned, ticket_text_plan,
+    render_ticket_80mm_mixed_versioned, render_ticket_80mm_versioned, render_ticket_ruler_80mm,
     ticket_text_plan_v2, LabelBarcodeGeometry, LabelBitmap, LabelTextSlot, TicketOp,
     TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine, TsplTicketTotals,
-    TRANSPORT_SPOOLER, TSPL_TICKET_TEMPLATE_VERSION_V1,
+    TRANSPORT_SPOOLER,
 };
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{DocumentId, DocumentLanguage};
@@ -571,13 +571,9 @@ where
         };
         // DOC-01: route every non-Latin line through the bitmap rasterer
         // (same rule as shelf labels) — pure-TEXT jobs stay byte-identical.
-        // The detection plan follows the pinned template (DOC-07): v1 docs
-        // keep the frozen geometry, anything newer rides v2.
-        let (ops, _) = if document.template_version == TSPL_TICKET_TEMPLATE_VERSION_V1 {
-            ticket_text_plan(&ticket)
-        } else {
-            ticket_text_plan_v2(&ticket)
-        };
+        // DOC-07 final: ONE layout for every document (see
+        // `render_ticket_80mm_mixed_versioned`).
+        let (ops, _) = ticket_text_plan_v2(&ticket);
         let needs_bitmap = ops.iter().any(|op| {
             matches!(op, TicketOp::Text(line) if label_text_needs_bitmap(&line.text, ticket.media.probe_mode))
         });
@@ -804,6 +800,50 @@ where
         }
         require_spooler_transport(self.settings)?;
         let bytes = render_calibration_pattern_40x20(&media_from_settings(self.settings)?)?;
+        self.transport.send_raster(&bytes)?;
+        Ok(TsplPrintOutcome {
+            bytes_sent: bytes.len(),
+        })
+    }
+}
+
+/// DOC-07 final: 80 mm ticket-printer ruler (`render_ticket_ruler_80mm`).
+/// Button-triggered only, spooler transport only — no dialog, no preview.
+/// Prints full-width 1 mm ticks so the owner can report the last visible
+/// tick number and margins move from a measurement, never a guess.
+/// ADMIN seam (`SystemSettingsManage`).
+pub struct PrintTsplTicketRulerUseCase<'a, S, T>
+where
+    S: ?Sized,
+    T: ?Sized,
+{
+    settings: &'a S,
+    transport: &'a T,
+}
+
+impl<'a, S, T> PrintTsplTicketRulerUseCase<'a, S, T>
+where
+    S: PrinterSettingsPort + ?Sized,
+    T: PrinterTransportPort + ?Sized,
+{
+    /// Wire the use case to its ports.
+    pub fn new(settings: &'a S, transport: &'a T) -> Self {
+        Self {
+            settings,
+            transport,
+        }
+    }
+
+    /// Validate, render the ticket ruler, and spool one copy.
+    pub fn execute(&self, session: &SessionContext) -> Result<TsplPrintOutcome, ApplicationError> {
+        if !session
+            .role
+            .has_permission(Permission::SystemSettingsManage)
+        {
+            return Err(ApplicationError::Unauthorized);
+        }
+        require_spooler_transport(self.settings)?;
+        let bytes = render_ticket_ruler_80mm(&media_from_settings(self.settings)?)?;
         self.transport.send_raster(&bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),

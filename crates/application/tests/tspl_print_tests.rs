@@ -17,7 +17,8 @@ use baraka_application::ports::{
 };
 use baraka_application::use_cases::tspl_printing::{
     PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplCalibrationUseCase,
-    PrintTsplLabelUseCase, PrintTsplTestTicketUseCase, PrintTsplTicketUseCase,
+    PrintTsplLabelUseCase, PrintTsplTestTicketUseCase, PrintTsplTicketRulerUseCase,
+    PrintTsplTicketUseCase,
 };
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
@@ -1272,6 +1273,38 @@ fn calibration_pattern_spools_with_stored_offsets() {
     assert!(text.contains("BOX 8,-8,327,151,2\r\n"), "border shifted");
     assert!(text.contains("\"X+1MM Y-1MM\""), "self-documenting offsets");
     assert!(text.ends_with("PRINT 1,1\r\n"), "single-copy tail");
+}
+
+// DOC-07 final: the 80 mm ticket ruler spools one ascii-clean job and is
+// an ADMIN seam like every other TSPL test print.
+#[test]
+fn ticket_ruler_spools_full_width_ticks_for_admin_only() {
+    let settings = FakeSettings {
+        transport: "spooler".to_string(),
+        media: TsplMediaSetup {
+            gap_mm: 0,
+            ..TsplMediaSetup::default()
+        },
+    };
+    let transport = FakeTransport::new();
+    let outcome = PrintTsplTicketRulerUseCase::new(&settings, &transport)
+        .execute(&session_with(Role::Admin))
+        .expect("ruler spools");
+    assert!(outcome.bytes_sent > 0, "ruler job is non-empty");
+    let spooled = transport.payloads();
+    assert_eq!(spooled.len(), 1, "exactly one ruler job");
+    let text = String::from_utf8(spooled[0].clone()).expect("ruler is ascii-clean");
+    assert!(text.contains("TICKET RULER 80MM"), "self-documenting title");
+    assert!(text.contains("BAR 0,56,2,48"), "first tick present");
+    assert!(text.contains("BAR 632,56,2,24"), "far-edge tick present");
+    assert!(text.ends_with("PRINT 1,1\r\n"), "single-copy tail");
+
+    let refused = PrintTsplTicketRulerUseCase::new(&settings, &transport)
+        .execute(&session_with(Role::Caissier));
+    assert!(
+        matches!(refused, Err(ApplicationError::Unauthorized)),
+        "ruler is an ADMIN seam"
+    );
 }
 
 // DOC-07: an orphaned reference (deleted user/warehouse) falls back to the

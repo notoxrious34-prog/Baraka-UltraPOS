@@ -305,18 +305,21 @@ const QUIET_ZONE_DOTS: i64 = 10 * BARCODE_NARROW_DOTS as i64;
 /// Ticket barcode height in dots (8.0 mm — see module math).
 const TICKET_BARCODE_HEIGHT: i64 = 64;
 
-/// DOC-07 (v2 layout): the printable area shrinks to dodge the printer's
-/// dead right edge (Right Margin Clipping). Left margin 3 mm, right margin
-/// 6 mm — both above the 3 mm safety floor.
-pub const TICKET_MARGIN_LEFT_DOTS: i64 = 24;
-pub const TICKET_MARGIN_RIGHT_DOTS: i64 = 48;
+/// DOC-07 final (owner verdict 2026-11-09: both prints clip): the printer's
+/// dead zone starts well before the paper edge, so the printable box is
+/// pulled further in — left margin 4 mm, right margin 9 mm. Deliberate
+/// asymmetry: the left side proved crisp down to x=0, the right side eats
+/// ink from ~x590. A ticket-printer ruler (`render_ticket_ruler_80mm`)
+/// measures the exact edge; these bounds move again only from its reading.
+pub const TICKET_MARGIN_LEFT_DOTS: i64 = 32;
+pub const TICKET_MARGIN_RIGHT_DOTS: i64 = 72;
 pub const TICKET_PRINTABLE_DOTS: i64 =
     TICKET_WIDTH_DOTS - TICKET_MARGIN_LEFT_DOTS - TICKET_MARGIN_RIGHT_DOTS;
 /// v2 barcode: 12 mm tall for fast scanner reads, centered.
 pub const TICKET_BARCODE_HEIGHT_V2: i64 = 96;
-/// v2 payload budget inside the narrower printable area with 20-dot quiet
-/// zones on both sides: floor((568 - 40) / 2 / 11) -> 20 chars.
-pub const TICKET_BARCODE_MAX_CHARS_V2: usize = 20;
+/// v2 payload budget inside the 536-dot printable area with 20-dot quiet
+/// zones on both sides: floor((536 - 40) / 2 / 11) -> 19 chars.
+pub const TICKET_BARCODE_MAX_CHARS_V2: usize = 19;
 
 /// Reformat a stored RFC3339 instant (`2026-11-07T19:20:04.123+00:00`) into
 /// the ticket wall-clock form `07/11/2026 19:20` (DOC-07). Strict parse of
@@ -2191,8 +2194,14 @@ pub fn render_ticket_80mm_mixed_versioned(
     template_version: u32,
 ) -> Result<Vec<u8>, DomainError> {
     match template_version {
-        TSPL_TICKET_TEMPLATE_VERSION_V1 => render_ticket_80mm_mixed(ticket, bitmaps),
-        TSPL_TICKET_TEMPLATE_VERSION => render_ticket_mixed_for(ticket, bitmaps, TicketLayout::V2),
+        // DOC-07 final: ONE layout for every document. v1 bytes were
+        // never correct (right-clipped money figures fail the receipt's
+        // legal purpose), so there is no faithful geometry to preserve —
+        // fidelity is the transcribed figures, identical either way.
+        // `ticket_text_plan` stays as the historical reference + pins.
+        TSPL_TICKET_TEMPLATE_VERSION_V1 | TSPL_TICKET_TEMPLATE_VERSION => {
+            render_ticket_mixed_for(ticket, bitmaps, TicketLayout::V2)
+        }
         _ => Err(DomainError::InvalidCanonicalString(
             "TSPL_TEMPLATE_VERSION_UNKNOWN".to_string(),
         )),
@@ -2519,6 +2528,40 @@ pub fn render_bitmap_job(
     }
     job.extend_from_slice(data);
     job.extend_from_slice(format!("\r\nPRINT 1,{copies}\r\n").as_bytes());
+    Ok(job)
+}
+
+/// DOC-07 final: 80 mm ticket-printer ruler — measures the printer's true
+/// right dead zone instead of guessing it from clipped receipts.
+/// Full-width 1 mm ticks (every 8 dots) from x=0 to x=632, tall ticks +
+/// millimetre numbers every 10 mm, framed by plain French instructions.
+/// The owner prints it once and reports the last visible number; ticket
+/// margins move only from that reading. ASCII-only by construction.
+pub fn render_ticket_ruler_80mm(media: &TsplMediaSetup) -> Result<Vec<u8>, DomainError> {
+    let mut head: Vec<String> = Vec::new();
+    push_media_preamble(&mut head, "SIZE 80 mm, 40 mm", media)?;
+    let mut body: Vec<String> = head;
+    body.push("TEXT 16,8,\"2\",0,1,1,\"TICKET RULER 80MM - LIRE LE DERNIER TRAIT\"".to_string());
+    body.push(
+        "TEXT 16,32,\"1\",0,1,1,\"IMPRIMER - NOTER LE DERNIER CHIFFRE VISIBLE A DROITE\""
+            .to_string(),
+    );
+    let mut x: i64 = 0;
+    while x <= 632 {
+        let tall = x % 80 == 0;
+        body.push(format!("BAR {x},56,2,{}", if tall { 48 } else { 24 }));
+        x += 8;
+    }
+    let mut mm: i64 = 0;
+    while mm <= 70 {
+        let tick_x = mm * 8;
+        let text_x = if mm == 0 { 0 } else { tick_x - 8 };
+        body.push(format!("TEXT {text_x},108,\"1\",0,1,1,\"{mm}\""));
+        mm += 10;
+    }
+    body.push("TEXT 16,132,\"1\",0,1,1,\"REPORTER CE CHIFFRE AU SUPPORT\"".to_string());
+    let mut job: Vec<u8> = body.join("\r\n").into_bytes();
+    job.extend_from_slice(b"\r\nPRINT 1,1\r\n");
     Ok(job)
 }
 
@@ -3203,25 +3246,26 @@ mod tests {
         assert!(text.ends_with("PRINT 1,1\r\n"));
     }
 
-    // DOC-04: the template version pins geometry — v1 is today's renderer
-    // byte-for-byte, anything else rejects LOUDLY (future v2 adds a branch
-    // here; v1 stays frozen so old reprints never change).
+    // DOC-07 final (owner verdict 2026-11-09): ONE layout for every
+    // document — v1 bytes were never correct (clipped money figures fail
+    // the receipt's legal purpose), so both pinned versions render the
+    // final v2 geometry; only unknown versions reject LOUDLY.
     #[test]
     fn ticket_template_version_dispatch_pins_v1_and_rejects_unknown() {
-        // v1 stays byte-identical to the frozen geometry; v2 is the DOC-07
-        // redesign (narrower box, REVERSE total) — different bytes by design.
+        // v1 and v2 both render the final geometry — the same bytes.
         let pinned_v1 =
             render_ticket_80mm_versioned(&owner_ticket(), TSPL_TICKET_TEMPLATE_VERSION_V1)
                 .expect("v1 renders");
-        let frozen = render_ticket_80mm(&owner_ticket()).expect("renders");
-        assert_eq!(pinned_v1, frozen, "v1 is the frozen geometry");
         let pinned_v2 = render_ticket_80mm_versioned(&owner_ticket(), TSPL_TICKET_TEMPLATE_VERSION)
             .expect("v2 renders");
-        assert_ne!(pinned_v2, frozen, "v2 redesign changes the bytes");
+        assert_eq!(pinned_v1, pinned_v2, "one layout for every document");
+        // ...while the frozen v1 reference stays byte-identical (history).
+        let frozen = render_ticket_80mm(&owner_ticket()).expect("renders");
+        assert_ne!(pinned_v2, frozen, "final layout supersedes the frozen v1");
         let v2_text = String::from_utf8(pinned_v2).expect("ascii");
         assert!(
             v2_text.contains("REVERSE "),
-            "v2 carries a REVERSE band, got:\n{v2_text}"
+            "final carries a REVERSE band, got:\n{v2_text}"
         );
         assert_eq!(
             render_ticket_80mm_versioned(&owner_ticket(), 99).expect_err("unknown rejects"),
@@ -3436,7 +3480,7 @@ mod tests {
                 _ => None,
             })
             .expect("REVERSE band on the total row");
-        assert_eq!(band, (24, 568, 24), "band spans the printable box");
+        assert_eq!(band, (32, 536, 24), "band spans the printable box");
 
         // `*** DUPLICATA ***` carries its own band.
         assert!(
@@ -3446,17 +3490,17 @@ mod tests {
 
         // Barcode: 12 mm, narrow bars, centered with quiet zones.
         assert!(
-            text.contains("BARCODE 97,"),
+            text.contains("BARCODE 89,"),
             "centered barcode x, got:\n{text}"
         );
         assert!(
             text.contains(",\"128\",96,0,0,1,2,\"TICK-2026-000028\""),
             "12 mm narrow barcode, got:\n{text}"
         );
-        // Right clipping is impossible: the rightmost figure ends at 592.
+        // Right clipping is impossible: the rightmost figure ends at 568.
         assert!(
-            text.contains("TEXT 480,"),
-            "total figure ends at the 592 edge, got:\n{text}"
+            text.contains("TEXT 456,"),
+            "total figure ends at the 568 edge, got:\n{text}"
         );
     }
 
@@ -3482,17 +3526,44 @@ mod tests {
         );
     }
 
-    // DOC-07: narrower payload budget — 20 chars fit, 21 reject loudly.
+    // DOC-07 final: narrower payload budget — 19 chars fit, 20 reject loudly.
     #[test]
     fn v2_barcode_budget_matches_printable_width() {
         let mut ticket = mock_ticket_v2();
+        ticket.number = "1234567890123456789";
+        render_ticket_80mm_v2(&ticket).expect("19 chars fit");
         ticket.number = "12345678901234567890";
-        render_ticket_80mm_v2(&ticket).expect("20 chars fit");
-        ticket.number = "123456789012345678901";
         assert_eq!(
-            render_ticket_80mm_v2(&ticket).expect_err("21 chars reject"),
+            render_ticket_80mm_v2(&ticket).expect_err("20 chars reject"),
             DomainError::TsplBarcodeTooWide
         );
+    }
+
+    // DOC-07 final: 80 mm ticket ruler — full-width 1 mm ticks for
+    // measuring the printer's true right dead zone on paper.
+    #[test]
+    fn ticket_ruler_spans_full_width_with_numbered_decades() {
+        let media = TsplMediaSetup {
+            gap_mm: 0,
+            ..TsplMediaSetup::default()
+        };
+        let text = String::from_utf8(render_ticket_ruler_80mm(&media).expect("renders"))
+            .expect("ascii-clean");
+        assert!(text.starts_with("SIZE 80 mm, 40 mm\r\n"), "ticket stock");
+        assert!(text.contains("GAP 0,0\r\n"), "continuous stock");
+        assert!(text.ends_with("PRINT 1,1\r\n"), "single-copy tail");
+        let bars: Vec<&str> = text
+            .lines()
+            .filter(|line| line.starts_with("BAR "))
+            .collect();
+        assert_eq!(bars.len(), 80, "1 mm ticks 0..=632 step 8");
+        assert_eq!(bars[0], "BAR 0,56,2,48", "first tick tall");
+        assert_eq!(bars[10], "BAR 80,56,2,48", "10 mm decade tall");
+        assert_eq!(bars[1], "BAR 8,56,2,24", "minor ticks short");
+        assert_eq!(bars[79], "BAR 632,56,2,24", "last tick at the far edge");
+        for mark in ["\"0\"", "\"10\"", "\"20\"", "\"70\""] {
+            assert!(text.contains(mark), "numbered {mark}");
+        }
     }
 
     // DOC-05: a reprint is visibly a reprint — the engine stamps a

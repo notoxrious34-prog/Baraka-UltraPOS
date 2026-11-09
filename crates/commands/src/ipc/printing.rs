@@ -10,7 +10,7 @@ use baraka_application::use_cases::sales::{GetFiscalSettingsUseCase, UpdateFisca
 use baraka_application::use_cases::tspl_printing::{
     PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplCalibrationUseCase,
     PrintTsplLabelUseCase, PrintTsplTestLabelUseCase, PrintTsplTestTicketUseCase,
-    PrintTsplTicketUseCase,
+    PrintTsplTicketRulerUseCase, PrintTsplTicketUseCase,
 };
 use baraka_domain::role::Permission;
 
@@ -269,6 +269,30 @@ pub fn printer_test_tspl_ticket(
 ) -> Result<TsplPrintResponse, String> {
     let session = require_session(&state, &request.session_token)?;
     let outcome = PrintTsplTestTicketUseCase::new(
+        state.printer_settings.as_ref(),
+        state.printer_transport.as_ref(),
+    )
+    .execute(&session)
+    .map_err(|error| error_code(&error))?;
+    Ok(TsplPrintResponse {
+        bytes_sent: outcome.bytes_sent,
+    })
+}
+
+/// `printer_test_tspl_ticket_ruler` command: DOC-07 final 80 mm ticket
+/// ruler (`render_ticket_ruler_80mm`).
+///
+/// Button-triggered only, spooler transport only — no dialog, no preview.
+/// The owner prints it once and reports the last visible tick number;
+/// ticket margins move only from that measurement. ADMIN seam
+/// (`SystemSettingsManage`).
+#[tauri::command(rename_all = "snake_case")]
+pub fn printer_test_tspl_ticket_ruler(
+    state: tauri::State<'_, AppState>,
+    request: TsplTestTicketRequest,
+) -> Result<TsplPrintResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let outcome = PrintTsplTicketRulerUseCase::new(
         state.printer_settings.as_ref(),
         state.printer_transport.as_ref(),
     )

@@ -332,7 +332,9 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
  * cashier + depot on one row, `*** DUPLICATA ***` on a black band, the
  * three-column header with indented detail rows, zero badge/discount/TVA
  * rows collapsed, split totals captions, the grand total on a black
- * REVERSE band between double rules, a 12 mm centered barcode.
+ * REVERSE band between double rules, a 12 mm centered barcode — all inside
+ * the DOC-07 final box (left 4 mm, right 9 mm). Nothing may touch the
+ * paper edge: the live prints proved the printer eats ink from ~x590.
  */
 
 /** Centime-string zero test (wire carries plain `to_string()` figures). */
@@ -400,7 +402,7 @@ export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
   const style =
     `@page { size: ${TICKET_PAGE_WIDTH_MM}mm auto; margin: 0; }` +
     `html,body { margin: 0; padding: 0; }` +
-    `.ticket { width: ${TICKET_PAGE_WIDTH_MM}mm; max-width: 100%; margin: 0 auto; padding: 2mm 6mm 2mm 3mm; ` +
+    `.ticket { width: ${TICKET_PAGE_WIDTH_MM}mm; max-width: 100%; margin: 0 auto; padding: 2mm 9mm 2mm 4mm; ` +
     `font-family: Arial, sans-serif; color: #000; background: #fff; font-size: 9pt; }` +
     `.ticket .shop { text-align: center; font-weight: bold; font-size: 11pt; }` +
     `.ticket .meta { text-align: center; font-size: 8pt; margin: 1mm 0; }` +

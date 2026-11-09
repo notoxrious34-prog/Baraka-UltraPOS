@@ -1857,6 +1857,22 @@ export async function printingTestTsplTicket(): Promise<TsplTestTicketResult> {
 }
 
 /**
+ * DOC-07 final 80 mm ticket ruler: full-width 1 mm ticks for measuring the
+ * printer's true right dead zone. Session only on the wire; STORED media,
+ * one copy.
+ */
+export interface TsplTicketRulerResult {
+  bytesSent: number;
+}
+
+export async function printingTestTsplTicketRuler(): Promise<TsplTicketRulerResult> {
+  const wire = await call<{ bytes_sent: number }>("printer_test_tspl_ticket_ruler", {
+    request: {},
+  });
+  return { bytesSent: wire.bytes_sent };
+}
+
+/**
  * DOC-06 calibration pattern (40x20 ruler printout).
  * Session only on the wire; the pattern renders with the STORED media +
  * calibration, one copy.

@@ -1,7 +1,7 @@
 {
   "name": "baraka-ultrapos",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "description": "Baraka UltraPOS - Quincaillerie Generale POS System (Offline-First, Tauri v2 + React)",
   "scripts": {

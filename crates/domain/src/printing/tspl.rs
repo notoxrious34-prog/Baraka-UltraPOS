@@ -532,12 +532,14 @@ fn captions(lang: TsplCaptionLang) -> Captions {
 /// Make free text safe for a quoted TSPL field: `"` would break command
 /// framing (no escape exists) and CR/LF would inject commands.
 /// Ticket printer face (DOC-02): F5 is the native 32x48 face — same
-/// geometry the old scale-2 price occupied, but crisp.
+/// geometry the old scale-2 price occupied, but crisp. F4 (DOC-07
+/// cosmetics) is the native 24x32 face for the store name + grand total.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TicketFace {
     F1,
     F2,
     F3,
+    F4,
     F5,
 }
 
@@ -547,6 +549,7 @@ impl TicketFace {
             TicketFace::F1 => "1",
             TicketFace::F2 => "2",
             TicketFace::F3 => "3",
+            TicketFace::F4 => "4",
             TicketFace::F5 => "5",
         }
     }
@@ -558,6 +561,7 @@ impl TicketFace {
             TicketFace::F1 => FONT_1_H,
             TicketFace::F2 => FONT_2_H,
             TicketFace::F3 => FONT_3_H,
+            TicketFace::F4 => FONT_4_H,
             TicketFace::F5 => 48,
         }
     }
@@ -567,15 +571,17 @@ impl TicketFace {
             TicketFace::F1 => FONT_1_W,
             TicketFace::F2 => FONT_2_W,
             TicketFace::F3 => FONT_3_W,
+            TicketFace::F4 => FONT_4_W,
             TicketFace::F5 => FONT_3_W * 2,
         }
     }
-    /// Row pitch actually consumed by the line (leading included).
-    fn pitch(self) -> i64 {
+    /// v2 row pitch: the +4 breathing room (v1 uses the PITCH_F* constants).
+    fn pitch_v2(self) -> i64 {
         match self {
-            TicketFace::F1 => PITCH_F1,
-            TicketFace::F2 => PITCH_F2,
-            TicketFace::F3 => PITCH_F3,
+            TicketFace::F1 => PITCH_F1_V2,
+            TicketFace::F2 => PITCH_F2_V2,
+            TicketFace::F3 => PITCH_F3_V2,
+            TicketFace::F4 => PITCH_F4_V2,
             TicketFace::F5 => 56,
         }
     }
@@ -671,6 +677,14 @@ pub enum TicketOp {
         height_dots: i64,
         /// Narrow bar width in dots (v1 2, v2 1 for a slimmer symbol).
         narrow: u8,
+    },
+    /// DOC-07 cosmetics: thin frame around the page-centered barcode
+    /// block (coupon look) — emitted as `BOX x1,y1,x2,y2,2`.
+    Box {
+        x1: i64,
+        y1: i64,
+        x2: i64,
+        y2: i64,
     },
 }
 
@@ -1099,6 +1113,71 @@ pub fn ticket_text_plan(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
 ///
 /// Geometry only: the caller resolves names and the instant first (v2 never
 /// prints a raw identifier — see [`format_ticket_instant`]).
+/// One-line item segments (dots, inside the printable box — owner agreement
+/// TICKET-ONELINE items 1-2, TRIAL F2 2026-11-09: name 240 + detail 164 +
+/// total 132 = 536; revert to 264/140/132 + F1 + 33 on owner word).
+pub const SEG_NAME_W_V2: i64 = 240;
+pub const SEG_DETAIL_W_V2: i64 = 164;
+pub const SEG_TOTAL_W_V2: i64 = 132;
+/// Name first-row capacity at F2 (240 / 12).
+pub const SEG_NAME_CHARS_V2: usize = 20;
+/// Black-band vertical padding (agreement item 3): the band grows 4 dots
+/// above the glyphs and 4 below; the text drops 4 (true optical centering).
+pub const TICKET_BAND_PAD_V2: i64 = 4;
+
+/// Split a designation into at most two rows on word boundaries (agreement
+/// item 1): the first row fills `width_chars`, the overflow words continue
+/// on a second row inside the same segment (truncated only when two full
+/// rows still do not fit — documented, never silent beyond that).
+pub fn wrap_two_lines(text: &str, width_chars: usize) -> (String, Option<String>) {
+    let text = text.trim();
+    if width_chars == 0 {
+        return (String::new(), None);
+    }
+    if text.chars().count() <= width_chars {
+        return (text.to_string(), None);
+    }
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut first = String::new();
+    let mut first_len = 0usize;
+    let mut split_at = words.len();
+    for (i, word) in words.iter().enumerate() {
+        let word_len = word.chars().count();
+        let add = if first.is_empty() {
+            word_len
+        } else {
+            1 + word_len
+        };
+        if first_len + add <= width_chars {
+            if !first.is_empty() {
+                first.push(' ');
+            }
+            first.push_str(word);
+            first_len += add;
+        } else {
+            split_at = i;
+            break;
+        }
+    }
+    if split_at >= words.len() {
+        return (first, None);
+    }
+    // A single word longer than the row hard-splits (rare, documented).
+    let mut second = if first.is_empty() {
+        let head: String = text.chars().take(width_chars).collect();
+        let tail: String = text.chars().skip(width_chars).collect();
+        first = head;
+        tail
+    } else {
+        words[split_at..].join(" ")
+    };
+    second = truncate_to_width(&second, width_chars);
+    if second.trim().is_empty() {
+        return (first, None);
+    }
+    (first, Some(second))
+}
+
 pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
     let mut ops: Vec<TicketOp> = Vec::new();
     let mut y: i64 = 8;
@@ -1106,15 +1185,15 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
     let left = TICKET_MARGIN_LEFT_DOTS;
     let full = TICKET_PRINTABLE_DOTS;
     let narrow_chars = (full / FONT_1_W) as usize;
-    let wide_chars = (full / FONT_2_W) as usize;
     let name_chars = (full / FONT_3_W) as usize;
 
-    // Three-column header / detail segments (dots, inside the printable box).
-    let col_article = 180;
-    let col_total_w = 188;
-    let col_qty_w = full - col_article - col_total_w;
-    let col_qty_x = left + col_article;
-    let col_total_x = left + full - col_total_w;
+    // One-line item segments (agreement items 1-2): name | detail | total.
+    let seg_detail_x = left + SEG_NAME_W_V2;
+    let seg_total_x = left + SEG_NAME_W_V2 + SEG_DETAIL_W_V2;
+    debug_assert_eq!(
+        SEG_NAME_W_V2 + SEG_DETAIL_W_V2 + SEG_TOTAL_W_V2,
+        TICKET_PRINTABLE_DOTS
+    );
     // Totals: caption block + value block.
     let cap_w = 330;
     let val_x = left + cap_w;
@@ -1135,13 +1214,13 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
             face,
             cell_h_dots: face.cell_h(),
             box_w_dots: w,
-            box_h_dots: face.pitch(),
+            box_h_dots: face.pitch_v2(),
             align,
         })
     };
 
     // Store block (blank fields collapse — never empty lines).
-    let store = truncate_to_width(ticket.store_name.trim(), name_chars);
+    let store = truncate_to_width(ticket.store_name.trim(), (full / FONT_4_W) as usize);
     if !store.is_empty() {
         ops.push(mk(
             TicketTextSlot::StoreName,
@@ -1149,13 +1228,13 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
             left,
             full,
             y,
-            TicketFace::F3,
+            TicketFace::F4,
             TicketAlign::Center,
         ));
-        y += PITCH_F3;
+        y += PITCH_F4_V2;
     }
     for line in [ticket.store_address, ticket.store_phone] {
-        let shown = truncate_to_width(line.trim(), narrow_chars);
+        let shown = truncate_to_width(line.trim(), (full / FONT_3_W) as usize);
         if !shown.is_empty() {
             ops.push(mk(
                 TicketTextSlot::Contact,
@@ -1163,10 +1242,10 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
                 left,
                 full,
                 y,
-                TicketFace::F1,
+                TicketFace::F3,
                 TicketAlign::Center,
             ));
-            y += PITCH_F1;
+            y += PITCH_F3_V2;
         }
     }
     for (prefix, value) in ticket.tax_rows {
@@ -1177,14 +1256,14 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
         let joined = format!("{prefix}: {trimmed}");
         ops.push(mk(
             TicketTextSlot::TaxRow,
-            truncate_to_width(&joined, narrow_chars),
+            truncate_to_width(&joined, (full / FONT_3_W) as usize),
             left,
             full,
             y,
-            TicketFace::F1,
+            TicketFace::F3,
             TicketAlign::Center,
         ));
-        y += PITCH_F1;
+        y += PITCH_F3_V2;
     }
     ops.push(TicketOp::Rule {
         x: left,
@@ -1198,30 +1277,30 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
     let num_w = 340;
     ops.push(mk(
         TicketTextSlot::DocNumber,
-        truncate_to_width(&number, (num_w / FONT_2_W) as usize),
+        truncate_to_width(&number, (num_w / FONT_3_W) as usize),
         left,
         num_w,
         y,
-        TicketFace::F2,
+        TicketFace::F3,
         TicketAlign::Left,
     ));
     let instant = format_ticket_instant(ticket.created_at);
     ops.push(mk(
         TicketTextSlot::Instant,
-        truncate_to_width(&instant, ((full - num_w) / FONT_1_W) as usize),
+        truncate_to_width(&instant, ((full - num_w) / FONT_2_W) as usize),
         left + num_w,
         full - num_w,
-        y + (FONT_2_H - FONT_1_H),
-        TicketFace::F1,
+        y + (FONT_3_H - FONT_2_H),
+        TicketFace::F2,
         TicketAlign::Right,
     ));
-    y += PITCH_F2;
+    y += PITCH_F3_V2;
 
     // Cashier (left half) + depot (right half): resolved names, never ids.
     // When either side overflows its half (orphaned raw identifiers), the
     // row splits into two full-width rows so the fallback stays verbatim.
     let half = full / 2;
-    let half_chars = (half / FONT_1_W) as usize;
+    let half_chars = (half / FONT_2_W) as usize;
     let cashier_full = format!("{}: {}", caps.cashier_word, ticket.cashier_text.trim());
     let depot_full = format!("{}: {}", caps.depot_word, ticket.warehouse_text.trim());
     if cashier_full.chars().count() <= half_chars && depot_full.chars().count() <= half_chars {
@@ -1231,7 +1310,7 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
             left,
             half,
             y,
-            TicketFace::F1,
+            TicketFace::F2,
             TicketAlign::Left,
         ));
         ops.push(mk(
@@ -1240,11 +1319,14 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
             left + half,
             half,
             y,
-            TicketFace::F1,
+            TicketFace::F2,
             TicketAlign::Right,
         ));
-        y += PITCH_F1;
+        y += PITCH_F2_V2;
     } else {
+        // Orphan fallback stays F1: a raw 36-char id + caption is 46
+        // chars — F2 halves would truncate it, breaking the verbatim
+        // contract. Ugly ids stay whole; pretty names ride F2 above.
         for (slot, row) in [
             (TicketTextSlot::Cashier, cashier_full),
             (TicketTextSlot::Depot, depot_full),
@@ -1258,7 +1340,7 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
                 TicketFace::F1,
                 TicketAlign::Left,
             ));
-            y += PITCH_F1;
+            y += PITCH_F1_V2;
         }
     }
 
@@ -1272,7 +1354,7 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
             truncate_to_width(&band, name_chars),
             left,
             full,
-            y,
+            y + TICKET_BAND_PAD_V2,
             TicketFace::F3,
             TicketAlign::Center,
         ));
@@ -1280,40 +1362,42 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
             x: left,
             y,
             w: full,
-            h: FONT_3_H,
+            h: FONT_3_H + 2 * TICKET_BAND_PAD_V2,
         });
-        y += PITCH_F3;
+        y += FONT_3_H + 2 * TICKET_BAND_PAD_V2 + 2 * TICKET_BAND_PAD_V2;
     }
 
-    // Column header: Article | Qté x P.U | Total.
+    // Column header: Article | Qté x P.U | Total (agreement item 2 —
+    // same three segments as the rows; the mid column opens left so the
+    // detail indent never wobbles).
     ops.push(mk(
         TicketTextSlot::ColumnHeader,
-        truncate_to_width(caps.column_article, (col_article / FONT_1_W) as usize),
+        truncate_to_width(caps.column_article, (SEG_NAME_W_V2 / FONT_2_W) as usize),
         left,
-        col_article,
+        SEG_NAME_W_V2,
         y,
-        TicketFace::F1,
+        TicketFace::F2,
         TicketAlign::Left,
     ));
     ops.push(mk(
         TicketTextSlot::ColumnHeaderMid,
-        truncate_to_width(caps.column_qty_price, (col_qty_w / FONT_1_W) as usize),
-        col_qty_x,
-        col_qty_w,
+        truncate_to_width(caps.column_qty_price, (SEG_DETAIL_W_V2 / FONT_2_W) as usize),
+        seg_detail_x,
+        SEG_DETAIL_W_V2,
         y,
-        TicketFace::F1,
-        TicketAlign::Right,
+        TicketFace::F2,
+        TicketAlign::Left,
     ));
     ops.push(mk(
         TicketTextSlot::ColumnHeaderRight,
-        truncate_to_width(caps.column_total, (col_total_w / FONT_1_W) as usize),
-        col_total_x,
-        col_total_w,
+        truncate_to_width(caps.column_total, (SEG_TOTAL_W_V2 / FONT_2_W) as usize),
+        seg_total_x,
+        SEG_TOTAL_W_V2,
         y,
-        TicketFace::F1,
+        TicketFace::F2,
         TicketAlign::Right,
     ));
-    y += PITCH_F1;
+    y += PITCH_F2_V2;
     ops.push(TicketOp::Rule {
         x: left,
         y,
@@ -1321,48 +1405,60 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
     });
     y += 8;
 
-    // Lines: designation on its own row, prices indented underneath.
+    // Lines (agreement items 1-2, TRIAL F2): ONE F2 row — name |
+    // `qty x price` | total — plus a wrapped overflow row for long
+    // designations. The unit never prints (owner requirement); quantities
+    // without a unit render `1 x 400.00` with no double space.
     for line in ticket.lines {
-        let designation = truncate_to_width(line.designation.trim(), wide_chars);
+        let (first, second) = wrap_two_lines(line.designation.trim(), SEG_NAME_CHARS_V2);
         ops.push(mk(
             TicketTextSlot::LineName,
-            designation,
+            first,
             left,
-            full,
+            SEG_NAME_W_V2,
             y,
             TicketFace::F2,
             TicketAlign::Left,
         ));
-        y += PITCH_F2;
-
         let detail = format!(
-            "{} {} x {}",
+            "{} x {}",
             line.quantity_text.trim(),
-            line.unit_text.trim(),
             line.unit_price_text.trim()
         );
         ops.push(mk(
             TicketTextSlot::LineDetail,
-            truncate_to_width(&detail, ((col_qty_w - 24) / FONT_1_W) as usize),
-            col_qty_x,
-            col_qty_w,
+            truncate_to_width(&detail, (SEG_DETAIL_W_V2 / FONT_2_W) as usize),
+            seg_detail_x,
+            SEG_DETAIL_W_V2,
             y,
-            TicketFace::F1,
-            TicketAlign::Right,
+            TicketFace::F2,
+            TicketAlign::Left,
         ));
         ops.push(mk(
             TicketTextSlot::LineTotal,
             truncate_to_width(
                 line.line_total_text.trim(),
-                (col_total_w / FONT_1_W) as usize,
+                (SEG_TOTAL_W_V2 / FONT_2_W) as usize,
             ),
-            col_total_x,
-            col_total_w,
+            seg_total_x,
+            SEG_TOTAL_W_V2,
             y,
-            TicketFace::F1,
+            TicketFace::F2,
             TicketAlign::Right,
         ));
-        y += PITCH_F1;
+        y += PITCH_F2_V2;
+        if let Some(overflow) = second {
+            ops.push(mk(
+                TicketTextSlot::LineName,
+                overflow,
+                left,
+                SEG_NAME_W_V2,
+                y,
+                TicketFace::F2,
+                TicketAlign::Left,
+            ));
+            y += PITCH_F2_V2;
+        }
 
         // Zero discount collapses (owner: `remise 0.00` under every product
         // wasted paper). Unparseable text stays visible on purpose.
@@ -1383,7 +1479,7 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
                     TicketFace::F1,
                     TicketAlign::Left,
                 ));
-                y += PITCH_F1;
+                y += PITCH_F1_V2;
             }
         }
     }
@@ -1422,64 +1518,65 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
         let caption_text = format!("{caption} :");
         ops.push(mk(
             slot,
-            truncate_to_width(&caption_text, (cap_w / FONT_1_W) as usize),
+            truncate_to_width(&caption_text, (cap_w / FONT_2_W) as usize),
             left,
             cap_w,
             y,
-            TicketFace::F1,
+            TicketFace::F2,
             TicketAlign::Left,
         ));
         ops.push(mk(
             TicketTextSlot::TotalsRow,
-            truncate_to_width(shown, (val_w / FONT_1_W) as usize),
+            truncate_to_width(shown, (val_w / FONT_2_W) as usize),
             val_x,
             val_w,
             y,
-            TicketFace::F1,
+            TicketFace::F2,
             TicketAlign::Right,
         ));
-        y += PITCH_F1;
+        y += PITCH_F2_V2;
     }
 
-    // Grand total: F3 inside a REVERSE band, framed by a double rule.
+    // Grand total: F4 inside a REVERSE band, framed by a double rule.
+    // Owner answer Q4: bigger face + a 20-dot breathing gap above.
     ops.push(TicketOp::RuleDouble {
         x: left,
         y,
         w: full,
     });
-    y += 10;
+    y += 20;
     let total_caption = format!("{} :", caps.total);
     ops.push(mk(
         TicketTextSlot::TotalTtc,
-        truncate_to_width(&total_caption, (cap_w / FONT_3_W) as usize),
+        truncate_to_width(&total_caption, (cap_w / FONT_4_W) as usize),
         left,
         cap_w,
-        y,
-        TicketFace::F3,
+        y + TICKET_BAND_PAD_V2,
+        TicketFace::F4,
         TicketAlign::Left,
     ));
     ops.push(mk(
         TicketTextSlot::TotalTtc,
-        truncate_to_width(ticket.totals.total_ttc.trim(), (val_w / FONT_3_W) as usize),
+        truncate_to_width(ticket.totals.total_ttc.trim(), (val_w / FONT_4_W) as usize),
         val_x,
         val_w,
-        y,
-        TicketFace::F3,
+        y + TICKET_BAND_PAD_V2,
+        TicketFace::F4,
         TicketAlign::Right,
     ));
     ops.push(TicketOp::Reverse {
         x: left,
         y,
         w: full,
-        h: FONT_3_H,
+        h: FONT_4_H + 2 * TICKET_BAND_PAD_V2,
     });
-    y += PITCH_F3;
+    y += FONT_4_H + 2 * TICKET_BAND_PAD_V2 + 2 * TICKET_BAND_PAD_V2;
     ops.push(TicketOp::RuleDouble {
         x: left,
         y,
         w: full,
     });
-    y += 10;
+    y += 16;
 
     // Payment + change (caption left, figure right).
     for (slot, text, value) in [
@@ -1496,29 +1593,34 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
     ] {
         ops.push(mk(
             slot,
-            truncate_to_width(&text, (cap_w / FONT_1_W) as usize),
+            truncate_to_width(&text, (cap_w / FONT_2_W) as usize),
             left,
             cap_w,
             y,
-            TicketFace::F1,
+            TicketFace::F2,
             TicketAlign::Left,
         ));
         ops.push(mk(
             slot,
-            truncate_to_width(value.trim(), (val_w / FONT_1_W) as usize),
+            truncate_to_width(value.trim(), (val_w / FONT_2_W) as usize),
             val_x,
             val_w,
             y,
-            TicketFace::F1,
+            TicketFace::F2,
             TicketAlign::Right,
         ));
-        y += PITCH_F1;
+        y += PITCH_F2_V2;
     }
 
-    // Barcode: 12 mm tall, narrow bars, centered with quiet zones.
-    y += 8;
+    // Barcode: 12 mm tall, narrow bars, concentric inside OUR wide frame
+    // (32..568 — agreement item 5). Bars, number and frame share the box
+    // center so the block reads as one coupon; the verification print
+    // decides whether an exogenous frame also exists (then ours is
+    // withdrawn instead of doubling it).
+    y += 12;
     let barcode_width = barcode_width_dots_v2(number.chars().count()) as i64;
     let barcode_x = left + centered_x(full, barcode_width);
+    let barcode_y0 = y;
     ops.push(TicketOp::Barcode {
         x_dots: barcode_x,
         y_dots: y,
@@ -1526,18 +1628,25 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
         height_dots: TICKET_BARCODE_HEIGHT_V2,
         narrow: 1,
     });
-    y += TICKET_BARCODE_HEIGHT_V2 + 4;
+    y += TICKET_BARCODE_HEIGHT_V2 + 10;
     let human = truncate_to_width(&number, narrow_chars);
+    let human_y = y;
     ops.push(mk(
         TicketTextSlot::Human,
         human,
         left,
         full,
-        y,
+        human_y,
         TicketFace::F1,
         TicketAlign::Center,
     ));
-    y += PITCH_F1 + 4;
+    ops.push(TicketOp::Box {
+        x1: left,
+        y1: barcode_y0 - 8,
+        x2: left + full,
+        y2: human_y + FONT_1_H + 8,
+    });
+    y += PITCH_F1_V2 + 8;
 
     // Footer: owner message (collapses when blank) + constant thanks.
     let footer = truncate_to_width(ticket.footer.trim(), narrow_chars);
@@ -1551,18 +1660,18 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
             TicketFace::F1,
             TicketAlign::Center,
         ));
-        y += PITCH_F1;
+        y += PITCH_F1_V2;
     }
     ops.push(mk(
         TicketTextSlot::Thanks,
-        truncate_to_width(caps.thanks, narrow_chars),
+        truncate_to_width(caps.thanks, (full / FONT_2_W) as usize),
         left,
         full,
         y,
-        TicketFace::F1,
+        TicketFace::F2,
         TicketAlign::Center,
     ));
-    y += PITCH_F1 + 16;
+    y += PITCH_F2_V2 + 16;
     (ops, y)
 }
 
@@ -1702,6 +1811,12 @@ fn ascii_probe_lossy(content: &str) -> String {
 const PITCH_F1: i64 = 20;
 const PITCH_F2: i64 = 28;
 const PITCH_F3: i64 = 32;
+/// DOC-07 cosmetics (owner answers 2026-11-09): v2 rows breathe +4 dots.
+/// Dedicated constants — the frozen v1 geometry keeps the base pitches.
+const PITCH_F1_V2: i64 = 24;
+const PITCH_F2_V2: i64 = 32;
+const PITCH_F3_V2: i64 = 36;
+const PITCH_F4_V2: i64 = 44;
 /// Advance after a double-height "3" row (2 × 24 + 8).
 const PITCH_F3_X2: i64 = 56;
 /// Ticket side margin.
@@ -1786,6 +1901,11 @@ pub struct LabelTextLine {
 const FONT_1_H: i64 = 12;
 const FONT_2_H: i64 = 20;
 const FONT_3_H: i64 = 24;
+/// DOC-07 cosmetics: TSC native 24x32 face ("4") for the store name (F4)
+/// and the grand total — the 4 mm middle the owner asked for, without the
+/// F5 slab that fills the paper edge to edge.
+const FONT_4_W: i64 = 24;
+const FONT_4_H: i64 = 32;
 /// Diacritic headroom for shaped Arabic (marks above/below the cell).
 const LABEL_BITMAP_PAD_DOTS: i64 = 4;
 
@@ -2302,6 +2422,9 @@ fn render_ticket_mixed_for(
             }
             TicketOp::Reverse { x, y, w, h } => {
                 body.extend_from_slice(format!("REVERSE {x},{y},{w},{h}\r\n").as_bytes());
+            }
+            TicketOp::Box { x1, y1, x2, y2 } => {
+                body.extend_from_slice(format!("BOX {x1},{y1},{x2},{y2},2\r\n").as_bytes());
             }
             TicketOp::Barcode {
                 x_dots,
@@ -3415,9 +3538,49 @@ mod tests {
             .expect("instant planned");
         assert_eq!(
             number_y,
-            instant_y - (FONT_2_H - FONT_1_H),
-            "instant bottom-aligns"
+            instant_y - (FONT_3_H - FONT_2_H),
+            "instant bottom-aligns to the F3 number"
         );
+
+        // One-line rows: name, detail and total share a single F1 row.
+        let mut item_rows = std::collections::HashMap::new();
+        for op in &ops {
+            if let TicketOp::Text(line) = op {
+                if matches!(
+                    line.slot,
+                    TicketTextSlot::LineName
+                        | TicketTextSlot::LineDetail
+                        | TicketTextSlot::LineTotal
+                ) {
+                    item_rows
+                        .entry(line.y_dots)
+                        .or_insert_with(Vec::new)
+                        .push(line.slot);
+                }
+            }
+        }
+        assert!(
+            item_rows.values().any(|slots| slots.len() == 3),
+            "name+detail+total share one row, got: {item_rows:?}"
+        );
+        let detail_face = ops
+            .iter()
+            .find_map(|op| match op {
+                TicketOp::Text(line) if line.slot == TicketTextSlot::LineDetail => Some(line.face),
+                _ => None,
+            })
+            .expect("detail planned");
+        assert_eq!(detail_face, TicketFace::F2, "TRIAL F2: detail rides F2");
+        let mid_align = ops
+            .iter()
+            .find_map(|op| match op {
+                TicketOp::Text(line) if line.slot == TicketTextSlot::ColumnHeaderMid => {
+                    Some(line.align)
+                }
+                _ => None,
+            })
+            .expect("mid header planned");
+        assert_eq!(mid_align, TicketAlign::Left, "mid header opens left");
 
         // Three-column header on one row.
         let mut header_rows = std::collections::HashSet::new();
@@ -3449,14 +3612,14 @@ mod tests {
         );
         assert!(text.contains("Sous-total"), "subtotal stays, got:\n{text}");
 
-        // Grand total: F3 (never the F5 slab) on a REVERSE band, framed.
+        // Grand total: F4 (never the F5 slab) on a REVERSE band, framed.
         assert!(
-            text.contains(",\"3\",0,1,1,\"TOTAL TTC :"),
-            "F3 total caption, got:\n{text}"
+            text.contains(",\"4\",0,1,1,\"TOTAL TTC :"),
+            "F4 total caption, got:\n{text}"
         );
         assert!(
-            text.contains(",\"3\",0,1,1,\"1310.00"),
-            "F3 total figure, got:\n{text}"
+            text.contains(",\"4\",0,1,1,\"1310.00"),
+            "F4 total figure, got:\n{text}"
         );
         assert!(
             !text.contains(",\"5\","),
@@ -3476,11 +3639,17 @@ mod tests {
         let band = ops
             .iter()
             .find_map(|op| match op {
-                TicketOp::Reverse { x, y, w, h } if *y == total_y => Some((*x, *w, *h)),
+                TicketOp::Reverse { x, y, w, h } if *y == total_y - TICKET_BAND_PAD_V2 => {
+                    Some((*x, *w, *h))
+                }
                 _ => None,
             })
             .expect("REVERSE band on the total row");
-        assert_eq!(band, (32, 536, 24), "band spans the printable box");
+        assert_eq!(
+            band,
+            (32, 536, FONT_4_H + 2 * TICKET_BAND_PAD_V2),
+            "band spans the printable box with +8 optical padding"
+        );
 
         // `*** DUPLICATA ***` carries its own band.
         assert!(
@@ -3488,10 +3657,10 @@ mod tests {
             "framed mark, got:\n{text}"
         );
 
-        // Barcode: 12 mm, narrow bars, centered with quiet zones.
+        // Barcode: 12 mm, narrow bars, concentric inside the wide frame.
         assert!(
             text.contains("BARCODE 89,"),
-            "centered barcode x, got:\n{text}"
+            "box-centered barcode x, got:\n{text}"
         );
         assert!(
             text.contains(",\"128\",96,0,0,1,2,\"TICK-2026-000028\""),
@@ -3499,8 +3668,44 @@ mod tests {
         );
         // Right clipping is impossible: the rightmost figure ends at 568.
         assert!(
-            text.contains("TEXT 456,"),
+            text.contains("TEXT 400,"),
             "total figure ends at the 568 edge, got:\n{text}"
+        );
+        let frame = ops
+            .iter()
+            .find_map(|op| match op {
+                TicketOp::Box { x1, x2, .. } => Some((*x1, *x2)),
+                _ => None,
+            })
+            .expect("wide frame planned");
+        assert_eq!(frame, (32, 568), "frame spans the printable box");
+        assert!(
+            text.contains("BOX 32,"),
+            "wide frame spans the printable box, got:\n{text}"
+        );
+    }
+
+    // Agreement item 1: long designations wrap on word boundaries, short
+    // ones never split, single monsters hard-split (documented, never lost).
+    #[test]
+    fn wrap_two_lines_keeps_short_names_whole_and_splits_long_ones() {
+        let (first, second) = wrap_two_lines("JILI BERRAK", SEG_NAME_CHARS_V2);
+        assert_eq!(first, "JILI BERRAK");
+        assert_eq!(second, None);
+        let long = "MONCH ISPANA GRIS0958 EXTRA LONG DESIGNATION FOR TEST";
+        let (first, second) = wrap_two_lines(long, SEG_NAME_CHARS_V2);
+        assert!(
+            first.chars().count() <= SEG_NAME_CHARS_V2,
+            "first fits: {first}"
+        );
+        let second = second.expect("long name wraps");
+        assert!(
+            second.chars().count() <= SEG_NAME_CHARS_V2,
+            "second fits: {second}"
+        );
+        assert!(
+            format!("{first} {second}").starts_with("MONCH ISPANA"),
+            "no word lost: {first} / {second}"
         );
     }
 

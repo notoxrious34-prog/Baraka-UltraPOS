@@ -426,19 +426,25 @@ describe("DOC-07 v2 mirror (owner redesign)", () => {
     expect(html).toContain("Article");
     expect(html).toContain("Qté x P.U");
     expect(html).toContain("Total");
-    // Indented detail + line total.
-    expect(html).toContain("1 PCS x 530.00");
+    // One row per line, no unit printed (agreement items 1-2, TRIAL F2).
+    expect(html).toContain("1 x 530.00");
+    expect(html).not.toContain("PCS");
+    expect(html).not.toContain("ticket-detail");
+    expect((html.match(/data-testid="ticket-line"/g) ?? []).length).toBe(1);
+    expect(html).toContain("td.det { font-size: 9pt");
     expect(html).toContain("530.00");
     // Zero badge / discount / TVA collapse; subtotal stays.
     expect(html).not.toContain("ticket-badge");
     expect(html).toContain("Sous-total");
     expect(html).not.toContain("Remise totale");
     expect(html).not.toContain(">TVA <");
-    // Framed reprint band + black grand-total band.
+    // Framed reprint band + black grand-total band + wide barcode frame.
     expect(html).toContain("*** DUPLICATA ***");
     expect(html).toContain("reprint-band");
     expect(html).toContain("TOTAL TTC");
     expect(html).toContain("1310.00");
+    expect(html).toContain("border: 1px solid #000");
+    expect(html).toContain('class="row pay"');
   });
 
   it("keeps v1 frozen: zero rows still render on the v1 builder", () => {

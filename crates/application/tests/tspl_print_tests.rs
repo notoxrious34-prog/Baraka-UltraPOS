@@ -688,7 +688,7 @@ fn ticket_transcribes_discounted_and_legacy_lines_verbatim() {
     assert!(text.starts_with("SIZE 80 mm,"));
     // Per-unit line: stored net PU 900, never the raw 1000 — v2 splits
     // the row (detail indented, net total on the right).
-    assert!(text.contains("3 Pièce x 9.00"));
+    assert!(text.contains("3 x 9.00"));
     assert!(
         !text.contains("10.00"),
         "raw PU never leaks into a discounted line"
@@ -709,8 +709,8 @@ fn ticket_transcribes_discounted_and_legacy_lines_verbatim() {
     assert!(!text.contains("HT:"));
     assert!(!text.contains("Remise totale"));
     assert!(!text.contains("TVA"));
-    assert!(text.contains(",\"3\",0,1,1,\"TOTAL TTC :"));
-    assert!(text.contains(",\"3\",0,1,1,\"32.00"));
+    assert!(text.contains(",\"4\",0,1,1,\"TOTAL TTC :\""));
+    assert!(text.contains(",\"4\",0,1,1,\"32.00\""));
     assert!(!text.contains(",\"5\","), "no F5 slab");
     assert!(text.contains("Payé (CASH) :"));
     assert!(text.contains("Rendu :"));

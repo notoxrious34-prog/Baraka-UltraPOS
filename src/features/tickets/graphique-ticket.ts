@@ -351,10 +351,12 @@ export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
         line.discountPerUnit === null || isZeroCentimes(line.discountPerUnit)
           ? ""
           : `<tr data-testid="ticket-badge-row"><td colspan="3"><div class="badge" data-testid="ticket-badge">${badgeWord}: <bdi dir="ltr">${escapeTicket(ticketMoney(line.discountPerUnit))}</bdi></div></td></tr>`;
+      // Agreement TICKET-ONELINE items 1-2: ONE row — name | `qty x price`
+      // | total. The unit never prints (owner requirement); long names wrap
+      // to two lines via CSS, mirroring the engine word-wrap.
       return (
-        `<tr data-testid="ticket-line"><td class="des" colspan="3">${escapeTicket(line.designation)}</td></tr>` +
-        `<tr data-testid="ticket-detail"><td></td>` +
-        `<td class="num"><bdi dir="ltr">${escapeTicket(ticketQty(line.quantity))} ${escapeTicket(line.unit)} x ${escapeTicket(ticketMoney(line.unitPrice))}</bdi></td>` +
+        `<tr data-testid="ticket-line"><td class="des">${escapeTicket(line.designation)}</td>` +
+        `<td class="det"><bdi dir="ltr">${escapeTicket(ticketQty(line.quantity))} x ${escapeTicket(ticketMoney(line.unitPrice))}</bdi></td>` +
         `<td class="num"><bdi dir="ltr">${escapeTicket(ticketMoney(line.lineTotal))}</bdi></td></tr>` +
         badge
       );
@@ -397,8 +399,8 @@ export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
     args.ownerFooter.trim() !== ""
       ? `<div class="foot owner">${escapeTicket(args.ownerFooter.trim())}</div>`
       : "";
-  const totalsRow = (caption: string, figure: string) =>
-    `<div class="row"><span>${caption} :</span><span><bdi dir="ltr">${escapeTicket(figure)}</bdi></span></div>`;
+  const totalsRow = (caption: string, figure: string, extra = "") =>
+    `<div class="row${extra}"><span>${caption} :</span><span><bdi dir="ltr">${escapeTicket(figure)}</bdi></span></div>`;
   const style =
     `@page { size: ${TICKET_PAGE_WIDTH_MM}mm auto; margin: 0; }` +
     `html,body { margin: 0; padding: 0; }` +
@@ -409,18 +411,26 @@ export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
     `.ticket .docline { display: flex; justify-content: space-between; font-size: 8pt; margin: 1mm 0; }` +
     `.ticket .crew { display: flex; justify-content: space-between; gap: 2mm; font-size: 8pt; margin: 1mm 0; }` +
     `.ticket .reprint-band { text-align: center; font-weight: bold; font-size: 12pt; ` +
-    `background: #000; color: #fff; margin: 2mm 0; padding: 1mm; }` +
-    `.ticket table { width: 100%; border-collapse: collapse; margin: 2mm 0; }` +
+    `background: #000; color: #fff; margin: 2mm 0; padding: 1.5mm; }` +
+    `.ticket table { width: 100%; border-collapse: collapse; margin: 2mm 0; table-layout: fixed; }` +
+    `.ticket col.c-name { width: 49%; }` +
+    `.ticket col.c-detail { width: 26%; }` +
+    `.ticket col.c-total { width: 25%; }` +
     `.ticket th, .ticket td { padding: 1mm 0; vertical-align: top; text-align: start; }` +
     `.ticket th.num, .ticket td.num { text-align: end; font-family: "Courier New", monospace; }` +
+    `.ticket td.des { font-size: 9pt; overflow: hidden; display: -webkit-box; ` +
+    `-webkit-line-clamp: 2; -webkit-box-orient: vertical; }` +
+    `.ticket td.det { font-size: 9pt; text-align: start; font-family: "Courier New", monospace; }` +
+    `.ticket td.num { font-size: 9pt; }` +
     `.ticket .badge { font-size: 7pt; font-weight: bold; margin-top: 0.5mm; }` +
     `.ticket .totals { margin-top: 2mm; border-top: 2px solid #000; padding-top: 1mm; }` +
     `.ticket .totals .row { display: flex; justify-content: space-between; }` +
+    `.ticket .totals .row.pay { font-size: 10pt; }` +
     `.ticket .totals .grand { font-weight: bold; font-size: 12pt; background: #000; color: #fff; ` +
-    `border-top: 4px double #fff; border-bottom: 4px double #fff; padding: 1mm; margin: 1mm 0; }` +
-    `.ticket .barcode { background: #fff; padding: 3mm 6mm; margin: 2mm 0; }` +
+    `border-top: 4px double #fff; border-bottom: 4px double #fff; padding: 1.5mm; margin: 1mm 0; }` +
+    `.ticket .barcode { background: #fff; padding: 3mm 6mm; margin: 2mm 0; border: 1px solid #000; }` +
     `.ticket .barcode svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }` +
-    `.ticket .foot { text-align: center; font-size: 8pt; margin-top: 2mm; }` +
+    `.ticket .foot { text-align: center; font-size: 9pt; margin-top: 2mm; }` +
     `.ticket .foot.owner { font-weight: bold; }`;
   return (
     `<!DOCTYPE html><html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "fr"}"><head><meta charset="utf-8">` +
@@ -431,8 +441,8 @@ export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
     `<div class="docline"><span><bdi dir="ltr">${escapeTicket(args.documentNumber)}</bdi></span><span><bdi dir="ltr">${escapeTicket(args.createdAt)}</bdi></span></div>` +
     crewLine +
     `<div class="meta">${escapeTicket(args.strings.title)}</div>${mark}` +
-    `<table><thead><tr><th>${escapeTicket(args.strings.article)}</th>` +
-    `<th class="num">${escapeTicket(args.strings.qtyPrice)}</th>` +
+    `<table><colgroup><col class="c-name"><col class="c-detail"><col class="c-total"></colgroup><thead><tr><th>${escapeTicket(args.strings.article)}</th>` +
+    `<th class="det">${escapeTicket(args.strings.qtyPrice)}</th>` +
     `<th class="num">${escapeTicket(args.strings.total)}</th></tr></thead><tbody>${rows}</tbody></table>` +
     `<div class="totals">` +
     totalsRow(escapeTicket(args.strings.subtotal), ticketMoney(args.subtotalHt)) +
@@ -446,8 +456,9 @@ export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
     totalsRow(
       `${escapeTicket(args.strings.paid)} (${escapeTicket(args.paymentLabel)})`,
       ticketMoney(args.paidAmount),
+      " pay",
     ) +
-    totalsRow(escapeTicket(args.strings.change), ticketMoney(args.changeAmount)) +
+    totalsRow(escapeTicket(args.strings.change), ticketMoney(args.changeAmount), " pay") +
     `</div>${barcode}${ownerFooter}<div class="foot">${escapeTicket(args.strings.footer)}</div></div></body></html>`
   );
 }

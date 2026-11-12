@@ -126,4 +126,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-110 | Polymorphic dual-vertical architecture: apparel wholesale/retail + hardware general trade via capability-driven profiles (TASK-REL-020) | ACCEPTED |
 
-Next free id: ADR-111.
+| ADR-111 | Immutable wholesale credit-equation snapshot on finalized documents (migration 0020, TASK-BRK-108) | ACCEPTED |
+
+Next free id: ADR-112.

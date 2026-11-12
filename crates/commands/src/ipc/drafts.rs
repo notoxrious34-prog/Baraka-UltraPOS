@@ -152,6 +152,18 @@ pub fn sales_get(
             }
             .to_string(),
             template_version: detail.document.template_version,
+            credit_solde_before_centimes: detail
+                .document
+                .credit_solde_before_centimes
+                .map(|value| value.to_string()),
+            credit_solde_after_centimes: detail
+                .document
+                .credit_solde_after_centimes
+                .map(|value| value.to_string()),
+            credit_delta_centimes: detail
+                .document
+                .credit_delta_centimes
+                .map(|value| value.to_string()),
             // DOC-07: the sale wire resolves display names + the wall-clock
             // instant once, so every OS printout matches the engine bytes.
             created_by_name: state

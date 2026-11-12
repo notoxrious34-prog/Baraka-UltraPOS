@@ -119,6 +119,11 @@ pub const MIGRATIONS: &[EmbeddedMigration] = &[
         name: "0019_document_template_version.sql",
         sql: include_str!("../../migrations/0019_document_template_version.sql"),
     },
+    EmbeddedMigration {
+        version: 20,
+        name: "0020_credit_equation_snapshot.sql",
+        sql: include_str!("../../migrations/0020_credit_equation_snapshot.sql"),
+    },
 ];
 
 /// This binary's migration horizon: the newest schema version it understands.

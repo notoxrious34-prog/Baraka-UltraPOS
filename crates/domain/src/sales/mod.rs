@@ -1,10 +1,13 @@
 //! Sales domain: documents, payments, sequences, pricing kernel.
 
+pub mod credit_equation;
 pub mod customer;
 pub mod document;
 pub mod payment;
 pub mod pricing;
 pub mod sequence;
+
+pub use credit_equation::CreditSnapshot;
 
 pub use customer::{
     validate_customer_name, validate_customer_phone, CreditPolicy, CreditProfile, Customer,

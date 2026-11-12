@@ -229,6 +229,9 @@ fn seed_sale(
                 change_amount_centimes: 0,
                 payment_method: "CASH".to_string(),
                 template_version: baraka_domain::printing::TSPL_TICKET_TEMPLATE_VERSION,
+                credit_solde_before_centimes: None,
+                credit_solde_after_centimes: None,
+                credit_delta_centimes: None,
                 notes: None,
                 created_at: chrono::Utc::now(),
                 created_by: UserId::from(Uuid::parse_str(ACTOR_UUID).expect("uuid")),
@@ -567,6 +570,21 @@ fn test_persist_return_credit_refund_atomic() {
         )
         .expect("balance");
     assert_eq!(balance, -20_000);
+    // BRK-108: the AVOIR froze its own credit equation (migration 0020):
+    // Ancien 0 - Montant 20,000 + Versement 0 = Nouveau -20,000.
+    let snapshot: (i64, i64, i64) = harness
+        .db
+        .lock()
+        .expect("lock")
+        .query_row(
+            "SELECT credit_solde_before_centimes, credit_solde_after_centimes,
+                    credit_delta_centimes
+             FROM documents WHERE id = ?1",
+            [&receipt.return_document_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .expect("credit snapshot");
+    assert_eq!(snapshot, (0, -20_000, -20_000));
     // No drawer movement for a pure credit settlement.
     let cash_rows: i64 = harness
         .db

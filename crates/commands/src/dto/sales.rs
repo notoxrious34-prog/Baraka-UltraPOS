@@ -220,6 +220,13 @@ pub struct DocumentDto {
     /// Pinned layout version (DOC-04): the OS printout picks v1 or v2 from
     /// the stored document, never from the current binary.
     pub template_version: u32,
+    /// Frozen wholesale credit snapshot (BRK-108): customer balance before
+    /// this document (`None` = no balance movement / legacy row).
+    pub credit_solde_before_centimes: Option<String>,
+    /// Frozen wholesale credit snapshot: balance after this document.
+    pub credit_solde_after_centimes: Option<String>,
+    /// Signed balance movement (`+` credit sale, `-` AVOIR refund).
+    pub credit_delta_centimes: Option<String>,
     /// Resolved operator login name (DOC-07) — the OS printout shows this,
     /// never the raw `created_by` id (orphans keep the verbatim id).
     pub created_by_name: String,

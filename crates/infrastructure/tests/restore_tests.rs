@@ -262,6 +262,9 @@ fn seed_document(
                 change_amount_centimes: 0,
                 payment_method: "CASH".to_string(),
                 template_version: baraka_domain::printing::TSPL_TICKET_TEMPLATE_VERSION,
+                credit_solde_before_centimes: None,
+                credit_solde_after_centimes: None,
+                credit_delta_centimes: None,
                 notes: None,
                 created_at: chrono::Utc::now(),
                 created_by: UserId::from(Uuid::parse_str(ACTOR_UUID).expect("uuid")),
@@ -799,6 +802,18 @@ fn restore_older_schema_backup_is_migrated() {
             // the ADD COLUMN migration fails the same way.
             conn.execute("ALTER TABLE documents DROP COLUMN template_version;", [])
                 .expect("drop v19 template column");
+        }
+        if app_version >= 20 {
+            // Genuine v19 backups predate migration 0020, so its three
+            // NULL-able credit-snapshot columns must go too.
+            for column in [
+                "credit_solde_before_centimes",
+                "credit_solde_after_centimes",
+                "credit_delta_centimes",
+            ] {
+                conn.execute(&format!("ALTER TABLE documents DROP COLUMN {column};"), [])
+                    .expect("drop v20 credit snapshot column");
+            }
         }
     }
     repoint_logged_hash(

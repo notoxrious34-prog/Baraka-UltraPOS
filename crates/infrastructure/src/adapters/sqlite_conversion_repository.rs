@@ -21,7 +21,7 @@ use baraka_application::ports::{
     ConvertDevisToBlResult,
 };
 use baraka_domain::errors::DomainError;
-use baraka_domain::sales::DocumentType;
+use baraka_domain::sales::{CreditSnapshot, DocumentType};
 use chrono::{Datelike, SecondsFormat, Utc};
 
 use crate::adapters::sqlite_audit_log::insert_cash_audit_row;
@@ -48,6 +48,22 @@ const EMPTY_SOURCE: &str = "DEVIS_EMPTY";
 // Tender lines do not cover the source total exactly (either direction);
 // surfaces as the checkout tender-coverage error (no change concept here).
 const TENDER_MISMATCH: &str = "TENDER_MISMATCH";
+
+/// Read the cached customer balance inside the open transaction (BRK-108).
+fn read_customer_balance_in_tx(
+    tx: &Transaction,
+    customer_id: &str,
+) -> Result<i64, InfrastructureError> {
+    tx.query_row(
+        "SELECT current_balance_centimes FROM customers WHERE id = ?1",
+        [customer_id],
+        |row| row.get(0),
+    )
+    .map_err(|error| match error {
+        rusqlite::Error::QueryReturnedNoRows => tx_failure("CUSTOMER_MISSING".to_string()),
+        other => InfrastructureError::from(other),
+    })
+}
 
 /// Authoritative in-transaction credit check for financial closings.
 ///
@@ -567,10 +583,17 @@ pub(crate) fn convert_bl_to_facture_atomic(
         // (ledger, payments, audit) binds it directly — no fix-up updates.
         let facture_id = Uuid::new_v4().to_string();
         let mut customer_balance: Option<i64> = None;
+        let mut credit_snapshot: Option<CreditSnapshot> = None;
         if command.credit_amount_centimes > 0 {
             let customer_id = source.party_id.as_deref().ok_or_else(|| {
                 tx_failure("CREDIT_CUSTOMER_REQUIRED".to_string())
             })?;
+            // BRK-108: freeze `Ancien Solde` before the authoritative write.
+            let ancien = read_customer_balance_in_tx(tx, customer_id)?;
+            credit_snapshot = Some(
+                CreditSnapshot::freeze(ancien, command.credit_amount_centimes)
+                    .map_err(|_| tx_failure(sentinel::OVERFLOW.to_string()))?,
+            );
             let new_balance = authorize_credit_for_closing(
                 tx,
                 customer_id,
@@ -625,9 +648,12 @@ pub(crate) fn convert_bl_to_facture_atomic(
               vat_total_centimes, global_discount_centimes, timbre_centimes,
               rounding_centimes, ttc_centimes, paid_amount_centimes,
               change_amount_centimes, payment_method, status, created_at,
-              created_by, revision, origin_device_id, notes)
+              created_by, revision, origin_device_id, notes,
+              credit_solde_before_centimes, credit_solde_after_centimes,
+              credit_delta_centimes)
              VALUES (?1, ?2, ?3, 'FACTURE', ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10, ?11, ?12, 0,
-                     ?13, ?13, 0, ?14, 'FINALIZED', ?15, ?16, 1, ?17, ?18)",
+                     ?13, ?13, 0, ?14, 'FINALIZED', ?15, ?16, 1, ?17, ?18,
+                     ?19, ?20, ?21)",
             rusqlite::params![
                 facture_id,
                 number,
@@ -647,6 +673,9 @@ pub(crate) fn convert_bl_to_facture_atomic(
                 actor,
                 command.terminal_id,
                 source.notes,
+                credit_snapshot.map(CreditSnapshot::ancien_solde_centimes),
+                credit_snapshot.map(CreditSnapshot::nouveau_solde_centimes),
+                credit_snapshot.map(CreditSnapshot::credit_delta_centimes),
             ],
         )?;
         for line in &source_lines {

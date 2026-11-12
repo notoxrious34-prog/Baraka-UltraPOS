@@ -250,6 +250,16 @@ pub struct Document {
     /// this version so old documents keep old geometry forever. Legacy rows
     /// (pre-migration-0019) read back as 1.
     pub template_version: u32,
+    /// Frozen wholesale credit snapshot (BRK-108, migration 0020): customer
+    /// ledger balance immediately before this document. `None` = no balance
+    /// movement was recorded (cash-only document, or legacy pre-BRK-108 row —
+    /// surfaces must render it absent, never as zero).
+    pub credit_solde_before_centimes: Option<i64>,
+    /// Frozen balance immediately after this document (`before + delta`).
+    pub credit_solde_after_centimes: Option<i64>,
+    /// Signed balance movement applied by this document: positive on a
+    /// credit sale, negative on an AVOIR.
+    pub credit_delta_centimes: Option<i64>,
     /// Operator note, if any.
     pub notes: Option<String>,
     /// Capture instant.

@@ -15,9 +15,11 @@ use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{PersistReturnOrder, PersistReturnReceipt, ReturnRepository};
 use baraka_domain::errors::DomainError;
 use baraka_domain::inventory::StockMovementType;
-use baraka_domain::sales::{format_number, DocumentId, DocumentStatus, DocumentType};
+use baraka_domain::sales::{
+    format_number, CreditSnapshot, DocumentId, DocumentStatus, DocumentType,
+};
 use chrono::{Datelike, SecondsFormat, Utc};
-use rusqlite::Connection;
+use rusqlite::{Connection, Transaction};
 use uuid::Uuid;
 
 use crate::adapters::sqlite_audit_log::insert_cash_audit_row;
@@ -38,6 +40,22 @@ fn store_failure() -> ApplicationError {
 
 /// In-transaction sentinel codes local to the return bundle.
 const BAD_SOURCE_STATUS: &str = "RETURN_BAD_SOURCE_STATUS";
+
+/// Read the cached customer balance inside the open transaction (BRK-108).
+fn read_customer_balance_in_tx(
+    tx: &Transaction,
+    customer_id: &str,
+) -> Result<i64, InfrastructureError> {
+    tx.query_row(
+        "SELECT current_balance_centimes FROM customers WHERE id = ?1",
+        [customer_id],
+        |row| row.get(0),
+    )
+    .map_err(|error| match error {
+        rusqlite::Error::QueryReturnedNoRows => tx_failure("CUSTOMER_MISSING".to_string()),
+        other => InfrastructureError::from(other),
+    })
+}
 
 /// Receipt stored for idempotent replay (serializable, like conversions).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -175,6 +193,22 @@ fn persist_return_atomic(
         let number = format_number(DocumentType::Avoir.prefix(), fiscal_year, sequence);
         let avoir_id = Uuid::new_v4().to_string();
         // e. AVOIR header (FINALIZED at birth: immutable from here on).
+        // BRK-108 snapshot: an AVOIR moves the balance DOWN by the credit
+        // refund; freeze `Ancien Solde` before any ledger write.
+        let credit_snapshot: Option<CreditSnapshot> = match &order.credit_refund {
+            Some(credit) if credit.amount_centimes > 0 => {
+                let ancien = read_customer_balance_in_tx(tx, &credit.customer_id.to_string())?;
+                let delta = credit
+                    .amount_centimes
+                    .checked_neg()
+                    .ok_or_else(|| tx_failure(sentinel::OVERFLOW.to_string()))?;
+                Some(
+                    CreditSnapshot::freeze(ancien, delta)
+                        .map_err(|_| tx_failure(sentinel::OVERFLOW.to_string()))?,
+                )
+            }
+            _ => None,
+        };
         tx.execute(
             "INSERT INTO documents
              (id, number, fiscal_year, type, party_type, party_id, source_document_id,
@@ -182,9 +216,12 @@ fn persist_return_atomic(
               vat_total_centimes, global_discount_centimes, timbre_centimes,
               rounding_centimes, ttc_centimes, paid_amount_centimes,
               change_amount_centimes, payment_method, status, created_at,
-              created_by, revision, origin_device_id, notes)
+              created_by, revision, origin_device_id, notes,
+              credit_solde_before_centimes, credit_solde_after_centimes,
+              credit_delta_centimes)
              VALUES (?1, ?2, ?3, 'AVOIR', ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10, 0, 0, 0,
-                     ?11, 0, 0, 'REFUND', 'FINALIZED', ?12, ?13, 1, ?14, ?15)",
+                     ?11, 0, 0, 'REFUND', 'FINALIZED', ?12, ?13, 1, ?14, ?15,
+                     ?16, ?17, ?18)",
             rusqlite::params![
                 avoir_id,
                 number,
@@ -201,6 +238,9 @@ fn persist_return_atomic(
                 actor,
                 &order.terminal_id,
                 order.notes.as_deref(),
+                credit_snapshot.map(CreditSnapshot::ancien_solde_centimes),
+                credit_snapshot.map(CreditSnapshot::nouveau_solde_centimes),
+                credit_snapshot.map(CreditSnapshot::credit_delta_centimes),
             ],
         )?;
         // f. Source-linked items.

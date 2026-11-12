@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{CheckoutCommand, CheckoutReceipt, CheckoutRepository};
-use baraka_domain::sales::{format_number, DocumentType};
+use baraka_domain::sales::{format_number, CreditSnapshot, DocumentType};
 use chrono::{Datelike, SecondsFormat, Utc};
 use rusqlite::{Connection, Transaction};
 use uuid::Uuid;
@@ -140,6 +140,25 @@ fn require_open_session_in_tx(
     })
 }
 
+/// Read the cached customer balance inside the open transaction (BRK-108).
+/// The authoritative re-check in [`authorize_credit_in_tx`] runs later in the
+/// same transaction, so this value is exactly the `Ancien Solde` the printed
+/// document must show.
+fn read_customer_balance_in_tx(
+    tx: &Transaction,
+    customer_id: &str,
+) -> Result<i64, InfrastructureError> {
+    tx.query_row(
+        "SELECT current_balance_centimes FROM customers WHERE id = ?1",
+        [customer_id],
+        |row| row.get(0),
+    )
+    .map_err(|error| match error {
+        rusqlite::Error::QueryReturnedNoRows => tx_failure("CUSTOMER_MISSING".to_string()),
+        other => InfrastructureError::from(other),
+    })
+}
+
 /// Authoritative in-transaction credit re-check; returns the new balance.
 fn authorize_credit_in_tx(
     tx: &Transaction,
@@ -251,6 +270,23 @@ impl CheckoutRepository for SqliteCheckoutRepository {
             let sequence = allocate_in_tx(tx, doc_type.code(), fiscal_year)?;
             let number = format_number(doc_type.prefix(), fiscal_year, sequence);
             let document_id = Uuid::new_v4().to_string();
+            // 2b. Wholesale credit-equation snapshot (BRK-108, ADR-110 Pillar
+            // 6.3): freeze the customer's `Ancien Solde` BEFORE any write and
+            // the signed movement this document applies, inside this same
+            // transaction. No credit leg -> no snapshot (both columns NULL).
+            let credit_snapshot = if command.credit_amount_centimes > 0 {
+                let customer_id = command
+                    .customer_id
+                    .map(|id| id.to_string())
+                    .ok_or_else(|| tx_failure("CREDIT_CUSTOMER_REQUIRED".to_string()))?;
+                let ancien = read_customer_balance_in_tx(tx, &customer_id)?;
+                Some(
+                    CreditSnapshot::freeze(ancien, command.credit_amount_centimes)
+                        .map_err(|_| tx_failure(sentinel::OVERFLOW.to_string()))?,
+                )
+            } else {
+                None
+            };
             // 3. Document header.
             let method_codes: Vec<&str> = {
                 let mut seen = Vec::new();
@@ -273,9 +309,11 @@ impl CheckoutRepository for SqliteCheckoutRepository {
                   global_discount_centimes, timbre_centimes, rounding_centimes,
                   ttc_centimes, paid_amount_centimes, change_amount_centimes,
                   payment_method, status, created_at, created_by, revision,
-                  origin_device_id, notes)
+                  origin_device_id, notes, credit_solde_before_centimes,
+                  credit_solde_after_centimes, credit_delta_centimes)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10, ?11, ?12, 0,
-                         ?13, ?14, ?15, ?16, 'FINALIZED', ?17, ?18, 1, ?19, ?20)",
+                         ?13, ?14, ?15, ?16, 'FINALIZED', ?17, ?18, 1, ?19, ?20,
+                         ?21, ?22, ?23)",
                 rusqlite::params![
                     document_id,
                     number,
@@ -297,6 +335,9 @@ impl CheckoutRepository for SqliteCheckoutRepository {
                     actor,
                     command.terminal_id,
                     command.notes,
+                    credit_snapshot.map(CreditSnapshot::ancien_solde_centimes),
+                    credit_snapshot.map(CreditSnapshot::nouveau_solde_centimes),
+                    credit_snapshot.map(CreditSnapshot::credit_delta_centimes),
                 ],
             )?;
             // 4. Item snapshots.

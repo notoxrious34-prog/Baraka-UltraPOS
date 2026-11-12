@@ -124,4 +124,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-109 | Split `ipc.rs` into 13 domain modules, pure motion (TASK-BRK-107) | ACCEPTED |
 
-Next free id: ADR-110.
+| ADR-110 | Polymorphic dual-vertical architecture: apparel wholesale/retail + hardware general trade via capability-driven profiles (TASK-REL-020) | ACCEPTED |
+
+Next free id: ADR-111.

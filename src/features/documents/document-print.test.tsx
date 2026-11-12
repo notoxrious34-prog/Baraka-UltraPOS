@@ -76,6 +76,7 @@ function detailsWithLines(count: number, docType: string, number: string): Docum
       unit_name_fr: "Pièce",
       unit_name_ar: "قطعة",
       product_missing: false,
+      colisage: null,
     })),
     payments: [{ method_code: "CASH", amount_centimes: "119000" }],
     print_status: "NONE",

@@ -8,8 +8,8 @@ use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::inventory::WarehouseId;
 
 use crate::dto::{
-    CreateDraftSaleRequest, DocumentDto, DocumentItemDto, DraftSaleResponse, GetSaleResponse,
-    PaymentDto,
+    ColisageShareDto, CreateDraftSaleRequest, DocumentDto, DocumentItemDto, DraftSaleResponse,
+    GetSaleResponse, PaymentDto,
 };
 
 /// `sales_create_draft` command (`sales.create_draft`): park an editable draft.
@@ -194,7 +194,8 @@ pub fn sales_get(
         items: detail
             .items_view
             .iter()
-            .map(|view| DocumentItemDto {
+            .enumerate()
+            .map(|(index, view)| DocumentItemDto {
                 product_id: view.item.product_id.to_string(),
                 unit_id: view.item.unit_id.to_string(),
                 quantity_micro: view.item.quantity_micro.to_string(),
@@ -215,6 +216,18 @@ pub fn sales_get(
                 unit_name_fr: view.unit_name_fr.clone(),
                 unit_name_ar: view.unit_name_ar.clone(),
                 product_missing: view.product_missing,
+                colisage: detail.items_colisage.get(index).map(|shares| {
+                    shares
+                        .iter()
+                        .map(|share| ColisageShareDto {
+                            unit_id: share.unit_id.clone(),
+                            unit_name_fr: share.unit_name_fr.clone(),
+                            unit_name_ar: share.unit_name_ar.clone(),
+                            factor_micro: share.factor_micro,
+                            count: share.count,
+                        })
+                        .collect()
+                }),
             })
             .collect(),
         payments: detail

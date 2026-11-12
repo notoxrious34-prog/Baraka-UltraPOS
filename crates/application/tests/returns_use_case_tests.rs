@@ -9,7 +9,7 @@ use std::sync::Mutex;
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    CashMovementView, CashSessionReport, CashSessionRepository, CashSessionView,
+    CashMovementView, CashSessionReport, CashSessionRepository, CashSessionView, ColisageShareView,
     ConvertBlToFactureCommand, ConvertBlToFactureResult, ConvertDevisToBlCommand,
     ConvertDevisToBlResult, CustomerRepository, CustomerSummary, CustomerUpdate, DeleteAudit,
     DocumentRepository, DocumentSearchFilter, DocumentSummary, LedgerEntryRow, PaymentRecord,
@@ -184,6 +184,13 @@ impl DocumentRepository for FakeDocuments {
         &self,
         _id: DocumentId,
     ) -> Result<Vec<DocumentItemView>, ApplicationError> {
+        Ok(Vec::new())
+    }
+
+    fn get_items_colisage(
+        &self,
+        _id: DocumentId,
+    ) -> Result<Vec<Vec<ColisageShareView>>, ApplicationError> {
         Ok(Vec::new())
     }
 

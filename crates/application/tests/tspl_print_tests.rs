@@ -9,9 +9,9 @@ use std::sync::Mutex;
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    BootstrapFirstAdminCommand, ConvertBlToFactureCommand, ConvertBlToFactureResult,
-    ConvertDevisToBlCommand, ConvertDevisToBlResult, CreateUserInput, DeleteAudit,
-    DocumentRepository, DocumentSearchFilter, DocumentSummary, PrinterSettings,
+    BootstrapFirstAdminCommand, ColisageShareView, ConvertBlToFactureCommand,
+    ConvertBlToFactureResult, ConvertDevisToBlCommand, ConvertDevisToBlResult, CreateUserInput,
+    DeleteAudit, DocumentRepository, DocumentSearchFilter, DocumentSummary, PrinterSettings,
     PrinterSettingsPort, PrinterTransportPort, SessionContext, SessionToken, StoreIdentityPort,
     StoredPayment, UpdateUserInput, UserRecord, UserRepository, WarehouseRepository,
 };
@@ -439,6 +439,13 @@ impl DocumentRepository for FakeDocuments {
         Ok(self.views.clone())
     }
 
+    fn get_items_colisage(
+        &self,
+        _id: DocumentId,
+    ) -> Result<Vec<Vec<ColisageShareView>>, ApplicationError> {
+        Ok(Vec::new())
+    }
+
     fn get_payments(&self, _id: DocumentId) -> Result<Vec<StoredPayment>, ApplicationError> {
         Ok(self.payments.clone())
     }
@@ -821,6 +828,12 @@ fn ticket_missing_document_surfaces_not_found() {
             &self,
             _id: DocumentId,
         ) -> Result<Vec<DocumentItemView>, ApplicationError> {
+            panic!("out of scope")
+        }
+        fn get_items_colisage(
+            &self,
+            _id: DocumentId,
+        ) -> Result<Vec<Vec<ColisageShareView>>, ApplicationError> {
             panic!("out of scope")
         }
         fn get_payments(&self, _id: DocumentId) -> Result<Vec<StoredPayment>, ApplicationError> {

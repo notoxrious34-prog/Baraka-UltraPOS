@@ -21,10 +21,10 @@ use uuid::Uuid;
 use crate::errors::ApplicationError;
 use crate::ports::{
     CheckoutCommand, CheckoutPayment, CheckoutReceipt, CheckoutRepository, Clock,
-    ConvertBlToFactureCommand, ConvertBlToFactureResult, ConvertDevisToBlCommand,
-    ConvertDevisToBlResult, ConvertLeafDeduction, CustomerRepository, DocumentRepository,
-    DocumentSearchFilter, DocumentSummary, LeafDeduction, PricedCheckoutLine, ProductRepository,
-    SessionContext, StockRepository, StoredPayment, WarehouseRepository,
+    ColisageShareView, ConvertBlToFactureCommand, ConvertBlToFactureResult,
+    ConvertDevisToBlCommand, ConvertDevisToBlResult, ConvertLeafDeduction, CustomerRepository,
+    DocumentRepository, DocumentSearchFilter, DocumentSummary, LeafDeduction, PricedCheckoutLine,
+    ProductRepository, SessionContext, StockRepository, StoredPayment, WarehouseRepository,
 };
 use crate::services::kit_expansion_service::expand_for_movement;
 use crate::services::sale_pricing_service::{verify_cart_line, VerifiedLine};
@@ -858,6 +858,9 @@ pub struct SaleDetail {
     pub items: Vec<DocumentItem>,
     /// Item snapshots with live product designation (same order as `items`).
     pub items_view: Vec<DocumentItemView>,
+    /// Whole-rung Colisage breakdown per line (same order as `items`;
+    /// empty inner vector = no whole-rung expression, TASK-BRK-109).
+    pub items_colisage: Vec<Vec<ColisageShareView>>,
     /// Payment rows.
     pub payments: Vec<StoredPayment>,
     /// Latest print-job status (`NONE` when absent).
@@ -1293,6 +1296,7 @@ where
             .ok_or_else(|| ApplicationError::NotFound("document".to_string()))?;
         let items = self.documents.get_items(id)?;
         let items_view = self.documents.get_items_with_names(id)?;
+        let items_colisage = self.documents.get_items_colisage(id)?;
         let payments = self.documents.get_payments(id)?;
         let print_status = self.documents.get_print_status(id)?;
         let paid: i128 = payments.iter().map(|p| i128::from(p.amount_centimes)).sum();
@@ -1302,6 +1306,7 @@ where
             document: document.clone(),
             items,
             items_view,
+            items_colisage,
             payments,
             print_status,
             payment_status: PaymentStatus::derive(paid_capped, document.ttc_centimes, has_credit),

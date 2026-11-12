@@ -4,15 +4,15 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    ConvertBlToFactureCommand, ConvertBlToFactureResult, ConvertDevisToBlCommand,
-    ConvertDevisToBlResult, DocumentRepository, DocumentSearchFilter, DocumentSummary,
-    StoredPayment,
+    ColisageShareView, ConvertBlToFactureCommand, ConvertBlToFactureResult,
+    ConvertDevisToBlCommand, ConvertDevisToBlResult, DocumentRepository, DocumentSearchFilter,
+    DocumentSummary, StoredPayment,
 };
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::inventory::WarehouseId;
 use baraka_domain::sales::{
-    CustomerId, Document, DocumentId, DocumentItem, DocumentItemView, DocumentLanguage,
-    DocumentStatus, DocumentType,
+    colisage_breakdown, ColisageRung, CustomerId, Document, DocumentId, DocumentItem,
+    DocumentItemView, DocumentLanguage, DocumentStatus, DocumentType,
 };
 use baraka_domain::user::UserId;
 use chrono::{SecondsFormat, Utc};
@@ -130,6 +130,64 @@ fn map_document(row: &rusqlite::Row) -> Result<Document, rusqlite::Error> {
         created_at: parse_stamp(&created_at_text)?,
         created_by: parse_user_id(&created_by_text)?,
     })
+}
+
+/// Whole-rung Colisage breakdown for one document line (TASK-BRK-109).
+///
+/// Loads the product's live unit ladder and expresses `quantity_base_micro`
+/// as whole rungs, largest first. Ladder gaps (missing product, no units,
+/// sub-rung fraction) degrade to an empty vector — the read never fails.
+fn colisage_for_line(
+    conn: &Connection,
+    product_id: &str,
+    quantity_base_micro: i64,
+) -> Result<Vec<ColisageShareView>, ApplicationError> {
+    let mut statement = conn
+        .prepare(
+            "SELECT id, unit_name_fr, unit_name_ar, factor_micro FROM product_units
+             WHERE product_id = ?1",
+        )
+        .map_err(|_| store_failure())?;
+    let ladder = statement
+        .query_map([product_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+            ))
+        })
+        .map_err(|_| store_failure())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| store_failure())?;
+    if ladder.is_empty() {
+        return Ok(Vec::new());
+    }
+    let rungs: Vec<ColisageRung> = ladder
+        .iter()
+        .map(|(_, _, _, factor)| ColisageRung {
+            factor_micro: *factor,
+        })
+        .collect();
+    let shares = match colisage_breakdown(quantity_base_micro, &rungs) {
+        Ok(shares) => shares,
+        Err(_) => return Ok(Vec::new()),
+    };
+    Ok(shares
+        .into_iter()
+        .filter_map(|share| {
+            ladder
+                .iter()
+                .find(|(_, _, _, factor)| *factor == share.factor_micro)
+                .map(|(unit_id, name_fr, name_ar, factor)| ColisageShareView {
+                    unit_id: unit_id.clone(),
+                    unit_name_fr: name_fr.clone(),
+                    unit_name_ar: name_ar.clone(),
+                    factor_micro: *factor,
+                    count: share.count,
+                })
+        })
+        .collect())
 }
 
 fn map_item(row: &rusqlite::Row) -> Result<DocumentItem, rusqlite::Error> {
@@ -398,6 +456,32 @@ impl DocumentRepository for SqliteDocumentRepository {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| store_failure())?;
         Ok(items)
+    }
+
+    fn get_items_colisage(
+        &self,
+        id: DocumentId,
+    ) -> Result<Vec<Vec<ColisageShareView>>, ApplicationError> {
+        let guard = self.lock()?;
+        let mut lines = guard
+            .prepare(
+                "SELECT product_id, quantity_base_micro FROM document_items
+                 WHERE document_id = ?1 ORDER BY sort_order",
+            )
+            .map_err(|_| store_failure())?;
+        let rows = lines
+            .query_map([id.to_string()], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?;
+        drop(lines);
+        rows.into_iter()
+            .map(|(product_id, quantity_base_micro)| {
+                colisage_for_line(&guard, &product_id, quantity_base_micro)
+            })
+            .collect()
     }
 
     fn get_payments(&self, id: DocumentId) -> Result<Vec<StoredPayment>, ApplicationError> {

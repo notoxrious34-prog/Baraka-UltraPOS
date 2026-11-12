@@ -271,6 +271,27 @@ pub struct DocumentItemDto {
     /// True when the product row is missing (frontend shows SKU-or-ID +
     /// archived marker, key TBD by DSN).
     pub product_missing: bool,
+    /// Whole-rung Colisage breakdown, largest rung first (TASK-BRK-109).
+    /// Empty = no whole-rung expression; surfaces show the base quantity.
+    /// Display integers (`count`/`factor_micro` ride as JSON numbers, NOT
+    /// money strings); `null` = detail written before BRK-109 — same
+    /// absence-not-zero rule as the credit snapshot.
+    pub colisage: Option<Vec<ColisageShareDto>>,
+}
+
+/// One whole-rung share of a line's Colisage breakdown (TASK-BRK-109).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ColisageShareDto {
+    /// Unit row backing this rung (stable frontend key).
+    pub unit_id: String,
+    /// Selling-unit label (FR).
+    pub unit_name_fr: String,
+    /// Selling-unit label (AR).
+    pub unit_name_ar: String,
+    /// Base micros per rung unit.
+    pub factor_micro: i64,
+    /// Whole units of this rung.
+    pub count: i64,
 }
 
 /// Stored payment row view.

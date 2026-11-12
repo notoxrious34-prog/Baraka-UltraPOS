@@ -128,4 +128,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-111 | Immutable wholesale credit-equation snapshot on finalized documents (migration 0020, TASK-BRK-108) | ACCEPTED |
 
-Next free id: ADR-112.
+| ADR-112 | Read-time Colisage breakdown on document lines, no migration (TASK-BRK-109) | ACCEPTED |
+
+Next free id: ADR-113.

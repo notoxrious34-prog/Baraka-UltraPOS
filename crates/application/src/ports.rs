@@ -703,6 +703,25 @@ pub trait CheckoutRepository: Send + Sync {
     ) -> Result<CheckoutReceipt, ApplicationError>;
 }
 
+/// One whole-rung share of a line's Colisage breakdown (TASK-BRK-109).
+///
+/// Display integers, NOT money: `factor_micro`/`count` ride the wire as JSON
+/// numbers. Empty vector = no whole-rung expression (missing ladder or
+/// sub-rung fraction); surfaces show the base quantity instead.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColisageShareView {
+    /// Unit row backing this rung (for stable frontend keys).
+    pub unit_id: String,
+    /// Selling-unit label (FR).
+    pub unit_name_fr: String,
+    /// Selling-unit label (AR).
+    pub unit_name_ar: String,
+    /// Base micros per rung unit (10_000 = base unit).
+    pub factor_micro: i64,
+    /// Whole units of this rung (`>= 1`).
+    pub count: i64,
+}
+
 /// Document persistence port (SQLite repository in infrastructure).
 pub trait DocumentRepository: Send + Sync {
     /// Park an editable draft (no sequence number consumed).
@@ -737,6 +756,18 @@ pub trait DocumentRepository: Send + Sync {
         &self,
         id: DocumentId,
     ) -> Result<Vec<DocumentItemView>, ApplicationError>;
+
+    /// Whole-rung packaging breakdown per document line (TASK-BRK-109).
+    ///
+    /// Same order as [`Self::get_items`]: one share vector per line, largest
+    /// rung first, zero-count rungs omitted. A line whose product ladder is
+    /// missing — or whose quantity has a sub-rung fraction — yields an empty
+    /// vector; surfaces then fall back to the base quantity. Never fails the
+    /// read: ladder gaps degrade, exactly like orphaned names above.
+    fn get_items_colisage(
+        &self,
+        id: DocumentId,
+    ) -> Result<Vec<Vec<ColisageShareView>>, ApplicationError>;
 
     /// Fetch all payment rows of a document.
     fn get_payments(&self, id: DocumentId) -> Result<Vec<StoredPayment>, ApplicationError>;

@@ -1288,6 +1288,18 @@ export interface DocumentDetailsWireResponse {
     unit_name_ar: string | null;
     /** True when the product row is missing (archived marker). */
     product_missing: boolean;
+    /**
+     * Whole-rung Colisage breakdown, largest rung first (BRK-109).
+     * Empty = no whole-rung expression (show base quantity);
+     * null = detail predates BRK-109 (absence, never zero).
+     */
+    colisage: Array<{
+      unit_id: string;
+      unit_name_fr: string;
+      unit_name_ar: string;
+      factor_micro: number;
+      count: number;
+    }> | null;
   }>;
   payments: Array<{
     method_code: string;

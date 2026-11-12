@@ -1,5 +1,6 @@
 //! Sales domain: documents, payments, sequences, pricing kernel.
 
+pub mod colisage;
 pub mod credit_equation;
 pub mod customer;
 pub mod document;
@@ -7,6 +8,7 @@ pub mod payment;
 pub mod pricing;
 pub mod sequence;
 
+pub use colisage::{breakdown as colisage_breakdown, ColisageRung, ColisageShare};
 pub use credit_equation::CreditSnapshot;
 
 pub use customer::{

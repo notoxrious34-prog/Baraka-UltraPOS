@@ -372,6 +372,7 @@ export function CheckoutModal(): ReactElement {
                 discountPerUnitCentimes: item.discount_per_unit_centimes,
                 discountedUnitPriceCentimes: item.discounted_unit_price_centimes,
                 lineTtcCentimes: item.line_ttc_centimes,
+                colisage: item.colisage ?? null,
               })),
             },
             {

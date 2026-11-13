@@ -26,6 +26,7 @@ const WIRE_LINES = [
     unitPrice: "85000",
     lineTotal: "170000",
     discountPerUnit: null,
+    colisage: null,
   },
   {
     designation: "Fer Ø12",
@@ -35,6 +36,7 @@ const WIRE_LINES = [
     unitPrice: "120000",
     lineTotal: "180000",
     discountPerUnit: null,
+    colisage: null,
   },
 ];
 
@@ -194,6 +196,10 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
         discountPerUnitCentimes: null,
         discountedUnitPriceCentimes: null,
         lineTtcCentimes: "170000",
+        colisage: [
+          { unit_name_fr: "Douzaine", unit_name_ar: "دزينة", count: 12 },
+          { unit_name_fr: "Demi-Douzaine", unit_name_ar: "نصف دزينة", count: 1 },
+        ],
       },
       {
         nameFr: null,
@@ -206,6 +212,7 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
         discountPerUnitCentimes: null,
         discountedUnitPriceCentimes: null,
         lineTtcCentimes: "0",
+        colisage: null,
       },
     ],
   };
@@ -286,6 +293,7 @@ describe("per-unit price mapping (DSN-097)", () => {
       discountPerUnitCentimes: null,
       discountedUnitPriceCentimes: null,
       lineTtcCentimes: "2700",
+      colisage: null,
       ...overrides,
     };
   }
@@ -329,6 +337,52 @@ describe("per-unit price mapping (DSN-097)", () => {
     expect(args.lines[0]?.unitPrice).toBe("1000");
     const html = buildTicketPrintHtml({ ...baseArgs(), lines: args.lines });
     expect(html).toContain("10.00");
+  });
+
+  it("v1 prints the wire colisage under the line, collapses legacy rows", () => {
+    // 150 pieces on a dozen ladder → 12 Douzaines + 1 Demi-Douzaine.
+    const packed = wireItem({});
+    const wire = {
+      ...detailsWith(packed),
+      items: [
+        {
+          ...packed,
+          colisage: [
+            { unit_name_fr: "Douzaine", unit_name_ar: "دزينة", count: 12 },
+            { unit_name_fr: "Demi-Douzaine", unit_name_ar: "نصف دزينة", count: 1 },
+          ],
+        },
+      ],
+    };
+    const args = ticketArgsFromWire(wire, OPTS);
+    expect(args.lines[0]?.colisage).toBe("12 × Douzaine + 1 × Demi-Douzaine");
+    const html = buildTicketPrintHtml({ ...baseArgs(), lines: args.lines });
+    expect(html).toContain('data-testid="ticket-colisage"');
+    expect(html).toContain("12 × Douzaine + 1 × Demi-Douzaine");
+    const legacy = buildTicketPrintHtml(baseArgs());
+    expect(legacy).not.toContain("ticket-colisage");
+  });
+
+  it("v2 prints the colisage in a spanning sub-row, legacy rows collapse", () => {
+    const packed = wireItem({});
+    const wire = {
+      ...detailsWith(packed),
+      items: [
+        {
+          ...packed,
+          colisage: [
+            { unit_name_fr: "Douzaine", unit_name_ar: "دزينة", count: 12 },
+            { unit_name_fr: "Demi-Douzaine", unit_name_ar: "نصف دزينة", count: 1 },
+          ],
+        },
+      ],
+    };
+    const args = ticketArgsFromWire(wire, OPTS);
+    const html = buildTicketPrintHtmlV2({ ...baseArgs(), lines: args.lines });
+    expect(html).toContain('data-testid="ticket-colisage-row"');
+    expect(html).toContain("Demi-Douzaine");
+    const legacy = buildTicketPrintHtmlV2(baseArgs());
+    expect(legacy).not.toContain("ticket-colisage");
   });
 });
 

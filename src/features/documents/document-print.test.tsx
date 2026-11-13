@@ -102,6 +102,29 @@ describe("per-type A4 button decision (DSN-085)", () => {
 });
 
 describe("A4 sheet content (DSN-085)", () => {
+  it("renders the wire Colisage breakdown under the line, collapses legacy rows", () => {
+    const base = detailsWithLines(2, "FACTURE", "F-2026-0042");
+    const details: DocumentDetailsWire = {
+      ...base,
+      items: base.items.map((item, index) =>
+        index === 0
+          ? {
+              ...item,
+              colisage: [
+                { unit_id: "u-dz", unit_name_fr: "Douzaine", unit_name_ar: "دزينة", factor_micro: 120000, count: 12 },
+                { unit_id: "u-dd", unit_name_fr: "Demi-Douzaine", unit_name_ar: "نصف دزينة", factor_micro: 60000, count: 1 },
+              ],
+            }
+          : item,
+      ),
+    };
+    const html = renderToStaticMarkup(
+      DocumentA4Sheet({ locale: "fr-DZ", details, identity: FULL_IDENTITY, createdAt: "2026-10-21T10:02:00" }) as never,
+    );
+    expect(html).toContain('data-testid="a4-colisage"');
+    expect(html).toContain("12 × Douzaine + 1 × Demi-Douzaine");
+    expect(html.match(/data-testid="a4-colisage"/g)).toHaveLength(1);
+  });
   it("renders 25 lines with a repeating thead and verbatim totals", () => {
     const html = renderToStaticMarkup(
       DocumentA4Sheet({ locale: "fr-DZ", details: detailsWithLines(25, "FACTURE", "F-2026-0042"), identity: FULL_IDENTITY, createdAt: "2026-10-21T10:02:00" }) as never,

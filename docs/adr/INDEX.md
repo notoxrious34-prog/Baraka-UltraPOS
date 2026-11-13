@@ -130,4 +130,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-112 | Read-time Colisage breakdown on document lines, no migration (TASK-BRK-109) | ACCEPTED |
 
-Next free id: ADR-113.
+| ADR-113 | Read-time Colisage display on cart, OS ticket, and A4; TSPL lines deferred (TASK-DSN-104) | ACCEPTED |
+
+Next free id: ADR-114.

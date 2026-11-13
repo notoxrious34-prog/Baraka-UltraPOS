@@ -9,6 +9,7 @@
  */
 
 import { formatQty, isIntString } from "@/lib/money";
+import { formatWireColisage, type WireColisageShare } from "@/lib/colisage";
 import { generateCode128Svg } from "@/lib/barcode-128";
 
 /** 80mm roll width (receipt printers; driver paper size must match). */
@@ -24,6 +25,8 @@ export interface TicketPrintLine {
   lineTotal: string;
   /** Stored per-unit discount centimes (`null` = legacy line, no badge). */
   discountPerUnit: string | null;
+  /** Pre-formatted Colisage breakdown (`null` = print nothing, DSN-104). */
+  colisage: string | null;
 }
 
 /** Localised chrome strings (caller passes t() values for its locale). */
@@ -148,6 +151,8 @@ export interface TicketWireItem {
   /** Exact edge-transcribed net PU (`null` = legacy: show raw PU). */
   discountedUnitPriceCentimes: string | null;
   lineTtcCentimes: string;
+  /** Whole-rung breakdown (`null` = legacy row or none, BRK-109/DSN-104). */
+  colisage: WireColisageShare[] | null;
 }
 
 /** Frozen credit-equation figures for one document (DSN-103). */
@@ -222,6 +227,8 @@ export function ticketArgsFromWire(
       // Stored per-unit discount rides through for the badge (`null` =
       // legacy line, no badge) — never summed, never recomputed.
       discountPerUnit: item.discountPerUnitCentimes,
+      // Document-wire Colisage shares formatted once, here (DSN-104).
+      colisage: formatWireColisage(item.colisage, fr),
     })),
     subtotalHt: wire.subtotalHt,
     discountTotal: wire.discountTotal,
@@ -252,6 +259,9 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
         (line.discountPerUnit === null
           ? ""
           : `<div class="badge" data-testid="ticket-badge">${badgeWord} <bdi dir="ltr">${escapeTicket(ticketMoney(line.discountPerUnit))}</bdi></div>`) +
+        (line.colisage === null
+          ? ""
+          : `<div class="colisage" data-testid="ticket-colisage">${escapeTicket(line.colisage)}</div>`) +
         `</td>` +
         `<td class="num"><bdi dir="ltr">${escapeTicket(ticketQty(line.quantity))} ${escapeTicket(line.unit)}</bdi></td>` +
         `<td class="num"><bdi dir="ltr">${escapeTicket(ticketMoney(line.unitPrice))}</bdi></td>` +
@@ -327,6 +337,7 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
     `.ticket .totals .credit { border-top: 1px dashed #000; margin-top: 1mm; padding-top: 1mm; }` +
     `.ticket .totals .credit .nouveau { font-weight: bold; }` +
     `.ticket .badge { font-size: 7pt; font-weight: bold; margin-top: 0.5mm; }` +
+    `.ticket .colisage { font-size: 7pt; margin-top: 0.5mm; }` +
     `.ticket .barcode { background: #fff; padding: 3mm 6mm; margin: 2mm 0; }` +
     `.ticket .barcode svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }` +
     `.ticket .foot { text-align: center; font-size: 8pt; margin-top: 2mm; }` +
@@ -387,12 +398,18 @@ export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
           : `<tr data-testid="ticket-badge-row"><td colspan="3"><div class="badge" data-testid="ticket-badge">${badgeWord}: <bdi dir="ltr">${escapeTicket(ticketMoney(line.discountPerUnit))}</bdi></div></td></tr>`;
       // Agreement TICKET-ONELINE items 1-2: ONE row — name | `qty x price`
       // | total. The unit never prints (owner requirement); long names wrap
-      // to two lines via CSS, mirroring the engine word-wrap.
+      // to two lines via CSS, mirroring the engine word-wrap. The Colisage
+      // breakdown rides a spanning sub-row (DSN-104), never the qty cell.
+      const colisage =
+        line.colisage === null
+          ? ""
+          : `<tr data-testid="ticket-colisage-row"><td colspan="3"><div class="colisage" data-testid="ticket-colisage">${escapeTicket(line.colisage)}</div></td></tr>`;
       return (
         `<tr data-testid="ticket-line"><td class="des">${escapeTicket(line.designation)}</td>` +
         `<td class="det"><bdi dir="ltr">${escapeTicket(ticketQty(line.quantity))} x ${escapeTicket(ticketMoney(line.unitPrice))}</bdi></td>` +
         `<td class="num"><bdi dir="ltr">${escapeTicket(ticketMoney(line.lineTotal))}</bdi></td></tr>` +
-        badge
+        badge +
+        colisage
       );
     })
     .join("");
@@ -457,6 +474,7 @@ export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
     `.ticket td.det { font-size: 9pt; text-align: start; font-family: "Courier New", monospace; }` +
     `.ticket td.num { font-size: 9pt; }` +
     `.ticket .badge { font-size: 7pt; font-weight: bold; margin-top: 0.5mm; }` +
+    `.ticket .colisage { font-size: 7pt; margin-top: 0.5mm; }` +
     `.ticket .totals { margin-top: 2mm; border-top: 2px solid #000; padding-top: 1mm; }` +
     `.ticket .totals .row { display: flex; justify-content: space-between; }` +
     `.ticket .totals .row.pay { font-size: 10pt; }` +

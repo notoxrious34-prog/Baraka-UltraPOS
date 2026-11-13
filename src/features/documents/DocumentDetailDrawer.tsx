@@ -26,6 +26,7 @@ import {
 } from "@/features/tickets/graphique-ticket";
 import { formatMoney, formatQty } from "@/lib/money";
 import { creditEquationFromDocument } from "@/lib/credit-equation";
+import { formatWireColisage } from "@/lib/colisage";
 import { PrintStatusIndicator } from "@/components/pos/PrintStatusIndicator";
 import type { Locale } from "@/types/pos";
 import "./document-print.css";
@@ -167,6 +168,14 @@ export function DocumentA4Sheet(props: {
                 <bdi className="a4-num">
                   {itemDisplayName(item, locale)}
                 </bdi>
+                {(() => {
+                  const breakdown = formatWireColisage(item.colisage, locale === "fr-DZ");
+                  return breakdown === null ? null : (
+                    <div className="a4-colisage" data-testid="a4-colisage">
+                      {breakdown}
+                    </div>
+                  );
+                })()}
               </td>
               <td>
                 <bdi dir="ltr" className="a4-num">
@@ -636,6 +645,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
                 discountPerUnitCentimes: item.discount_per_unit_centimes,
                 discountedUnitPriceCentimes: item.discounted_unit_price_centimes,
                 lineTtcCentimes: item.line_ttc_centimes,
+                colisage: item.colisage ?? null,
               })),
             },
             {

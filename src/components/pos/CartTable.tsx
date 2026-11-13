@@ -16,6 +16,7 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 import { usePrivacyShieldStore } from "@/stores/privacy-shield-store";
 import { t } from "@/lib/i18n";
 import { addBig, formatMoney, formatQty, subBig } from "@/lib/money";
+import { colisageShares, formatColisage } from "@/lib/colisage";
 import { UnitSelectPopover, factorTag, isBaseUnit } from "@/features/pos/UnitSelectPopover";
 
 import type { CartLine, CustomerTier, LineMargin, Locale } from "@/types/pos";
@@ -158,6 +159,20 @@ export function CartTableView({
                   {locale === "ar-DZ" ? line.nameAr : line.nameFr}
                 </p>
                 <p className="font-mono text-[11px] text-slate-500">{line.sku}</p>
+                {(() => {
+                  const breakdown =
+                    unit === undefined
+                      ? null
+                      : colisageShares(line.quantityMicro, unit.factorMicro, line.units);
+                  return breakdown === null ? null : (
+                    <p
+                      className="truncate text-[11px] text-slate-500 dark:text-slate-400"
+                      data-testid="cart-colisage"
+                    >
+                      {formatColisage(breakdown, locale)}
+                    </p>
+                  );
+                })()}
                 {(tierPriced || belowCost) && (
                   <span className="mt-0.5 flex flex-wrap gap-1">
                     {tierPriced && (

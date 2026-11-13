@@ -119,6 +119,18 @@ describe("CartTableView multi-unit rendering", () => {
     const closed = renderToStaticMarkup(<CartTableView {...viewProps([MULTI_LINE])} />);
     expect(closed).not.toContain('role="dialog"');
   });
+
+  it("prints the Colisage breakdown for mixed-rung quantities, collapses single rungs", () => {
+    // 2.5 boxes = 250 pieces → 2 Boîtes + 50 Pièces (DSN-104).
+    const mixed = renderToStaticMarkup(
+      <CartTableView {...viewProps([{ ...MULTI_LINE, quantityMicro: "25000" }])} />,
+    );
+    expect(mixed).toContain('data-testid="cart-colisage"');
+    expect(mixed).toContain("2 × Boîte + 50 × Pièce");
+    // 3 whole boxes collapse — the row already shows the unit quantity.
+    const whole = renderToStaticMarkup(<CartTableView {...viewProps([MULTI_LINE])} />);
+    expect(whole).not.toContain("cart-colisage");
+  });
 });
 
 describe("UnitSelectPopover rendering", () => {

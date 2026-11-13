@@ -54,6 +54,11 @@ export interface TicketPrintStrings {
   article: string;
   /** v2 three-column header, middle segment (`Qté x P.U` / `الكمية × السعر`). */
   qtyPrice: string;
+  /** Credit-equation block captions (DSN-103, shown only on credit docs). */
+  ancienSolde: string;
+  montantDocument: string;
+  versement: string;
+  nouveauSolde: string;
 }
 
 export interface TicketPrintArgs {
@@ -78,6 +83,12 @@ export interface TicketPrintArgs {
   paidAmount: string;
   changeAmount: string;
   paymentLabel: string;
+  /**
+   * Frozen credit equation for this document (DSN-103, computed upstream by
+   * `creditEquationFromDocument`): `null` = cash-only or legacy row, the
+   * equation block collapses — never a zeroed block.
+   */
+  credit: CreditTicketBlock | null;
   isReprint: boolean;
   /** Pinned layout version (DOC-04): the caller picks v1 or v2 builder. */
   templateVersion: number;
@@ -139,6 +150,14 @@ export interface TicketWireItem {
   lineTtcCentimes: string;
 }
 
+/** Frozen credit-equation figures for one document (DSN-103). */
+export interface CreditTicketBlock {
+  ancien: string;
+  montant: string;
+  versement: string;
+  nouveau: string;
+}
+
 export interface TicketWireDetails {
   documentNumber: string;
   createdAt: string;
@@ -152,6 +171,8 @@ export interface TicketWireDetails {
   paidAmount: string;
   changeAmount: string;
   paymentLabel: string;
+  /** Frozen credit equation (`null` = absent, the block collapses). */
+  credit: CreditTicketBlock | null;
   items: TicketWireItem[];
 }
 
@@ -209,6 +230,7 @@ export function ticketArgsFromWire(
     paidAmount: wire.paidAmount,
     changeAmount: wire.changeAmount,
     paymentLabel: wire.paymentLabel,
+    credit: wire.credit,
     taxRows: opts.taxRows,
     warehouseText: opts.warehouseText,
     cashierText: opts.cashierText,
@@ -263,6 +285,15 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
     args.cashierText.trim() !== ""
       ? `<div class="meta" data-testid="ticket-cashier">${escapeTicket(args.strings.cashier)}: <bdi dir="ltr">${escapeTicket(args.cashierText.trim())}</bdi></div>`
       : "";
+  const creditRowsV1 =
+    args.credit === null
+      ? ""
+      : `<div class="credit" data-testid="ticket-credit-equation">` +
+        `<div class="row"><span>${escapeTicket(args.strings.ancienSolde)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.credit.ancien))}</bdi></span></div>` +
+        `<div class="row"><span>${escapeTicket(args.strings.montantDocument)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.credit.montant))}</bdi></span></div>` +
+        `<div class="row"><span>${escapeTicket(args.strings.versement)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.credit.versement))}</bdi></span></div>` +
+        `<div class="row nouveau"><span>${escapeTicket(args.strings.nouveauSolde)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.credit.nouveau))}</bdi></span></div>` +
+        `</div>`;
   // Doc-number Code128 with human-readable caption (quiet zones via CSS
   // padding on white; never throws into the print dispatch).
   let barcode = "";
@@ -293,6 +324,8 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
     `.ticket .totals { margin-top: 2mm; border-top: 1px dashed #000; padding-top: 1mm; }` +
     `.ticket .totals .row { display: flex; justify-content: space-between; }` +
     `.ticket .totals .grand { font-weight: bold; font-size: 12pt; }` +
+    `.ticket .totals .credit { border-top: 1px dashed #000; margin-top: 1mm; padding-top: 1mm; }` +
+    `.ticket .totals .credit .nouveau { font-weight: bold; }` +
     `.ticket .badge { font-size: 7pt; font-weight: bold; margin-top: 0.5mm; }` +
     `.ticket .barcode { background: #fff; padding: 3mm 6mm; margin: 2mm 0; }` +
     `.ticket .barcode svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }` +
@@ -319,6 +352,7 @@ export function buildTicketPrintHtml(args: TicketPrintArgs): string {
     `<div class="row grand"><span>${escapeTicket(args.strings.grandTotal)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.totalTtc))}</bdi></span></div>` +
     `<div class="row"><span>${escapeTicket(args.strings.payment)} (${escapeTicket(args.paymentLabel)})</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.paidAmount))}</bdi></span></div>` +
     `<div class="row"><span>${escapeTicket(args.strings.change)}</span><span><bdi dir="ltr">${escapeTicket(ticketMoney(args.changeAmount))}</bdi></span></div>` +
+    creditRowsV1 +
     `</div>${barcode}${ownerFooter}<div class="foot">${escapeTicket(args.strings.footer)}</div></div></body></html>`
   );
 }
@@ -426,6 +460,8 @@ export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
     `.ticket .totals { margin-top: 2mm; border-top: 2px solid #000; padding-top: 1mm; }` +
     `.ticket .totals .row { display: flex; justify-content: space-between; }` +
     `.ticket .totals .row.pay { font-size: 10pt; }` +
+    `.ticket .totals .credit { border-top: 2px solid #000; margin-top: 1mm; padding-top: 1mm; }` +
+    `.ticket .totals .row.nouveau { font-weight: bold; font-size: 11pt; }` +
     `.ticket .totals .grand { font-weight: bold; font-size: 12pt; background: #000; color: #fff; ` +
     `border-top: 4px double #fff; border-bottom: 4px double #fff; padding: 1.5mm; margin: 1mm 0; }` +
     `.ticket .barcode { background: #fff; padding: 3mm 6mm; margin: 2mm 0; border: 1px solid #000; }` +
@@ -459,6 +495,14 @@ export function buildTicketPrintHtmlV2(args: TicketPrintArgs): string {
       " pay",
     ) +
     totalsRow(escapeTicket(args.strings.change), ticketMoney(args.changeAmount), " pay") +
+    (args.credit === null
+      ? ""
+      : `<div class="credit" data-testid="ticket-credit-equation">` +
+        totalsRow(escapeTicket(args.strings.ancienSolde), ticketMoney(args.credit.ancien)) +
+        totalsRow(escapeTicket(args.strings.montantDocument), ticketMoney(args.credit.montant)) +
+        totalsRow(escapeTicket(args.strings.versement), ticketMoney(args.credit.versement)) +
+        totalsRow(escapeTicket(args.strings.nouveauSolde), ticketMoney(args.credit.nouveau), " nouveau") +
+        `</div>`) +
     `</div>${barcode}${ownerFooter}<div class="foot">${escapeTicket(args.strings.footer)}</div></div></body></html>`
   );
 }

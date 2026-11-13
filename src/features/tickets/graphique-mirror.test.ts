@@ -76,6 +76,7 @@ function mirrorArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
     paidAmount: "3200",
     changeAmount: "0",
     paymentLabel: "CASH",
+    credit: null,
     isReprint: false,
     ownerFooter: "Échange sous 7 jours",
     strings: {
@@ -98,6 +99,10 @@ function mirrorArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
       discountBadge: "remise",
       article: "Article",
       qtyPrice: "Qté x P.U",
+      ancienSolde: "Ancien solde",
+      montantDocument: "Montant document",
+      versement: "Versement",
+      nouveauSolde: "Nouveau solde",
     },
     ...overrides,
   };
@@ -207,6 +212,7 @@ describe("DOC-05 engine parity proof (OS == TSPL, data level)", () => {
       paidAmount: "2700",
       changeAmount: "0",
       paymentLabel: "CASH",
+      credit: null,
       ...overrides,
     });
   }
@@ -310,6 +316,7 @@ describe("legacy-NULL lines keep the old format (raw PU, no badge)", () => {
       paidAmount: "500",
       changeAmount: "0",
       paymentLabel: "CASH",
+      credit: null,
       items: [
         {
           nameFr: "Clou 5cm",

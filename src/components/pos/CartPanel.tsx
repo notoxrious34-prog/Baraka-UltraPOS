@@ -4,8 +4,10 @@
  */
 
 import type { ReactElement } from "react";
+import { useEffect } from "react";
 import { useCartStore } from "@/stores/cart-store";
 import { usePosUiStore } from "@/stores/pos-ui-store";
+import { usePrivacyShieldStore } from "@/stores/privacy-shield-store";
 import { t } from "@/lib/i18n";
 import type { DocType } from "@/types/pos";
 import { CartTable } from "@/components/pos/CartTable";
@@ -18,6 +20,27 @@ export function CartPanel(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const docType = useCartStore((state) => state.docType);
   const setDocType = useCartStore((state) => state.setDocType);
+  const shielded = usePrivacyShieldStore((state) => state.shielded);
+  const toggleShield = usePrivacyShieldStore((state) => state.toggleShield);
+
+  // DSN-103 Cost/Margin Privacy Shield: Ctrl+H masks cost/margin figures
+  // from counter eyes. Skipped while typing (inputs hold the keystroke).
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (!event.ctrlKey || event.key.toLowerCase() !== "h") return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName ?? "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable === true) {
+        return;
+      }
+      event.preventDefault();
+      toggleShield();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [toggleShield]);
 
   const docLabel = (doc: DocType): string => {
     if (doc === "TICKET") {
@@ -48,6 +71,22 @@ export function CartPanel(): ReactElement {
             {docLabel(doc)}
           </button>
         ))}
+        <button
+          key="privacy-shield"
+          type="button"
+          onClick={() => {
+            toggleShield();
+          }}
+          aria-pressed={shielded}
+          title="Ctrl+H"
+          className={`shrink-0 rounded-lg px-2 py-2 text-xs font-black ${
+            shielded
+              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+              : "bg-slate-200 text-slate-600 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-300"
+          }`}
+        >
+          [H] {shielded ? t(locale, "cart.shieldActive") : t(locale, "cart.shieldInactive")}
+        </button>
       </div>
 
       <CreditHud />

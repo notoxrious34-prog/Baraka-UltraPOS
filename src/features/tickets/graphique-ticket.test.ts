@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTicketPrintHtml,
+  buildTicketPrintHtmlV2,
   printTicketDocument,
   ticketArgsFromWire,
   ticketPrintFrameStyle,
@@ -57,6 +58,7 @@ function baseArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
     paidAmount: "400000",
     changeAmount: "40000",
     paymentLabel: "Espèces",
+    credit: null,
     isReprint: false,
     ownerFooter: "",
     strings: {
@@ -79,6 +81,10 @@ function baseArgs(overrides: Partial<TicketPrintArgs> = {}): TicketPrintArgs {
       discountBadge: "remise",
       article: "Article",
       qtyPrice: "Qté x P.U",
+      ancienSolde: "Ancien solde",
+      montantDocument: "Montant document",
+      versement: "Versement",
+      nouveauSolde: "Nouveau solde",
     },
     ...overrides,
   };
@@ -175,6 +181,7 @@ describe("wire mapper (BRK-088 names + summary, no new IPC)", () => {
     paidAmount: "400000",
     changeAmount: "40000",
     paymentLabel: "CASH",
+    credit: null,
     items: [
       {
         nameFr: "Ciment",
@@ -295,6 +302,7 @@ describe("per-unit price mapping (DSN-097)", () => {
       paidAmount: "2700",
       changeAmount: "0",
       paymentLabel: "CASH",
+      credit: null,
       items: [item],
     };
   }
@@ -321,5 +329,36 @@ describe("per-unit price mapping (DSN-097)", () => {
     expect(args.lines[0]?.unitPrice).toBe("1000");
     const html = buildTicketPrintHtml({ ...baseArgs(), lines: args.lines });
     expect(html).toContain("10.00");
+  });
+});
+
+describe("credit-equation witness block (DSN-103)", () => {
+  const creditArgs = {
+    credit: { ancien: "0", montant: "20000", versement: "5000", nouveau: "15000" },
+  };
+
+  it("v1 prints the four witness rows with engine figures", () => {
+    const html = buildTicketPrintHtml(baseArgs(creditArgs));
+    expect(html).toContain('data-testid="ticket-credit-equation"');
+    expect(html).toContain("Ancien solde");
+    expect(html).toContain("Montant document");
+    expect(html).toContain("Versement");
+    expect(html).toContain("Nouveau solde");
+    expect(html).toContain("150.00");
+    expect(html).toContain("50.00");
+  });
+
+  it("v1 collapses the block on cash-only rows, never a zeroed block", () => {
+    const html = buildTicketPrintHtml(baseArgs());
+    expect(html).not.toContain("ticket-credit-equation");
+    expect(html).not.toContain("Ancien solde");
+  });
+
+  it("v2 prints and collapses the block symmetrically", () => {
+    const withCredit = buildTicketPrintHtmlV2(baseArgs(creditArgs));
+    expect(withCredit).toContain('data-testid="ticket-credit-equation"');
+    expect(withCredit).toContain("Nouveau solde");
+    const cashOnly = buildTicketPrintHtmlV2(baseArgs());
+    expect(cashOnly).not.toContain("ticket-credit-equation");
   });
 });

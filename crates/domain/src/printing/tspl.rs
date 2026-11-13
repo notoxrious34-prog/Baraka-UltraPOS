@@ -443,6 +443,21 @@ pub struct TsplTicketTotals<'a> {
     pub change: &'a str,
     /// Payment method code as stored (e.g. `CASH`, `MIXED`).
     pub payment_method: &'a str,
+    /// Frozen wholesale credit equation (DSN-103): `None` = cash-only or
+    /// legacy document — the four witness rows collapse, never zeroed.
+    pub credit: Option<TsplTicketCredit<'a>>,
+}
+
+/// Four frozen credit-equation figures, pre-formatted (DSN-103).
+pub struct TsplTicketCredit<'a> {
+    /// Customer balance before this document.
+    pub ancien: &'a str,
+    /// Document grand total.
+    pub montant: &'a str,
+    /// Non-credit tender (`Montant − |delta|`, never the paid column).
+    pub versement: &'a str,
+    /// Customer balance after this document.
+    pub nouveau: &'a str,
 }
 
 /// A silent 80 mm ticket with the full BRK-098 receipt anatomy.
@@ -492,6 +507,11 @@ struct Captions {
     column_article: &'static str,
     column_qty_price: &'static str,
     column_total: &'static str,
+    /// DSN-103 wholesale credit-equation captions.
+    ancien_solde: &'static str,
+    montant_document: &'static str,
+    versement: &'static str,
+    nouveau_solde: &'static str,
 }
 
 fn captions(lang: TsplCaptionLang) -> Captions {
@@ -512,6 +532,10 @@ fn captions(lang: TsplCaptionLang) -> Captions {
             column_article: "Article",
             column_qty_price: "Qté x P.U",
             column_total: "Total",
+            ancien_solde: "Ancien solde",
+            montant_document: "Montant document",
+            versement: "Versement",
+            nouveau_solde: "Nouveau solde",
         },
         TsplCaptionLang::Arabic => Captions {
             subtotal: "المجموع الفرعي",
@@ -529,6 +553,10 @@ fn captions(lang: TsplCaptionLang) -> Captions {
             column_article: "الصنف",
             column_qty_price: "الكمية × السعر",
             column_total: "المجموع",
+            ancien_solde: "الرصيد السابق",
+            montant_document: "مبلغ الوثيقة",
+            versement: "الدفعة",
+            nouveau_solde: "الرصيد الجديد",
         },
     }
 }
@@ -619,6 +647,8 @@ pub enum TicketTextSlot {
     TotalTtc,
     Payment,
     Change,
+    /// DSN-103 wholesale credit-equation witness rows (4 captions + figures).
+    CreditEquation,
     Human,
     Footer,
     Thanks,
@@ -1614,6 +1644,37 @@ pub fn ticket_text_plan_v2(ticket: &TsplTicket<'_>) -> (Vec<TicketOp>, i64) {
             TicketAlign::Right,
         ));
         y += PITCH_F2_V2;
+    }
+
+    // DSN-103 wholesale credit-equation witness (frozen figures only; the
+    // block collapses entirely on cash-only / legacy documents).
+    if let Some(credit) = ticket.totals.credit.as_ref() {
+        for (caption, value) in [
+            (caps.ancien_solde, credit.ancien),
+            (caps.montant_document, credit.montant),
+            (caps.versement, credit.versement),
+            (caps.nouveau_solde, credit.nouveau),
+        ] {
+            ops.push(mk(
+                TicketTextSlot::CreditEquation,
+                truncate_to_width(&format!("{caption} :"), (cap_w / FONT_2_W) as usize),
+                left,
+                cap_w,
+                y,
+                TicketFace::F2,
+                TicketAlign::Left,
+            ));
+            ops.push(mk(
+                TicketTextSlot::CreditEquation,
+                truncate_to_width(value.trim(), (val_w / FONT_2_W) as usize),
+                val_x,
+                val_w,
+                y,
+                TicketFace::F2,
+                TicketAlign::Right,
+            ));
+            y += PITCH_F2_V2;
+        }
     }
 
     // Barcode: 12 mm tall, narrow bars, concentric inside OUR wide frame
@@ -2973,6 +3034,7 @@ mod tests {
                 paid: "27.00",
                 change: "0.00",
                 payment_method: "CASH",
+                credit: None,
             },
             footer: "Merci",
             is_reprint: false,
@@ -3475,6 +3537,7 @@ mod tests {
                 paid: "1310.00",
                 change: "0.00",
                 payment_method: "CASH",
+                credit: None,
             },
             footer: "",
             is_reprint: true,
@@ -3725,6 +3788,42 @@ mod tests {
             shown.contains("remise: 50.00"),
             "real badge prints, got:\n{shown}"
         );
+    }
+
+    // DSN-103: frozen credit-equation witness rows print on credit
+    // documents and collapse entirely on cash-only / legacy documents.
+    #[test]
+    fn v2_credit_equation_prints_only_with_snapshot() {
+        let plain = mock_ticket_v2();
+        let text =
+            String::from_utf8(render_ticket_80mm_v2(&plain).expect("renders")).expect("text");
+        assert!(
+            !text.contains("Ancien solde"),
+            "no witness rows without snapshot, got:\n{text}"
+        );
+
+        let mut credit = mock_ticket_v2();
+        credit.totals.credit = Some(TsplTicketCredit {
+            ancien: "4500.00",
+            montant: "200.00",
+            versement: "50.00",
+            nouveau: "4650.00",
+        });
+        let shown =
+            String::from_utf8(render_ticket_80mm_v2(&credit).expect("renders")).expect("text");
+        for witness in [
+            "Ancien solde",
+            "Montant document",
+            "Versement",
+            "Nouveau solde",
+            "4500.00",
+            "4650.00",
+        ] {
+            assert!(
+                shown.contains(witness),
+                "witness prints {witness}, got:\n{shown}"
+            );
+        }
     }
 
     // DOC-07 final: narrower payload budget — 19 chars fit, 20 reject loudly.

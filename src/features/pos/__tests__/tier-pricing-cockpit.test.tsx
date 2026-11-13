@@ -113,6 +113,7 @@ describe("CartTableView tier and Margin Guard pills", () => {
       locale: "fr-DZ" as const,
       customerTier,
       margins,
+      shielded: false,
       popoverKey: null,
       onSelectLine: noop,
       onTogglePopover: noop,
@@ -164,6 +165,16 @@ describe("CartTableView tier and Margin Guard pills", () => {
       />,
     );
     expect(html).not.toContain("Vente à perte");
+  });
+
+  it("masks the margin figure while shielded, badge stays", () => {
+    const props = viewProps([tierLine("8500")], "artisan", [
+      { line_index: 0, margin_basis_points: -2500, is_below_cost: true },
+    ]);
+    const html = renderToStaticMarkup(<CartTableView {...props} shielded={true} />);
+    expect(html).toContain("Vente à perte");
+    expect(html).not.toContain("-25%");
+    expect(html).toContain("•••");
   });
 });
 

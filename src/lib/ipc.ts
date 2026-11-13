@@ -1251,6 +1251,16 @@ export interface DocumentDetailsWireResponse {
     total_ttc_centimes: string;
     paid_amount_centimes: string;
     change_amount_centimes: string;
+    /**
+     * Frozen wholesale credit snapshot (BRK-108 engine columns, DSN-103 print).
+     * `null` = no balance movement (cash-only) or legacy row — surfaces must
+     * render the equation block absent, never zero.
+     */
+    credit_solde_before_centimes: string | null;
+    /** Balance after this document (`null` = absent, see above). */
+    credit_solde_after_centimes: string | null;
+    /** Signed movement (`+` credit sale, `-` AVOIR refund; `null` = absent). */
+    credit_delta_centimes: string | null;
     /** Capture instant, stored verbatim (DOC-05). */
     created_at: string;
     /** Acting operator id, stored verbatim (DOC-05 engine cashier row). */

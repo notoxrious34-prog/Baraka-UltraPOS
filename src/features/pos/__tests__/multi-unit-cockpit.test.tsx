@@ -76,6 +76,7 @@ function viewProps(lines: CartLine[], popoverKey: string | null = null) {
     locale: "fr-DZ" as const,
     customerTier: "retail" as const,
     margins: [],
+    shielded: false,
     popoverKey,
     onSelectLine: noop,
     onTogglePopover: noop,

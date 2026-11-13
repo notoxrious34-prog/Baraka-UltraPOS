@@ -25,6 +25,7 @@ import {
   type TicketPrintStrings,
 } from "@/features/tickets/graphique-ticket";
 import { formatMoney, formatQty } from "@/lib/money";
+import { creditEquationFromDocument } from "@/lib/credit-equation";
 import { PrintStatusIndicator } from "@/components/pos/PrintStatusIndicator";
 import type { Locale } from "@/types/pos";
 import "./document-print.css";
@@ -224,6 +225,40 @@ export function DocumentA4Sheet(props: {
             {fmtAmount(doc.total_ttc_centimes, locale)}
           </bdi>
         </p>
+        {(() => {
+          const equation = creditEquationFromDocument(doc);
+          if (equation === null) return null;
+          return (
+            <section data-testid="a4-credit-equation" className="a4-credit">
+              <p>
+                {t(locale, "ticket.ancienSolde")}:{" "}
+                <bdi dir="ltr" className="a4-num">
+                  {fmtAmount(equation.ancien, locale)}
+                </bdi>
+              </p>
+              <p>
+                {t(locale, "ticket.montantDocument")}:{" "}
+                <bdi dir="ltr" className="a4-num">
+                  {fmtAmount(equation.montant, locale)}
+                </bdi>
+              </p>
+              <p>
+                {t(locale, "ticket.versement")}:{" "}
+                <bdi dir="ltr" className="a4-num">
+                  {fmtAmount(equation.versement, locale)}
+                </bdi>
+              </p>
+              <p>
+                <strong>
+                  {t(locale, "ticket.nouveauSolde")}:{" "}
+                  <bdi dir="ltr" className="a4-num">
+                    {fmtAmount(equation.nouveau, locale)}
+                  </bdi>
+                </strong>
+              </p>
+            </section>
+          );
+        })()}
         <p>{t(locale, "documents.printFooter")}</p>
       </footer>
     </div>
@@ -569,6 +604,10 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
       discountBadge: t(locale, "ticket.discountBadge"),
       article: t(locale, "ticket.article"),
       qtyPrice: t(locale, "ticket.qtyPrice"),
+      ancienSolde: t(locale, "ticket.ancienSolde"),
+      montantDocument: t(locale, "ticket.montantDocument"),
+      versement: t(locale, "ticket.versement"),
+      nouveauSolde: t(locale, "ticket.nouveauSolde"),
     };
     const dispatchWith = (id: A4Identity): void => {
       // DOC-07: the wire resolves display names + the wall-clock instant
@@ -585,6 +624,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
               paidAmount: snapshot.document.paid_amount_centimes,
               changeAmount: snapshot.document.change_amount_centimes,
               paymentLabel: snapshot.payments.map((p) => p.method_code).join(" + "),
+              credit: creditEquationFromDocument(snapshot.document),
               items: snapshot.items.map((item) => ({
                 nameFr: item.product_name_fr,
                 nameAr: item.product_name_ar,

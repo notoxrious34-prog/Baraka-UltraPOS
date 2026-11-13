@@ -59,6 +59,9 @@ function detailsWithLines(count: number, docType: string, number: string): Docum
       total_ttc_centimes: "119000",
       paid_amount_centimes: "119000",
       change_amount_centimes: "0",
+      credit_solde_before_centimes: null,
+      credit_solde_after_centimes: null,
+      credit_delta_centimes: null,
       payment_status: "PAID",
     },
     items: Array.from({ length: count }, (_, i) => ({

@@ -23,8 +23,8 @@ use baraka_domain::printing::{
     render_label_40x20, render_label_40x20_mixed, render_ticket_80mm,
     render_ticket_80mm_mixed_versioned, render_ticket_80mm_versioned, render_ticket_ruler_80mm,
     ticket_text_plan_v2, LabelBarcodeGeometry, LabelBitmap, LabelTextSlot, TicketOp,
-    TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketLine, TsplTicketTotals,
-    TRANSPORT_SPOOLER,
+    TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketCredit, TsplTicketLine,
+    TsplTicketTotals, TRANSPORT_SPOOLER,
 };
 use baraka_domain::role::Permission;
 use baraka_domain::sales::{DocumentId, DocumentLanguage};
@@ -516,6 +516,32 @@ where
         let total_ttc = format_centimes_plain(document.ttc_centimes);
         let paid = format_centimes_plain(document.paid_amount_centimes);
         let change = format_centimes_plain(document.change_amount_centimes);
+        // DSN-103 credit-equation witness: frozen snapshot figures only.
+        // `Versement` is the non-credit tender (`Montant − |delta|`), never
+        // the paid column (which counts the CREDIT leg too). Any gap or
+        // unrepresentable figure omits the block — the ticket never fails.
+        let credit_versement = match document.credit_delta_centimes {
+            Some(delta) => i128::from(document.ttc_centimes)
+                .checked_sub(i128::from(delta).abs())
+                .and_then(|versement| i64::try_from(versement).ok())
+                .map(format_centimes_plain),
+            None => None,
+        };
+        let credit_ancien = document
+            .credit_solde_before_centimes
+            .map(format_centimes_plain);
+        let credit_nouveau = document
+            .credit_solde_after_centimes
+            .map(format_centimes_plain);
+        let credit = match (&credit_ancien, &credit_nouveau, &credit_versement) {
+            (Some(ancien), Some(nouveau), Some(versement)) => Some(TsplTicketCredit {
+                ancien,
+                montant: &total_ttc,
+                versement,
+                nouveau,
+            }),
+            _ => None,
+        };
         // DOC-07: the ticket shows resolved display names, never raw
         // identifiers — an orphaned reference (deleted user/warehouse)
         // falls back to the stored id verbatim, never invented.
@@ -564,6 +590,7 @@ where
                 paid: &paid,
                 change: &change,
                 payment_method: &payment_label,
+                credit,
             },
             footer: &identity.ticket_footer_message,
             is_reprint,
@@ -930,6 +957,7 @@ where
                 paid: "300,00",
                 change: "2,50",
                 payment_method: "CASH",
+                credit: None,
             },
             footer: "TICKET TEST",
             is_reprint: false,

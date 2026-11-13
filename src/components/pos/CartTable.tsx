@@ -13,6 +13,7 @@ import {
   useCartStore,
 } from "@/stores/cart-store";
 import { usePosUiStore } from "@/stores/pos-ui-store";
+import { usePrivacyShieldStore } from "@/stores/privacy-shield-store";
 import { t } from "@/lib/i18n";
 import { addBig, formatMoney, formatQty, subBig } from "@/lib/money";
 import { UnitSelectPopover, factorTag, isBaseUnit } from "@/features/pos/UnitSelectPopover";
@@ -38,6 +39,8 @@ export interface CartTableViewProps {
   customerTier: CustomerTier;
   /** Last preview Margin Guard readout (indexed by cart line order). */
   margins: LineMargin[];
+  /** Privacy shield: mask margin figures from counter eyes (DSN-103). */
+  shielded: boolean;
   popoverKey: string | null;
   onSelectLine: (index: number) => void;
   onTogglePopover: (key: string) => void;
@@ -53,6 +56,7 @@ export function CartTableView({
   locale,
   customerTier,
   margins,
+  shielded,
   popoverKey,
   onSelectLine,
   onTogglePopover,
@@ -169,7 +173,11 @@ export function CartTableView({
                     )}
                     {belowCost && margin !== undefined && (
                       <span
-                        title={`${t(locale, "margin_label")}: ${formatMarginPercent(margin.margin_basis_points)}`}
+                        title={
+                          shielded
+                            ? `${t(locale, "margin_label")}: •••`
+                            : `${t(locale, "margin_label")}: ${formatMarginPercent(margin.margin_basis_points)}`
+                        }
                         className="animate-pulse rounded border border-rose-300 bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700 dark:border-rose-700 dark:bg-rose-950/60 dark:text-rose-400"
                       >
                         ⚠️ {t(locale, "below_cost_warning")}
@@ -315,6 +323,7 @@ export function CartTableView({
 /** Thin store-to-props bridge: owns selection, popover state, and qty stepping. */
 export function CartTable(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
+  const shielded = usePrivacyShieldStore((state) => state.shielded);
   const lines = useCartStore((state) => state.lines);
   const customer = useCartStore((state) => state.customer);
   const previewMargins = useCartStore((state) => state.previewMargins);
@@ -349,6 +358,7 @@ export function CartTable(): ReactElement {
       locale={locale}
       customerTier={customer.kind === "named" ? customer.tier : "retail"}
       margins={previewMargins}
+      shielded={shielded}
       popoverKey={popoverKey}
       onSelectLine={setSelectedLineIndex}
       onTogglePopover={(key) =>

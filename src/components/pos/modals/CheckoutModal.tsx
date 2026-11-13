@@ -21,6 +21,7 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { t, translateBackendError } from "@/lib/i18n";
 import { addBig, formatMoney, formatQty, parseMoneyToCentimes } from "@/lib/money";
+import { creditEquationFromDocument } from "@/lib/credit-equation";
 import {
   ipcCheckout,
   ipcPreviewTotals,
@@ -74,6 +75,10 @@ function ticketStrings(locale: Locale): TicketPrintStrings {
     discountBadge: t(locale, "ticket.discountBadge"),
     article: t(locale, "ticket.article"),
     qtyPrice: t(locale, "ticket.qtyPrice"),
+    ancienSolde: t(locale, "ticket.ancienSolde"),
+    montantDocument: t(locale, "ticket.montantDocument"),
+    versement: t(locale, "ticket.versement"),
+    nouveauSolde: t(locale, "ticket.nouveauSolde"),
   };
 }
 
@@ -355,6 +360,7 @@ export function CheckoutModal(): ReactElement {
               paidAmount: full.document.paid_amount_centimes,
               changeAmount: full.document.change_amount_centimes,
               paymentLabel: full.payments.map((p) => p.method_code).join(" + "),
+              credit: creditEquationFromDocument(full.document),
               items: full.items.map((item) => ({
                 nameFr: item.product_name_fr,
                 nameAr: item.product_name_ar,

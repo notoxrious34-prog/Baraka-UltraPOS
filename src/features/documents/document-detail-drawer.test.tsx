@@ -44,6 +44,9 @@ const TICKET: DocumentDetailsWire = {
     total_ttc_centimes: "3025",
     paid_amount_centimes: "5000",
     change_amount_centimes: "1975",
+    credit_solde_before_centimes: null,
+    credit_solde_after_centimes: null,
+    credit_delta_centimes: null,
     payment_status: "PAID",
   },
   items: [
@@ -88,6 +91,9 @@ const FACTURE: DocumentDetailsWire = {
     total_ttc_centimes: "119000",
     paid_amount_centimes: "119000",
     change_amount_centimes: "0",
+    credit_solde_before_centimes: "0",
+    credit_solde_after_centimes: "15000",
+    credit_delta_centimes: "15000",
     payment_status: "PAID",
   },
   items: [

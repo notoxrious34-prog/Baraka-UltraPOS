@@ -6,8 +6,8 @@ use super::{
 use baraka_application::errors::ApplicationError;
 use baraka_application::use_cases::customers::{
     CreateCustomerUseCase, GetCreditOverviewUseCase, GetCustomerStatementUseCase,
-    GetCustomerUseCase, ListCustomersUseCase, RecordCreditPaymentUseCase, SearchCustomersUseCase,
-    UpdateCustomerUseCase,
+    GetCustomerUseCase, GetLastPriceUseCase, ListCustomersUseCase, RecordCreditPaymentUseCase,
+    SearchCustomersUseCase, UpdateCustomerUseCase,
 };
 use baraka_application::use_cases::deletion::DeleteCustomerUseCase;
 use baraka_domain::sales::{CreditPolicy, CustomerId};
@@ -15,9 +15,9 @@ use baraka_domain::sales::{CreditPolicy, CustomerId};
 use crate::dto::{
     CreditDebtorDto, CreditOverviewDto, CreditOverviewRequest, CustomerDetailDto,
     CustomerSummaryDto, DeleteEntityRequestDto, DeleteEntityResultDto, GetCustomerRequestDto,
-    GetStatementRequest, GetStatementResponse, NewCustomerRequest, RecordCreditPaymentRequest,
-    RecordCreditPaymentResponse, SearchCustomersRequest, SearchCustomersResponse,
-    StatementEntryDto, UpdateCustomerRequest,
+    GetStatementRequest, GetStatementResponse, LastPriceRequest, LastPriceResponse,
+    NewCustomerRequest, RecordCreditPaymentRequest, RecordCreditPaymentResponse,
+    SearchCustomersRequest, SearchCustomersResponse, StatementEntryDto, UpdateCustomerRequest,
 };
 
 /// `customers_create` command: register a customer (RBAC-gated).
@@ -304,5 +304,34 @@ pub fn customers_credit_overview(
                 },
             })
             .collect(),
+    })
+}
+
+/// `customers_last_price` command: last transacted price recall (read-only).
+#[tauri::command(rename_all = "snake_case")]
+pub fn customers_last_price(
+    state: tauri::State<'_, AppState>,
+    request: LastPriceRequest,
+) -> Result<LastPriceResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let customer_id = parse_wire_id(&request.customer_id, "customer_id")
+        .map(CustomerId::from)
+        .map_err(|error| error_code(&error))?;
+    let memory = GetLastPriceUseCase::new(state.customers.as_ref())
+        .execute(&session, customer_id, request.product_id, request.unit_id)
+        .map_err(|error| error_code(&error))?;
+    Ok(match memory {
+        Some(cell) => LastPriceResponse {
+            price_centimes: Some(cell.price_centimes.to_string()),
+            discount_per_unit_centimes: Some(cell.discount_per_unit_centimes.to_string()),
+            document_id: Some(cell.document_id),
+            sold_at: Some(cell.sold_at),
+        },
+        None => LastPriceResponse {
+            price_centimes: None,
+            discount_per_unit_centimes: None,
+            document_id: None,
+            sold_at: None,
+        },
     })
 }

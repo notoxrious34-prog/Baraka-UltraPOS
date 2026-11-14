@@ -369,6 +369,35 @@ impl CheckoutRepository for SqliteCheckoutRepository {
                     ],
                 )?;
             }
+            // 4b. Last-price memory (BRK-111): per customer x product x unit,
+            // the transacted legs, inside the same atomic transaction.
+            // Guest sales (no customer) record nothing; empty = unknown.
+            if let Some(customer_id) = command.customer_id {
+                let customer_key = customer_id.to_string();
+                for line in &command.priced_lines {
+                    tx.execute(
+                        "INSERT INTO customer_last_prices
+                         (customer_id, product_id, unit_id, price_centimes,
+                          discount_per_unit_centimes, document_id, sold_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                         ON CONFLICT (customer_id, product_id, unit_id)
+                         DO UPDATE SET price_centimes = excluded.price_centimes,
+                                       discount_per_unit_centimes =
+                                           excluded.discount_per_unit_centimes,
+                                       document_id = excluded.document_id,
+                                       sold_at = excluded.sold_at",
+                        rusqlite::params![
+                            customer_key,
+                            line.product_id.to_string(),
+                            line.unit_id.to_string(),
+                            line.unit_price_centimes,
+                            line.discount_per_unit_centimes,
+                            document_id,
+                            stamp,
+                        ],
+                    )?;
+                }
+            }
             // 5. Leaf stock deductions (SALE_OUT, atomic with everything).
             // Override leaves are collected for the detailed audit rows
             // in step 5b (the engine additionally appends its own minimal

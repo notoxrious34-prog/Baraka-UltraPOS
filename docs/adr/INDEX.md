@@ -135,6 +135,7 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-114 | Customer credit aggregator & limit alerts: domain bands, read-model overview, dossier banner (TASK-BRK-110) | ACCEPTED |
 | ADR-115 | BRK-110 collision resolved: aggregator keeps 110, profiles move to 117 | ACCEPTED |
 | ADR-116 | Vertical profiles & Super-Gros tiers: domain bands, settings key, migration 0021 (TASK-BRK-117) | ACCEPTED |
-| ADR-117 | Future high-level proposals (parking lot, documented only — no implementation, TASK-DSN-105 follow-up) | PROPOSED |
+| ADR-117 | Future high-level proposals (parking lot, documented only, TASK-DSN-105 follow-up) | PROPOSED |
+| ADR-118 | Customer last-price memory: additive 0022, atomic checkout upsert, read-only recall (TASK-BRK-111) | ACCEPTED |
 
-Next free id: ADR-118.
+Next free id: ADR-119.

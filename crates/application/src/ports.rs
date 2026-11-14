@@ -1216,6 +1216,17 @@ pub trait CustomerRepository: Send + Sync {
     /// i128-safe); SQL only reads rows, never money math.
     fn get_credit_overview(&self, top_n: usize) -> Result<CreditOverview, ApplicationError>;
 
+    /// Last transacted price legs for one customer x product x unit
+    /// (BRK-111, read-only recall). `None` = never sold to this customer.
+    /// The caller derives the effective price (`price - discount`);
+    /// the engine never auto-applies it.
+    fn get_last_price(
+        &self,
+        customer_id: CustomerId,
+        product_id: String,
+        unit_id: String,
+    ) -> Result<Option<CustomerLastPrice>, ApplicationError>;
+
     /// Count historical references: sale documents (party) + ledger rows.
     fn count_customer_references(&self, customer_id: CustomerId) -> Result<u64, ApplicationError>;
 
@@ -1316,6 +1327,19 @@ pub struct CreditOverview {
     pub near_limit_count: i64,
     /// Largest debtors first, capped by the caller limit.
     pub top_debtors: Vec<CreditDebtorRow>,
+}
+
+/// Last transacted price legs for one customer x product x unit (BRK-111).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CustomerLastPrice {
+    /// Transacted unit price in centimes (before line discount).
+    pub price_centimes: i64,
+    /// Transacted per-unit discount in centimes.
+    pub discount_per_unit_centimes: i64,
+    /// Document that froze these legs.
+    pub document_id: String,
+    /// Sale timestamp (RFC3339).
+    pub sold_at: String,
 }
 
 /// Recorded credit payment outcome.

@@ -213,3 +213,29 @@ pub struct CreditOverviewRequest {
     /// Largest-debtor cap (defaults to 10, clamped to 1..=100).
     pub top_n: Option<u32>,
 }
+
+/// Last transacted price recall (BRK-111, read-only).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LastPriceRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Customer UUID (canonical string).
+    pub customer_id: String,
+    /// Product UUID (canonical string).
+    pub product_id: String,
+    /// Unit UUID (canonical string).
+    pub unit_id: String,
+}
+
+/// Last transacted price legs (BRK-111). All `None` = never sold.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LastPriceResponse {
+    /// Transacted unit price in centimes (canonical string).
+    pub price_centimes: Option<String>,
+    /// Transacted per-unit discount in centimes (canonical string).
+    pub discount_per_unit_centimes: Option<String>,
+    /// Document that froze these legs.
+    pub document_id: Option<String>,
+    /// Sale timestamp (RFC3339).
+    pub sold_at: Option<String>,
+}

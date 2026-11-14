@@ -826,6 +826,13 @@ fn restore_older_schema_backup_is_migrated() {
             )
             .expect("drop v21 super-gros column");
         }
+        if app_version >= 22 {
+            // Genuine v21 backups predate migration 0022, so the whole
+            // `customer_last_prices` table must go, or replaying the
+            // CREATE TABLE migration fails the same way.
+            conn.execute("DROP TABLE IF EXISTS customer_last_prices;", [])
+                .expect("drop v22 last-price table");
+        }
     }
     repoint_logged_hash(
         &harness,

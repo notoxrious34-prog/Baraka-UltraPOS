@@ -5,8 +5,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    CreditDebtorRow, CreditOverview, CustomerRepository, CustomerSummary, CustomerUpdate,
-    DeleteAudit, LedgerEntryRow, PaymentRecord,
+    CreditDebtorRow, CreditOverview, CustomerLastPrice, CustomerRepository, CustomerSummary,
+    CustomerUpdate, DeleteAudit, LedgerEntryRow, PaymentRecord,
 };
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
@@ -17,7 +17,7 @@ use baraka_domain::sales::{
 };
 use baraka_domain::user::UserId;
 use chrono::{SecondsFormat, Utc};
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use uuid::Uuid;
 
 use crate::adapters::sqlite_audit_log::insert_delete_audit_row;
@@ -748,6 +748,35 @@ impl CustomerRepository for SqliteCustomerRepository {
             near_limit_count: near,
             top_debtors,
         })
+    }
+
+    fn get_last_price(
+        &self,
+        customer_id: CustomerId,
+        product_id: String,
+        unit_id: String,
+    ) -> Result<Option<CustomerLastPrice>, ApplicationError> {
+        let guard = self.lock()?;
+        let row: Option<(i64, i64, String, String)> = guard
+            .query_row(
+                "SELECT price_centimes, discount_per_unit_centimes, document_id, sold_at
+                 FROM customer_last_prices
+                 WHERE customer_id = ?1 AND product_id = ?2 AND unit_id = ?3",
+                rusqlite::params![customer_id.to_string(), product_id, unit_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .optional()
+            .map_err(|_| store_failure())?;
+        Ok(row.map(
+            |(price_centimes, discount_per_unit_centimes, document_id, sold_at)| {
+                CustomerLastPrice {
+                    price_centimes,
+                    discount_per_unit_centimes,
+                    document_id,
+                    sold_at,
+                }
+            },
+        ))
     }
 
     fn count_customer_references(&self, customer_id: CustomerId) -> Result<u64, ApplicationError> {

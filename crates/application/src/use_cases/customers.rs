@@ -14,8 +14,8 @@ use baraka_domain::sales::{
 
 use crate::errors::ApplicationError;
 use crate::ports::{
-    CreditOverview, CustomerRepository, CustomerSummary, CustomerUpdate, LedgerEntryRow,
-    NewCustomer, PaymentRecord, SessionContext,
+    CreditOverview, CustomerLastPrice, CustomerRepository, CustomerSummary, CustomerUpdate,
+    LedgerEntryRow, NewCustomer, PaymentRecord, SessionContext,
 };
 
 /// Stable-code constructor for i18n-ready validation failures.
@@ -282,6 +282,37 @@ where
     ) -> Result<CreditOverview, ApplicationError> {
         require(session, Permission::ViewCustomers)?;
         self.customers.get_credit_overview(top_n.clamp(1, 100))
+    }
+}
+
+/// Last transacted price recall (BRK-111): read-only, `ViewCustomers` gate.
+pub struct GetLastPriceUseCase<'a, C>
+where
+    C: ?Sized,
+{
+    customers: &'a C,
+}
+
+impl<'a, C> GetLastPriceUseCase<'a, C>
+where
+    C: CustomerRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(customers: &'a C) -> Self {
+        Self { customers }
+    }
+
+    /// Recall one memory cell; `None` = never sold to this customer.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        customer_id: CustomerId,
+        product_id: String,
+        unit_id: String,
+    ) -> Result<Option<CustomerLastPrice>, ApplicationError> {
+        require(session, Permission::ViewCustomers)?;
+        self.customers
+            .get_last_price(customer_id, product_id, unit_id)
     }
 }
 

@@ -11,9 +11,9 @@ use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
     CashMovementView, CashSessionReport, CashSessionRepository, CashSessionView, ColisageShareView,
     ConvertBlToFactureCommand, ConvertBlToFactureResult, ConvertDevisToBlCommand,
-    ConvertDevisToBlResult, CreditOverview, CustomerRepository, CustomerSummary, CustomerUpdate,
-    DeleteAudit, DocumentRepository, DocumentSearchFilter, DocumentSummary, LedgerEntryRow,
-    PaymentRecord, PersistReturnOrder, PersistReturnReceipt, ReturnRepository,
+    ConvertDevisToBlResult, CreditOverview, CustomerLastPrice, CustomerRepository, CustomerSummary,
+    CustomerUpdate, DeleteAudit, DocumentRepository, DocumentSearchFilter, DocumentSummary,
+    LedgerEntryRow, PaymentRecord, PersistReturnOrder, PersistReturnReceipt, ReturnRepository,
 };
 use baraka_application::use_cases::returns::{
     ProcessReturnCommand, ProcessReturnUseCase, RefundDestination, ReturnItemInput,
@@ -368,6 +368,15 @@ impl CustomerRepository for FakeCustomers {
     }
 
     fn get_credit_overview(&self, _top_n: usize) -> Result<CreditOverview, ApplicationError> {
+        panic!("out of scope for return tests");
+    }
+
+    fn get_last_price(
+        &self,
+        _customer_id: CustomerId,
+        _product_id: String,
+        _unit_id: String,
+    ) -> Result<Option<CustomerLastPrice>, ApplicationError> {
         panic!("out of scope for return tests");
     }
 

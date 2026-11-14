@@ -232,6 +232,7 @@ fn seed_product(harness: &Harness, sku: &str, sale: i64, purchase: i64) -> (Prod
                     sale_price_centimes: sale,
                     purchase_price_centimes: purchase,
                     wholesale_price_centimes: None,
+                    super_gros_price_centimes: None,
                     is_base_unit: true,
                     is_default_selling: true,
                 }],

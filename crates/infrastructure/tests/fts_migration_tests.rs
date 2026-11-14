@@ -57,6 +57,7 @@ fn base_unit(barcode: Option<String>) -> NewUnitInput {
         sale_price_centimes: 15_000,
         purchase_price_centimes: 12_000,
         wholesale_price_centimes: None,
+        super_gros_price_centimes: None,
         is_base_unit: true,
         is_default_selling: true,
     }
@@ -89,34 +90,51 @@ fn apply_pre16(conn: &mut rusqlite::Connection) {
 fn seed_two_products(db_path: &std::path::Path) {
     let mut conn = open_connection(db_path).expect("open");
     apply_pre16(&mut conn);
-    let repo = SqliteCatalogRepository::new(Arc::new(Mutex::new(conn)));
-    let gerant = session_gerant();
-    let create = CreateProductUseCase::new(&repo, &repo);
+    // Genuine legacy rows: raw pre-16 SQL (no repo code — current writers
+    // target the post-21 schema and must fail here by construction).
     for (sku, fr, ar, barcode) in [
         (
             "VIS-PLA-25",
             "Vis Placo 3.5x25",
             "برغي بلاكو",
-            Some("6111250090011".to_string()),
+            Some("6111250090011"),
         ),
         ("COU-PVC-32", "Coude PVC 32", "كود بلاستيك", None),
     ] {
-        create
-            .execute(
-                &gerant,
-                CreateProductInput {
-                    sku: sku.to_string(),
-                    barcode: None,
-                    name_ar: ar.to_string(),
-                    name_fr: fr.to_string(),
-                    category_id: None,
-                    is_kit: false,
-                    units: vec![base_unit(barcode)],
-                },
-                "FTS-PROBE",
-            )
-            .expect("seed product");
+        seed_legacy_product(&conn, sku, fr, ar, barcode);
     }
+}
+
+/// One pre-16 product + base unit, written with exactly the columns that
+/// existed before migration 0016 (wholesale included via 0015, no
+/// `search_norm_*`, no `super_gros_price_centimes`).
+fn seed_legacy_product(
+    conn: &rusqlite::Connection,
+    sku: &str,
+    name_fr: &str,
+    name_ar: &str,
+    barcode: Option<&str>,
+) {
+    let product_id = format!("legacy-{sku}");
+    let unit_id = format!("legacy-{sku}-base");
+    conn.execute(
+        "INSERT INTO products
+         (id, sku, barcode, name_ar, name_fr, category_id, is_kit, is_active,
+          created_at, updated_at, revision, origin_device_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, NULL, 0, 1,
+                 '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', 1, 'LOCAL')",
+        rusqlite::params![product_id, sku, barcode, name_ar, name_fr],
+    )
+    .expect("legacy product");
+    conn.execute(
+        "INSERT INTO product_units
+         (id, product_id, unit_name_ar, unit_name_fr, factor_micro, barcode,
+          sale_price_centimes, purchase_price_centimes, wholesale_price_centimes,
+          is_base_unit, is_default_selling)
+         VALUES (?1, ?2, 'قطعة', 'Piece', 10000, ?3, 15000, 12000, NULL, 1, 1)",
+        rusqlite::params![unit_id, product_id, barcode],
+    )
+    .expect("legacy unit");
 }
 
 /// 0016 applies cleanly on a fresh database with bookkeeping.
@@ -143,19 +161,19 @@ fn fresh_apply_registers_v16_with_checksum() {
     assert_eq!(checksum, expected);
 }
 
-/// 0016+0017+0018+0019+0020 apply on an upgraded database (0001-0015 pre-applied raw).
+/// 0016+0017+0018+0019+0020+0021 apply on an upgraded database (0001-0015 pre-applied raw).
 #[test]
 fn upgrade_path_applies_only_pending() {
     let dir = tempfile::tempdir().expect("tempdir");
     let mut conn = open_connection(&dir.path().join("up.db")).expect("open");
     apply_pre16(&mut conn);
-    run_migrations(&mut conn).expect("upgrade to 20");
+    run_migrations(&mut conn).expect("upgrade to 21");
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM schema_migrations", [], |row| {
             row.get(0)
         })
         .expect("count");
-    assert_eq!(count, 20);
+    assert_eq!(count, 21);
     let fts_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM products_fts", [], |row| row.get(0))
         .expect("fts readable");
@@ -255,26 +273,17 @@ fn consistency_fails_on_stale_norm() {
     let db_path = dir.path().join("stale.db");
     seed_two_products(&db_path);
     {
+        // Fillers are legacy rows too: the stride sampler needs 65 rows
+        // present BEFORE the 0016 upgrade.
         let conn = open_connection(&db_path).expect("open");
-        let repo = SqliteCatalogRepository::new(Arc::new(Mutex::new(conn)));
-        let gerant = session_gerant();
-        let create = CreateProductUseCase::new(&repo, &repo);
         for index in 0..63 {
-            create
-                .execute(
-                    &gerant,
-                    CreateProductInput {
-                        sku: format!("STALE-{index:02}"),
-                        barcode: None,
-                        name_ar: format!("صنف {index}"),
-                        name_fr: format!("Article Test {index}"),
-                        category_id: None,
-                        is_kit: false,
-                        units: vec![base_unit(None)],
-                    },
-                    "FTS-PROBE",
-                )
-                .expect("seed filler");
+            seed_legacy_product(
+                &conn,
+                &format!("STALE-{index:02}"),
+                &format!("Article Test {index}"),
+                &format!("صنف {index}"),
+                None,
+            );
         }
     }
     let mut conn = open_connection(&db_path).expect("reopen");
@@ -400,7 +409,7 @@ fn triggers_mirror_inserts_updates_deletes() {
 }
 
 /// 80k backfill wall clock (measurement only, #[ignore] like the perf probe).
-/// Seeds via the repository path on a pre-16 database, then times the v16
+/// Seeds genuine legacy rows on a pre-16 database, then times the v16
 /// upgrade (DDL + norm backfill + alias seeding, one transaction).
 #[test]
 #[ignore = "slow: seeds 80k products; run explicitly with --ignored --nocapture"]
@@ -413,53 +422,73 @@ fn backfill_80k_wall_clock() {
         apply_pre16(&mut conn);
     }
     const COUNT: usize = 80_000;
+    const FR: &[&str] = &[
+        "Vis Placo",
+        "Boulon Hex",
+        "Robinet Laiton",
+        "Cadenas Acier",
+        "Cable Cuivre",
+        "Marteau Manche",
+        "Serrure Porte",
+        "Tuyau PVC",
+    ];
+    const AR: &[&str] = &[
+        "برغي بلاكو",
+        "صامولة حديد",
+        "حنفية نحاس",
+        "قفل فولاذ",
+        "كابل نحاس",
+        "مطرقة يد",
+        "قفل باب",
+        "انبوب بلاستيك",
+    ];
     {
-        let conn = open_connection(&db_path).expect("open");
-        let repo = SqliteCatalogRepository::new(Arc::new(Mutex::new(conn)));
-        let gerant = session_gerant();
-        let create = CreateProductUseCase::new(&repo, &repo);
-        const FR: &[&str] = &[
-            "Vis Placo",
-            "Boulon Hex",
-            "Robinet Laiton",
-            "Cadenas Acier",
-            "Cable Cuivre",
-            "Marteau Manche",
-            "Serrure Porte",
-            "Tuyau PVC",
-        ];
-        const AR: &[&str] = &[
-            "برغي بلاكو",
-            "صامولة حديد",
-            "حنفية نحاس",
-            "قفل فولاذ",
-            "كابل نحاس",
-            "مطرقة يد",
-            "قفل باب",
-            "انبوب بلاستيك",
-        ];
-        for index in 0..COUNT {
-            let barcode = if index % 5 < 2 {
-                Some(format!("80K{index:08}"))
-            } else {
-                None
-            };
-            create
-                .execute(
-                    &gerant,
-                    CreateProductInput {
-                        sku: format!("BF-{index:05}"),
-                        barcode: None,
-                        name_ar: format!("{} رقم {index}", AR[index % AR.len()]),
-                        name_fr: format!("{} n°{index}", FR[index % FR.len()]),
-                        category_id: None,
-                        is_kit: false,
-                        units: vec![base_unit(barcode)],
-                    },
-                    "BACKFILL-PROBE",
+        let mut conn = open_connection(&db_path).expect("open");
+        let tx = conn.transaction().expect("tx");
+        {
+            let mut insert_product = tx
+                .prepare(
+                    "INSERT INTO products
+                     (id, sku, barcode, name_ar, name_fr, category_id, is_kit, is_active,
+                      created_at, updated_at, revision, origin_device_id)
+                     VALUES (?1, ?2, NULL, ?3, ?4, NULL, 0, 1,
+                             '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', 1, 'LOCAL')",
                 )
-                .unwrap_or_else(|_| panic!("seed {index}"));
+                .expect("prepare product");
+            let mut insert_unit = tx
+                .prepare(
+                    "INSERT INTO product_units
+                     (id, product_id, unit_name_ar, unit_name_fr, factor_micro, barcode,
+                      sale_price_centimes, purchase_price_centimes, wholesale_price_centimes,
+                      is_base_unit, is_default_selling)
+                     VALUES (?1, ?2, 'قطعة', 'Piece', 10000, ?3, 15000, 12000, NULL, 1, 1)",
+                )
+                .expect("prepare unit");
+            for index in 0..COUNT {
+                let barcode = if index % 5 < 2 {
+                    Some(format!("80K{index:08}"))
+                } else {
+                    None
+                };
+                let product_id = format!("bulk-{index:05}");
+                insert_product
+                    .execute(rusqlite::params![
+                        product_id,
+                        format!("BF-{index:05}"),
+                        format!("{} رقم {index}", AR[index % AR.len()]),
+                        format!("{} n°{index}", FR[index % FR.len()]),
+                    ])
+                    .unwrap_or_else(|_| panic!("seed product {index}"));
+                insert_unit
+                    .execute(rusqlite::params![
+                        format!("bulk-{index:05}-base"),
+                        product_id,
+                        barcode,
+                    ])
+                    .unwrap_or_else(|_| panic!("seed unit {index}"));
+            }
         }
+        tx.commit().expect("commit legacy bulk");
     }
     let mut conn = open_connection(&db_path).expect("reopen");
     let started = Instant::now();

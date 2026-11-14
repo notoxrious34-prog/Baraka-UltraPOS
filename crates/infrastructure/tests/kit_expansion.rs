@@ -54,6 +54,7 @@ fn seed_product(harness: &Harness, sku: &str, is_kit: bool) -> (ProductId, UnitI
         sale_price: Money::from_centimes(1_000),
         purchase_price: Money::from_centimes(800),
         wholesale_price: None,
+        super_gros_price: None,
         is_base_unit: true,
         is_default_selling: true,
     };

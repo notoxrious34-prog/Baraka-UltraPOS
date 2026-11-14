@@ -53,6 +53,7 @@ fn base_unit_tagged(suffix: &str) -> NewUnitInput {
         sale_price_centimes: 15_000,
         purchase_price_centimes: 12_000,
         wholesale_price_centimes: None,
+        super_gros_price_centimes: None,
         is_base_unit: true,
         is_default_selling: true,
     }
@@ -67,6 +68,7 @@ fn box_unit_tagged(suffix: &str) -> NewUnitInput {
         sale_price_centimes: 1_450_000,
         purchase_price_centimes: 1_150_000,
         wholesale_price_centimes: None,
+        super_gros_price_centimes: None,
         is_base_unit: false,
         is_default_selling: false,
     }
@@ -291,6 +293,7 @@ fn search_and_update_behave() {
                         sale_price_centimes: 16_000,
                         purchase_price_centimes: 12_000,
                         wholesale_price_centimes: None,
+                        super_gros_price_centimes: None,
                         is_base_unit: true,
                         is_default_selling: true,
                     },

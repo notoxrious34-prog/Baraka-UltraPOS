@@ -159,6 +159,7 @@ fn setup() -> (Harness, Fixture) {
                         sale_price: Money::from_centimes(sale),
                         purchase_price: Money::from_centimes(cost),
                         wholesale_price: None,
+                        super_gros_price: None,
                         is_base_unit: true,
                         is_default_selling: true,
                     }],

@@ -27,6 +27,7 @@ import type {
   SaleReceipt,
   SessionInfo,
   StatementEntry,
+  VerticalProfileInfo,
   WarehouseInfo,
 } from "@/types/pos";
 
@@ -1826,6 +1827,34 @@ export async function saveStoreIdentity(
   return {
     identity: toIdentity(wire.identity),
     deviceKind: wire.device_kind === "capture" ? "capture" : "physical",
+  };
+}
+
+/** Read the active vertical profile + tier vocabulary (BRK-117, DSN-105 uses this). */
+export async function getVerticalProfile(): Promise<VerticalProfileInfo> {
+  const wire = await call<{
+    profile: string;
+    offered_tiers: string[];
+    default_tier: string;
+  }>("vertical_profile_get", {});
+  return {
+    profile: wire.profile,
+    offeredTiers: wire.offered_tiers,
+    defaultTier: wire.default_tier,
+  };
+}
+
+/** Switch the vertical profile (SystemSettingsManage server-side). */
+export async function setVerticalProfile(profile: string): Promise<VerticalProfileInfo> {
+  const wire = await call<{
+    profile: string;
+    offered_tiers: string[];
+    default_tier: string;
+  }>("vertical_profile_set", { request: { profile } });
+  return {
+    profile: wire.profile,
+    offeredTiers: wire.offered_tiers,
+    defaultTier: wire.default_tier,
   };
 }
 

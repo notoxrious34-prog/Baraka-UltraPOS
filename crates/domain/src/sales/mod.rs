@@ -7,6 +7,7 @@ pub mod document;
 pub mod payment;
 pub mod pricing;
 pub mod sequence;
+pub mod vertical;
 
 pub use colisage::{breakdown as colisage_breakdown, ColisageRung, ColisageShare};
 pub use credit_equation::CreditSnapshot;
@@ -27,3 +28,4 @@ pub use pricing::{
     PricedLine, PricedLineInput, TenderResult,
 };
 pub use sequence::{format_number, next_number};
+pub use vertical::VerticalProfile;

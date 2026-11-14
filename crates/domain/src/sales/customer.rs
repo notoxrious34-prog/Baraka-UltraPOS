@@ -140,6 +140,9 @@ pub enum CustomerTier {
     Artisan,
     /// Wholesale price.
     Wholesale,
+    /// Bulk wholesale (`Super-Gros`): quantity-break price, falls back to
+    /// wholesale then sale when unset (BRK-117).
+    SuperGros,
 }
 
 impl CustomerTier {
@@ -150,6 +153,7 @@ impl CustomerTier {
             Self::Retail => "retail",
             Self::Artisan => "artisan",
             Self::Wholesale => "wholesale",
+            Self::SuperGros => "super_gros",
         }
     }
 }
@@ -162,6 +166,7 @@ impl std::str::FromStr for CustomerTier {
             "retail" | "comptant" | "detail" | "détail" => Ok(Self::Retail),
             "artisan" | "pro" | "professionnel" => Ok(Self::Artisan),
             "wholesale" | "gros" | "grossiste" => Ok(Self::Wholesale),
+            "super_gros" | "super-gros" | "supergros" | "super gros" => Ok(Self::SuperGros),
             other => Err(DomainError::InvalidCanonicalString(format!(
                 "unknown customer tier: {other}"
             ))),

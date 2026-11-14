@@ -67,6 +67,9 @@ pub struct ProductUnit {
     pub purchase_price: Money,
     /// Artisan/wholesale price per selling unit (`None` = fall back to sale price).
     pub wholesale_price: Option<Money>,
+    /// Bulk wholesale price per selling unit (`None` = fall back to wholesale
+    /// then sale; BRK-117, additive column `super_gros_price_centimes`).
+    pub super_gros_price: Option<Money>,
     /// True for the single immutable base unit.
     pub is_base_unit: bool,
     /// Default unit offered on the POS screen.
@@ -74,7 +77,9 @@ pub struct ProductUnit {
 }
 
 /// Tier price resolution (Pillar 4): retail pays the sale price; artisan and
-/// wholesale pay the wholesale price when set, else the sale price.
+/// wholesale pay the wholesale price when set, else the sale price;
+/// super-gros pays the bulk price when set, else wholesale, else sale.
+/// Shape untouched (BRK-117 only adds the fallback rung).
 impl ProductUnit {
     /// Effective unit price in centimes for `tier`.
     #[must_use]
@@ -84,6 +89,10 @@ impl ProductUnit {
             CustomerTier::Artisan | CustomerTier::Wholesale => {
                 self.wholesale_price.unwrap_or(self.sale_price)
             }
+            CustomerTier::SuperGros => self
+                .super_gros_price
+                .or(self.wholesale_price)
+                .unwrap_or(self.sale_price),
         }
     }
 }
@@ -165,6 +174,7 @@ mod tests {
             sale_price: Money::from_centimes(15_000),
             purchase_price: Money::from_centimes(12_000),
             wholesale_price: None,
+            super_gros_price: None,
             is_base_unit: true,
             is_default_selling: true,
         }
@@ -181,6 +191,7 @@ mod tests {
             sale_price: Money::from_centimes(1_450_000),
             purchase_price: Money::from_centimes(1_150_000),
             wholesale_price: None,
+            super_gros_price: None,
             is_base_unit: false,
             is_default_selling: false,
         }

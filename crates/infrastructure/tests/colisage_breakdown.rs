@@ -143,6 +143,7 @@ fn seed_laddered(
             sale_price: Money::from_centimes(*price),
             purchase_price: Money::from_centimes(price / 2),
             wholesale_price: None,
+            super_gros_price: None,
             is_base_unit: index == 0,
             is_default_selling: index == 0,
         });

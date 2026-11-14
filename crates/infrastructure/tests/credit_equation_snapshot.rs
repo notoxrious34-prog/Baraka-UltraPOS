@@ -126,6 +126,7 @@ fn seed_product(harness: &Harness, sku: &str, sale_price: i64) -> (ProductId, Un
         sale_price: Money::from_centimes(sale_price),
         purchase_price: Money::from_centimes(sale_price / 2),
         wholesale_price: None,
+        super_gros_price: None,
         is_base_unit: true,
         is_default_selling: true,
     };
@@ -432,13 +433,13 @@ fn migration_0020_is_additive_on_a_populated_0019_database() {
     .expect("legacy finalized document");
 
     // Stage 2: the official upgrade path.
-    run_migrations(&mut conn).expect("upgrade to 0020");
+    run_migrations(&mut conn).expect("upgrade to 0021");
     let version: i64 = conn
         .query_row("SELECT MAX(version) FROM schema_migrations", [], |row| {
             row.get(0)
         })
         .expect("version");
-    assert_eq!(version, 20, "binary horizon must be 0020");
+    assert_eq!(version, 21, "binary horizon must be 0021");
 
     // Stage 3: zero data loss + legacy rows read back NULL (no backfilled lie).
     let balance: i64 = conn

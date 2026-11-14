@@ -319,3 +319,27 @@ pub struct TestPrintResponse {
     /// `capture-only` | `sent` | typed device-error code.
     pub device_outcome: String,
 }
+
+// Vertical profile wire types (BRK-117) --------------------------------
+// Profile + derived tier vocabulary; money never crosses this edge.
+
+/// Active profile view with the tiers the trade offers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerticalProfileResponse {
+    /// Canonical code (`apparel_wholesale_retail` | `hardware_general` |
+    /// `hybrid_enterprise`).
+    pub profile: String,
+    /// Tier codes this trade offers, cheapest-attention order.
+    pub offered_tiers: Vec<String>,
+    /// Tier assigned to a new customer when the cashier picks none.
+    pub default_tier: String,
+}
+
+/// Profile switch request (SystemSettingsManage).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SaveVerticalProfileRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Canonical profile code to activate.
+    pub profile: String,
+}

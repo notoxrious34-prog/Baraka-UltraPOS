@@ -2,9 +2,10 @@
 use super::{error_code, parse_wire_id, parse_wire_int, require_session, AppState};
 use baraka_application::errors::ApplicationError;
 use baraka_application::use_cases::printing::{
-    GetPrintStatusUseCase, GetPrinterSettingsUseCase, ReprintDocumentUseCase,
-    SaveStoreIdentityUseCase, TestPrintDeviceOutcome, TestPrintUseCase,
-    UpdatePrinterSettingsUseCase, UpdateTsplMediaSettingsUseCase,
+    GetPrintStatusUseCase, GetPrinterSettingsUseCase, GetVerticalProfileUseCase,
+    ReprintDocumentUseCase, SaveStoreIdentityUseCase, SaveVerticalProfileUseCase,
+    TestPrintDeviceOutcome, TestPrintUseCase, UpdatePrinterSettingsUseCase,
+    UpdateTsplMediaSettingsUseCase,
 };
 use baraka_application::use_cases::sales::{GetFiscalSettingsUseCase, UpdateFiscalSettingsUseCase};
 use baraka_application::use_cases::tspl_printing::{
@@ -16,11 +17,12 @@ use baraka_domain::role::Permission;
 
 use crate::dto::{
     DecodeSummaryDto, FiscalSettingsDto, PreviewLineDto, PrintStatusResponse, PrinterSettingsDto,
-    RawBitmapRequest, ReprintRequest, ReprintResponse, SaveStoreIdentityRequest, StoreIdentityDto,
-    StoreIdentityResponse, TestPrintRequest, TestPrintResponse, TsplCalibrationRequest,
-    TsplLabelPreviewRequest, TsplLabelPreviewResponse, TsplLabelRequest, TsplPreviewLineDto,
-    TsplPrintResponse, TsplTestLabelRequest, TsplTestTicketRequest, TsplTicketRequest,
-    UpdateFiscalSettingsRequestDto, UpdatePrinterSettingsRequest,
+    RawBitmapRequest, ReprintRequest, ReprintResponse, SaveStoreIdentityRequest,
+    SaveVerticalProfileRequest, StoreIdentityDto, StoreIdentityResponse, TestPrintRequest,
+    TestPrintResponse, TsplCalibrationRequest, TsplLabelPreviewRequest, TsplLabelPreviewResponse,
+    TsplLabelRequest, TsplPreviewLineDto, TsplPrintResponse, TsplTestLabelRequest,
+    TsplTestTicketRequest, TsplTicketRequest, UpdateFiscalSettingsRequestDto,
+    UpdatePrinterSettingsRequest, VerticalProfileResponse,
 };
 
 /// `documents_get_print_status` command: latest outbox state for a document.
@@ -438,6 +440,46 @@ pub fn store_identity_save(
         identity: to_identity_dto(&saved),
         device_kind,
     })
+}
+
+/// `vertical_profile_get` command (BRK-117): active profile + the tier
+/// vocabulary the trade offers (any authenticated session).
+#[tauri::command(rename_all = "snake_case")]
+pub fn vertical_profile_get(
+    state: tauri::State<'_, AppState>,
+    session_token: String,
+) -> Result<VerticalProfileResponse, String> {
+    let session = require_session(&state, &session_token)?;
+    let profile = GetVerticalProfileUseCase::new(state.vertical_profile.as_ref())
+        .execute(&session)
+        .map_err(|error| error_code(&error))?;
+    Ok(to_profile_dto(&profile))
+}
+
+/// `vertical_profile_set` command (BRK-117, SystemSettingsManage):
+/// validate the wire code, persist, audit, echo the stored profile.
+#[tauri::command(rename_all = "snake_case")]
+pub fn vertical_profile_set(
+    state: tauri::State<'_, AppState>,
+    request: SaveVerticalProfileRequest,
+) -> Result<VerticalProfileResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let profile = SaveVerticalProfileUseCase::new(state.vertical_profile.as_ref())
+        .execute(&session, request.profile.trim())
+        .map_err(|error| error_code(&error))?;
+    Ok(to_profile_dto(&profile))
+}
+
+fn to_profile_dto(profile: &baraka_domain::sales::VerticalProfile) -> VerticalProfileResponse {
+    VerticalProfileResponse {
+        profile: profile.as_str().to_string(),
+        offered_tiers: profile
+            .offered_tiers()
+            .iter()
+            .map(|tier| tier.as_str().to_string())
+            .collect(),
+        default_tier: profile.default_tier().as_str().to_string(),
+    }
 }
 
 /// `fiscal_settings_get` command: read the timbre toggle (ADR-092,

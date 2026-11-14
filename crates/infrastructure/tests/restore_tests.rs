@@ -126,6 +126,7 @@ fn seed_consistent(harness: &Harness, doc_number: &str) -> (WarehouseId, Product
                 sale_price: Money::from_centimes(10_000),
                 purchase_price: Money::from_centimes(8_000),
                 wholesale_price: None,
+                super_gros_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],
@@ -626,6 +627,7 @@ fn restore_success_swaps_active_db_and_preserves_quarantine() {
                 sale_price: Money::from_centimes(5_000),
                 purchase_price: Money::from_centimes(4_000),
                 wholesale_price: None,
+                super_gros_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],
@@ -814,6 +816,15 @@ fn restore_older_schema_backup_is_migrated() {
                 conn.execute(&format!("ALTER TABLE documents DROP COLUMN {column};"), [])
                     .expect("drop v20 credit snapshot column");
             }
+        }
+        if app_version >= 21 {
+            // Genuine v20 backups predate migration 0021, so the NULL-able
+            // bulk-price column must go too.
+            conn.execute(
+                "ALTER TABLE product_units DROP COLUMN super_gros_price_centimes;",
+                [],
+            )
+            .expect("drop v21 super-gros column");
         }
     }
     repoint_logged_hash(

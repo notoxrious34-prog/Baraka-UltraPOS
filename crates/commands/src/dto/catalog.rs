@@ -22,6 +22,8 @@ pub struct NewProductUnitDto {
     pub purchase_price_centimes: String,
     /// Artisan/wholesale price in centimes (`None` = fall back to sale price).
     pub wholesale_price_centimes: Option<String>,
+    /// Bulk wholesale price in centimes (`None` = fall back to wholesale, BRK-117).
+    pub super_gros_price_centimes: Option<String>,
     /// True for the single base unit.
     pub is_base_unit: bool,
     /// Default POS unit.
@@ -70,6 +72,8 @@ pub struct ProductUnitDto {
     pub purchase_price_centimes: String,
     /// Artisan/wholesale price in centimes (`None` = fall back to sale price).
     pub wholesale_price_centimes: Option<String>,
+    /// Bulk wholesale price in centimes (`None` = fall back to wholesale, BRK-117).
+    pub super_gros_price_centimes: Option<String>,
     /// True for the single base unit.
     pub is_base_unit: bool,
     /// Default POS unit.
@@ -162,6 +166,8 @@ pub struct UpdateProductUnitDto {
     pub purchase_price_centimes: String,
     /// Artisan/wholesale price in centimes (`None` = fall back to sale price).
     pub wholesale_price_centimes: Option<String>,
+    /// Bulk wholesale price in centimes (`None` = fall back to wholesale, BRK-117).
+    pub super_gros_price_centimes: Option<String>,
     /// True for the single base unit.
     pub is_base_unit: bool,
     /// Default POS unit.

@@ -66,6 +66,7 @@ fn unit(barcode: Option<String>) -> NewUnitInput {
         sale_price_centimes: 15_000,
         purchase_price_centimes: 12_000,
         wholesale_price_centimes: None,
+        super_gros_price_centimes: None,
         is_base_unit: true,
         is_default_selling: true,
     }

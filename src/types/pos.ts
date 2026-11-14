@@ -155,6 +155,13 @@ export interface WarehouseInfo {
   isActive: boolean;
 }
 
+/** Active vertical profile with the tier vocabulary the trade offers (BRK-117). */
+export interface VerticalProfileInfo {
+  profile: string;
+  offeredTiers: string[];
+  defaultTier: string;
+}
+
 /** Catalog product view (mirrors ProductResponseDto). */
 export interface CatalogProduct {
   product_id: string;

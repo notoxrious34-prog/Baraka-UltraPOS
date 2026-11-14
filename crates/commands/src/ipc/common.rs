@@ -13,7 +13,7 @@ use baraka_application::ports::{
     PrinterTransportPort, ProductRepository, PurchaseRepository, ReceiptRendererPort,
     ReportingRepository, ReturnRepository, SessionContext, SessionStore, SessionToken,
     StockRepository, StoreIdentityPort, SupplierRepository, TsplLabelRasterPort, UserRepository,
-    WarehouseRepository,
+    VerticalProfilePort, WarehouseRepository,
 };
 use baraka_application::use_cases::catalog::{
     NewUnitInput, ProductDetail, ProductImportRepository, UnitUpsert,
@@ -65,6 +65,8 @@ pub struct AppState {
     pub printer_settings: Arc<dyn PrinterSettingsPort>,
     /// Store identity + diagnostics settings (same table, identity port).
     pub store_identity: Arc<dyn StoreIdentityPort>,
+    /// Active vertical profile (same table, `vertical.profile` key, BRK-117).
+    pub vertical_profile: Arc<dyn VerticalProfilePort>,
     /// Fiscal stamp settings (`fiscal.*` keys, ADR-092).
     pub fiscal: Arc<dyn FiscalSettingsPort>,
     /// Physical printer transport edge.
@@ -386,6 +388,11 @@ pub(crate) fn parse_unit_dto(dto: &NewProductUnitDto) -> Result<NewUnitInput, Ap
             .as_deref()
             .map(|text| parse_wire_int(text, "wholesale_price_centimes"))
             .transpose()?,
+        super_gros_price_centimes: dto
+            .super_gros_price_centimes
+            .as_deref()
+            .map(|text| parse_wire_int(text, "super_gros_price_centimes"))
+            .transpose()?,
         is_base_unit: dto.is_base_unit,
         is_default_selling: dto.is_default_selling,
     })
@@ -465,6 +472,11 @@ pub(crate) fn parse_upsert_unit_dto(
                 .as_deref()
                 .map(|text| parse_wire_int(text, "wholesale_price_centimes"))
                 .transpose()?,
+            super_gros_price_centimes: dto
+                .super_gros_price_centimes
+                .as_deref()
+                .map(|text| parse_wire_int(text, "super_gros_price_centimes"))
+                .transpose()?,
             is_base_unit: dto.is_base_unit,
             is_default_selling: dto.is_default_selling,
         },
@@ -487,6 +499,9 @@ pub(crate) fn to_unit_dto(unit: &baraka_domain::catalog::ProductUnit) -> Product
         purchase_price_centimes: unit.purchase_price.centimes().to_string(),
         wholesale_price_centimes: unit
             .wholesale_price
+            .map(|price| price.centimes().to_string()),
+        super_gros_price_centimes: unit
+            .super_gros_price
             .map(|price| price.centimes().to_string()),
         is_base_unit: unit.is_base_unit,
         is_default_selling: unit.is_default_selling,

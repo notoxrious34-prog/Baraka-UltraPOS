@@ -106,6 +106,7 @@ pub fn seed_db(db_path: &Path) -> DriverStack {
                 sale_price: Money::from_centimes(UNIT_PRICE_CENTIMES),
                 purchase_price: Money::from_centimes(8_000),
                 wholesale_price: None,
+                super_gros_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],

@@ -104,6 +104,7 @@ fn seed_product(harness: &Harness) -> (ProductId, UnitId) {
                 sale_price: Money::from_centimes(15_000),
                 purchase_price: Money::from_centimes(12_000),
                 wholesale_price: None,
+                super_gros_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],

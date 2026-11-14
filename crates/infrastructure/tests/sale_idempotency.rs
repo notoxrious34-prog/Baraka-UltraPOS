@@ -101,6 +101,7 @@ fn seed_sale_context(harness: &Harness) -> (WarehouseId, ProductId, UnitId) {
                 sale_price: Money::from_centimes(10_000),
                 purchase_price: Money::from_centimes(8_000),
                 wholesale_price: None,
+                super_gros_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],

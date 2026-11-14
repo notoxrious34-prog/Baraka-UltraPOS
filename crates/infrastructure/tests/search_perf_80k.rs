@@ -118,6 +118,7 @@ fn make_unit(barcode: Option<String>, base: bool, factor: i64, price: i64) -> Ne
         sale_price_centimes: price,
         purchase_price_centimes: price - price / 10,
         wholesale_price_centimes: None,
+        super_gros_price_centimes: None,
         is_base_unit: base,
         is_default_selling: base,
     }

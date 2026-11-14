@@ -55,6 +55,9 @@ pub struct NewUnitInput {
     pub purchase_price_centimes: i64,
     /// Artisan/wholesale price in centimes (`None` = fall back to sale price).
     pub wholesale_price_centimes: Option<i64>,
+    /// Bulk wholesale price in centimes (`None` = fall back to wholesale,
+    /// BRK-117).
+    pub super_gros_price_centimes: Option<i64>,
     /// True for the single base unit.
     pub is_base_unit: bool,
     /// Default POS unit.
@@ -146,6 +149,9 @@ fn build_unit(
     if input
         .wholesale_price_centimes
         .is_some_and(|price| price < 0)
+        || input
+            .super_gros_price_centimes
+            .is_some_and(|price| price < 0)
     {
         return Err(ApplicationError::Validation(
             DomainError::NegativeMoneyForbidden,
@@ -167,6 +173,7 @@ fn build_unit(
         sale_price: Money::from_centimes(input.sale_price_centimes),
         purchase_price: Money::from_centimes(input.purchase_price_centimes),
         wholesale_price: input.wholesale_price_centimes.map(Money::from_centimes),
+        super_gros_price: input.super_gros_price_centimes.map(Money::from_centimes),
         is_base_unit: input.is_base_unit,
         is_default_selling: input.is_default_selling,
     })
@@ -1020,6 +1027,7 @@ mod tests {
                 sale_price: Money::from_centimes(1_000),
                 purchase_price: Money::from_centimes(800),
                 wholesale_price: None,
+                super_gros_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             };
@@ -1265,6 +1273,7 @@ mod tests {
             sale_price_centimes: 1_000,
             purchase_price_centimes: 800,
             wholesale_price_centimes: None,
+            super_gros_price_centimes: None,
             is_base_unit: true,
             is_default_selling: true,
         }]

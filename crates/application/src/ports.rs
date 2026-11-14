@@ -1542,13 +1542,27 @@ pub trait StoreIdentityPort: Send + Sync {
 
     /// Persist the diagnostics device kind (ADMIN-gated + audited upstream).
     fn save_device(&self, kind: &str, actor: &str) -> Result<(), ApplicationError>;
-
     /// Append a chain-linked settings audit row (diagnostics + saves).
     fn append_settings_audit(
         &self,
         actor: &str,
         action: &str,
         detail: &str,
+    ) -> Result<(), ApplicationError>;
+}
+
+/// Vertical-profile port (BRK-117): the trade the counter speaks.
+/// Persisted as the `vertical.profile` key in the existing `settings`
+/// table — zero schema changes. Absent key reads as the default profile.
+pub trait VerticalProfilePort: Send + Sync {
+    /// Load the active profile (absent key = default).
+    fn load_profile(&self) -> Result<baraka_domain::sales::VerticalProfile, ApplicationError>;
+
+    /// Persist the profile (SystemSettingsManage-gated + audited upstream).
+    fn save_profile(
+        &self,
+        profile: &baraka_domain::sales::VerticalProfile,
+        actor: &str,
     ) -> Result<(), ApplicationError>;
 }
 

@@ -7,11 +7,12 @@ use baraka_domain::printing::{
 use baraka_domain::printing::{ReceiptLine, ReceiptTotals, StoreIdentity};
 use baraka_domain::role::Permission;
 use baraka_domain::sales::DocumentId;
+use baraka_domain::sales::VerticalProfile;
 
 use crate::errors::ApplicationError;
 use crate::ports::{
     CaptureSink, DocumentRepository, PrintJobRepository, PrinterTransportPort, ReceiptRendererPort,
-    SessionContext, StoreIdentityPort,
+    SessionContext, StoreIdentityPort, VerticalProfilePort,
 };
 
 /// Enqueue a DUPLICATA reprint job (original row untouched).
@@ -197,6 +198,69 @@ where
         self.settings.save_identity(&clean, &actor)?;
         self.settings.save_device(kind, &actor)?;
         Ok(clean)
+    }
+}
+
+/// Vertical-profile use cases (BRK-117): read the trade the counter speaks
+/// (any authenticated session) and switch it (SystemSettingsManage).
+/// Switching changes defaults and surfaces only — never prices, ledger
+/// entries, or migration history (ADR-110).
+pub struct GetVerticalProfileUseCase<'a, S>
+where
+    S: ?Sized,
+{
+    settings: &'a S,
+}
+
+impl<'a, S> GetVerticalProfileUseCase<'a, S>
+where
+    S: VerticalProfilePort + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(settings: &'a S) -> Self {
+        Self { settings }
+    }
+
+    /// Load the active profile (absent key = default).
+    pub fn execute(&self, _session: &SessionContext) -> Result<VerticalProfile, ApplicationError> {
+        self.settings.load_profile()
+    }
+}
+
+/// Profile switch use case (SystemSettingsManage-gated + audited).
+pub struct SaveVerticalProfileUseCase<'a, S>
+where
+    S: ?Sized,
+{
+    settings: &'a S,
+}
+
+impl<'a, S> SaveVerticalProfileUseCase<'a, S>
+where
+    S: VerticalProfilePort + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(settings: &'a S) -> Self {
+        Self { settings }
+    }
+
+    /// Validate the wire code, persist, and echo the stored profile.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        profile_code: &str,
+    ) -> Result<VerticalProfile, ApplicationError> {
+        if !session
+            .role
+            .has_permission(Permission::SystemSettingsManage)
+        {
+            return Err(ApplicationError::Unauthorized);
+        }
+        let profile: VerticalProfile =
+            profile_code.parse().map_err(ApplicationError::Validation)?;
+        let actor = session.user_id.to_string();
+        self.settings.save_profile(&profile, &actor)?;
+        Ok(profile)
     }
 }
 

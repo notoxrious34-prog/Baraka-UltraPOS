@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
-use baraka_application::ports::{PrinterSettings, PrinterSettingsPort};
+use baraka_application::ports::{PrinterSettings, PrinterSettingsPort, VerticalProfilePort};
 use rusqlite::Connection;
 
 use crate::persistence::transaction::run_transaction;
@@ -245,6 +245,8 @@ pub mod store_keys {
     pub const FOOTER: &str = "store.footer_message";
     /// `"physical"` (default) or `"capture"` (diagnostics-scoped).
     pub const DEVICE_KIND: &str = "printing.device.kind";
+    /// Active vertical profile (BRK-117); absent reads as the default.
+    pub const VERTICAL_PROFILE: &str = "vertical.profile";
 }
 
 fn write_key(
@@ -353,6 +355,38 @@ impl baraka_application::ports::StoreIdentityPort for SqlitePrinterSettings {
         let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         run_transaction(&mut guard, |tx| {
             audit_settings(tx, action, detail, actor, &stamp)
+        })
+        .map_err(|_| store_failure())
+    }
+}
+
+impl VerticalProfilePort for SqlitePrinterSettings {
+    fn load_profile(&self) -> Result<baraka_domain::sales::VerticalProfile, ApplicationError> {
+        Ok(self
+            .read_key(store_keys::VERTICAL_PROFILE)
+            .as_deref()
+            .map(str::parse)
+            .transpose()
+            .map_err(ApplicationError::Validation)?
+            .unwrap_or_default())
+    }
+
+    fn save_profile(
+        &self,
+        profile: &baraka_domain::sales::VerticalProfile,
+        actor: &str,
+    ) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        run_transaction(&mut guard, |tx| {
+            write_key(tx, store_keys::VERTICAL_PROFILE, profile.as_str(), &stamp)?;
+            audit_settings(
+                tx,
+                "VERTICAL_PROFILE_UPDATED",
+                profile.as_str(),
+                actor,
+                &stamp,
+            )
         })
         .map_err(|_| store_failure())
     }

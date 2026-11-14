@@ -192,6 +192,7 @@ fn seed_one_product(
                 sale_price: Money::from_centimes(price_centimes),
                 purchase_price: Money::from_centimes(8_000),
                 wholesale_price: None,
+                super_gros_price: None,
                 is_base_unit: true,
                 is_default_selling: true,
             }],

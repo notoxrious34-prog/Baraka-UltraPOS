@@ -28,10 +28,11 @@ no floats; atomic sale untouched; Gates G1–G7 per wave; innovation section
 
 ## WAVE 2 — Profiles, Super-Gros & Price Memory
 **Goal:** the system speaks each trade's language and remembers its prices.
-- `TASK-BRK-110` — Vertical profiles (`apparel_wholesale_retail` |
+- `TASK-BRK-117` — Vertical profiles (`apparel_wholesale_retail` |
   `hardware_general` | `hybrid_enterprise`) + `Super-Gros`/quantity-break tiers
   extending `0015` semantics (new additive migration; `price_for_tier`
-  untouched in shape).
+  untouched in shape). Renumbered from `BRK-110` per ADR-115 (credit
+  aggregator shipped under that number).
 - `TASK-BRK-111` — Customer last-price memory: per-customer×product last
   invoiced PU (read-only recall, never auto-override without manager key).
 - `TASK-DSN-105` — Profile switch UX in Settings + tier badges/safeguards in POS.

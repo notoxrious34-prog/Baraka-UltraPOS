@@ -290,6 +290,7 @@ pub fn run() {
             baraka_commands::ipc::customers_list,
             baraka_commands::ipc::credit_record_payment,
             baraka_commands::ipc::credit_get_statement,
+            baraka_commands::ipc::customers_credit_overview,
             baraka_commands::ipc::documents_get_print_status,
             baraka_commands::ipc::documents_reprint,
             baraka_commands::ipc::print_tspl_label,

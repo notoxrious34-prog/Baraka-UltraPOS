@@ -132,4 +132,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-113 | Read-time Colisage display on cart, OS ticket, and A4; TSPL lines deferred (TASK-DSN-104) | ACCEPTED |
 
-Next free id: ADR-114.
+| ADR-114 | Customer credit aggregator & limit alerts: domain bands, read-model overview, dossier banner (TASK-BRK-110) | ACCEPTED |
+
+Next free id: ADR-115.

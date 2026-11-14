@@ -107,6 +107,25 @@ export interface CustomerDetail {
   is_active: boolean;
 }
 
+/** One at-risk customer row (mirrors CreditDebtorDto). */
+export interface CreditDebtor {
+  id: string;
+  name: string;
+  credit_policy: "LIMITED" | "UNLIMITED" | "DISABLED";
+  credit_limit_centimes: string;
+  balance_centimes: string;
+  risk: "OVER_LIMIT" | "NEAR_LIMIT" | "indebted" | "CLEAR";
+}
+
+/** Whole-book credit exposure (mirrors CreditOverviewDto). */
+export interface CreditOverview {
+  total_outstanding_centimes: string;
+  debtor_count: number;
+  over_limit_count: number;
+  near_limit_count: number;
+  top_debtors: CreditDebtor[];
+}
+
 /** Statement line (mirrors StatementEntryDto). */
 export interface StatementEntry {
   entry_type: string;

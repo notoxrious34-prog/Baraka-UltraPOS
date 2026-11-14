@@ -72,6 +72,45 @@ impl CreditPolicy {
     }
 }
 
+/// Near-limit watch threshold, percent of the ceiling (BRK-110).
+pub const CREDIT_NEAR_LIMIT_PERCENT: i64 = 80;
+
+/// Credit-risk band for one customer (BRK-110 aggregator input).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CreditRisk {
+    /// `Limited` policy with balance above the ceiling.
+    OverLimit,
+    /// `Limited` policy with balance at/above the watch threshold.
+    NearLimit,
+    /// Positive balance below the watch band (or unceiled policy).
+    Indebted,
+    /// Zero or negative balance (credit/overpayment).
+    Clear,
+}
+
+/// Classify one customer from its live profile (pure, i128-safe).
+pub fn assess_credit_risk(
+    policy: CreditPolicy,
+    limit_centimes: i64,
+    balance_centimes: i64,
+) -> CreditRisk {
+    if balance_centimes <= 0 {
+        return CreditRisk::Clear;
+    }
+    if policy != CreditPolicy::Limited {
+        return CreditRisk::Indebted;
+    }
+    if i128::from(balance_centimes) > i128::from(limit_centimes) {
+        return CreditRisk::OverLimit;
+    }
+    if i128::from(balance_centimes) * 100
+        >= i128::from(limit_centimes) * CREDIT_NEAR_LIMIT_PERCENT as i128
+    {
+        return CreditRisk::NearLimit;
+    }
+    CreditRisk::Indebted
+}
+
 /// Credit state read for authorization decisions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CreditProfile {
@@ -282,5 +321,24 @@ mod tests {
             CustomerTier::Retail
         );
         assert!(CustomerTier::from_str("unknown").is_err());
+    }
+
+    // BRK-110 risk bands: pure classification pins.
+    #[test]
+    fn risk_bands() {
+        use CreditPolicy::{Disabled, Limited, Unlimited};
+        use CreditRisk::{Clear, Indebted, NearLimit, OverLimit};
+        // Zero and credit balances are always clear.
+        assert_eq!(assess_credit_risk(Limited, 10000, 0), Clear);
+        assert_eq!(assess_credit_risk(Limited, 10000, -500), Clear);
+        // Unceiled policies never escalate past indebted.
+        assert_eq!(assess_credit_risk(Unlimited, 0, 9999900), Indebted);
+        assert_eq!(assess_credit_risk(Disabled, 0, 1000), Indebted);
+        // Ceiling bands on Limited (limit 100.00, watch at 80.00).
+        assert_eq!(assess_credit_risk(Limited, 10000, 1000), Indebted);
+        assert_eq!(assess_credit_risk(Limited, 10000, 7999), Indebted);
+        assert_eq!(assess_credit_risk(Limited, 10000, 8000), NearLimit);
+        assert_eq!(assess_credit_risk(Limited, 10000, 10000), NearLimit);
+        assert_eq!(assess_credit_risk(Limited, 10000, 10001), OverLimit);
     }
 }

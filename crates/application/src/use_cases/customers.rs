@@ -14,8 +14,8 @@ use baraka_domain::sales::{
 
 use crate::errors::ApplicationError;
 use crate::ports::{
-    CustomerRepository, CustomerSummary, CustomerUpdate, LedgerEntryRow, NewCustomer,
-    PaymentRecord, SessionContext,
+    CreditOverview, CustomerRepository, CustomerSummary, CustomerUpdate, LedgerEntryRow,
+    NewCustomer, PaymentRecord, SessionContext,
 };
 
 /// Stable-code constructor for i18n-ready validation failures.
@@ -254,6 +254,34 @@ where
         }
         self.customers
             .search_customers(trimmed, limit.clamp(1, 100))
+    }
+}
+
+/// Whole-book credit exposure (BRK-110): aggregates plus largest debtors.
+pub struct GetCreditOverviewUseCase<'a, C>
+where
+    C: ?Sized,
+{
+    customers: &'a C,
+}
+
+impl<'a, C> GetCreditOverviewUseCase<'a, C>
+where
+    C: CustomerRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(customers: &'a C) -> Self {
+        Self { customers }
+    }
+
+    /// Read-only aggregate; any role with `ViewCustomers` may call it.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        top_n: usize,
+    ) -> Result<CreditOverview, ApplicationError> {
+        require(session, Permission::ViewCustomers)?;
+        self.customers.get_credit_overview(top_n.clamp(1, 100))
     }
 }
 

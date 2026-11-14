@@ -17,8 +17,10 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
 import { ipcGetCustomer, ipcListCustomers, ipcSearchCustomers } from "@/lib/ipc";
 import { ipcDeleteCustomer, type DeleteEntityResult } from "@/lib/ipc";
+import { ipcGetCreditOverview } from "@/lib/ipc";
 import { SafeDeleteModal } from "@/components/common/SafeDeleteModal";
 import type { CustomerDetail, CustomerSummary } from "@/types/pos";
+import type { CreditOverview } from "@/types/pos";
 import { CustomerListPane, type DirectoryRow } from "@/features/customers/CustomerListPane";
 import { CustomerDossierPane } from "@/features/customers/CustomerDossierPane";
 import { CustomerFormModal, type CustomerFormMode } from "@/features/customers/CustomerFormModal";
@@ -56,6 +58,8 @@ export function CustomersModule(): ReactElement {
   const [listError, setListError] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<CustomerFormMode | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  /** Whole-book exposure (BRK-110); null = not loaded or fetch failed. */
+  const [overview, setOverview] = useState<CreditOverview | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CustomerDetail | null>(null);
   /** Inline confirmation after a safe deletion (mode-aware copy). */
   const [deleteNote, setDeleteNote] = useState<string | null>(null);
@@ -95,6 +99,19 @@ export function CustomersModule(): ReactElement {
           setListError(typeof failure === "string" ? failure : "INTERNAL_ERROR");
           setDetails([]);
           setLoading(false);
+        }
+      });
+    // Credit overview rides along (BRK-110): independent fetch, silent on
+    // failure — the strip collapses, the directory keeps working.
+    ipcGetCreditOverview(token, 10)
+      .then((snapshot) => {
+        if (!cancelled) {
+          setOverview(snapshot);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOverview(null);
         }
       });
     return () => {
@@ -146,6 +163,26 @@ export function CustomersModule(): ReactElement {
       <div className="flex h-10 shrink-0 items-center px-4">
         <h1 className="text-sm font-black">{t(locale, "customers.title")}</h1>
       </div>
+      {overview !== null && (
+        <div
+          className="flex shrink-0 flex-wrap gap-2 px-4"
+          data-testid="credit-overview-strip"
+        >
+          <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            {t(locale, "customers.totalOutstanding")}:{" "}
+            <bdi dir="ltr">{formatMoney(overview.total_outstanding_centimes, locale)}</bdi>
+          </span>
+          <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            {t(locale, "customers.debtorCount")}: {overview.debtor_count}
+          </span>
+          <span className="rounded-md bg-rose-100 px-2 py-1 text-[11px] font-bold text-rose-800 dark:bg-rose-900/40 dark:text-rose-200">
+            {t(locale, "customers.overLimitCount")}: {overview.over_limit_count}
+          </span>
+          <span className="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+            {t(locale, "customers.nearLimitCount")}: {overview.near_limit_count}
+          </span>
+        </div>
+      )}
       <div className="flex min-h-0 flex-1 overflow-hidden">
       <CustomerListPane
         locale={locale}

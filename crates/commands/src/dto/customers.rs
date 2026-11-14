@@ -172,3 +172,44 @@ pub struct GetStatementResponse {
     /// Statement lines in ledger order.
     pub entries: Vec<StatementEntryDto>,
 }
+
+/// One at-risk customer row (BRK-110): money as canonical strings.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CreditDebtorDto {
+    /// Customer id.
+    pub id: String,
+    /// Display name.
+    pub name: String,
+    /// Policy code.
+    pub credit_policy: String,
+    /// Ceiling in centimes (meaningful for `LIMITED`).
+    pub credit_limit_centimes: String,
+    /// Cached balance in centimes.
+    pub balance_centimes: String,
+    /// Risk band code (`OVER_LIMIT` / `NEAR_LIMIT` / `indebted` / `CLEAR`).
+    pub risk: String,
+}
+
+/// Whole-book credit exposure (BRK-110).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CreditOverviewDto {
+    /// Sum of positive cached balances, in centimes.
+    pub total_outstanding_centimes: String,
+    /// Customers with a positive balance.
+    pub debtor_count: u64,
+    /// `LIMITED` customers above their ceiling.
+    pub over_limit_count: u64,
+    /// `LIMITED` customers inside the watch band.
+    pub near_limit_count: u64,
+    /// Largest debtors first, capped by the request limit.
+    pub top_debtors: Vec<CreditDebtorDto>,
+}
+
+/// Credit overview request (BRK-110).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CreditOverviewRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Largest-debtor cap (defaults to 10, clamped to 1..=100).
+    pub top_n: Option<u32>,
+}

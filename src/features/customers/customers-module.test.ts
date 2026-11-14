@@ -38,6 +38,12 @@ describe("customers i18n keys", () => {
       '"customers.opSale": "Vente"',
       '"customers.opPayment": "Règlement"',
       '"customers.formNameError": "Nom requis (2 à 100 caractères)"',
+      '"customers.overLimitBanner": "Plafond dépassé — tout nouveau crédit est bloqué"',
+      '"customers.nearLimitBanner": "Plafond presque atteint — surveiller',
+      '"customers.totalOutstanding": "Encours total"',
+      '"customers.debtorCount": "Débiteurs"',
+      '"customers.overLimitCount": "Dépassements"',
+      '"customers.nearLimitCount": "Sous surveillance"',
     ]) {
       expect(I18N_SRC).toContain(entry);
     }
@@ -51,6 +57,12 @@ describe("customers i18n keys", () => {
       '"customers.statement": "كشف الحساب"',
       '"customers.opPayment": "سند قبض"',
       '"customers.filterInactive": "غير نشطين"',
+      '"customers.overLimitBanner": "تم تجاوز السقف — أي ائتمان جديد محظور"',
+      '"customers.nearLimitBanner": "السقف شارف على النفاد',
+      '"customers.totalOutstanding": "إجمالي المستحقات"',
+      '"customers.debtorCount": "المدينون"',
+      '"customers.overLimitCount": "تجاوزات"',
+      '"customers.nearLimitCount": "تحت المراقبة"',
     ]) {
       expect(I18N_SRC).toContain(entry);
     }
@@ -73,6 +85,17 @@ describe("navigation and IPC wiring", () => {
     expect(IPC_SRC).toContain("export async function ipcUpdateCustomer");
     expect(IPC_SRC).toContain('call<CustomerDetail>("customers_update"');
     expect(IPC_SRC).toContain("credit_limit_centimes?: string | null");
+  });
+
+  it("binds the credit overview endpoint with canonical money strings", () => {
+    expect(IPC_SRC).toContain("export async function ipcGetCreditOverview");
+    expect(IPC_SRC).toContain('call<CreditOverview>("customers_credit_overview"');
+  });
+
+  it("renders the overview strip and the dossier risk banner", () => {
+    expect(MODULE_SRC).toContain("ipcGetCreditOverview");
+    expect(MODULE_SRC).toContain('data-testid="credit-overview-strip"');
+    expect(MODULE_SRC).toContain("customers.totalOutstanding");
   });
 });
 
@@ -143,5 +166,25 @@ describe("customer helpers", async () => {
     expect(helpers.isValidCustomerName(" A ")).toBe(false);
     expect(helpers.isValidCustomerName("")).toBe(false);
     expect(helpers.isValidCustomerName("x".repeat(101))).toBe(false);
+  });
+
+  it("assessDetailRisk mirrors the domain bands, garbage-safe to OK", () => {
+    // Limit 100.00, watch band from 80.00.
+    expect(helpers.assessDetailRisk(detail({ current_balance_centimes: "1000" }))).toBe("OK");
+    expect(helpers.assessDetailRisk(detail({ current_balance_centimes: "7999" }))).toBe("OK");
+    expect(helpers.assessDetailRisk(detail({ current_balance_centimes: "8000" }))).toBe("NEAR_LIMIT");
+    expect(helpers.assessDetailRisk(detail({ current_balance_centimes: "10000" }))).toBe("NEAR_LIMIT");
+    expect(helpers.assessDetailRisk(detail({ current_balance_centimes: "10001" }))).toBe("OVER_LIMIT");
+    // Unceiled and zero balances never escalate.
+    expect(
+      helpers.assessDetailRisk(detail({ credit_policy: "UNLIMITED", current_balance_centimes: "50000" })),
+    ).toBe("OK");
+    expect(
+      helpers.assessDetailRisk(detail({ credit_policy: "DISABLED", current_balance_centimes: "500" })),
+    ).toBe("OK");
+    expect(helpers.assessDetailRisk(detail({ current_balance_centimes: "0" }))).toBe("OK");
+    // Null limit and garbage strings collapse to OK — the banner never fires.
+    expect(helpers.assessDetailRisk(detail({ credit_limit_centimes: null }))).toBe("OK");
+    expect(helpers.assessDetailRisk(detail({ current_balance_centimes: "nope" }))).toBe("OK");
   });
 });

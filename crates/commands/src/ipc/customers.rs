@@ -5,17 +5,19 @@ use super::{
 };
 use baraka_application::errors::ApplicationError;
 use baraka_application::use_cases::customers::{
-    CreateCustomerUseCase, GetCustomerStatementUseCase, GetCustomerUseCase, ListCustomersUseCase,
-    RecordCreditPaymentUseCase, SearchCustomersUseCase, UpdateCustomerUseCase,
+    CreateCustomerUseCase, GetCreditOverviewUseCase, GetCustomerStatementUseCase,
+    GetCustomerUseCase, ListCustomersUseCase, RecordCreditPaymentUseCase, SearchCustomersUseCase,
+    UpdateCustomerUseCase,
 };
 use baraka_application::use_cases::deletion::DeleteCustomerUseCase;
 use baraka_domain::sales::{CreditPolicy, CustomerId};
 
 use crate::dto::{
-    CustomerDetailDto, CustomerSummaryDto, DeleteEntityRequestDto, DeleteEntityResultDto,
-    GetCustomerRequestDto, GetStatementRequest, GetStatementResponse, NewCustomerRequest,
-    RecordCreditPaymentRequest, RecordCreditPaymentResponse, SearchCustomersRequest,
-    SearchCustomersResponse, StatementEntryDto, UpdateCustomerRequest,
+    CreditDebtorDto, CreditOverviewDto, CreditOverviewRequest, CustomerDetailDto,
+    CustomerSummaryDto, DeleteEntityRequestDto, DeleteEntityResultDto, GetCustomerRequestDto,
+    GetStatementRequest, GetStatementResponse, NewCustomerRequest, RecordCreditPaymentRequest,
+    RecordCreditPaymentResponse, SearchCustomersRequest, SearchCustomersResponse,
+    StatementEntryDto, UpdateCustomerRequest,
 };
 
 /// `customers_create` command: register a customer (RBAC-gated).
@@ -264,6 +266,42 @@ pub fn credit_get_statement(
                 reference_id: row.reference_id,
                 created_at: row.created_at,
                 balance_after_centimes: row.balance_after_centimes.to_string(),
+            })
+            .collect(),
+    })
+}
+
+/// `customers_credit_overview` command: whole-book exposure (read-only).
+#[tauri::command(rename_all = "snake_case")]
+pub fn customers_credit_overview(
+    state: tauri::State<'_, AppState>,
+    request: CreditOverviewRequest,
+) -> Result<CreditOverviewDto, String> {
+    use baraka_domain::sales::CreditRisk;
+    let session = require_session(&state, &request.session_token)?;
+    let overview = GetCreditOverviewUseCase::new(state.customers.as_ref())
+        .execute(&session, request.top_n.unwrap_or(10) as usize)
+        .map_err(|error| error_code(&error))?;
+    Ok(CreditOverviewDto {
+        total_outstanding_centimes: overview.total_outstanding_centimes.to_string(),
+        debtor_count: overview.debtor_count as u64,
+        over_limit_count: overview.over_limit_count as u64,
+        near_limit_count: overview.near_limit_count as u64,
+        top_debtors: overview
+            .top_debtors
+            .into_iter()
+            .map(|row| CreditDebtorDto {
+                id: row.id.to_string(),
+                name: row.name,
+                credit_policy: row.credit_policy.code().to_string(),
+                credit_limit_centimes: row.credit_limit_centimes.to_string(),
+                balance_centimes: row.balance_centimes.to_string(),
+                risk: match row.risk {
+                    CreditRisk::OverLimit => "OVER_LIMIT".to_string(),
+                    CreditRisk::NearLimit => "NEAR_LIMIT".to_string(),
+                    CreditRisk::Indebted => "indebted".to_string(),
+                    CreditRisk::Clear => "CLEAR".to_string(),
+                },
             })
             .collect(),
     })

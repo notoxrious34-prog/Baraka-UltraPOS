@@ -5,13 +5,16 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    CustomerRepository, CustomerSummary, CustomerUpdate, DeleteAudit, LedgerEntryRow, PaymentRecord,
+    CreditDebtorRow, CreditOverview, CustomerRepository, CustomerSummary, CustomerUpdate,
+    DeleteAudit, LedgerEntryRow, PaymentRecord,
 };
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
     format_centimes_plain, DebtReceiptDocument, ReceiptLanguage, StoreIdentity,
 };
-use baraka_domain::sales::{CreditPolicy, CreditProfile, Customer, CustomerId, CustomerTier};
+use baraka_domain::sales::{
+    assess_credit_risk, CreditPolicy, CreditProfile, CreditRisk, Customer, CustomerId, CustomerTier,
+};
 use baraka_domain::user::UserId;
 use chrono::{SecondsFormat, Utc};
 use rusqlite::Connection;
@@ -658,6 +661,93 @@ impl CustomerRepository for SqliteCustomerRepository {
             });
         }
         Ok(out)
+    }
+
+    /// Whole-book exposure from cached balances (one light read; the ledger
+    /// stays the truth). Classification runs through the domain classifier.
+    fn get_credit_overview(&self, top_n: usize) -> Result<CreditOverview, ApplicationError> {
+        let guard = self.lock()?;
+        let rows = guard
+            .prepare(
+                "SELECT credit_policy, credit_limit_centimes, current_balance_centimes
+                 FROM customers
+                 WHERE is_active = 1 AND current_balance_centimes > 0",
+            )
+            .map_err(|_| store_failure())?
+            .query_map([], |row| {
+                let policy_text: String = row.get(0)?;
+                let limit: i64 = row.get(1)?;
+                let balance: i64 = row.get(2)?;
+                Ok((policy_text, limit, balance))
+            })
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?;
+        let mut total: i128 = 0;
+        let mut debtors: i64 = 0;
+        let mut over: i64 = 0;
+        let mut near: i64 = 0;
+        for (policy_text, limit, balance) in rows {
+            let policy = CreditPolicy::from_code(&policy_text).map_err(|_| store_failure())?;
+            total = total
+                .checked_add(i128::from(balance))
+                .ok_or_else(store_failure)?;
+            debtors = debtors.checked_add(1).ok_or_else(store_failure)?;
+            match assess_credit_risk(policy, limit, balance) {
+                CreditRisk::OverLimit => {
+                    over = over.checked_add(1).ok_or_else(store_failure)?;
+                }
+                CreditRisk::NearLimit => {
+                    near = near.checked_add(1).ok_or_else(store_failure)?;
+                }
+                CreditRisk::Indebted | CreditRisk::Clear => {}
+            }
+        }
+        let total_outstanding_centimes = i64::try_from(total).map_err(|_| store_failure())?;
+        let cap = top_n.clamp(1, 100) as i64;
+        let mut top = guard
+            .prepare(
+                "SELECT id, name, credit_policy, credit_limit_centimes, current_balance_centimes
+                 FROM customers
+                 WHERE is_active = 1 AND current_balance_centimes > 0
+                 ORDER BY current_balance_centimes DESC
+                 LIMIT ?1",
+            )
+            .map_err(|_| store_failure())?;
+        let top_debtors = top
+            .query_map([cap], |row| {
+                let id: String = row.get(0)?;
+                let name: String = row.get(1)?;
+                let policy_text: String = row.get(2)?;
+                let limit: i64 = row.get(3)?;
+                let balance: i64 = row.get(4)?;
+                Ok((id, name, policy_text, limit, balance))
+            })
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?
+            .into_iter()
+            .map(|(id, name, policy_text, limit, balance)| {
+                let policy = CreditPolicy::from_code(&policy_text).map_err(|_| store_failure())?;
+                Ok(CreditDebtorRow {
+                    id: Uuid::parse_str(&id)
+                        .map(CustomerId::from)
+                        .map_err(|_| store_failure())?,
+                    name,
+                    credit_policy: policy,
+                    credit_limit_centimes: limit,
+                    balance_centimes: balance,
+                    risk: assess_credit_risk(policy, limit, balance),
+                })
+            })
+            .collect::<Result<Vec<_>, ApplicationError>>()?;
+        Ok(CreditOverview {
+            total_outstanding_centimes,
+            debtor_count: debtors,
+            over_limit_count: over,
+            near_limit_count: near,
+            top_debtors,
+        })
     }
 
     fn count_customer_references(&self, customer_id: CustomerId) -> Result<u64, ApplicationError> {

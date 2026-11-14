@@ -12,8 +12,9 @@ pub use colisage::{breakdown as colisage_breakdown, ColisageRung, ColisageShare}
 pub use credit_equation::CreditSnapshot;
 
 pub use customer::{
-    validate_customer_name, validate_customer_phone, CreditPolicy, CreditProfile, Customer,
-    CustomerId, CustomerLedgerEntryType, CustomerTier,
+    assess_credit_risk, validate_customer_name, validate_customer_phone, CreditPolicy,
+    CreditProfile, CreditRisk, Customer, CustomerId, CustomerLedgerEntryType, CustomerTier,
+    CREDIT_NEAR_LIMIT_PERCENT,
 };
 pub use document::{
     Document, DocumentId, DocumentItem, DocumentItemView, DocumentLanguage, DocumentStatus,

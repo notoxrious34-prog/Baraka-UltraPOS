@@ -11,9 +11,9 @@ use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
     CashMovementView, CashSessionReport, CashSessionRepository, CashSessionView, ColisageShareView,
     ConvertBlToFactureCommand, ConvertBlToFactureResult, ConvertDevisToBlCommand,
-    ConvertDevisToBlResult, CustomerRepository, CustomerSummary, CustomerUpdate, DeleteAudit,
-    DocumentRepository, DocumentSearchFilter, DocumentSummary, LedgerEntryRow, PaymentRecord,
-    PersistReturnOrder, PersistReturnReceipt, ReturnRepository,
+    ConvertDevisToBlResult, CreditOverview, CustomerRepository, CustomerSummary, CustomerUpdate,
+    DeleteAudit, DocumentRepository, DocumentSearchFilter, DocumentSummary, LedgerEntryRow,
+    PaymentRecord, PersistReturnOrder, PersistReturnReceipt, ReturnRepository,
 };
 use baraka_application::use_cases::returns::{
     ProcessReturnCommand, ProcessReturnUseCase, RefundDestination, ReturnItemInput,
@@ -364,6 +364,10 @@ impl CustomerRepository for FakeCustomers {
         _from_date: Option<String>,
         _to_date: Option<String>,
     ) -> Result<Vec<LedgerEntryRow>, ApplicationError> {
+        panic!("out of scope for return tests");
+    }
+
+    fn get_credit_overview(&self, _top_n: usize) -> Result<CreditOverview, ApplicationError> {
         panic!("out of scope for return tests");
     }
 

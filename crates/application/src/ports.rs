@@ -14,8 +14,8 @@ use baraka_domain::inventory::{
 use baraka_domain::primitives::FactorMicro;
 use baraka_domain::role::Role;
 use baraka_domain::sales::{
-    CreditPolicy, CreditProfile, Customer, CustomerId, CustomerTier, Document, DocumentId,
-    DocumentItem, DocumentItemView, DocumentLanguage,
+    CreditPolicy, CreditProfile, CreditRisk, Customer, CustomerId, CustomerTier, Document,
+    DocumentId, DocumentItem, DocumentItemView, DocumentLanguage,
 };
 use baraka_domain::user::{User, UserId};
 use chrono::{DateTime, Utc};
@@ -1208,6 +1208,14 @@ pub trait CustomerRepository: Send + Sync {
         to_date: Option<String>,
     ) -> Result<Vec<LedgerEntryRow>, ApplicationError>;
 
+    /// Whole-book credit exposure: cached-balance aggregates plus the
+    /// largest debtors first (`top_n` capped by the caller). The ledger
+    /// stays the truth; cached balances are its maintained mirror.
+    ///
+    /// Risk bands come from the domain classifier (`assess_credit_risk`,
+    /// i128-safe); SQL only reads rows, never money math.
+    fn get_credit_overview(&self, top_n: usize) -> Result<CreditOverview, ApplicationError>;
+
     /// Count historical references: sale documents (party) + ledger rows.
     fn count_customer_references(&self, customer_id: CustomerId) -> Result<u64, ApplicationError>;
 
@@ -1276,6 +1284,38 @@ pub struct CustomerSummary {
     pub credit_policy: CreditPolicy,
     /// Pricing tier.
     pub customer_tier: CustomerTier,
+}
+
+/// One at-risk customer row of the credit overview (BRK-110).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreditDebtorRow {
+    /// Stable identifier.
+    pub id: CustomerId,
+    /// Display name.
+    pub name: String,
+    /// Policy code.
+    pub credit_policy: CreditPolicy,
+    /// Ceiling in centimes (meaningful for `Limited`).
+    pub credit_limit_centimes: i64,
+    /// Cached ledger balance in centimes.
+    pub balance_centimes: i64,
+    /// Band from `assess_credit_risk` (engine truth, not display math).
+    pub risk: CreditRisk,
+}
+
+/// Whole-book credit exposure in one read (BRK-110).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreditOverview {
+    /// Sum of positive cached balances, in centimes.
+    pub total_outstanding_centimes: i64,
+    /// Customers with a positive balance.
+    pub debtor_count: i64,
+    /// `Limited` customers above their ceiling.
+    pub over_limit_count: i64,
+    /// `Limited` customers inside the watch band.
+    pub near_limit_count: i64,
+    /// Largest debtors first, capped by the caller limit.
+    pub top_debtors: Vec<CreditDebtorRow>,
 }
 
 /// Recorded credit payment outcome.

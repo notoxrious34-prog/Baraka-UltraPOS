@@ -16,6 +16,7 @@ import type {
   ActiveCustomer,
   CatalogProduct,
   Category,
+  CreditOverview,
   CustomerDetail,
   CustomerSummary,
   DocType,
@@ -895,6 +896,16 @@ export async function ipcListCustomers(sessionToken: string): Promise<CustomerSu
     session_token: sessionToken,
   });
   return wire.customers;
+}
+
+/** Whole-book credit exposure (BRK-110): aggregates plus largest debtors. */
+export async function ipcGetCreditOverview(
+  sessionToken: string,
+  topN?: number,
+): Promise<CreditOverview> {
+  return call<CreditOverview>("customers_credit_overview", {
+    request: { session_token: sessionToken, top_n: topN ?? null },
+  });
 }
 
 export interface CreditPaymentResult {

@@ -10,7 +10,7 @@ import { formatMoney } from "@/lib/money";
 import type { CustomerDetail, Locale } from "@/types/pos";
 import { useSessionStore } from "@/stores/session-store";
 import { CustomerStatementTable } from "@/features/customers/CustomerStatementTable";
-import { availableCredit, isDebtor } from "@/features/customers/customer-helpers";
+import { assessDetailRisk, availableCredit, isDebtor } from "@/features/customers/customer-helpers";
 
 interface CustomerDossierPaneProps {
   locale: Locale;
@@ -97,6 +97,7 @@ export function CustomerDossierPane(props: CustomerDossierPaneProps): ReactEleme
   }
   const debtor = isDebtor(detail.current_balance_centimes);
   const remaining = availableCredit(detail);
+  const risk = assessDetailRisk(detail);
   const limitText =
     detail.credit_policy === "UNLIMITED"
       ? t(locale, "customers.unlimited")
@@ -150,6 +151,18 @@ export function CustomerDossierPane(props: CustomerDossierPaneProps): ReactEleme
           alert={false}
         />
       </div>
+      {risk !== "OK" && (
+        <p
+          data-testid="credit-risk-banner"
+          className={`shrink-0 rounded-md px-3 py-2 text-xs font-black ${
+            risk === "OVER_LIMIT"
+              ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200"
+              : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+          }`}
+        >
+          {t(locale, risk === "OVER_LIMIT" ? "customers.overLimitBanner" : "customers.nearLimitBanner")}
+        </p>
+      )}
       <CustomerStatementTable locale={locale} token={props.token} customerId={detail.id} />
     </section>
   );

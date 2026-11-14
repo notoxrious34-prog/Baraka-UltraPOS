@@ -22,6 +22,7 @@ function unit(overrides: Record<string, unknown> = {}) {
     sale_price_centimes: "15050",
     purchase_price_centimes: "12000",
     wholesale_price_centimes: null,
+    super_gros_price_centimes: null,
     is_base_unit: true,
     is_default_selling: true,
     ...overrides,

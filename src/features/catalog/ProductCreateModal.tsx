@@ -189,6 +189,8 @@ export function buildModalWire(data: ModalFormData, categoryId?: string | null):
       data.costPrice.trim() === "" ? "0" : parseMoneyToCentimes(data.costPrice),
     wholesale_price_centimes:
       data.wholesalePrice.trim() === "" ? null : parseMoneyToCentimes(data.wholesalePrice),
+    // No bulk input at creation (editable later); explicit null = honest wire.
+    super_gros_price_centimes: null,
     is_base_unit: true,
     is_default_selling: true,
   };

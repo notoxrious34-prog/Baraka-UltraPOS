@@ -204,6 +204,8 @@ export interface NewProductUnitWire {
   sale_price_centimes: string;
   purchase_price_centimes: string;
   wholesale_price_centimes: string | null;
+  /** Bulk price; omit to leave unchanged (`null` clears, BRK-117). */
+  super_gros_price_centimes?: string | null;
   is_base_unit: boolean;
   is_default_selling: boolean;
 }
@@ -238,6 +240,8 @@ export interface UpdateProductUnitPayload {
   sale_price_centimes: string;
   purchase_price_centimes: string;
   wholesale_price_centimes: string | null;
+  /** Bulk price; omit to leave unchanged (`null` clears, BRK-117). */
+  super_gros_price_centimes?: string | null;
   is_base_unit: boolean;
   is_default_selling: boolean;
 }
@@ -817,7 +821,7 @@ export interface NewCustomerWire {
   address: string | null;
   credit_policy: "DISABLED" | "LIMITED" | "UNLIMITED";
   credit_limit_centimes: string | null;
-  customer_tier?: "retail" | "artisan" | "wholesale" | null;
+  customer_tier?: "retail" | "artisan" | "wholesale" | "super_gros" | null;
 }
 
 export interface UpdateCustomerWire {
@@ -827,7 +831,7 @@ export interface UpdateCustomerWire {
   address?: string | null;
   credit_policy?: "DISABLED" | "LIMITED" | "UNLIMITED";
   credit_limit_centimes?: string | null;
-  customer_tier?: "retail" | "artisan" | "wholesale" | null;
+  customer_tier?: "retail" | "artisan" | "wholesale" | "super_gros" | null;
   is_active?: boolean;
 }
 

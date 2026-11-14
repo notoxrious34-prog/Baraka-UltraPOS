@@ -26,6 +26,7 @@ const PIECE: CartUnitSnapshot = {
   barcode: "PCS-001",
   salePriceCentimes: "15020",
   wholesalePriceCentimes: null,
+  superGrosPriceCentimes: null,
   isBaseUnit: true,
   isDefaultSelling: true,
 };
@@ -39,6 +40,7 @@ const BOX: CartUnitSnapshot = {
   barcode: "BOX-001",
   salePriceCentimes: "1205000",
   wholesalePriceCentimes: null,
+  superGrosPriceCentimes: null,
   isBaseUnit: false,
   isDefaultSelling: false,
 };

@@ -10,7 +10,9 @@ import { useSessionStore } from "@/stores/session-store";
 import type { Locale } from "@/types/pos";
 import {
   getStoreIdentity,
+  getVerticalProfile,
   saveStoreIdentity,
+  setVerticalProfile,
   type DeviceKind,
   type StoreIdentity,
 } from "@/lib/ipc";
@@ -36,6 +38,9 @@ export function StoreIdentityTab({ locale }: StoreIdentityTabProps): ReactElemen
   const canWrite = hasPermission("SYSTEM_SETTINGS_MANAGE");
   const [identity, setIdentity] = useState<StoreIdentity>(EMPTY);
   const [deviceKind, setDeviceKind] = useState<DeviceKind>("physical");
+  /** Active vertical profile (DSN-105); saved alongside the identity. */
+  const [profile, setProfile] = useState("apparel_wholesale_retail");
+  const [savedProfile, setSavedProfile] = useState("apparel_wholesale_retail");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
@@ -54,6 +59,21 @@ export function StoreIdentityTab({ locale }: StoreIdentityTabProps): ReactElemen
         if (!cancelled) {
           setNotice({ ok: false, text: String(failure) });
           setLoading(false);
+        }
+      });
+    // Profile rides along (DSN-105): silent on failure, the select keeps
+    // the default and the identity flow is unaffected.
+    getVerticalProfile()
+      .then((snapshot) => {
+        if (!cancelled) {
+          setProfile(snapshot.profile);
+          setSavedProfile(snapshot.profile);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProfile("apparel_wholesale_retail");
+          setSavedProfile("apparel_wholesale_retail");
         }
       });
     return () => {
@@ -84,6 +104,11 @@ export function StoreIdentityTab({ locale }: StoreIdentityTabProps): ReactElemen
       const state = await saveStoreIdentity(identity, deviceKind);
       setIdentity(state.identity);
       setDeviceKind(state.deviceKind);
+      if (profile !== savedProfile) {
+        const snapshot = await setVerticalProfile(profile);
+        setProfile(snapshot.profile);
+        setSavedProfile(snapshot.profile);
+      }
       setNotice({ ok: true, text: t(locale, "settings.saved") });
     } catch (failure) {
       setNotice({ ok: false, text: String(failure) });
@@ -194,6 +219,30 @@ export function StoreIdentityTab({ locale }: StoreIdentityTabProps): ReactElemen
           <option value="physical">{t(locale, "settings.devicePhysical")}</option>
           <option value="capture">{t(locale, "settings.deviceCapture")}</option>
         </select>
+      </label>
+      <label className={labelClass}>
+        <span className="font-bold">{t(locale, "settings.verticalProfile")}</span>
+        <select
+          className={inputClass}
+          value={profile}
+          disabled={saving || !canWrite}
+          onChange={(event) => {
+            setProfile(event.target.value);
+          }}
+        >
+          <option value="apparel_wholesale_retail">
+            {t(locale, "settings.profileApparel")}
+          </option>
+          <option value="hardware_general">
+            {t(locale, "settings.profileHardware")}
+          </option>
+          <option value="hybrid_enterprise">
+            {t(locale, "settings.profileHybrid")}
+          </option>
+        </select>
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          {t(locale, "settings.verticalProfileHint")}
+        </span>
       </label>
       {notice !== null && (
         <p

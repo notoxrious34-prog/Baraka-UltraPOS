@@ -47,6 +47,7 @@ function unit(unitId: string): CatalogProduct["units"][number] {
     sale_price_centimes: "100",
     purchase_price_centimes: "80",
     wholesale_price_centimes: null,
+    super_gros_price_centimes: null,
     is_base_unit: true,
     is_default_selling: true,
   };

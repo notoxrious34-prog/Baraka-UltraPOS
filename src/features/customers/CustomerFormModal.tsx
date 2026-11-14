@@ -12,6 +12,10 @@ import { ModalShell } from "@/components/pos/modals/ModalShell";
 import type { CustomerDetail, CustomerTier, Locale } from "@/types/pos";
 import { useSessionStore } from "@/stores/session-store";
 import { isValidCustomerName } from "@/features/customers/customer-helpers";
+import {
+  tierLabelKey,
+  useVerticalProfile,
+} from "@/features/customers/use-vertical-profile";
 
 type CreditPolicy = "DISABLED" | "LIMITED" | "UNLIMITED";
 
@@ -49,6 +53,12 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
   // depth — the engine remains authoritative).
   const hasPermission = useSessionStore((state) => state.hasPermission);
   const canManageCredit = hasPermission("MANAGE_CUSTOMER_CREDIT");
+  /** Trade vocabulary (DSN-105): offered tiers only; stale tier coerces. */
+  const { profile } = useVerticalProfile();
+  const offeredTiers = profile.offeredTiers;
+  const effectiveTier: CustomerTier = offeredTiers.includes(tier)
+    ? tier
+    : (profile.defaultTier as CustomerTier);
 
   const submit = (): void => {
     if (saving) {
@@ -95,7 +105,7 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
         address: address.trim() === "" ? null : address.trim(),
         credit_policy: policy,
         credit_limit_centimes: limit,
-        customer_tier: tier,
+        customer_tier: effectiveTier,
         is_active: active,
       })
         .then(done)
@@ -107,7 +117,7 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
         address: address.trim() === "" ? null : address.trim(),
         credit_policy: policy,
         credit_limit_centimes: limit,
-        customer_tier: tier,
+        customer_tier: effectiveTier,
       })
         .then((id) => ipcGetCustomer(props.token, id).then(done).catch(failed))
         .catch(failed);
@@ -178,19 +188,15 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
         <div className="flex flex-col gap-1">
           <span className={labelClass}>{t(locale, "customers.formTier")}</span>
           <div className="grid grid-cols-3 gap-2">
-            {(
-              [
-                { id: "retail", label: t(locale, "tier_retail") },
-                { id: "artisan", label: t(locale, "tier_artisan") },
-                { id: "wholesale", label: t(locale, "tier_wholesale") },
-              ] as const
-            ).map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => {
-                  setTier(option.id);
-                }}
+            {offeredTiers.map((code) => {
+              const option = { id: code as CustomerTier, label: t(locale, tierLabelKey(code)) };
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => {
+                    setTier(option.id);
+                  }}
                 className={`rounded-lg px-2 py-2 text-xs font-black ${
                   tier === option.id
                     ? "bg-amber-500 text-slate-950"
@@ -199,9 +205,15 @@ export function CustomerFormModal(props: CustomerFormModalProps): ReactElement {
               >
                 {option.label}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
+        {!offeredTiers.includes(tier) && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+            {t(locale, "customers.tierOutsideProfile")}
+          </p>
+        )}
         {editing !== null && (
           <label className="flex items-center gap-2 text-sm font-bold">
             <input

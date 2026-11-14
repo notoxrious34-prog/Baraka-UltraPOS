@@ -31,6 +31,8 @@ function toSnapshot(
     barcode: string | null;
     sale_price_centimes: string;
     wholesale_price_centimes: string | null;
+    /** Absent on pre-21 rows → treated as `null` (BRK-117). */
+    super_gros_price_centimes?: string | null;
     is_base_unit: boolean;
     is_default_selling: boolean;
   },
@@ -44,6 +46,7 @@ function toSnapshot(
     barcode: unit.barcode,
     salePriceCentimes: unit.sale_price_centimes,
     wholesalePriceCentimes: unit.wholesale_price_centimes,
+    superGrosPriceCentimes: unit.super_gros_price_centimes ?? null,
     isBaseUnit: unit.is_base_unit,
     isDefaultSelling: unit.is_default_selling,
   };
@@ -214,19 +217,31 @@ export const useCartStore = create<CartState>()((set, get) => ({
     }),
 }));
 
-/** Preview total of one line at the customer's tier price. */
+/** Preview total of one line at the customer's tier price. Mirrors the
+ * domain ladder (BRK-117): super-gros prefers bulk, then wholesale, then
+ * sale; other trade tiers prefer wholesale, then sale. Garbage-safe. */
 export function lineUnitPriceCentimes(line: CartLine, tier: CustomerTier): string {
   const unit = line.units[line.unitIndex];
   if (unit === undefined) {
     return "0";
   }
-  if (tier !== "retail" && unit.wholesalePriceCentimes !== null) {
+  if (tier === "retail") {
+    return unit.salePriceCentimes;
+  }
+  const candidates =
+    tier === "super_gros"
+      ? [unit.superGrosPriceCentimes, unit.wholesalePriceCentimes]
+      : [unit.wholesalePriceCentimes];
+  for (const candidate of candidates) {
+    if (candidate === null) {
+      continue;
+    }
     try {
-      if (BigInt(unit.wholesalePriceCentimes) > 0n) {
-        return unit.wholesalePriceCentimes;
+      if (BigInt(candidate) > 0n) {
+        return candidate;
       }
     } catch {
-      // Unparseable wholesale wire: fall through to the sale price.
+      // Unparseable wire: try the next fallback rung.
     }
   }
   return unit.salePriceCentimes;

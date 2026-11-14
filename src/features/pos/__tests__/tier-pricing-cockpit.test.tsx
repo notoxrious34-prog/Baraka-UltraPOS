@@ -34,6 +34,7 @@ function tierLine(wholesale: string | null): CartLine {
         barcode: null,
         salePriceCentimes: "10000",
         wholesalePriceCentimes: wholesale,
+        superGrosPriceCentimes: null,
         isBaseUnit: true,
         isDefaultSelling: true,
       },
@@ -44,8 +45,18 @@ function tierLine(wholesale: string | null): CartLine {
   };
 }
 
+/** Same line with an explicit bulk rung (DSN-105). */
+function bulkLine(superGros: string | null, wholesale: string | null): CartLine {
+  const line = tierLine(wholesale);
+  const head = line.units[0];
+  if (head === undefined) {
+    throw new Error("bulkLine requires one unit");
+  }
+  return { ...line, units: [{ ...head, superGrosPriceCentimes: superGros }] };
+}
+
 describe("CustomerTierBadge", () => {
-  it("renders retail/artisan/wholesale labels in French", () => {
+  it("renders retail/artisan/wholesale/super_gros labels in French", () => {
     expect(renderToStaticMarkup(<CustomerTierBadge tier="retail" locale="fr-DZ" />)).toContain(
       "Détail",
     );
@@ -55,9 +66,12 @@ describe("CustomerTierBadge", () => {
     expect(renderToStaticMarkup(<CustomerTierBadge tier="wholesale" locale="fr-DZ" />)).toContain(
       "Gros",
     );
+    expect(
+      renderToStaticMarkup(<CustomerTierBadge tier="super_gros" locale="fr-DZ" />),
+    ).toContain("Super-Gros");
   });
 
-  it("renders retail/artisan/wholesale labels in Arabic", () => {
+  it("renders retail/artisan/wholesale/super_gros labels in Arabic", () => {
     expect(renderToStaticMarkup(<CustomerTierBadge tier="retail" locale="ar-DZ" />)).toContain(
       "تجزئة",
     );
@@ -67,15 +81,20 @@ describe("CustomerTierBadge", () => {
     expect(renderToStaticMarkup(<CustomerTierBadge tier="wholesale" locale="ar-DZ" />)).toContain(
       "جملة",
     );
+    expect(
+      renderToStaticMarkup(<CustomerTierBadge tier="super_gros" locale="ar-DZ" />),
+    ).toContain("سوبر-جملة");
   });
 
   it("uses distinct color tokens per tier", () => {
     const retail = renderToStaticMarkup(<CustomerTierBadge tier="retail" locale="fr-DZ" />);
     const artisan = renderToStaticMarkup(<CustomerTierBadge tier="artisan" locale="fr-DZ" />);
     const wholesale = renderToStaticMarkup(<CustomerTierBadge tier="wholesale" locale="fr-DZ" />);
+    const bulk = renderToStaticMarkup(<CustomerTierBadge tier="super_gros" locale="fr-DZ" />);
     expect(retail).toContain("bg-slate-100");
     expect(artisan).toContain("bg-amber-50");
     expect(wholesale).toContain("bg-indigo-50");
+    expect(bulk).toContain("bg-emerald-50");
   });
 });
 
@@ -98,6 +117,16 @@ describe("cart tier-price derivation", () => {
     const line = tierLine(null);
     expect(lineUnitPriceCentimes(line, "artisan")).toBe("10000");
     expect(isLineTierPriced(line, "artisan")).toBe(false);
+  });
+
+  it("prefers the bulk price for super_gros, then wholesale, then sale", () => {
+    expect(lineUnitPriceCentimes(bulkLine("7800", "8500"), "super_gros")).toBe("7800");
+    expect(lineUnitPriceCentimes(bulkLine(null, "8500"), "super_gros")).toBe("8500");
+    expect(lineUnitPriceCentimes(bulkLine(null, null), "super_gros")).toBe("10000");
+    // Other trade tiers never see the bulk rung.
+    expect(lineUnitPriceCentimes(bulkLine("7800", "8500"), "wholesale")).toBe("8500");
+    expect(lineUnitPriceCentimes(bulkLine("7800", "8500"), "artisan")).toBe("8500");
+    expect(isLineTierPriced(bulkLine("7800", "8500"), "super_gros")).toBe(true);
   });
 });
 

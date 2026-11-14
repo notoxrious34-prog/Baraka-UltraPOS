@@ -46,6 +46,8 @@ export interface EditFormData {
   costPrice: string;
   /** Artisan/wholesale DZD price (blank clears it; falls back to sale price). */
   wholesalePrice: string;
+  /** Bulk super-gros DZD price (blank clears it; falls back to wholesale, BRK-117). */
+  bulkPrice: string;
   isActive: boolean;
   /**
    * Selected rayon id (`""` clears the assignment; `undefined` keeps the
@@ -84,6 +86,10 @@ export function formFromProduct(product: CatalogProduct): EditFormData {
       base?.wholesale_price_centimes === null || base?.wholesale_price_centimes === undefined
         ? ""
         : centimesToDecimalInput(base.wholesale_price_centimes),
+    bulkPrice:
+      base?.super_gros_price_centimes === null || base?.super_gros_price_centimes === undefined
+        ? ""
+        : centimesToDecimalInput(base.super_gros_price_centimes),
     isActive: product.is_active,
   };
 }
@@ -126,6 +132,10 @@ export function validateEditForm(data: EditFormData): Partial<Record<string, I18
   const wholesale = priceError(data.wholesalePrice);
   if (wholesale !== null) {
     errors.wholesalePrice = wholesale;
+  }
+  const bulk = priceError(data.bulkPrice);
+  if (bulk !== null) {
+    errors.bulkPrice = bulk;
   }
   return errors;
 }
@@ -174,6 +184,9 @@ export function buildUpdatePayload(
       wholesale_price_centimes: edited
         ? blankToNull(data.wholesalePrice, parseMoneyToCentimes)
         : unit.wholesale_price_centimes,
+      super_gros_price_centimes: edited
+        ? blankToNull(data.bulkPrice, parseMoneyToCentimes)
+        : (unit.super_gros_price_centimes ?? null),
       is_base_unit: unit.is_base_unit,
       is_default_selling: unit.is_default_selling,
     };
@@ -441,6 +454,21 @@ export function ProductEditModalView(props: ProductEditModalViewProps): ReactEle
                 className={`${inputClass} font-mono`}
               />
               {fieldError(errors, "wholesalePrice", locale)}
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold">
+                {t(locale, "bulk_price")} (DZD)
+              </span>
+              <input
+                value={form.bulkPrice}
+                inputMode="decimal"
+                dir="ltr"
+                onChange={(event) => {
+                  props.onPatch("bulkPrice", event.target.value);
+                }}
+                className={`${inputClass} font-mono`}
+              />
+              {fieldError(errors, "bulkPrice", locale)}
             </label>
           </div>
           <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-3 py-2 dark:bg-slate-800">

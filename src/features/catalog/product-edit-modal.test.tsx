@@ -38,6 +38,7 @@ function unit(overrides: Partial<CatalogProduct["units"][number]>) {
     sale_price_centimes: "15050",
     purchase_price_centimes: "12000",
     wholesale_price_centimes: null,
+    super_gros_price_centimes: null,
     is_base_unit: true,
     is_default_selling: true,
     ...overrides,
@@ -84,8 +85,21 @@ describe("formFromProduct", () => {
       salePrice: "150.5",
       costPrice: "120",
       wholesalePrice: "",
+      bulkPrice: "",
       isActive: true,
     });
+  });
+
+  it("pre-fills and persists the bulk super-gros price", () => {
+    const stocked = product({
+      units: [unit({ super_gros_price_centimes: "9000" })],
+    });
+    expect(formFromProduct(stocked).bulkPrice).toBe("90");
+    const payload = buildUpdatePayload("t", stocked, {
+      ...formFromProduct(stocked),
+      bulkPrice: "85.5",
+    });
+    expect(payload.units[0]?.super_gros_price_centimes).toBe("8550");
   });
 
   it("tolerates missing barcodes and unit-less products", () => {
@@ -139,6 +153,7 @@ describe("buildUpdatePayload", () => {
           sale_price_centimes: "15050",
           purchase_price_centimes: "12000",
           wholesale_price_centimes: null,
+          super_gros_price_centimes: null,
           is_base_unit: true,
           is_default_selling: true,
         },
@@ -155,6 +170,7 @@ describe("buildUpdatePayload", () => {
       salePrice: "200",
       costPrice: "150.25",
       wholesalePrice: "",
+      bulkPrice: "",
       isActive: false,
     });
     expect(payload.name_fr).toBe("Vis 8x42");
@@ -165,6 +181,7 @@ describe("buildUpdatePayload", () => {
       sale_price_centimes: "20000",
       purchase_price_centimes: "15025",
       wholesale_price_centimes: null,
+      super_gros_price_centimes: null,
     });
   });
 
@@ -180,6 +197,7 @@ describe("buildUpdatePayload", () => {
       sale_price_centimes: "0",
       purchase_price_centimes: "0",
       wholesale_price_centimes: null,
+      super_gros_price_centimes: null,
     });
   });
 

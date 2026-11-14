@@ -184,6 +184,8 @@ function toWireUnit(unit: UnitFormData, factorMicro: string, isBase: boolean): N
     purchase_price_centimes:
       unit.costPrice.trim() === "" ? "0" : parseMoneyToCentimes(unit.costPrice),
     wholesale_price_centimes: null,
+    // No bulk input at creation (editable later); explicit null = honest wire.
+    super_gros_price_centimes: null,
     is_base_unit: isBase,
     is_default_selling: isBase,
   };

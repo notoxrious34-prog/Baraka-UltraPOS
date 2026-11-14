@@ -21,6 +21,10 @@ import { usePaymentModalStore } from "@/stores/payment-modal-store";
 import type { CustomerSummary, CustomerTier, NamedCustomer } from "@/types/pos";
 import { ModalShell } from "@/components/pos/modals/ModalShell";
 import { CustomerTierBadge } from "@/components/pos/CustomerTierBadge";
+import {
+  tierLabelKey,
+  useVerticalProfile,
+} from "@/features/customers/use-vertical-profile";
 
 const DEBOUNCE_MS = 150;
 
@@ -48,6 +52,14 @@ export function CustomerSelectModal(): ReactElement {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [newTier, setNewTier] = useState<CustomerTier>("retail");
+  /** Trade vocabulary (DSN-105): creation + filters offer profile tiers only. */
+  const { profile } = useVerticalProfile();
+  const offeredTiers = profile.offeredTiers;
+  const profileDefaultTier = (profile.defaultTier === "artisan" ||
+  profile.defaultTier === "wholesale" ||
+  profile.defaultTier === "super_gros"
+    ? profile.defaultTier
+    : "retail") as CustomerTier;
   const [policy, setPolicy] = useState<"LIMITED" | "UNLIMITED" | "DISABLED">("DISABLED");
   const [limitText, setLimitText] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -188,7 +200,8 @@ export function CustomerSelectModal(): ReactElement {
       address: null,
       credit_policy: policy,
       credit_limit_centimes: limit,
-      customer_tier: newTier,
+      // Safeguard: a stale selection outside the profile coerces to default.
+      customer_tier: (offeredTiers.includes(newTier) ? newTier : profileDefaultTier),
     })
       .then((id) => {
         selectCustomer(id);
@@ -212,11 +225,12 @@ export function CustomerSelectModal(): ReactElement {
   const visible =
     tierFilter === "all" ? results : results.filter((entry) => entry.customer_tier === tierFilter);
 
-  const tierOptions: Array<{ id: CustomerTier; label: string }> = [
-    { id: "retail", label: t(locale, "tier_retail") },
-    { id: "artisan", label: t(locale, "tier_artisan") },
-    { id: "wholesale", label: t(locale, "tier_wholesale") },
-  ];
+  const tierOptions: Array<{ id: CustomerTier; label: string }> = offeredTiers.map(
+    (code) => ({
+      id: code as CustomerTier,
+      label: t(locale, tierLabelKey(code)),
+    }),
+  );
 
   return (
     <ModalShell title={t(locale, "customer.title")} onClose={closeModal}>
@@ -243,8 +257,7 @@ export function CustomerSelectModal(): ReactElement {
           {(
             [
               { id: "all", label: t(locale, "customer.filterAll") },
-              { id: "artisan", label: t(locale, "tier_artisan") },
-              { id: "wholesale", label: t(locale, "tier_wholesale") },
+              ...tierOptions,
             ] as const
           ).map((option) => (
             <button
@@ -395,6 +408,11 @@ export function CustomerSelectModal(): ReactElement {
                     </button>
                   ))}
                 </div>
+                {!offeredTiers.includes(newTier) && (
+                  <p className="rounded-md bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+                    {t(locale, "customers.tierOutsideProfile")}
+                  </p>
+                )}
                 {policy === "LIMITED" && canManageCredit(role) && (
                   <input
                     value={limitText}

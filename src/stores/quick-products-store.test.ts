@@ -30,6 +30,7 @@ function product(id: string, name: string): CatalogProduct {
         sale_price_centimes: "100",
         purchase_price_centimes: "50",
         wholesale_price_centimes: null,
+        super_gros_price_centimes: null,
         is_default_selling: true,
       },
     ],

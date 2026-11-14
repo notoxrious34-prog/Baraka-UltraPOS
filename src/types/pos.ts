@@ -41,6 +41,8 @@ export interface CartUnitSnapshot {
   salePriceCentimes: string;
   /** Artisan/wholesale price (`null` = fall back to sale price). */
   wholesalePriceCentimes: string | null;
+  /** Bulk wholesale price (`null` = fall back to wholesale, BRK-117). */
+  superGrosPriceCentimes: string | null;
   isBaseUnit: boolean;
   isDefaultSelling: boolean;
 }
@@ -83,7 +85,7 @@ export interface NamedCustomer {
 export type ActiveCustomer = GuestCustomer | NamedCustomer;
 
 /** Pricing tier (mirrors CustomerTier; wire codes are lowercase). */
-export type CustomerTier = "retail" | "artisan" | "wholesale";
+export type CustomerTier = "retail" | "artisan" | "wholesale" | "super_gros";
 
 /** Customer list row (mirrors CustomerSummaryDto). */
 export interface CustomerSummary {
@@ -234,6 +236,8 @@ export interface CatalogUnit {
   purchase_price_centimes: string;
   /** Artisan/wholesale price (`null` = fall back to sale price). */
   wholesale_price_centimes: string | null;
+  /** Bulk wholesale price (`null` = fall back to wholesale, BRK-117). */
+  super_gros_price_centimes: string | null;
   is_base_unit: boolean;
   is_default_selling: boolean;
 }

@@ -134,4 +134,4 @@ Recorded as stated in that package. Not independently re-verified by the current
 
 | ADR-114 | Customer credit aggregator & limit alerts: domain bands, read-model overview, dossier banner (TASK-BRK-110) | ACCEPTED |
 
-Next free id: ADR-115.
+Next free id: ADR-116.

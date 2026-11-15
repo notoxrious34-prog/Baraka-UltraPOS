@@ -140,5 +140,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-119 | Manual retest protocol for credit-checkout & initial-stock (AUD-061 outcome) | PROPOSED |
 | ADR-120 | Visual track v1.4.0 scope: P1→P5 + R3/R4 + DSN-113 (AUD-VIS-001) | PROPOSED |
 | ADR-121 | Unified stockout threshold (amends ADR-037; BRK-120 Option A) | PROPOSED |
+| ADR-122 | Quantity breaks over tier price (`min(tier, break)`; BRK-121a) | PROPOSED |
 
-Next free id: ADR-122.
+Next free id: ADR-123.

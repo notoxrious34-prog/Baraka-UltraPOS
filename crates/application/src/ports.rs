@@ -6,7 +6,8 @@
 //! lives in infrastructure (`system_clock.rs`); only the trait lives here.
 
 use baraka_domain::catalog::{
-    Barcode, Category, CategoryId, KitItem, Product, ProductId, ProductUnit, Sku, UnitId,
+    Barcode, Category, CategoryId, KitItem, PriceBreak, Product, ProductId, ProductUnit, Sku,
+    UnitId,
 };
 use baraka_domain::inventory::{
     ReferenceType, StockMovementType, Warehouse, WarehouseCode, WarehouseId, WarehouseStockPresence,
@@ -304,6 +305,17 @@ pub trait ProductRepository: Send + Sync {
 
     /// Soft-deactivate a historically referenced product.
     fn set_product_active(&self, id: ProductId, active: bool) -> Result<(), ApplicationError>;
+
+    /// Quantity-break ladder for one product x unit, ascending by rung.
+    /// Default is empty (pure tier pricing) so existing implementers —
+    /// especially test doubles — keep working untouched (BRK-121).
+    fn price_breaks(
+        &self,
+        _product_id: ProductId,
+        _unit_id: UnitId,
+    ) -> Result<Vec<PriceBreak>, ApplicationError> {
+        Ok(Vec::new())
+    }
 }
 
 /// Category persistence port (SQLite repository in infrastructure).

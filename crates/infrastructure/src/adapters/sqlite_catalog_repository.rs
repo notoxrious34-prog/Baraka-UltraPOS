@@ -22,7 +22,8 @@ use baraka_application::use_cases::catalog::{
 };
 use baraka_domain::catalog::{
     search_normalization::{normalize_for_search, tokenize_query},
-    Barcode, Category, CategoryId, KitItem, Product, ProductId, ProductUnit, Sku, UnitId,
+    Barcode, Category, CategoryId, KitItem, PriceBreak, Product, ProductId, ProductUnit, Sku,
+    UnitId,
 };
 use baraka_domain::errors::DomainError;
 use baraka_domain::primitives::{FactorMicro, Money, QtyMicro};
@@ -1038,6 +1039,7 @@ impl ProductRepository for SqliteCatalogRepository {
         let key = id.to_string();
         run_transaction(&mut guard, |tx| {
             tx.execute("DELETE FROM stock_levels WHERE product_id = ?1", [&key])?;
+            tx.execute("DELETE FROM price_breaks WHERE product_id = ?1", [&key])?;
             tx.execute("DELETE FROM product_units WHERE product_id = ?1", [&key])?;
             let removed = tx.execute("DELETE FROM products WHERE id = ?1", [&key])?;
             if removed == 0 {
@@ -1061,6 +1063,34 @@ impl ProductRepository for SqliteCatalogRepository {
             return Err(ApplicationError::NotFound("product".to_string()));
         }
         Ok(())
+    }
+
+    fn price_breaks(
+        &self,
+        product_id: ProductId,
+        unit_id: UnitId,
+    ) -> Result<Vec<PriceBreak>, ApplicationError> {
+        let guard = self.lock()?;
+        let mut statement = guard
+            .prepare(
+                "SELECT min_qty_micro, price_centimes FROM price_breaks
+                 WHERE product_id = ?1 AND unit_id = ?2
+                 ORDER BY min_qty_micro ASC",
+            )
+            .map_err(|_| store_failure())?;
+        let rows = statement
+            .query_map(
+                rusqlite::params![product_id.to_string(), unit_id.to_string()],
+                |row| {
+                    Ok(PriceBreak {
+                        min_qty_micro: row.get(0)?,
+                        price: Money::from_centimes(row.get::<_, i64>(1)?),
+                    })
+                },
+            )
+            .map_err(|_| store_failure())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())
     }
 }
 

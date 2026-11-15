@@ -58,6 +58,14 @@ export interface CartLine {
   unitIndex: number;
   quantityMicro: string;
   lineDiscountCentimes: string;
+  /** Quantity-break ladders fetched per unit id (BRK-121; `{}` = none loaded). */
+  breaksByUnit: Record<string, PriceBreakRung[]>;
+}
+
+/** One ladder rung as carried on the wire (canonical strings). */
+export interface PriceBreakRung {
+  minQtyMicro: string;
+  priceCentimes: string;
 }
 
 /** Guest (anonymous cash) customer. */

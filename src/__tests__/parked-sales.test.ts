@@ -128,6 +128,7 @@ describe("cart-store loadLines", async () => {
           unitIndex: 0,
           quantityMicro: "20000",
           lineDiscountCentimes: "0",
+          breaksByUnit: {},
         },
       ],
       { kind: "named", id: "c1", name: "Client", policy: "LIMITED", limitCentimes: null, balanceCentimes: "0", tier: "retail", source: "backend" },

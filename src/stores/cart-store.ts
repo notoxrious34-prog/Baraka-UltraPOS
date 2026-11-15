@@ -13,8 +13,10 @@ import type {
   DocType,
   LineMargin,
   Locale,
+  PriceBreakRung,
 } from "@/types/pos";
 import { addBig, maxZero, mulQtyPrice, subBig } from "@/lib/money";
+import { applyBreakPrice } from "@/lib/price-breaks";
 
 const DEFAULT_QTY_MICRO = "10000";
 const ZERO = "0";
@@ -81,6 +83,8 @@ interface CartState {
   clearCart: () => void;
   /** Atomically replace cart lines (draft resume); resets discount, sets customer. */
   loadLines: (lines: CartLine[], customer?: ActiveCustomer) => void;
+  /** Attach a fetched quantity-break ladder to one line x unit (BRK-121). */
+  setLineBreaks: (key: string, unitId: string, breaks: PriceBreakRung[]) => void;
 }
 
 /** Structured F3/unit-switch feedback for toasts and badges. */
@@ -145,6 +149,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
         unitIndex: resolved,
         quantityMicro: DEFAULT_QTY_MICRO,
         lineDiscountCentimes: ZERO,
+        breaksByUnit: {},
       };
       return { previewMargins: [], lines: [...state.lines, line] };
     }),
@@ -210,17 +215,25 @@ export const useCartStore = create<CartState>()((set, get) => ({
     }),
   loadLines: (lines, customer) =>
     set({
-      lines,
+      lines: lines.map((line) => ({ ...line, breaksByUnit: line.breaksByUnit ?? {} })),
       globalDiscountCentimes: ZERO,
       customer: customer ?? { kind: "guest" },
       previewMargins: [],
     }),
+  setLineBreaks: (key, unitId, breaks) =>
+    set((state) => ({
+      lines: state.lines.map((line) =>
+        line.key === key
+          ? { ...line, breaksByUnit: { ...line.breaksByUnit, [unitId]: breaks } }
+          : line,
+      ),
+    })),
 }));
 
 /** Preview total of one line at the customer's tier price. Mirrors the
  * domain ladder (BRK-117): super-gros prefers bulk, then wholesale, then
  * sale; other trade tiers prefer wholesale, then sale. Garbage-safe. */
-export function lineUnitPriceCentimes(line: CartLine, tier: CustomerTier): string {
+export function lineTierPriceCentimes(line: CartLine, tier: CustomerTier): string {
   const unit = line.units[line.unitIndex];
   if (unit === undefined) {
     return "0";
@@ -247,13 +260,29 @@ export function lineUnitPriceCentimes(line: CartLine, tier: CustomerTier): strin
   return unit.salePriceCentimes;
 }
 
-/** True when the line prices at the artisan/wholesale tier (PRO/GROS pill). */
+/** Effective preview unit price: tier price with the quantity-break ladder
+ * applied on top (`min(tier, break)` — BRK-121). Matches the engine's
+ * `verify_cart_line`, so preview and committed totals agree. */
+export function lineUnitPriceCentimes(line: CartLine, tier: CustomerTier): string {
+  const unit = line.units[line.unitIndex];
+  if (unit === undefined) {
+    return "0";
+  }
+  return applyBreakPrice(
+    lineTierPriceCentimes(line, tier),
+    line.breaksByUnit[unit.unitId],
+    line.quantityMicro,
+  );
+}
+
+/** True when the line prices at the artisan/wholesale tier (PRO/GROS pill).
+ * Quantity-break discounts alone never flip the pill (BRK-121). */
 export function isLineTierPriced(line: CartLine, tier: CustomerTier): boolean {
   const unit = line.units[line.unitIndex];
   if (unit === undefined || tier === "retail") {
     return false;
   }
-  return lineUnitPriceCentimes(line, tier) !== unit.salePriceCentimes;
+  return lineTierPriceCentimes(line, tier) !== unit.salePriceCentimes;
 }
 
 /** Preview discounted unit price: max(0, tierPrice - perUnitDiscount).

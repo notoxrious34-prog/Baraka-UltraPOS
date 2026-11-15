@@ -268,3 +268,24 @@ pub struct UpdateCategoryRequestDto {
     /// Active flag.
     pub is_active: bool,
 }
+
+/// One quantity-break rung (BRK-121): minimum quantity in the ladder
+/// unit's micros and its unit price in centimes, both canonical strings.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PriceBreakDto {
+    /// Minimum line quantity in ladder-unit micros.
+    pub min_qty_micro: String,
+    /// Rung unit price in centimes.
+    pub price_centimes: String,
+}
+
+/// Quantity-break ladder read request (ascending by rung).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ListPriceBreaksDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Product id (UUID string).
+    pub product_id: String,
+    /// Ladder unit id (UUID string).
+    pub unit_id: String,
+}

@@ -134,6 +134,11 @@ pub const MIGRATIONS: &[EmbeddedMigration] = &[
         name: "0022_customer_last_prices.sql",
         sql: include_str!("../../migrations/0022_customer_last_prices.sql"),
     },
+    EmbeddedMigration {
+        version: 23,
+        name: "0023_price_breaks.sql",
+        sql: include_str!("../../migrations/0023_price_breaks.sql"),
+    },
 ];
 
 /// This binary's migration horizon: the newest schema version it understands.

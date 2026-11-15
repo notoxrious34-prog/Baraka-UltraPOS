@@ -17,8 +17,8 @@ use baraka_domain::catalog::{Category, CategoryId, ProductId, UnitId};
 use crate::dto::{
     CatalogMetricsDto, CatalogSearchRequestDto, CategoryResponseDto, CreateCategoryRequestDto,
     CreateProductDto, DefineKitDto, DeleteEntityRequestDto, DeleteEntityResultDto, GetProductDto,
-    ImportProductsRequestDto, ImportProductsResponseDto, ImportRowErrorDto, ProductResponseDto,
-    UpdateCategoryRequestDto, UpdateProductDto,
+    ImportProductsRequestDto, ImportProductsResponseDto, ImportRowErrorDto, ListPriceBreaksDto,
+    PriceBreakDto, ProductResponseDto, UpdateCategoryRequestDto, UpdateProductDto,
 };
 
 /// `catalog_create_product` command: atomic product + unit-set creation.
@@ -378,4 +378,30 @@ pub fn category_seed_starter(
         .execute(&session)
         .map_err(|error| error_code(&error))?;
     Ok(categories.iter().map(to_category_dto).collect())
+}
+
+/// `catalog_list_price_breaks` command: quantity-break ladder for one
+/// product x unit, ascending by rung (BRK-121). Empty when no ladder is
+/// defined (pure tier pricing). Read-only for the preview path and the
+/// future ladder manager; writes stay out of S1 scope.
+#[tauri::command(rename_all = "snake_case")]
+pub fn catalog_list_price_breaks(
+    state: tauri::State<'_, AppState>,
+    request: ListPriceBreaksDto,
+) -> Result<Vec<PriceBreakDto>, String> {
+    let _session = require_session(&state, &request.session_token)?;
+    let product_id =
+        parse_wire_id(&request.product_id, "product_id").map_err(|error| error_code(&error))?;
+    let unit_id = parse_wire_id(&request.unit_id, "unit_id").map_err(|error| error_code(&error))?;
+    let ladder = state
+        .catalog
+        .price_breaks(ProductId::from(product_id), UnitId::from(unit_id))
+        .map_err(|error| error_code(&error))?;
+    Ok(ladder
+        .iter()
+        .map(|rung| PriceBreakDto {
+            min_qty_micro: rung.min_qty_micro.to_string(),
+            price_centimes: rung.price.centimes().to_string(),
+        })
+        .collect())
 }

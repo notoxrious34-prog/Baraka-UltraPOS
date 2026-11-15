@@ -14,6 +14,7 @@ import {
 } from "@/stores/cart-store";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { usePrivacyShieldStore } from "@/stores/privacy-shield-store";
+import { useEnsurePriceBreaks } from "@/hooks/use-price-breaks";
 import { t } from "@/lib/i18n";
 import { addBig, formatMoney, formatQty, subBig } from "@/lib/money";
 import { colisageShares, formatColisage } from "@/lib/colisage";
@@ -71,6 +72,7 @@ export function CartTableView({
   onRemoveLine,
 }: CartTableViewProps): ReactElement {
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
+  useEnsurePriceBreaks(lines);
 
   useEffect(() => {
     const row = rowRefs.current[selectedLineIndex];

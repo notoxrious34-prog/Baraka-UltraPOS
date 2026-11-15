@@ -249,6 +249,7 @@ pub fn run() {
             baraka_commands::ipc::catalog_get_metrics,
             baraka_commands::ipc::catalog_define_kit,
             baraka_commands::ipc::catalog_import_products,
+            baraka_commands::ipc::catalog_list_price_breaks,
             baraka_commands::ipc::category_list,
             baraka_commands::ipc::category_create,
             baraka_commands::ipc::category_update,

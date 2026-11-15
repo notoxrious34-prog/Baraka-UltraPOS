@@ -190,6 +190,23 @@ export async function ipcSearchCatalog(
   });
 }
 
+/** One quantity-break rung as carried on the wire (BRK-121). */
+export interface PriceBreakWire {
+  min_qty_micro: string;
+  price_centimes: string;
+}
+
+/** Quantity-break ladder for one product x unit, ascending by rung. */
+export async function ipcListPriceBreaks(
+  sessionToken: string,
+  productId: string,
+  unitId: string,
+): Promise<PriceBreakWire[]> {
+  return call<PriceBreakWire[]>("catalog_list_price_breaks", {
+    request: { session_token: sessionToken, product_id: productId, unit_id: unitId },
+  });
+}
+
 /** Database-level catalog aggregates (total / in-stock / out-of-stock / inactive). */
 export async function ipcGetCatalogMetrics(sessionToken: string): Promise<CatalogMetricsDto> {
   return call<CatalogMetricsDto>("catalog_get_metrics", {

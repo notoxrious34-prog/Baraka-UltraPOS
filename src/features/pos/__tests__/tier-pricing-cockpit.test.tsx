@@ -42,6 +42,7 @@ function tierLine(wholesale: string | null): CartLine {
     unitIndex: 0,
     quantityMicro: "10000",
     lineDiscountCentimes: "0",
+    breaksByUnit: {},
   };
 }
 

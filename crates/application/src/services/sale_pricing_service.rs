@@ -5,7 +5,7 @@
 //! the pure pricing kernel receives only validated inputs. Price-override
 //! *permission* is checked by the calling use case, not here.
 
-use baraka_domain::catalog::{convert_to_base_micros, ProductId, UnitId};
+use baraka_domain::catalog::{convert_to_base_micros, resolve_break_price, ProductId, UnitId};
 use baraka_domain::errors::DomainError;
 use baraka_domain::sales::pricing::calculate_margin_basis_points;
 use baraka_domain::sales::CustomerTier;
@@ -42,7 +42,9 @@ pub struct VerifiedLine {
 ///
 /// `override_price`: explicit operator price, accepted verbatim here (the
 /// caller gates it behind `PriceOverride`); `None` uses the tier-resolved
-/// catalog price (`ProductUnit::price_for_tier`).
+/// catalog price (`ProductUnit::price_for_tier`) with the quantity-break
+/// ladder applied on top — a break may only lower the tier price, never
+/// raise it (BRK-121: `min(tier, break)`).
 pub fn verify_cart_line<P>(
     products: &P,
     product_id: ProductId,
@@ -73,7 +75,17 @@ where
                 "INVALID_UNIT".to_string(),
             ))
         })?;
-    let unit_price = override_price.unwrap_or_else(|| unit.price_for_tier(tier).centimes());
+    let tier_price = unit.price_for_tier(tier).centimes();
+    let unit_price = match override_price {
+        Some(explicit) => explicit,
+        None => {
+            let ladder = products.price_breaks(product_id, unit_id)?;
+            match resolve_break_price(&ladder, quantity_micro) {
+                Some(rung) => tier_price.min(rung.centimes()),
+                None => tier_price,
+            }
+        }
+    };
     let cost_price = unit.purchase_price.centimes();
     let quantity_base_micro = convert_to_base_micros(quantity_micro, unit.factor_micro)
         .map_err(ApplicationError::Validation)?;

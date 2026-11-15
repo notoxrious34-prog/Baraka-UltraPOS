@@ -55,6 +55,7 @@ const MULTI_LINE: CartLine = {
   unitIndex: 1,
   quantityMicro: "30000",
   lineDiscountCentimes: "0",
+  breaksByUnit: {},
 };
 
 const SINGLE_LINE: CartLine = {
@@ -67,6 +68,7 @@ const SINGLE_LINE: CartLine = {
   unitIndex: 0,
   quantityMicro: "20000",
   lineDiscountCentimes: "0",
+  breaksByUnit: {},
 };
 
 function noop(): void {}

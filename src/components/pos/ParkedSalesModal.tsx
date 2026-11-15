@@ -88,6 +88,7 @@ function toCartLine(
       isBaseUnit: unit.is_base_unit,
       isDefaultSelling: unit.is_default_selling,
     })),
+    breaksByUnit: {},
     unitIndex,
     quantityMicro,
     lineDiscountCentimes: "0",

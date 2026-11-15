@@ -8,6 +8,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { CartLine, CartUnitSnapshot, CatalogProduct } from "@/types/pos";
 import {
   calculateBaseQuantityEquivalent,
+  isLineTierPriced,
+  lineTierPriceCentimes,
+  lineUnitPriceCentimes,
   previewDiscountedUnitPrice,
   previewLineTotal,
   useCartStore,
@@ -96,6 +99,7 @@ function line(overrides: Partial<CartLine> = {}): CartLine {
     unitIndex: 0,
     quantityMicro: "30000",
     lineDiscountCentimes: "0",
+    breaksByUnit: {},
     ...overrides,
   };
 }
@@ -217,6 +221,7 @@ describe("per-unit discount display (DSN-097)", () => {
       units: [unit({ unitId: "u-piece", salePriceCentimes: "1000" })],
       quantityMicro: "30000",
       lineDiscountCentimes: "100",
+      breaksByUnit: {},
     });
     expect(previewDiscountedUnitPrice(owner)).toBe("900");
     expect(previewLineTotal(owner)).toBe("2700");
@@ -233,5 +238,40 @@ describe("per-unit discount display (DSN-097)", () => {
     const corrupt = line({ lineDiscountCentimes: "99999" });
     expect(previewDiscountedUnitPrice(corrupt)).toBe("0");
     expect(previewLineTotal(corrupt)).toBe("0");
+  });
+
+  it("applies the quantity-break ladder on top of the tier price (BRK-121)", () => {
+    const owner = line({
+      quantityMicro: "60000",
+      breaksByUnit: {
+        "u-piece": [{ minQtyMicro: "50000", priceCentimes: "14000" }],
+      },
+    });
+    expect(lineTierPriceCentimes(owner, "retail")).toBe("15020");
+    expect(lineUnitPriceCentimes(owner, "retail")).toBe("14000");
+    expect(previewLineTotal(owner)).toBe("84000");
+  });
+
+  it("ignores rungs above the line quantity and caps at the tier price", () => {
+    const low = line({
+      quantityMicro: "10000",
+      breaksByUnit: { "u-piece": [{ minQtyMicro: "50000", priceCentimes: "14000" }] },
+    });
+    expect(lineUnitPriceCentimes(low, "retail")).toBe("15020");
+    const greedy = line({
+      quantityMicro: "60000",
+      breaksByUnit: { "u-piece": [{ minQtyMicro: "50000", priceCentimes: "99999" }] },
+    });
+    expect(lineUnitPriceCentimes(greedy, "retail")).toBe("15020");
+  });
+
+  it("breaks alone never flip the tier pill", () => {
+    const owner = line({
+      quantityMicro: "60000",
+      breaksByUnit: {
+        "u-piece": [{ minQtyMicro: "50000", priceCentimes: "14000" }],
+      },
+    });
+    expect(isLineTierPriced(owner, "retail")).toBe(false);
   });
 });

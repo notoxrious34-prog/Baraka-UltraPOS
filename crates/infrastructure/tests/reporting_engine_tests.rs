@@ -15,7 +15,7 @@ use baraka_application::use_cases::reports::{
     GetCashSessionsHistoryUseCase, GetCreditOutstandingReportUseCase, GetDailySalesSummaryUseCase,
     GetGrossMarginReportUseCase, GetLowStockReportUseCase, GetReplenishmentRadarUseCase,
     GetSalesByCategoryUseCase, GetSalesByProductUseCase, GetStockMovementHistoryUseCase,
-    GetUserActivityLogUseCase, MAX_PAGE_SIZE,
+    GetUnitSalesMixUseCase, GetUserActivityLogUseCase, MAX_PAGE_SIZE,
 };
 use baraka_domain::catalog::{Barcode, CategoryId, Product, ProductId, ProductUnit, Sku, UnitId};
 use baraka_domain::errors::DomainError;
@@ -1134,4 +1134,110 @@ fn replenishment_radar_orders_movers_by_cover() {
     assert_eq!(head.len(), 2);
     assert_eq!(head[0].sku, "REP-P4");
     assert_eq!(head[1].sku, "REP-P1");
+}
+
+/// Unit-mix (S4): per-unit shares in basis points with day-count confidence.
+/// Hand-computed: P1 sells 10 base units (2 days) + 2 cartons x12 (1 day);
+/// old carton sales never count; P3 has no sales.
+#[test]
+fn unit_sales_mix_splits_shares_with_confidence() {
+    let (harness, fixture) = setup();
+    let day1 = (chrono::Utc::now() - chrono::TimeDelta::days(5))
+        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let day2 = (chrono::Utc::now() - chrono::TimeDelta::days(2))
+        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let old = (chrono::Utc::now() - chrono::TimeDelta::days(40))
+        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let carton = UnitId::new();
+    {
+        let guard = harness.db.lock().expect("lock");
+        exec(
+            &guard,
+            "INSERT INTO product_units
+             (id, product_id, unit_name_ar, unit_name_fr, factor_micro, barcode,
+              sale_price_centimes, purchase_price_centimes, is_base_unit, is_default_selling)
+             VALUES (?1, ?2, 'كرتون', 'Carton x12', 120000, NULL, 110000, 90000, 0, 0)",
+            &[&carton.to_string(), &fixture.p1.0.to_string()],
+        );
+        let mut seq = 200i64;
+        let mut doc = |number: &str, created: &str| {
+            seq += 1;
+            let id = format!("44444444-4444-4000-8000-{seq:012}");
+            exec(
+                &guard,
+                "INSERT INTO documents
+                 (id, number, fiscal_year, type, party_type, party_id,
+                  source_document_id, warehouse_id, document_language, language,
+                  subtotal_ht_centimes, vat_total_centimes, global_discount_centimes,
+                  timbre_centimes, rounding_centimes, ttc_centimes,
+                  paid_amount_centimes, change_amount_centimes, payment_method,
+                  status, created_at, created_by, revision, origin_device_id, notes)
+                 VALUES (?1, ?2, 2026, 'TICKET', 'NONE', '', NULL, ?3, 'FR', 'FR', 1000, 0, 0,
+                         0, 0, 1000, 1000, 0, 'CASH', 'FINALIZED', ?4, ?5, 1, ?6, NULL)",
+                &[
+                    &id,
+                    &number.to_string(),
+                    &harness.warehouse_id.to_string(),
+                    &created.to_string(),
+                    &GERANT_UUID.to_string(),
+                    &harness.terminal_id,
+                ],
+            );
+            id
+        };
+        let mut item_seq = 200i64;
+        let mut item = |doc: &str, unit: UnitId, qty_base_micro: i64| {
+            item_seq += 1;
+            let id = format!("55555555-5555-4000-8000-{item_seq:012}");
+            exec(
+                &guard,
+                "INSERT INTO document_items
+                 (id, document_id, product_id, unit_id, source_item_id,
+                  quantity_micro, quantity_base_micro, unit_price_centimes,
+                  discount_centimes, tva_rate_micro, tax_exemption_code,
+                  line_ht_centimes, line_tva_centimes, line_ttc_centimes,
+                  cost_price_centimes, sort_order)
+                 VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?5, 1000, 0, 0, NULL, 1000, 0, 1000, 1000, 1)",
+                &[
+                    &id,
+                    &doc.to_string(),
+                    &fixture.p1.0.to_string(),
+                    &unit.to_string(),
+                    &qty_base_micro,
+                ],
+            );
+        };
+        // Base unit: 7 units day1 + 3 units day2 = 100_000 base micros.
+        let d1 = doc("MIX-1", &day1);
+        item(&d1, fixture.p1.1, 70_000);
+        let d2 = doc("MIX-2", &day2);
+        item(&d2, fixture.p1.1, 30_000);
+        // Carton x12: 2 cartons day1 = 240_000 base micros.
+        let d3 = doc("MIX-3", &day1);
+        item(&d3, carton, 240_000);
+        // Old carton sale: excluded by the window.
+        let d4 = doc("MIX-4", &old);
+        item(&d4, carton, 1_200_000);
+    }
+    let mix = GetUnitSalesMixUseCase::new(&harness.reports)
+        .execute(&gerant(), &fixture.p1.0.to_string(), 0)
+        .expect("mix");
+    // Total 340_000: carton 240_000 -> 7058bp, base 100_000 -> 2941bp
+    // (integer floors; 7058 + 2941 = 9999 <= 10000).
+    assert_eq!(mix.len(), 2);
+    assert_eq!(mix[0].unit_name_fr, "Carton x12");
+    assert_eq!(mix[0].share_bp, 7058);
+    assert_eq!(mix[1].unit_name_fr, "Pièce");
+    assert_eq!(mix[1].share_bp, 2941);
+    // Sample is product-level: 2 distinct sale days behind the split.
+    assert_eq!(mix[0].sample_days, 2);
+    assert_eq!(mix[1].sample_days, 2);
+    // Confidence: 2 distinct days of 30 -> 666bp.
+    assert_eq!(mix[0].confidence_bp, 666);
+    assert_eq!(mix[1].confidence_bp, 666);
+    // Unknown product: empty mix, not an error.
+    let empty = GetUnitSalesMixUseCase::new(&harness.reports)
+        .execute(&gerant(), &ProductId::new().to_string(), 30)
+        .expect("empty mix");
+    assert!(empty.is_empty());
 }

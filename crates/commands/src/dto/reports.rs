@@ -269,6 +269,36 @@ pub struct ReplenishmentRadarRequestDto {
     pub limit: Option<u32>,
 }
 
+/// One unit-mix row (S4): per-unit share of a product's window sales.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnitMixRowDto {
+    /// Unit id.
+    pub unit_id: String,
+    /// French unit name.
+    pub unit_name_fr: String,
+    /// Arabic unit name.
+    pub unit_name_ar: String,
+    /// Quantity sold through this unit in base micros.
+    pub qty_base_micro: String,
+    /// Share of the product's window sales in basis points.
+    pub share_bp: String,
+    /// Distinct sale days in the window.
+    pub sample_days: String,
+    /// `sample_days * 10000 / window_days`, capped at 10000.
+    pub confidence_bp: String,
+}
+
+/// `reports.unitSalesMix` request (Gerant/Admin).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnitSalesMixRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Product id.
+    pub product_id: String,
+    /// Trailing window in days (0 selects 30, max 90).
+    pub window_days: Option<u32>,
+}
+
 /// `reports.lowStock` request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LowStockRequestDto {

@@ -38,6 +38,9 @@ describe("stock i18n keys", () => {
       '"radar.movers": "Articles Suivis"',
       '"radar.ruptures": "Ruptures Imminentes"',
       '"radar.empty": "Aucun mouvement sur 30 jours',
+      '"mix.title": "Répartition Suggérée"',
+      '"mix.confidence": "Confiance"',
+      '"mix.empty": "Aucune vente sur la fenêtre"',
       '"stock.noRupture": "Aucune rupture de stock détectée"',
       '"stock.adjust": "Régularisation"',
       '"stock.transfer": "Transfert Inter-Dépôts"',
@@ -55,6 +58,9 @@ describe("stock i18n keys", () => {
       '"stock.tabRadar": "رادار التموين"',
       '"radar.movers": "أصناف متحركة"',
       '"radar.ruptures": "نفاد وشيك"',
+      '"mix.title": "التوزيع المقترح"',
+      '"mix.confidence": "الثقة"',
+      '"mix.empty": "لا مبيعات في النافذة"',
       '"stock.noRupture": "لا توجد تنبيهات نفاذ مخزون"',
       '"stock.adjust": "تسوية مخزون"',
       '"stock.transfer": "تحويل بين المستودعات"',
@@ -105,11 +111,20 @@ describe("module surface", () => {
 
   it("radar pane isolates figures in bdi and never touches floats", () => {
     expect(RADAR_SRC).toContain("formatQty(row.coverDaysMicro)");
+    expect(RADAR_SRC).toContain("formatBpPercent(unit.shareBp)");
     expect(RADAR_SRC).toContain('<bdi dir="ltr"');
     expect(RADAR_SRC).toContain("tabular-nums");
     expect(RADAR_SRC).toContain('t(locale, "radar.empty")');
+    expect(RADAR_SRC).toContain('t(locale, "mix.title")');
+    expect(RADAR_SRC).toContain("ipcUnitSalesMix(token, productId)");
     expect(RADAR_SRC).not.toContain("parseFloat");
     expect(RADAR_SRC).not.toContain("Number(");
+  });
+
+  it("unit-mix binds the reports command behind the session token", () => {
+    expect(MODULE_SRC).toContain("token={token}");
+    expect(IPC_SRC).toContain("export async function ipcUnitSalesMix");
+    expect(IPC_SRC).toContain('call<UnitMixWire[]>("reports_unit_sales_mix"');
   });
 
   it("warehouse selector reloads low-stock and movement lists", () => {

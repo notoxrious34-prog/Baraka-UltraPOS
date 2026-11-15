@@ -15,7 +15,7 @@ use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
     CashSessionHistoryRow, CreditOutstandingRow, DailySalesRow, GrossMarginRow, LowStockRow,
     ReplenishmentRow, ReportingRepository, SalesByCategoryRow, SalesByProductRow,
-    StockMovementHistoryRow, UserActivityRow,
+    StockMovementHistoryRow, UnitMixRow, UserActivityRow,
 };
 use baraka_domain::inventory::StockMovementType;
 use baraka_domain::primitives::{Money, QtyMicro};
@@ -648,6 +648,79 @@ impl ReportingRepository for SqliteReportingRepository {
                 .then(a.sku.cmp(&b.sku))
         });
         out.truncate(limit);
+        Ok(out)
+    }
+
+    fn unit_sales_mix(
+        &self,
+        product_id: &str,
+        window_days: u32,
+    ) -> Result<Vec<UnitMixRow>, ApplicationError> {
+        let guard = self.lock()?;
+        let cutoff = (chrono::Utc::now() - chrono::TimeDelta::days(i64::from(window_days.max(1))))
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let mut statement = guard
+            .prepare(&format!(
+                "SELECT di.unit_id, pu.unit_name_fr, pu.unit_name_ar,
+                        SUM(di.quantity_base_micro)
+                 FROM document_items di
+                 JOIN documents d ON d.id = di.document_id
+                 JOIN product_units pu ON pu.id = di.unit_id
+                 WHERE di.product_id = ?1 AND d.created_at >= ?2 AND {COMMITTED_SALES}
+                 GROUP BY di.unit_id"
+            ))
+            .map_err(|_| store_failure())?;
+        let rows = statement
+            .query_map(rusqlite::params![product_id, cutoff], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            })
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?;
+        let total: i128 = rows.iter().map(|row| i128::from(row.3)).sum();
+        if total <= 0 {
+            return Ok(Vec::new());
+        }
+        let window = i128::from(window_days.max(1));
+        // Confidence is product-level: distinct sale days behind the split.
+        let sample_days: i64 = guard
+            .query_row(
+                &format!(
+                    "SELECT COUNT(DISTINCT substr(d.created_at, 1, 10))
+                     FROM document_items di
+                     JOIN documents d ON d.id = di.document_id
+                     WHERE di.product_id = ?1 AND d.created_at >= ?2 AND {COMMITTED_SALES}"
+                ),
+                rusqlite::params![product_id, cutoff],
+                |row| row.get(0),
+            )
+            .map_err(|_| store_failure())?;
+        let confidence = (i128::from(sample_days) * 10_000 / window).min(10_000) as i64;
+        let mut out = Vec::with_capacity(rows.len());
+        for (unit_id, name_fr, name_ar, qty) in rows {
+            let share = (i128::from(qty) * 10_000 / total)
+                .try_into()
+                .map_err(|_| store_failure())?;
+            out.push(UnitMixRow {
+                unit_id,
+                unit_name_fr: name_fr,
+                unit_name_ar: name_ar,
+                qty_base_micro: qty,
+                share_bp: share,
+                sample_days,
+                confidence_bp: confidence,
+            });
+        }
+        out.sort_by(|a, b| {
+            b.share_bp
+                .cmp(&a.share_bp)
+                .then(a.unit_name_fr.cmp(&b.unit_name_fr))
+        });
         Ok(out)
     }
 

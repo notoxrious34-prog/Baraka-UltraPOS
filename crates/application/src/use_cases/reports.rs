@@ -11,7 +11,7 @@ use crate::errors::ApplicationError;
 use crate::ports::{
     CashSessionHistoryRow, CreditOutstandingRow, DailySalesRow, GrossMarginRow, LowStockRow,
     ReplenishmentRow, ReportingRepository, SalesByCategoryRow, SalesByProductRow, SessionContext,
-    StockMovementHistoryRow, UserActivityRow,
+    StockMovementHistoryRow, UnitMixRow, UserActivityRow,
 };
 
 /// Default page size for paginated history reports.
@@ -325,6 +325,47 @@ where
     ) -> Result<Vec<ReplenishmentRow>, ApplicationError> {
         require_reports(session)?;
         self.reports.replenishment_radar(resolve_limit(limit)?)
+    }
+}
+
+/// Unit-mix (S4): suggested order split across a product's selling units.
+/// Read-only over committed sale lines; `window_days` <= 0 selects 30.
+pub struct GetUnitSalesMixUseCase<'a, R>
+where
+    R: ?Sized,
+{
+    reports: &'a R,
+}
+
+impl<'a, R> GetUnitSalesMixUseCase<'a, R>
+where
+    R: ReportingRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(reports: &'a R) -> Self {
+        Self { reports }
+    }
+
+    /// Per-unit shares for one product's trailing-window committed sales.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        product_id: &str,
+        window_days: u32,
+    ) -> Result<Vec<UnitMixRow>, ApplicationError> {
+        require_reports(session)?;
+        let product = product_id.trim();
+        if product.is_empty() {
+            return Err(ApplicationError::Validation(
+                DomainError::InvalidCanonicalString("product_id must not be blank".to_string()),
+            ));
+        }
+        let window = if window_days == 0 || window_days > 90 {
+            30
+        } else {
+            window_days
+        };
+        self.reports.unit_sales_mix(product, window)
     }
 }
 

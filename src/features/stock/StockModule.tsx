@@ -272,6 +272,7 @@ export function StockModule(): ReactElement {
       ) : tab === "radar" ? (
         <ReplenishmentPane
           locale={locale}
+          token={token}
           rows={radarRows}
           loading={loading}
           error={radarForbidden ? t(locale, "radar.reservedGuidance") : null}

@@ -4,7 +4,7 @@ use baraka_application::use_cases::reports::{
     GetCashSessionsHistoryUseCase, GetCreditOutstandingReportUseCase, GetDailySalesSummaryUseCase,
     GetGrossMarginReportUseCase, GetLowStockReportUseCase, GetReplenishmentRadarUseCase,
     GetSalesByCategoryUseCase, GetSalesByProductUseCase, GetStockMovementHistoryUseCase,
-    GetUserActivityLogUseCase,
+    GetUnitSalesMixUseCase, GetUserActivityLogUseCase,
 };
 
 use crate::dto::{
@@ -12,7 +12,8 @@ use crate::dto::{
     DailySalesSummaryDto, GrossMarginRowDto, LowStockRequestDto, LowStockRowDto,
     ReplenishmentRadarRequestDto, ReplenishmentRowDto, ReportDateRangeRequestDto,
     SalesByCategoryRowDto, SalesByProductRowDto, StockMovementHistoryRequestDto,
-    StockMovementRowDto, UserActivityRequestDto, UserActivityRowDto,
+    StockMovementRowDto, UnitMixRowDto, UnitSalesMixRequestDto, UserActivityRequestDto,
+    UserActivityRowDto,
 };
 
 fn to_daily_sales_dto(row: &baraka_application::ports::DailySalesRow) -> DailySalesSummaryDto {
@@ -269,6 +270,34 @@ pub fn reports_replenishment_radar(
             on_hand_base_micro: row.on_hand_base_micro.to_string(),
             sold_30d_base_micro: row.sold_30d_base_micro.to_string(),
             cover_days_micro: row.cover_days_micro.to_string(),
+        })
+        .collect())
+}
+
+/// `reports.unitSalesMix` command (Gerant/Admin, S4 suggested split).
+#[tauri::command(rename_all = "snake_case")]
+pub fn reports_unit_sales_mix(
+    state: tauri::State<'_, AppState>,
+    request: UnitSalesMixRequestDto,
+) -> Result<Vec<UnitMixRowDto>, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let rows = GetUnitSalesMixUseCase::new(state.reports.as_ref())
+        .execute(
+            &session,
+            &request.product_id,
+            request.window_days.unwrap_or(0),
+        )
+        .map_err(|error| error_code(&error))?;
+    Ok(rows
+        .iter()
+        .map(|row| UnitMixRowDto {
+            unit_id: row.unit_id.clone(),
+            unit_name_fr: row.unit_name_fr.clone(),
+            unit_name_ar: row.unit_name_ar.clone(),
+            qty_base_micro: row.qty_base_micro.to_string(),
+            share_bp: row.share_bp.to_string(),
+            sample_days: row.sample_days.to_string(),
+            confidence_bp: row.confidence_bp.to_string(),
         })
         .collect())
 }

@@ -2240,6 +2240,26 @@ pub struct ReplenishmentRow {
     pub cover_days_micro: i64,
 }
 
+/// One unit-mix row (S4): share of a product's trailing-window sales that
+/// flow through one unit. All integers — shares in basis points.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct UnitMixRow {
+    /// Unit id.
+    pub unit_id: String,
+    /// French unit name.
+    pub unit_name_fr: String,
+    /// Arabic unit name.
+    pub unit_name_ar: String,
+    /// Quantity sold through this unit in base micros.
+    pub qty_base_micro: i64,
+    /// Share of the product's window sales in basis points (sums to 10000).
+    pub share_bp: i64,
+    /// Distinct sale days in the window (sample size behind confidence).
+    pub sample_days: i64,
+    /// `sample_days * 10000 / window_days`, capped at 10000.
+    pub confidence_bp: i64,
+}
+
 /// One credit-outstanding row.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CreditOutstandingRow {
@@ -2393,6 +2413,15 @@ pub trait ReportingRepository: Send + Sync {
     /// Read-time computation over `document_items` + active-warehouse
     /// `stock_levels`; zero schema. `limit` caps the returned head.
     fn replenishment_radar(&self, limit: usize) -> Result<Vec<ReplenishmentRow>, ApplicationError>;
+
+    /// Unit-mix (S4): one product's committed sales in `window_days` grouped
+    /// by selling unit, shares in basis points. Empty when the product has
+    /// no window sales. `window_days` <= 0 selects the 30-day default.
+    fn unit_sales_mix(
+        &self,
+        product_id: &str,
+        window_days: u32,
+    ) -> Result<Vec<UnitMixRow>, ApplicationError>;
 
     /// Filtered, paginated audit-log rows (newest first, generic payload).
     fn user_activity(

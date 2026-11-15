@@ -2625,6 +2625,7 @@ import type {
   SalesByProductRow,
   StockMovementFilters,
   StockMovementRow,
+  UnitMixRow,
   UserActivityFilters,
   UserActivityRow,
 } from "@/types/reports";
@@ -2727,6 +2728,16 @@ interface ReplenishmentWire {
   on_hand_base_micro: string;
   sold_30d_base_micro: string;
   cover_days_micro: string;
+}
+
+interface UnitMixWire {
+  unit_id: string;
+  unit_name_fr: string;
+  unit_name_ar: string;
+  qty_base_micro: string;
+  share_bp: string;
+  sample_days: string;
+  confidence_bp: string;
 }
 
 function rangeArgs(sessionToken: string, range: ReportDateRange): Record<string, unknown> {
@@ -2861,6 +2872,25 @@ export async function ipcReplenishmentRadar(
     onHandBaseMicro: row.on_hand_base_micro,
     sold30dBaseMicro: row.sold_30d_base_micro,
     coverDaysMicro: row.cover_days_micro,
+  }));
+}
+
+/** Unit-mix: one product's window sales split by selling unit (S4). */
+export async function ipcUnitSalesMix(
+  sessionToken: string,
+  productId: string,
+): Promise<UnitMixRow[]> {
+  const wire = await call<UnitMixWire[]>("reports_unit_sales_mix", {
+    request: { session_token: sessionToken, product_id: productId, window_days: null },
+  });
+  return wire.map((row) => ({
+    unitId: row.unit_id,
+    unitNameFr: row.unit_name_fr,
+    unitNameAr: row.unit_name_ar,
+    qtyBaseMicro: row.qty_base_micro,
+    shareBp: row.share_bp,
+    sampleDays: row.sample_days,
+    confidenceBp: row.confidence_bp,
   }));
 }
 

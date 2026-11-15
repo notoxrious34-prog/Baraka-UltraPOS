@@ -121,6 +121,17 @@ export interface ReplenishmentRow {
   coverDaysMicro: string;
 }
 
+/** One unit-mix row (mirrors UnitMixRowDto, S4). */
+export interface UnitMixRow {
+  unitId: string;
+  unitNameFr: string;
+  unitNameAr: string;
+  qtyBaseMicro: string;
+  shareBp: string;
+  sampleDays: string;
+  confidenceBp: string;
+}
+
 /** Shared date-range filter shared by every ranged report screen. */
 export interface ReportDateRange {
   dateFrom: string;

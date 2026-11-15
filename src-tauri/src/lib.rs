@@ -343,6 +343,7 @@ pub fn run() {
             baraka_commands::ipc::reports_cash_sessions_history,
             baraka_commands::ipc::reports_low_stock,
             baraka_commands::ipc::reports_replenishment_radar,
+            baraka_commands::ipc::reports_unit_sales_mix,
             baraka_commands::ipc::reports_user_activity
         ])
         .build(tauri::generate_context!())

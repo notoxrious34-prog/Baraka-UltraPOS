@@ -42,9 +42,9 @@ export function countForCategory(
 }
 
 const ACTIVE_PILL =
-  "shrink-0 rounded-full bg-primary-600 px-3 py-1.5 text-xs font-black text-white shadow-sm hover:bg-primary-900";
+  "inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-600 px-3 py-1.5 text-xs font-black text-white shadow-sm hover:bg-primary-900";
 const IDLE_PILL =
-  "shrink-0 rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700";
+  "inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700 hover:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700";
 
 export function CategoryPillStrip(props: CategoryPillStripProps): ReactElement {
   const { locale, categories, selectedCategoryId } = props;
@@ -64,7 +64,7 @@ export function CategoryPillStrip(props: CategoryPillStripProps): ReactElement {
         className={selectedCategoryId === null ? ACTIVE_PILL : IDLE_PILL}
       >
         {t(locale, "cat.allPill")}
-        <span className="ms-1 rounded-full bg-black/10 px-1.5 py-0.5 font-mono text-[11px]">
+        <span className="rounded-full bg-black/10 px-1.5 py-0.5 font-mono text-[11px]">
           {props.totalProductsCount}
         </span>
       </button>
@@ -85,7 +85,7 @@ export function CategoryPillStrip(props: CategoryPillStripProps): ReactElement {
           >
             {categoryLabel(category, locale)}
             {count !== null && (
-              <span className="ms-1 rounded-full bg-black/10 px-1.5 py-0.5 font-mono text-[11px]">
+              <span className="rounded-full bg-black/10 px-1.5 py-0.5 font-mono text-[11px]">
                 {count}
               </span>
             )}

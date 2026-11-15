@@ -441,7 +441,12 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
       </div>
 
       <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
-        {kpiCards.map((card) => {
+        {(totalCount ?? products.length) === 0 && !loading && error === null ? (
+          <p className="col-span-full rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            {t(locale, "cat.noProducts")} — {t(locale, "cat.newProduct")}
+          </p>
+        ) : (
+          kpiCards.map((card) => {
           const selected = filter === card.key;
           return (
             <button
@@ -464,7 +469,8 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
               </span>
             </button>
           );
-        })}
+          })
+        )}
       </div>
 
       {loading && <p className="shrink-0 text-xs font-bold">{t(locale, "cash.loading")}</p>}
@@ -499,6 +505,7 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
             <col style={{ width: "7%" }} />
             <col style={{ width: "12%" }} />
           </colgroup>
+          {products.length > 0 && (
           <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800">
             <tr>
               <th scope="col" className="px-3 py-2 text-start font-black">
@@ -536,6 +543,7 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
               </th>
             </tr>
           </thead>
+          )}
           <tbody>
             {products.map((product) => {
               const base = baseUnitOf(product);

@@ -182,7 +182,9 @@ export function ProductDiscovery(): ReactElement {
           }`}
         >
           <span className="font-mono">▮▮▮</span>
-          {scanFlash ? t(locale, "search.scanning") : t(locale, "search.barcodeHint")}
+          <span className="max-[1100px]:hidden">
+            {scanFlash ? t(locale, "search.scanning") : t(locale, "search.barcodeHint")}
+          </span>
         </span>
       </div>
       {lastScanned !== null && (

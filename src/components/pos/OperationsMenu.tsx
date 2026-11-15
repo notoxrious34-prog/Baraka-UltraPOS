@@ -245,7 +245,7 @@ export function OperationsMenuView({
         onClick={() => {
           setIsOpen((value) => !value);
         }}
-        className="flex h-9 items-center gap-1.5 rounded-lg bg-white/10 px-3 text-xs font-bold text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-accent-400"
+        className="flex h-7 items-center gap-1.5 rounded-md bg-white/10 px-2 text-xs font-bold text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-accent-400"
       >
         <svg
           className="h-4 w-4"

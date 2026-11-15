@@ -537,6 +537,7 @@ export function CheckoutModal(): ReactElement {
       <input
         value={value}
         disabled={disabled}
+        dir="ltr"
         onChange={(event) => {
           setValue(event.target.value);
         }}
@@ -678,23 +679,23 @@ export function CheckoutModal(): ReactElement {
         <div className="rounded-lg bg-slate-100 p-3 text-sm dark:bg-slate-800">
           <div className="flex justify-between py-0.5">
             <span>{t(locale, "totals.subtotal")}</span>
-            <span className="font-mono font-bold">{fmt(preview?.subtotal_ht_centimes)}</span>
+            <span dir="ltr" className="font-mono font-bold">{fmt(preview?.subtotal_ht_centimes)}</span>
           </div>
           <div className="flex justify-between py-0.5">
             <span>{t(locale, "totals.discount")}</span>
-            <span className="font-mono font-bold">−{fmt(preview?.global_discount_centimes)}</span>
+            <span dir="ltr" className="font-mono font-bold">−{fmt(preview?.global_discount_centimes)}</span>
           </div>
           <div className="flex justify-between py-0.5">
             <span>{t(locale, "totals.tva")}</span>
-            <span className="font-mono font-bold">{fmt(preview?.tva_total_centimes)}</span>
+            <span dir="ltr" className="font-mono font-bold">{fmt(preview?.tva_total_centimes)}</span>
           </div>
           <div className="flex justify-between py-0.5">
             <span>{t(locale, "totals.timbre")}</span>
-            <span className="font-mono font-bold">{fmt(preview?.timbre_centimes)}</span>
+            <span dir="ltr" className="font-mono font-bold">{fmt(preview?.timbre_centimes)}</span>
           </div>
           <div className="flex justify-between py-0.5 text-base font-black">
             <span>{t(locale, "totals.total")}</span>
-            <span className="font-mono tabular-nums">{fmt(preview?.total_ttc_centimes)}</span>
+            <span dir="ltr" className="font-mono tabular-nums">{fmt(preview?.total_ttc_centimes)}</span>
           </div>
           {cash !== "0" && docType !== "BL" && (
             <p className="mt-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">

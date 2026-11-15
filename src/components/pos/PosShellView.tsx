@@ -27,11 +27,6 @@ export function PosShellView(): ReactElement {
           className="flex shrink-0 items-center justify-center gap-3 bg-red-700 px-3 py-2 text-center text-xs font-black text-white"
         >
           <span>{t(locale, "cash.noSessionBanner")}</span>
-          <span lang="ar" dir="rtl">
-            {locale === "ar-DZ"
-              ? "يرجى فتح جلسة الصندوق قبل البيع."
-              : "Veuillez ouvrir une session de caisse avant de vendre."}
-          </span>
         </div>
       )}
       <main className="grid min-h-0 flex-1 grid-cols-12 gap-2 p-2">

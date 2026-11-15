@@ -137,5 +137,7 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-116 | Vertical profiles & Super-Gros tiers: domain bands, settings key, migration 0021 (TASK-BRK-117) | ACCEPTED |
 | ADR-117 | Future high-level proposals (parking lot, documented only, TASK-DSN-105 follow-up) | PROPOSED |
 | ADR-118 | Customer last-price memory: additive 0022, atomic checkout upsert, read-only recall (TASK-BRK-111) | ACCEPTED |
+| ADR-119 | Manual retest protocol for credit-checkout & initial-stock (AUD-061 outcome) | PROPOSED |
+| ADR-120 | Visual track v1.4.0 scope: P1→P5 + R3/R4 + DSN-113 (AUD-VIS-001) | PROPOSED |
 
-Next free id: ADR-119.
+Next free id: ADR-121.

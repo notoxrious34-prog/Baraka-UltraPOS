@@ -29,7 +29,8 @@ no floats; atomic sale untouched; Gates G1–G7 per wave; innovation section
 ## WAVE 2 — Profiles, Super-Gros & Price Memory
 **Goal:** the system speaks each trade's language and remembers its prices.
 - `TASK-BRK-117` — Vertical profiles (`apparel_wholesale_retail` |
-  `hardware_general` | `hybrid_enterprise`) + `Super-Gros`/quantity-break tiers
+  `hardware_general` | `hybrid_enterprise`) + flat `Super-Gros` tier (no
+  quantity-breaks — deferred to S1/`BRK-121` per AUD-060/G-D1 errata)
   extending `0015` semantics (new additive migration; `price_for_tier`
   untouched in shape). Renumbered from `BRK-110` per ADR-115 (credit
   aggregator shipped under that number).

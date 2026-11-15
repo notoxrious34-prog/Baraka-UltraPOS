@@ -17,6 +17,11 @@ import { QuickProductPalette } from "@/features/pos/QuickProductPalette";
 import { QuickProductsConfigModal } from "@/features/pos/QuickProductsConfigModal";
 import { useQuickProductsStore } from "@/stores/quick-products-store";
 import { ipcGetStock } from "@/lib/ipc";
+import {
+  isSpeechRecognitionSupported,
+  isVoicePickingEnabled,
+  startVoiceSearch,
+} from "@/lib/voice-picking";
 import { t } from "@/lib/i18n";
 import { formatMoney, formatQty } from "@/lib/money";
 import type { CatalogProduct } from "@/types/pos";
@@ -72,6 +77,43 @@ export function ProductDiscovery(): ReactElement {
     timestamp: number;
   } | null>(null);
   const scanTimer = useRef<number | null>(null);
+  // S6 experimental voice picking: mic renders only behind the opt-in flag
+  // AND a real recognizer. Transcript -> search box (visual confirm); the
+  // operator still picks the row and adds it — never auto-add.
+  const [voiceOn] = useState(() => isVoicePickingEnabled() && isSpeechRecognitionSupported());
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const stopVoice = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    return () => {
+      stopVoice.current?.();
+    };
+  }, []);
+  const handleMic = (): void => {
+    if (listening) {
+      stopVoice.current?.();
+      return;
+    }
+    setVoiceError(null);
+    try {
+      setListening(true);
+      stopVoice.current = startVoiceSearch(locale, {
+        onTranscript: (text) => {
+          setSearchQuery(text);
+        },
+        onSpeechError: (code) => {
+          setVoiceError(code);
+        },
+        onEnd: () => {
+          setListening(false);
+          stopVoice.current = null;
+        },
+      });
+    } catch {
+      setListening(false);
+      setVoiceError("UNSUPPORTED");
+    }
+  };
 
   // Tile stock chips: best-effort per-product levels for the visible rows,
   // same `stock_get` source as the catalog hub. Failures stay "…".
@@ -174,6 +216,22 @@ export function ProductDiscovery(): ReactElement {
           autoComplete="off"
           className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-600/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         />
+        {voiceOn && (
+          <button
+            type="button"
+            onClick={handleMic}
+            title={t(locale, "voice.micHint")}
+            aria-label={t(locale, "voice.micHint")}
+            aria-pressed={listening}
+            className={`h-11 w-11 shrink-0 rounded-lg text-base font-black ${
+              listening
+                ? "animate-pulse bg-red-600 text-white"
+                : "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+            }`}
+          >
+            {listening ? "●" : "◉"}
+          </button>
+        )}
         <span
           className={`flex h-11 shrink-0 items-center gap-1 rounded-lg px-3 text-xs font-bold ${
             scanFlash
@@ -194,6 +252,20 @@ export function ProductDiscovery(): ReactElement {
           {" — "}
           {t(locale, "pos.itemScannedSuccess")}
         </div>
+      )}
+      {(listening || voiceError !== null) && (
+        <p className="px-1 text-xs font-bold text-slate-500">
+          {listening ? (
+            t(locale, "voice.listening")
+          ) : (
+            <>
+              {t(locale, "voice.error")}
+              {" ("}
+              <bdi dir="ltr">{voiceError}</bdi>
+              {")"}
+            </>
+          )}
+        </p>
       )}
 
       <div className="flex shrink-0 flex-wrap items-center gap-1">

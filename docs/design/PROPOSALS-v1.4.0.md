@@ -41,8 +41,8 @@
 | S2 | Devis→BL | `تحويل إلى BL` بإعادة `DocumentConversion` + أسعار مجمدة + ذرية | BL مسودة من Devis بسعر مجمد |
 | S3 ✅ | Replenishment Radar | `sales_velocity(30d)` + `days_of_cover` قراءة-وقتية؛ صفر سكيمة | تبويب Radar في المخزون + شارة تغطية ملوّنة لكل صف (G3 ‏661/0/7 + G7 ‏976/976) |
 | S4 ✅ | Size-Run | تجميع `size × qty` من `document_items`؛ قراءة فقط | التوزيع المقترح (ثقة %) — طيّة mix لكل صف رادار (G3 ‏662/0/7 + G7 ‏980/980) |
-| S5 | Multi-Counter Sync | **ADR مستقل أولًا**؛ `sequence` لكل طرفية + `outbox` | صندوقان بلا تصادم تسلسل |
-| S6 | Voice Picking | تجريبي خلف flag؛ Web Speech → نفس `catalog_search`؛ صفر محرك | أمر صوتي → تأكيد بصري → إضافة |
+| S5 | Multi-Counter Sync | **ADR-123 مستقل أولًا**؛ `sequence` لكل طرفية + `outbox` | ADR-123 مكتوب (PROPOSED)؛ التنفيذ مؤجل لما بعد R الميدانية |
+| S6 ✅ | Voice Picking | تجريبي خلف flag (`localStorage baraka.voicePicking`)؛ Web Speech → نفس `catalog_search`؛ صفر محرك | زر ميك مخفي افتراضيًا؛ النص → مربع البحث (تأكيد بصري) → الإضافة اليدوية المعتادة |
 
 ## الترتيب المقترح للتنفيذ
 `R1 → R2 → R3/R4` ← `P1 ← P2 ← P3/P4/P5` ← `S1/S2 ← S3/S4 ← S5(ADR) ← S6`.

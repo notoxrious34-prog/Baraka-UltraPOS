@@ -149,4 +149,20 @@ describe("scan-to-cart i18n and source contracts", () => {
     expect(PANEL_SRC).toContain('"search.noResults"');
     expect(PANEL_SRC).toContain('"search.discoveryTitle"');
   });
+
+  it("gates the experimental mic behind flag + recognizer, transcript into search only", () => {
+    // S6: no auto-add — transcript lands in the search box (visual confirm),
+    // the existing pick flow owns the add.
+    expect(PANEL_SRC).toContain(
+      "isVoicePickingEnabled() && isSpeechRecognitionSupported()",
+    );
+    expect(PANEL_SRC).toContain("startVoiceSearch(locale, {");
+    expect(PANEL_SRC).toContain("onTranscript: (text) => {");
+    expect(PANEL_SRC).toContain("setSearchQuery(text)");
+    expect(PANEL_SRC).toContain('t(locale, "voice.micHint")');
+    expect(PANEL_SRC).toContain('t(locale, "voice.listening")');
+    expect(PANEL_SRC).toContain('t(locale, "voice.error")');
+    expect(I18N_SRC).toContain('"voice.micHint": "Recherche vocale (expérimental)"');
+    expect(I18N_SRC).toContain('"voice.micHint": "بحث صوتي (تجريبي)"');
+  });
 });

@@ -2,16 +2,17 @@
 use super::{error_code, require_session, AppState};
 use baraka_application::use_cases::reports::{
     GetCashSessionsHistoryUseCase, GetCreditOutstandingReportUseCase, GetDailySalesSummaryUseCase,
-    GetGrossMarginReportUseCase, GetLowStockReportUseCase, GetSalesByCategoryUseCase,
-    GetSalesByProductUseCase, GetStockMovementHistoryUseCase, GetUserActivityLogUseCase,
+    GetGrossMarginReportUseCase, GetLowStockReportUseCase, GetReplenishmentRadarUseCase,
+    GetSalesByCategoryUseCase, GetSalesByProductUseCase, GetStockMovementHistoryUseCase,
+    GetUserActivityLogUseCase,
 };
 
 use crate::dto::{
     CashSessionHistoryRowDto, CashSessionsHistoryRequestDto, CreditOutstandingRowDto,
     DailySalesSummaryDto, GrossMarginRowDto, LowStockRequestDto, LowStockRowDto,
-    ReportDateRangeRequestDto, SalesByCategoryRowDto, SalesByProductRowDto,
-    StockMovementHistoryRequestDto, StockMovementRowDto, UserActivityRequestDto,
-    UserActivityRowDto,
+    ReplenishmentRadarRequestDto, ReplenishmentRowDto, ReportDateRangeRequestDto,
+    SalesByCategoryRowDto, SalesByProductRowDto, StockMovementHistoryRequestDto,
+    StockMovementRowDto, UserActivityRequestDto, UserActivityRowDto,
 };
 
 fn to_daily_sales_dto(row: &baraka_application::ports::DailySalesRow) -> DailySalesSummaryDto {
@@ -244,6 +245,30 @@ pub fn reports_low_stock(
             warehouse_id: row.warehouse_id.clone(),
             warehouse_code: row.warehouse_code.clone(),
             quantity_base_micro: row.quantity_base_micro.to_string(),
+        })
+        .collect())
+}
+
+/// `reports.replenishmentRadar` command (Gerant/Admin, S3 movers only).
+#[tauri::command(rename_all = "snake_case")]
+pub fn reports_replenishment_radar(
+    state: tauri::State<'_, AppState>,
+    request: ReplenishmentRadarRequestDto,
+) -> Result<Vec<ReplenishmentRowDto>, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let rows = GetReplenishmentRadarUseCase::new(state.reports.as_ref())
+        .execute(&session, request.limit.unwrap_or(0) as usize)
+        .map_err(|error| error_code(&error))?;
+    Ok(rows
+        .iter()
+        .map(|row| ReplenishmentRowDto {
+            product_id: row.product_id.clone(),
+            sku: row.sku.clone(),
+            name_fr: row.name_fr.clone(),
+            name_ar: row.name_ar.clone(),
+            on_hand_base_micro: row.on_hand_base_micro.to_string(),
+            sold_30d_base_micro: row.sold_30d_base_micro.to_string(),
+            cover_days_micro: row.cover_days_micro.to_string(),
         })
         .collect())
 }

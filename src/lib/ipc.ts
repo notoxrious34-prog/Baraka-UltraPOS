@@ -2619,6 +2619,7 @@ import type {
   DailySalesRow,
   GrossMarginRow,
   LowStockRow,
+  ReplenishmentRow,
   ReportDateRange,
   SalesByCategoryRow,
   SalesByProductRow,
@@ -2716,6 +2717,16 @@ interface LowStockWire {
   warehouse_id: string;
   warehouse_code: string;
   quantity_base_micro: string;
+}
+
+interface ReplenishmentWire {
+  product_id: string;
+  sku: string;
+  name_fr: string;
+  name_ar: string;
+  on_hand_base_micro: string;
+  sold_30d_base_micro: string;
+  cover_days_micro: string;
 }
 
 function rangeArgs(sessionToken: string, range: ReportDateRange): Record<string, unknown> {
@@ -2831,6 +2842,25 @@ export async function ipcLowStock(
     warehouseId: row.warehouse_id,
     warehouseCode: row.warehouse_code,
     quantityBaseMicro: row.quantity_base_micro,
+  }));
+}
+
+/** Replenishment radar: trailing-30d movers, most urgent first (S3). */
+export async function ipcReplenishmentRadar(
+  sessionToken: string,
+  limit: number,
+): Promise<ReplenishmentRow[]> {
+  const wire = await call<ReplenishmentWire[]>("reports_replenishment_radar", {
+    request: { session_token: sessionToken, limit },
+  });
+  return wire.map((row) => ({
+    productId: row.product_id,
+    sku: row.sku,
+    nameFr: row.name_fr,
+    nameAr: row.name_ar,
+    onHandBaseMicro: row.on_hand_base_micro,
+    sold30dBaseMicro: row.sold_30d_base_micro,
+    coverDaysMicro: row.cover_days_micro,
   }));
 }
 

@@ -13,9 +13,9 @@ use baraka_application::ports::{ProductRepository, WarehouseRepository};
 use baraka_application::use_cases::cash::OpenCashSessionUseCase;
 use baraka_application::use_cases::reports::{
     GetCashSessionsHistoryUseCase, GetCreditOutstandingReportUseCase, GetDailySalesSummaryUseCase,
-    GetGrossMarginReportUseCase, GetLowStockReportUseCase, GetSalesByCategoryUseCase,
-    GetSalesByProductUseCase, GetStockMovementHistoryUseCase, GetUserActivityLogUseCase,
-    MAX_PAGE_SIZE,
+    GetGrossMarginReportUseCase, GetLowStockReportUseCase, GetReplenishmentRadarUseCase,
+    GetSalesByCategoryUseCase, GetSalesByProductUseCase, GetStockMovementHistoryUseCase,
+    GetUserActivityLogUseCase, MAX_PAGE_SIZE,
 };
 use baraka_domain::catalog::{Barcode, CategoryId, Product, ProductId, ProductUnit, Sku, UnitId};
 use baraka_domain::errors::DomainError;
@@ -976,4 +976,162 @@ fn gross_margin_flags_zero_cost_lines_as_untracked() {
         .find(|row| row.product_id == fixture.p2.0.to_string())
         .expect("p2 bucket");
     assert!(!p2.has_untracked_cost);
+}
+
+/// Replenishment radar (S3): movers only, stockout first, then lowest
+/// cover. Hand-computed: P4 rowless (cover 0) < P1 (5 days) < P2
+/// (300 days); P3 (no sales), old sales, and drafts never surface.
+#[test]
+fn replenishment_radar_orders_movers_by_cover() {
+    let (harness, fixture) = setup();
+    let recent = (chrono::Utc::now() - chrono::TimeDelta::days(5))
+        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let old = (chrono::Utc::now() - chrono::TimeDelta::days(40))
+        .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    // P4: rowless mover (20 units recent) — cover 0, most urgent.
+    let p4 = ProductId::new();
+    let p4_unit = UnitId::new();
+    harness
+        ._catalog
+        .create_product(
+            &Product {
+                id: p4,
+                sku: Sku::new("REP-P4").expect("sku"),
+                barcode: None,
+                name_ar: "منتج".to_string(),
+                name_fr: "Produit REP-P4".to_string(),
+                category_id: None,
+                is_kit: false,
+                is_active: true,
+            },
+            &[ProductUnit {
+                id: p4_unit,
+                product_id: p4,
+                unit_name_ar: "قطعة".to_string(),
+                unit_name_fr: "Pièce".to_string(),
+                factor_micro: FactorMicro::from_micros(10_000),
+                barcode: None,
+                sale_price: Money::from_centimes(10_000),
+                purchase_price: Money::from_centimes(8_000),
+                wholesale_price: None,
+                super_gros_price: None,
+                is_base_unit: true,
+                is_default_selling: true,
+            }],
+            &harness.terminal_id,
+        )
+        .expect("p4");
+    {
+        let guard = harness.db.lock().expect("lock");
+        let mut seq = 100i64;
+        let mut doc = |number: &str, doc_type: &str, status: &str, created: &str, ttc: i64| {
+            seq += 1;
+            let id = format!("22222222-2222-4000-8000-{seq:012}");
+            exec(
+                &guard,
+                "INSERT INTO documents
+                 (id, number, fiscal_year, type, party_type, party_id,
+                  source_document_id, warehouse_id, document_language, language,
+                  subtotal_ht_centimes, vat_total_centimes, global_discount_centimes,
+                  timbre_centimes, rounding_centimes, ttc_centimes,
+                  paid_amount_centimes, change_amount_centimes, payment_method,
+                  status, created_at, created_by, revision, origin_device_id, notes)
+                 VALUES (?1, ?2, 2026, ?3, 'NONE', '', NULL, ?4, 'FR', 'FR', ?5, 0, 0,
+                         0, 0, ?5, ?5, 0, 'CASH', ?6, ?7, ?8, 1, ?9, NULL)",
+                &[
+                    &id,
+                    &number.to_string(),
+                    &doc_type.to_string(),
+                    &harness.warehouse_id.to_string(),
+                    &ttc,
+                    &status.to_string(),
+                    &created.to_string(),
+                    &GERANT_UUID.to_string(),
+                    &harness.terminal_id,
+                ],
+            );
+            id
+        };
+        let mut item_seq = 100i64;
+        let mut item = |doc: &str, product: ProductId, unit: UnitId, qty_units: i64, price: i64| {
+            item_seq += 1;
+            let id = format!("33333333-3333-4000-8000-{item_seq:012}");
+            let micros = qty_units * 10_000;
+            exec(
+                &guard,
+                "INSERT INTO document_items
+                 (id, document_id, product_id, unit_id, source_item_id,
+                  quantity_micro, quantity_base_micro, unit_price_centimes,
+                  discount_centimes, tva_rate_micro, tax_exemption_code,
+                  line_ht_centimes, line_tva_centimes, line_ttc_centimes,
+                  cost_price_centimes, sort_order)
+                 VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?5, ?6, 0, 0, NULL, ?7, 0, ?7, ?6, 1)",
+                &[
+                    &id,
+                    &doc.to_string(),
+                    &product.to_string(),
+                    &unit.to_string(),
+                    &micros,
+                    &price,
+                    &(price * qty_units),
+                ],
+            );
+        };
+        // P1: 30 units recent TICKET (velocity 1/day).
+        let d1 = doc("RAD-1", "TICKET", "FINALIZED", &recent, 300_000);
+        item(&d1, fixture.p1.0, fixture.p1.1, 30, 10_000);
+        // P1 draft: 50 units must NOT count.
+        let d1d = doc("RAD-2", "TICKET", "DRAFT", &recent, 500_000);
+        item(&d1d, fixture.p1.0, fixture.p1.1, 50, 10_000);
+        // P2: 10 units recent + 50 units 40d ago (cutoff excludes the old).
+        let d2 = doc("RAD-3", "TICKET", "FINALIZED", &recent, 200_000);
+        item(&d2, fixture.p2.0, fixture.p2.1, 10, 20_000);
+        let d2o = doc("RAD-4", "TICKET", "FINALIZED", &old, 1_000_000);
+        item(&d2o, fixture.p2.0, fixture.p2.1, 50, 20_000);
+        // P4: 20 units recent BL.
+        let d4 = doc("RAD-5", "BL", "FINALIZED", &recent, 200_000);
+        item(&d4, p4, p4_unit, 20, 10_000);
+        // Stock: P1 five units, P2 one hundred units; P4 rowless (0).
+        let put = |product: ProductId, micros: i64| {
+            guard
+                .execute(
+                    "INSERT INTO stock_levels
+                     (warehouse_id, product_id, quantity_micro, quantity_base_micro,
+                      revision, updated_at)
+                     VALUES (?1, ?2, ?3, ?3, 0, '2026-09-21T00:00:00.000Z')
+                     ON CONFLICT(warehouse_id, product_id) DO UPDATE
+                     SET quantity_base_micro = excluded.quantity_base_micro",
+                    rusqlite::params![
+                        harness.warehouse_id.to_string(),
+                        product.to_string(),
+                        micros,
+                    ],
+                )
+                .expect("level");
+        };
+        put(fixture.p1.0, 50_000);
+        put(fixture.p2.0, 1_000_000);
+    }
+    let view = |limit: usize| {
+        GetReplenishmentRadarUseCase::new(&harness.reports)
+            .execute(&gerant(), limit)
+            .expect("radar")
+    };
+    // P1 cover = 50_000 * 30d / 300_000 = 5 days = 50_000 day-micros.
+    // P2 cover = 1_000_000 * 30d / 100_000 = 300 days (old sale excluded).
+    // P4 cover = 0 (rowless). P3 never sold: absent.
+    let all = view(10);
+    assert_eq!(all.len(), 3);
+    assert_eq!(all[0].sku, "REP-P4");
+    assert_eq!(all[0].cover_days_micro, 0);
+    assert_eq!(all[1].sku, "REP-P1");
+    assert_eq!(all[1].cover_days_micro, 50_000);
+    assert_eq!(all[1].sold_30d_base_micro, 300_000);
+    assert_eq!(all[2].sku, "REP-P2");
+    assert_eq!(all[2].cover_days_micro, 3_000_000);
+    assert_eq!(all[2].sold_30d_base_micro, 100_000);
+    let head = view(2);
+    assert_eq!(head.len(), 2);
+    assert_eq!(head[0].sku, "REP-P4");
+    assert_eq!(head[1].sku, "REP-P1");
 }

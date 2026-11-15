@@ -19,19 +19,21 @@ import { useWarehouseTransferStore } from "@/stores/warehouse-transfer-store";
 import {
   ipcListWarehouses,
   ipcLowStock,
+  ipcReplenishmentRadar,
   ipcStockMovementHistory,
 } from "@/lib/ipc";
 import type { WarehouseInfo } from "@/types/pos";
-import type { LowStockRow, StockMovementRow } from "@/types/reports";
+import type { LowStockRow, ReplenishmentRow, StockMovementRow } from "@/types/reports";
 import { todayIso } from "@/features/reports/components/ReportDateRangePicker";
 import { StockAdjustModal } from "@/components/pos/modals/StockAdjustModal";
 import { WarehouseTransferModal } from "@/components/pos/modals/WarehouseTransferModal";
 import { StockOverviewPane } from "@/features/stock/StockOverviewPane";
+import { ReplenishmentPane } from "@/features/stock/ReplenishmentPane";
 import { StockMovementHistoryPane } from "@/features/stock/StockMovementHistoryPane";
 import { WarehouseCreateModal } from "@/features/stock/WarehouseCreateModal";
 import type { MovementGroup } from "@/features/stock/stock-helpers";
 
-type StockTab = "alerts" | "history";
+type StockTab = "alerts" | "history" | "radar";
 
 export function StockModule(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
@@ -46,6 +48,8 @@ export function StockModule(): ReactElement {
   const [warehouses, setWarehouses] = useState<WarehouseInfo[]>([]);
   const [warehouseId, setWarehouseId] = useState<string | null>(null);
   const [lowRows, setLowRows] = useState<LowStockRow[]>([]);
+  const [radarRows, setRadarRows] = useState<ReplenishmentRow[]>([]);
+  const [radarForbidden, setRadarForbidden] = useState(false);
   const [moveRows, setMoveRows] = useState<StockMovementRow[]>([]);
   const [group, setGroup] = useState<MovementGroup>("ALL");
   const [loading, setLoading] = useState(false);
@@ -59,6 +63,8 @@ export function StockModule(): ReactElement {
   const canTransfer = session !== null && hasPermission("TRANSFER_STOCK");
   const canManageWarehouses = session !== null && hasPermission("MANAGE_WAREHOUSES");
 
+  const canViewRadar = session !== null && hasPermission("REPORTS_VIEW");
+
   useEffect(() => {
     if (token === null) {
       return;
@@ -67,6 +73,12 @@ export function StockModule(): ReactElement {
     setLoading(true);
     setListError(null);
     const today = todayIso();
+    // Radar degrades on its own: a ReportsView refusal (or any failure)
+    // empties the radar tab without nuking the stock lists.
+    const radarRequest =
+      canViewRadar && session !== null
+        ? ipcReplenishmentRadar(session.token, 50).catch(() => [] as ReplenishmentRow[])
+        : Promise.resolve([] as ReplenishmentRow[]);
     Promise.all([
       ipcListWarehouses(),
       ipcLowStock(token, warehouseId),
@@ -79,12 +91,15 @@ export function StockModule(): ReactElement {
         limit: "100",
         offset: "0",
       }),
+      radarRequest,
     ])
-      .then(([listed, low, moves]) => {
+      .then(([listed, low, moves, radar]) => {
         if (!cancelled) {
           setWarehouses(listed);
           setLowRows(low);
           setMoveRows(moves);
+          setRadarRows(radar);
+          setRadarForbidden(!canViewRadar);
           setLoading(false);
         }
       })
@@ -93,13 +108,14 @@ export function StockModule(): ReactElement {
           setListError(typeof failure === "string" ? failure : "INTERNAL_ERROR");
           setLowRows([]);
           setMoveRows([]);
+          setRadarRows([]);
           setLoading(false);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [token, warehouseId, refreshTick]);
+  }, [token, warehouseId, refreshTick, canViewRadar, session]);
 
   // Refresh after adjust/transfer modals close (stock changed underneath).
   // Fires only on a real close transition, never on mount.
@@ -191,6 +207,19 @@ export function StockModule(): ReactElement {
           >
             {t(locale, "stock.tabHistory")}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTab("radar");
+            }}
+            className={`h-10 rounded-lg px-3 text-xs font-bold ${
+              tab === "radar"
+                ? "bg-primary-900 text-white dark:bg-primary-700"
+                : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+            }`}
+          >
+            {t(locale, "stock.tabRadar")}
+          </button>
         </div>
         <div className="ms-auto flex flex-wrap gap-1">
           <button
@@ -239,6 +268,13 @@ export function StockModule(): ReactElement {
           loading={loading}
           canAdjust={canAdjust}
           onAdjust={openAdjust}
+        />
+      ) : tab === "radar" ? (
+        <ReplenishmentPane
+          locale={locale}
+          rows={radarRows}
+          loading={loading}
+          error={radarForbidden ? t(locale, "radar.reservedGuidance") : null}
         />
       ) : (
         <StockMovementHistoryPane

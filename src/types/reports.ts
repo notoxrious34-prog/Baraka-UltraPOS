@@ -110,6 +110,17 @@ export interface LowStockRow {
   quantityBaseMicro: string;
 }
 
+/** One replenishment-radar row (mirrors ReplenishmentRowDto, S3). */
+export interface ReplenishmentRow {
+  productId: string;
+  sku: string;
+  nameFr: string;
+  nameAr: string;
+  onHandBaseMicro: string;
+  sold30dBaseMicro: string;
+  coverDaysMicro: string;
+}
+
 /** Shared date-range filter shared by every ranged report screen. */
 export interface ReportDateRange {
   dateFrom: string;

@@ -14,8 +14,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
     CashSessionHistoryRow, CreditOutstandingRow, DailySalesRow, GrossMarginRow, LowStockRow,
-    ReportingRepository, SalesByCategoryRow, SalesByProductRow, StockMovementHistoryRow,
-    UserActivityRow,
+    ReplenishmentRow, ReportingRepository, SalesByCategoryRow, SalesByProductRow,
+    StockMovementHistoryRow, UserActivityRow,
 };
 use baraka_domain::inventory::StockMovementType;
 use baraka_domain::primitives::{Money, QtyMicro};
@@ -577,6 +577,78 @@ impl ReportingRepository for SqliteReportingRepository {
                 },
             )
             .collect()
+    }
+
+    fn replenishment_radar(&self, limit: usize) -> Result<Vec<ReplenishmentRow>, ApplicationError> {
+        let guard = self.lock()?;
+        // Trailing-30d cutoff as fixed-width RFC3339 (lexicographic compare
+        // is chronological here — same contract as every sales aggregate).
+        let cutoff = (chrono::Utc::now() - chrono::TimeDelta::days(30))
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        // Movers only (INNER JOIN velocity); on-hand sums active warehouses
+        // with rowless products reading 0. Cover math stays in Rust (`i128`).
+        let mut statement = guard
+            .prepare(&format!(
+                "SELECT p.id, p.sku, p.name_fr, p.name_ar,
+                        COALESCE(oh.qty, 0), v.sold30
+                 FROM products p
+                 JOIN (SELECT di.product_id AS pid, SUM(di.quantity_base_micro) AS sold30
+                       FROM document_items di
+                       JOIN documents d ON d.id = di.document_id
+                       WHERE d.created_at >= ?1 AND {COMMITTED_SALES}
+                       GROUP BY di.product_id) v ON v.pid = p.id
+                 LEFT JOIN (SELECT sl.product_id AS pid, SUM(sl.quantity_base_micro) AS qty
+                            FROM stock_levels sl
+                            WHERE sl.warehouse_id IN
+                                  (SELECT id FROM warehouses WHERE is_active = 1)
+                            GROUP BY sl.product_id) oh ON oh.pid = p.id
+                 WHERE p.is_active = 1"
+            ))
+            .map_err(|_| store_failure())?;
+        let rows = statement
+            .query_map([cutoff], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, i64>(5)?,
+                ))
+            })
+            .map_err(|_| store_failure())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| store_failure())?;
+        let mut out = Vec::with_capacity(rows.len());
+        for (product_id, sku, name_fr, name_ar, on_hand, sold30) in rows {
+            // sold30 > 0 by construction (INNER JOIN over a SUM of committed
+            // sale lines); the guard keeps a corrupt zero out of division.
+            if sold30 <= 0 {
+                continue;
+            }
+            let cover = (i128::from(on_hand) * 30 * 10_000 / i128::from(sold30))
+                .try_into()
+                .map_err(|_| store_failure())?;
+            out.push(ReplenishmentRow {
+                product_id,
+                sku,
+                name_fr,
+                name_ar,
+                on_hand_base_micro: on_hand,
+                sold_30d_base_micro: sold30,
+                cover_days_micro: cover,
+            });
+        }
+        // Most urgent first: depleted stock, then lowest cover; SKU breaks
+        // ties deterministically.
+        out.sort_by(|a, b| {
+            (a.on_hand_base_micro > 0)
+                .cmp(&(b.on_hand_base_micro > 0))
+                .then(a.cover_days_micro.cmp(&b.cover_days_micro))
+                .then(a.sku.cmp(&b.sku))
+        });
+        out.truncate(limit);
+        Ok(out)
     }
 
     fn user_activity(

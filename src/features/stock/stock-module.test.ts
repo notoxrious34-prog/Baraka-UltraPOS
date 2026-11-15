@@ -25,6 +25,7 @@ const MODULE_SRC = readSrc("src", "features", "stock", "StockModule.tsx");
 const OVERVIEW_SRC = readSrc("src", "features", "stock", "StockOverviewPane.tsx");
 const HISTORY_SRC = readSrc("src", "features", "stock", "StockMovementHistoryPane.tsx");
 const FORM_SRC = readSrc("src", "features", "stock", "WarehouseCreateModal.tsx");
+const RADAR_SRC = readSrc("src", "features", "stock", "ReplenishmentPane.tsx");
 
 describe("stock i18n keys", () => {
   it("declares nav.stock and the stock.* namespace in FR", () => {
@@ -33,6 +34,10 @@ describe("stock i18n keys", () => {
       '"stock.title": "Stock & Dépôts"',
       '"stock.tabAlerts": "Aperçu & Alertes Ruptures"',
       '"stock.tabHistory": "Historique des Mouvements"',
+      '"stock.tabRadar": "Radar Réappro"',
+      '"radar.movers": "Articles Suivis"',
+      '"radar.ruptures": "Ruptures Imminentes"',
+      '"radar.empty": "Aucun mouvement sur 30 jours',
       '"stock.noRupture": "Aucune rupture de stock détectée"',
       '"stock.adjust": "Régularisation"',
       '"stock.transfer": "Transfert Inter-Dépôts"',
@@ -47,6 +52,9 @@ describe("stock i18n keys", () => {
       '"nav.stock": "المخزون والمستودعات"',
       '"stock.tabAlerts": "نظرة عامة وتنبيهات النفاذ"',
       '"stock.tabHistory": "سجل حركات المخزون"',
+      '"stock.tabRadar": "رادار التموين"',
+      '"radar.movers": "أصناف متحركة"',
+      '"radar.ruptures": "نفاد وشيك"',
       '"stock.noRupture": "لا توجد تنبيهات نفاذ مخزون"',
       '"stock.adjust": "تسوية مخزون"',
       '"stock.transfer": "تحويل بين المستودعات"',
@@ -78,11 +86,30 @@ describe("navigation and IPC wiring", () => {
 });
 
 describe("module surface", () => {
-  it("tabs switch alerts and history panes", () => {
+  it("tabs switch alerts, history, and radar panes", () => {
     expect(MODULE_SRC).toContain('setTab("alerts")');
     expect(MODULE_SRC).toContain('setTab("history")');
+    expect(MODULE_SRC).toContain('setTab("radar")');
     expect(MODULE_SRC).toContain("<StockOverviewPane");
     expect(MODULE_SRC).toContain("<StockMovementHistoryPane");
+    expect(MODULE_SRC).toContain("<ReplenishmentPane");
+  });
+
+  it("radar loads movers behind REPORTS_VIEW and degrades without nuking stock lists", () => {
+    expect(MODULE_SRC).toContain('hasPermission("REPORTS_VIEW")');
+    expect(MODULE_SRC).toContain("ipcReplenishmentRadar(session.token, 50)");
+    expect(MODULE_SRC).toContain("radar.reservedGuidance");
+    expect(IPC_SRC).toContain("export async function ipcReplenishmentRadar");
+    expect(IPC_SRC).toContain('call<ReplenishmentWire[]>("reports_replenishment_radar"');
+  });
+
+  it("radar pane isolates figures in bdi and never touches floats", () => {
+    expect(RADAR_SRC).toContain("formatQty(row.coverDaysMicro)");
+    expect(RADAR_SRC).toContain('<bdi dir="ltr"');
+    expect(RADAR_SRC).toContain("tabular-nums");
+    expect(RADAR_SRC).toContain('t(locale, "radar.empty")');
+    expect(RADAR_SRC).not.toContain("parseFloat");
+    expect(RADAR_SRC).not.toContain("Number(");
   });
 
   it("warehouse selector reloads low-stock and movement lists", () => {

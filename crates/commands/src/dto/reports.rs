@@ -241,6 +241,34 @@ pub struct LowStockRowDto {
     pub quantity_base_micro: String,
 }
 
+/// One replenishment-radar row (S3): trailing-30d mover, most urgent first.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplenishmentRowDto {
+    /// Product id.
+    pub product_id: String,
+    /// Product SKU.
+    pub sku: String,
+    /// French display name.
+    pub name_fr: String,
+    /// Arabic display name.
+    pub name_ar: String,
+    /// On-hand across active warehouses in base micros (rowless = 0).
+    pub on_hand_base_micro: String,
+    /// Sold in the trailing 30 days in base micros (> 0).
+    pub sold_30d_base_micro: String,
+    /// Days of cover in day-micros (10^4 micros per day).
+    pub cover_days_micro: String,
+}
+
+/// `reports.replenishmentRadar` request (Gerant/Admin).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplenishmentRadarRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Head size (0 selects the default page size, max 200).
+    pub limit: Option<u32>,
+}
+
 /// `reports.lowStock` request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LowStockRequestDto {

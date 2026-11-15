@@ -10,7 +10,7 @@ use baraka_domain::role::Permission;
 use crate::errors::ApplicationError;
 use crate::ports::{
     CashSessionHistoryRow, CreditOutstandingRow, DailySalesRow, GrossMarginRow, LowStockRow,
-    ReportingRepository, SalesByCategoryRow, SalesByProductRow, SessionContext,
+    ReplenishmentRow, ReportingRepository, SalesByCategoryRow, SalesByProductRow, SessionContext,
     StockMovementHistoryRow, UserActivityRow,
 };
 
@@ -296,6 +296,35 @@ where
         require_reports(session)?;
         self.reports
             .low_stock(warehouse_id.map(str::trim).filter(|v| !v.is_empty()))
+    }
+}
+
+/// Replenishment radar (S3): trailing-30d movers, most urgent first.
+/// Read-only; `limit` caps the head (0 selects the default page size).
+pub struct GetReplenishmentRadarUseCase<'a, R>
+where
+    R: ?Sized,
+{
+    reports: &'a R,
+}
+
+impl<'a, R> GetReplenishmentRadarUseCase<'a, R>
+where
+    R: ReportingRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(reports: &'a R) -> Self {
+        Self { reports }
+    }
+
+    /// Active products with trailing-30d committed sales, most urgent first.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        limit: usize,
+    ) -> Result<Vec<ReplenishmentRow>, ApplicationError> {
+        require_reports(session)?;
+        self.reports.replenishment_radar(resolve_limit(limit)?)
     }
 }
 

@@ -39,7 +39,7 @@
 |---|---|---|---|
 | S1 | Quantity-Break | `price_breaks(unit,min_qty,price)` فوق `price_for_tier`؛ شريط `12+ → −3%` | كسر يُطبَّق حيًا ويُطبع |
 | S2 | Devis→BL | `تحويل إلى BL` بإعادة `DocumentConversion` + أسعار مجمدة + ذرية | BL مسودة من Devis بسعر مجمد |
-| S3 | Replenishment Radar | `sales_velocity(30d)` + `days_of_cover` قراءة-وقتية؛ صفر سكيمة | لوحة `Top Ruptures` + شارة بطاقة |
+| S3 ✅ | Replenishment Radar | `sales_velocity(30d)` + `days_of_cover` قراءة-وقتية؛ صفر سكيمة | تبويب Radar في المخزون + شارة تغطية ملوّنة لكل صف (G3 ‏661/0/7 + G7 ‏976/976) |
 | S4 | Size-Run | تجميع `size × qty` من `document_items`؛ قراءة فقط | `التوزيع المقترح (ثقة %)` |
 | S5 | Multi-Counter Sync | **ADR مستقل أولًا**؛ `sequence` لكل طرفية + `outbox` | صندوقان بلا تصادم تسلسل |
 | S6 | Voice Picking | تجريبي خلف flag؛ Web Speech → نفس `catalog_search`؛ صفر محرك | أمر صوتي → تأكيد بصري → إضافة |

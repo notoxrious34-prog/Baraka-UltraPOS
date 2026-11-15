@@ -2219,6 +2219,27 @@ pub struct LowStockRow {
     pub quantity_base_micro: i64,
 }
 
+/// One replenishment-radar row (S3): movers only, most urgent first.
+/// All integers — `cover_days_micro` (10^4 micros per day) computed with
+/// `i128` intermediates.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ReplenishmentRow {
+    /// Product id.
+    pub product_id: String,
+    /// Product SKU.
+    pub sku: String,
+    /// French display name.
+    pub name_fr: String,
+    /// Arabic display name.
+    pub name_ar: String,
+    /// On-hand across active warehouses in base micros (rowless = 0).
+    pub on_hand_base_micro: i64,
+    /// Sold in the trailing 30 days in base micros (> 0 by construction).
+    pub sold_30d_base_micro: i64,
+    /// `on_hand * 30d / sold_30d` in day-micros (may be <= 0 when depleted).
+    pub cover_days_micro: i64,
+}
+
 /// One credit-outstanding row.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CreditOutstandingRow {
@@ -2366,6 +2387,12 @@ pub trait ReportingRepository: Send + Sync {
     /// Products at or below zero on hand (ADR-037), most depleted first.
     /// `warehouse_id` narrows to one warehouse; `None` covers all.
     fn low_stock(&self, warehouse_id: Option<&str>) -> Result<Vec<LowStockRow>, ApplicationError>;
+
+    /// Replenishment radar (S3): active products with trailing-30d committed
+    /// sales, most urgent first (stockout, then lowest days of cover).
+    /// Read-time computation over `document_items` + active-warehouse
+    /// `stock_levels`; zero schema. `limit` caps the returned head.
+    fn replenishment_radar(&self, limit: usize) -> Result<Vec<ReplenishmentRow>, ApplicationError>;
 
     /// Filtered, paginated audit-log rows (newest first, generic payload).
     fn user_activity(

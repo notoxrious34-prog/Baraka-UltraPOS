@@ -905,22 +905,31 @@ fn low_stock_lists_depleted_levels_most_depleted_first() {
         put(fixture.p1.0, 0);
         put(fixture.p2.0, -25_000);
     }
-    // P3 has no level row at all: absent rows are not reported (ADR-037
-    // covers stocked pairs only; unknown is not conflated with depleted).
+    // P3 has no level row at all: Option A (BRK-120) reports rowless active
+    // products as depleted at every active warehouse (qty 0) instead of
+    // hiding them (old ADR-037 "unknown is not depleted" reading).
+    // Fixture shops hold two active warehouses (seeded DEP-01 + MAIN):
+    // rowless pairs surface per warehouse (adjust targets stay real).
     let rows = GetLowStockReportUseCase::new(&harness.reports)
         .execute(&gerant(), None)
         .expect("low stock");
-    assert_eq!(rows.len(), 2);
+    assert_eq!(rows.len(), 6);
     assert_eq!(rows[0].product_id, fixture.p2.0.to_string());
     assert_eq!(rows[0].quantity_base_micro, -25_000);
     assert_eq!(rows[0].warehouse_code, "MAIN");
-    assert_eq!(rows[1].product_id, fixture.p1.0.to_string());
+    // P1 is stocked at MAIN but rowless at DEP-01: depleted there (qty 0).
+    assert_eq!(rows[1].sku, "REP-P1");
     assert_eq!(rows[1].quantity_base_micro, 0);
+    assert_eq!(rows[1].warehouse_code, "DEP-01");
+    // Rowless P3 surfaces at both warehouses, never hidden again.
+    assert_eq!(rows[5].sku, "REP-P3");
+    assert_eq!(rows[5].quantity_base_micro, 0);
+    assert_eq!(rows[5].warehouse_code, "MAIN");
     // Warehouse filter narrows; unknown warehouse yields zero rows.
     let scoped = GetLowStockReportUseCase::new(&harness.reports)
         .execute(&gerant(), Some(&harness.warehouse_id.to_string()))
         .expect("scoped");
-    assert_eq!(scoped.len(), 2);
+    assert_eq!(scoped.len(), 3);
     let empty = GetLowStockReportUseCase::new(&harness.reports)
         .execute(&gerant(), Some("00000000-0000-4000-8000-000000000000"))
         .expect("empty");

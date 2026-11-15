@@ -516,9 +516,14 @@ impl ReportingRepository for SqliteReportingRepository {
 
     fn low_stock(&self, warehouse_id: Option<&str>) -> Result<Vec<LowStockRow>, ApplicationError> {
         let guard = self.lock()?;
-        // ADR-037: low stock IS stockout/depletion (quantity_base_micro <= 0).
-        // stock_levels is keyed (warehouse_id, product_id); the scan stays
-        // bounded by the level-table size (one row per stocked pair).
+        // ADR-037 (amended by BRK-120, Option A): low stock IS stockout /
+        // depletion (quantity_base_micro <= 0) PLUS rowless active products,
+        // which are depleted at every active warehouse (qty 0) so the alerts
+        // tab can never hide a saleable product the Catalogue counts as out
+        // of stock (F-B2). The depleted-pairs branch keeps its exact legacy
+        // semantics; the second branch only adds the missing coverage.
+        // stock_levels is keyed (warehouse_id, product_id); the first branch
+        // stays bounded by the level-table size.
         let mut statement = guard
             .prepare(
                 "SELECT sl.product_id, p.sku, p.name_fr,
@@ -528,7 +533,20 @@ impl ReportingRepository for SqliteReportingRepository {
                  JOIN warehouses w ON w.id = sl.warehouse_id
                  WHERE sl.quantity_base_micro <= 0
                    AND (?1 IS NULL OR sl.warehouse_id = ?1)
-                 ORDER BY sl.quantity_base_micro ASC",
+                 UNION ALL
+                 SELECT p.id, p.sku, p.name_fr,
+                        w.id, w.code, 0
+                 FROM products p
+                 CROSS JOIN warehouses w
+                 WHERE p.is_active = 1
+                   AND w.is_active = 1
+                   AND NOT EXISTS (
+                       SELECT 1 FROM stock_levels sl2
+                       WHERE sl2.product_id = p.id
+                         AND sl2.warehouse_id = w.id
+                   )
+                   AND (?1 IS NULL OR w.id = ?1)
+                 ORDER BY 6 ASC, 2 ASC, 5 ASC",
             )
             .map_err(|_| store_failure())?;
         let rows = statement

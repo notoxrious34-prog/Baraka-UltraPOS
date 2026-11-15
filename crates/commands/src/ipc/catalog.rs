@@ -8,8 +8,9 @@ use baraka_application::use_cases::catalog::{
     CreateCategoryInput, CreateCategoryUseCase, CreateProductInput, CreateProductUseCase,
     DefineKitUseCase, GetCatalogMetricsUseCase, GetProductWithUnitsUseCase, ImportBatchInput,
     ImportDuplicatePolicy, ImportProductRow, ImportProductsUseCase, ListCategoriesUseCase,
-    NewKitItemInput, ProductDetail, SearchCatalogUseCase, SeedStarterCategoriesUseCase,
-    UpdateCategoryInput, UpdateCategoryUseCase, UpdateProductInput, UpdateProductUseCase,
+    NewKitItemInput, ProductDetail, ReplaceLadderInput, ReplacePriceBreaksUseCase,
+    SearchCatalogUseCase, SeedStarterCategoriesUseCase, UpdateCategoryInput, UpdateCategoryUseCase,
+    UpdateProductInput, UpdateProductUseCase,
 };
 use baraka_application::use_cases::deletion::DeleteProductUseCase;
 use baraka_domain::catalog::{Category, CategoryId, ProductId, UnitId};
@@ -18,7 +19,8 @@ use crate::dto::{
     CatalogMetricsDto, CatalogSearchRequestDto, CategoryResponseDto, CreateCategoryRequestDto,
     CreateProductDto, DefineKitDto, DeleteEntityRequestDto, DeleteEntityResultDto, GetProductDto,
     ImportProductsRequestDto, ImportProductsResponseDto, ImportRowErrorDto, ListPriceBreaksDto,
-    PriceBreakDto, ProductResponseDto, UpdateCategoryRequestDto, UpdateProductDto,
+    PriceBreakDto, ProductResponseDto, ReplacePriceBreaksDto, UpdateCategoryRequestDto,
+    UpdateProductDto,
 };
 
 /// `catalog_create_product` command: atomic product + unit-set creation.
@@ -404,4 +406,39 @@ pub fn catalog_list_price_breaks(
             price_centimes: rung.price.centimes().to_string(),
         })
         .collect())
+}
+
+/// `catalog_replace_price_breaks` command: atomic ladder replacement for one
+/// product x unit (empty clears; BRK-121b). Catalog managers only; rungs are
+/// validated and normalized server-side (`validate_ladder`).
+#[tauri::command(rename_all = "snake_case")]
+pub fn catalog_replace_price_breaks(
+    state: tauri::State<'_, AppState>,
+    request: ReplacePriceBreaksDto,
+) -> Result<(), String> {
+    let session = require_session(&state, &request.session_token)?;
+    let product_id =
+        parse_wire_id(&request.product_id, "product_id").map_err(|error| error_code(&error))?;
+    let unit_id = parse_wire_id(&request.unit_id, "unit_id").map_err(|error| error_code(&error))?;
+    let mut rungs = Vec::with_capacity(request.rungs.len());
+    for rung in &request.rungs {
+        let min_qty_micro = parse_wire_int(&rung.min_qty_micro, "min_qty_micro")
+            .map_err(|error| error_code(&error))?;
+        let price_centimes = parse_wire_int(&rung.price_centimes, "price_centimes")
+            .map_err(|error| error_code(&error))?;
+        rungs.push(baraka_domain::catalog::PriceBreak {
+            min_qty_micro,
+            price: baraka_domain::primitives::Money::from_centimes(price_centimes),
+        });
+    }
+    ReplacePriceBreaksUseCase::new(state.catalog.as_ref())
+        .execute(
+            &session,
+            ReplaceLadderInput {
+                product_id: ProductId::from(product_id),
+                unit_id: UnitId::from(unit_id),
+                rungs,
+            },
+        )
+        .map_err(|error| error_code(&error))
 }

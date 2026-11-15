@@ -6,6 +6,7 @@
 //! wins; otherwise `None` (caller falls back to `price_for_tier`).
 //! All money stays `i64` centimes — no floats anywhere near pricing.
 
+use crate::errors::DomainError;
 use crate::primitives::Money;
 
 /// One ladder rung: minimum quantity (unit micros) and its unit price.
@@ -32,6 +33,27 @@ pub fn resolve_break_price(breaks: &[PriceBreak], quantity_micro: i64) -> Option
         .filter(|rung| rung.min_qty_micro > 0 && rung.min_qty_micro <= quantity_micro)
         .max_by_key(|rung| rung.min_qty_micro)
         .map(|rung| rung.price)
+}
+
+/// Validate and normalize a ladder for storage: strictly positive rungs,
+/// non-negative prices, strictly increasing minima. Returns the rungs
+/// sorted ascending (idempotent normalize). Empty = clear the ladder.
+pub fn validate_ladder(mut rungs: Vec<PriceBreak>) -> Result<Vec<PriceBreak>, DomainError> {
+    rungs.sort_by_key(|rung| rung.min_qty_micro);
+    let mut previous: Option<i64> = None;
+    for rung in &rungs {
+        if rung.min_qty_micro <= 0 {
+            return Err(DomainError::InvalidQuantity);
+        }
+        if rung.price.centimes() < 0 {
+            return Err(DomainError::NegativeMoneyForbidden);
+        }
+        if previous.is_some_and(|floor| rung.min_qty_micro <= floor) {
+            return Err(DomainError::InvalidQuantity);
+        }
+        previous = Some(rung.min_qty_micro);
+    }
+    Ok(rungs)
 }
 
 #[cfg(test)]
@@ -92,5 +114,21 @@ mod tests {
             resolve_break_price(&ladder, 1_000_000),
             Some(Money::from_centimes(500))
         );
+    }
+
+    #[test]
+    fn validate_ladder_sorts_and_accepts() {
+        let ladder = vec![rung(100_000, 450), rung(10_000, 500)];
+        let clean = validate_ladder(ladder).expect("valid");
+        assert_eq!(clean[0].min_qty_micro, 10_000);
+        assert_eq!(clean[1].min_qty_micro, 100_000);
+    }
+
+    #[test]
+    fn validate_ladder_rejects_degenerate() {
+        assert!(validate_ladder(vec![rung(0, 100)]).is_err());
+        assert!(validate_ladder(vec![rung(10_000, 100), rung(10_000, 90)]).is_err());
+        assert!(validate_ladder(vec![rung(10_000, -5)]).is_err());
+        assert!(validate_ladder(vec![]).expect("empty clears").is_empty());
     }
 }

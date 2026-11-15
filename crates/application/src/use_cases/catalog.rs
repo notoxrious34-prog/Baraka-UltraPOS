@@ -4,8 +4,8 @@
 //! (Gerant/Admin). Reads require `PosSell` (all roles).
 
 use baraka_domain::catalog::{
-    validate_kit_edges, validate_unit_set, Barcode, Category, CategoryId, KitItem, Product,
-    ProductId, ProductUnit, Sku, UnitId,
+    validate_kit_edges, validate_ladder, validate_unit_set, Barcode, Category, CategoryId, KitItem,
+    PriceBreak, Product, ProductId, ProductUnit, Sku, UnitId,
 };
 use baraka_domain::errors::DomainError;
 use baraka_domain::primitives::{FactorMicro, Money, QtyMicro};
@@ -317,6 +317,56 @@ where
     P: ?Sized,
 {
     products: &'a P,
+}
+
+/// Replacement input for one product x unit ladder (empty clears it).
+pub struct ReplaceLadderInput {
+    /// Owning product id.
+    pub product_id: ProductId,
+    /// Ladder unit id (must belong to the product).
+    pub unit_id: UnitId,
+    /// Replacement rungs (unsorted accepted; validated + normalized).
+    pub rungs: Vec<PriceBreak>,
+}
+
+/// Atomically replace the quantity-break ladder for one product x unit
+/// (BRK-121b). Catalog managers only; the unit must belong to the product.
+pub struct ReplacePriceBreaksUseCase<'a, P>
+where
+    P: ?Sized,
+{
+    products: &'a P,
+}
+
+impl<'a, P> ReplacePriceBreaksUseCase<'a, P>
+where
+    P: ProductRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(products: &'a P) -> Self {
+        Self { products }
+    }
+
+    /// Validate (permission, ownership, ladder shape) then replace atomically.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        input: ReplaceLadderInput,
+    ) -> Result<(), ApplicationError> {
+        require_any(session, &MANAGE_PERMISSIONS)?;
+        let (_, units) = match self.products.find_by_id(input.product_id)? {
+            Some(found) => found,
+            None => return Err(ApplicationError::NotFound("product".to_string())),
+        };
+        if !units.iter().any(|unit| unit.id == input.unit_id) {
+            return Err(ApplicationError::Validation(
+                DomainError::InvalidCanonicalString("INVALID_UNIT".to_string()),
+            ));
+        }
+        let clean = validate_ladder(input.rungs).map_err(ApplicationError::Validation)?;
+        self.products
+            .replace_price_breaks(input.product_id, input.unit_id, &clean)
+    }
 }
 
 impl<'a, P> DefineKitUseCase<'a, P>
@@ -992,6 +1042,7 @@ mod tests {
 
     struct FakeCatalog {
         products: Mutex<HashMap<ProductId, (Product, Vec<ProductUnit>)>>,
+        breaks: Mutex<HashMap<(ProductId, UnitId), Vec<PriceBreak>>>,
         kit_items: Mutex<HashMap<ProductId, Vec<KitItem>>>,
         categories: Mutex<HashMap<CategoryId, Category>>,
     }
@@ -1000,6 +1051,7 @@ mod tests {
         fn new() -> Self {
             Self {
                 products: Mutex::new(HashMap::new()),
+                breaks: Mutex::new(HashMap::new()),
                 kit_items: Mutex::new(HashMap::new()),
                 categories: Mutex::new(HashMap::new()),
             }
@@ -1209,6 +1261,33 @@ mod tests {
                 }
                 None => Err(ApplicationError::NotFound("product".to_string())),
             }
+        }
+
+        fn price_breaks(
+            &self,
+            product_id: ProductId,
+            unit_id: UnitId,
+        ) -> Result<Vec<PriceBreak>, ApplicationError> {
+            Ok(self
+                .breaks
+                .lock()
+                .expect("breaks")
+                .get(&(product_id, unit_id))
+                .cloned()
+                .unwrap_or_default())
+        }
+
+        fn replace_price_breaks(
+            &self,
+            product_id: ProductId,
+            unit_id: UnitId,
+            rungs: &[PriceBreak],
+        ) -> Result<(), ApplicationError> {
+            self.breaks
+                .lock()
+                .expect("breaks")
+                .insert((product_id, unit_id), rungs.to_vec());
+            Ok(())
         }
     }
 
@@ -1790,5 +1869,98 @@ mod tests {
             other => panic!("expected coded validation failure, got {other:?}"),
         }
         assert!(store.seen.lock().expect("lock").is_empty());
+    }
+
+    #[test]
+    fn ladder_replace_roundtrip_end_to_end() {
+        use baraka_domain::primitives::Money;
+
+        let catalog = FakeCatalog::new();
+        let gerant = session_with(Role::Gerant);
+        let create = CreateProductUseCase::new(&catalog, &catalog);
+        let id = create
+            .execute(
+                &gerant,
+                CreateProductInput {
+                    sku: "BRK-1".to_string(),
+                    barcode: None,
+                    name_ar: "قطعة".to_string(),
+                    name_fr: "Piece".to_string(),
+                    category_id: None,
+                    is_kit: false,
+                    units: base_input(),
+                },
+                "TEST-TERMINAL",
+            )
+            .expect("create");
+        let unit_id = catalog
+            .find_by_id(id)
+            .expect("lookup")
+            .expect("product")
+            .1
+            .into_iter()
+            .next()
+            .expect("base unit")
+            .id;
+        let replace = ReplacePriceBreaksUseCase::new(&catalog);
+        replace
+            .execute(
+                &gerant,
+                ReplaceLadderInput {
+                    product_id: id,
+                    unit_id,
+                    rungs: vec![
+                        PriceBreak {
+                            min_qty_micro: 100_000,
+                            price: Money::from_centimes(450),
+                        },
+                        PriceBreak {
+                            min_qty_micro: 10_000,
+                            price: Money::from_centimes(500),
+                        },
+                    ],
+                },
+            )
+            .expect("replace");
+        // Normalized ascending despite unsorted input.
+        let stored = catalog.price_breaks(id, unit_id).expect("read");
+        assert_eq!(stored.len(), 2);
+        assert_eq!(stored[0].min_qty_micro, 10_000);
+        // Vendeur cannot mutate ladders.
+        let vendeur = session_with(Role::Vendeur);
+        let denied = replace.execute(
+            &vendeur,
+            ReplaceLadderInput {
+                product_id: id,
+                unit_id,
+                rungs: vec![],
+            },
+        );
+        assert!(matches!(denied, Err(ApplicationError::Unauthorized)));
+        // Degenerate rungs rejected before any write.
+        let bad = replace.execute(
+            &gerant,
+            ReplaceLadderInput {
+                product_id: id,
+                unit_id,
+                rungs: vec![PriceBreak {
+                    min_qty_micro: 0,
+                    price: Money::from_centimes(100),
+                }],
+            },
+        );
+        assert!(matches!(bad, Err(ApplicationError::Validation(_))));
+        // Clearing works.
+        replace
+            .execute(
+                &gerant,
+                ReplaceLadderInput {
+                    product_id: id,
+                    unit_id,
+                    rungs: vec![],
+                },
+            )
+            .expect("clear");
+        assert!(catalog.price_breaks(id, unit_id).expect("read").is_empty());
     }
 }

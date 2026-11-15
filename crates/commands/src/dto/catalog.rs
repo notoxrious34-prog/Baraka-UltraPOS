@@ -289,3 +289,16 @@ pub struct ListPriceBreaksDto {
     /// Ladder unit id (UUID string).
     pub unit_id: String,
 }
+
+/// Quantity-break ladder replacement (empty clears; BRK-121b).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplacePriceBreaksDto {
+    /// Authorizing session token (catalog managers only).
+    pub session_token: String,
+    /// Product id (UUID string).
+    pub product_id: String,
+    /// Ladder unit id (UUID string).
+    pub unit_id: String,
+    /// Replacement rungs (unsorted accepted; validated server-side).
+    pub rungs: Vec<PriceBreakDto>,
+}

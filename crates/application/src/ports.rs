@@ -316,6 +316,15 @@ pub trait ProductRepository: Send + Sync {
     ) -> Result<Vec<PriceBreak>, ApplicationError> {
         Ok(Vec::new())
     }
+
+    /// Atomically replace the ladder for one product x unit (empty clears).
+    /// Rungs arrive validated via `validate_ladder` (BRK-121b).
+    fn replace_price_breaks(
+        &self,
+        product_id: ProductId,
+        unit_id: UnitId,
+        rungs: &[PriceBreak],
+    ) -> Result<(), ApplicationError>;
 }
 
 /// Category persistence port (SQLite repository in infrastructure).

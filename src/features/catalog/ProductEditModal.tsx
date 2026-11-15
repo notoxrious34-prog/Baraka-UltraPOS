@@ -23,6 +23,7 @@ import {
 } from "@/lib/ipc";
 import { formatMoney, parseMoneyToCentimes } from "@/lib/money";
 import { computeMargin, formatMarginPct } from "@/features/catalog/CatalogModule";
+import { PriceBreaksEditor } from "@/features/catalog/PriceBreaksEditor";
 
 export interface ProductEditModalProps {
   isOpen: boolean;
@@ -261,6 +262,8 @@ export interface ProductEditModalViewProps {
   categories?: Category[];
   categoryId?: string;
   onCategory?: (id: string) => void;
+  /** Quantity-break editor node (absent = section hidden; SSR-safe views omit it). */
+  breaksEditor?: ReactElement | null;
 }
 
 /** Presentational edition dialog (pure props; SSR-safe for tests). */
@@ -476,6 +479,15 @@ export function ProductEditModalView(props: ProductEditModalViewProps): ReactEle
             {marginPreview}
           </div>
 
+          {props.breaksEditor !== undefined && props.breaksEditor !== null && (
+            <>
+              <h3 className="text-xs font-black uppercase opacity-70">
+                {t(locale, "breaks_title")}
+              </h3>
+              {props.breaksEditor}
+            </>
+          )}
+
           <h3 className="text-xs font-black uppercase opacity-70">
             {t(locale, "cat.statusSection")}
           </h3>
@@ -671,6 +683,22 @@ export function ProductEditModal({
       categories={categories}
       categoryId={categoryId}
       onCategory={setCategoryId}
+      breaksEditor={(() => {
+        const base =
+          product.units.find((unit) => unit.is_base_unit) ?? product.units[0] ?? null;
+        if (base === null) {
+          return null;
+        }
+        return (
+          <PriceBreaksEditor
+            locale={locale}
+            token={token}
+            productId={product.product_id}
+            unitId={base.unit_id}
+            inputClass={inputClass}
+          />
+        );
+      })()}
     />
   );
 }

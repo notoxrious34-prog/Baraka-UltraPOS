@@ -25,6 +25,7 @@ import type {
   LastPriceMemory,
   Locale,
   PaymentMethodCode,
+  PriceBreakRung,
   SaleReceipt,
   SessionInfo,
   StatementEntry,
@@ -204,6 +205,26 @@ export async function ipcListPriceBreaks(
 ): Promise<PriceBreakWire[]> {
   return call<PriceBreakWire[]>("catalog_list_price_breaks", {
     request: { session_token: sessionToken, product_id: productId, unit_id: unitId },
+  });
+}
+
+/** Atomically replace the ladder (empty clears; BRK-121b). Managers only. */
+export async function ipcReplacePriceBreaks(
+  sessionToken: string,
+  productId: string,
+  unitId: string,
+  rungs: PriceBreakRung[],
+): Promise<void> {
+  await call<unknown>("catalog_replace_price_breaks", {
+    request: {
+      session_token: sessionToken,
+      product_id: productId,
+      unit_id: unitId,
+      rungs: rungs.map((rung) => ({
+        min_qty_micro: rung.minQtyMicro,
+        price_centimes: rung.priceCentimes,
+      })),
+    },
   });
 }
 

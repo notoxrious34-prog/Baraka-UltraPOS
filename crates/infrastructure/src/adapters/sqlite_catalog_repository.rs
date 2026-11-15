@@ -1092,6 +1092,38 @@ impl ProductRepository for SqliteCatalogRepository {
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(|_| store_failure())
     }
+
+    fn replace_price_breaks(
+        &self,
+        product_id: ProductId,
+        unit_id: UnitId,
+        rungs: &[PriceBreak],
+    ) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
+        let product_key = product_id.to_string();
+        let unit_key = unit_id.to_string();
+        run_transaction(&mut guard, |tx| {
+            tx.execute(
+                "DELETE FROM price_breaks WHERE product_id = ?1 AND unit_id = ?2",
+                [&product_key, &unit_key],
+            )?;
+            for rung in rungs {
+                tx.execute(
+                    "INSERT INTO price_breaks (id, product_id, unit_id, min_qty_micro, price_centimes)
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    rusqlite::params![
+                        Uuid::new_v4().to_string(),
+                        product_key,
+                        unit_key,
+                        rung.min_qty_micro,
+                        rung.price.centimes(),
+                    ],
+                )?;
+            }
+            Ok(())
+        })
+        .map_err(|_| store_failure())
+    }
 }
 
 impl CategoryRepository for SqliteCatalogRepository {

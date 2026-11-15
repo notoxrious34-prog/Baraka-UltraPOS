@@ -30,6 +30,18 @@
 
 ---
 
+## Artifact (build machine record)
+
+- File: `target/release/bundle/nsis/Baraka UltraPOS_1.3.0_x64-setup.exe`
+- Size: 224,561,882 bytes (~214 MB, WebView2 offline installer embedded)
+- SHA-256:
+  `2c21d50e2070ed5263aec1fa9ec430ddb9d681c1631b91b88ccc35dd62a48f4a`
+- Gates on the release commit: G1 0, G2 0, G3 651/0/7, G4 0, G5 0,
+  G6 6.07s, G7 93/960.
+- Known gap: the updater `.sig` was NOT produced (no signing private key
+  on the build machine) — field-test installs manually; auto-update
+  signature follows when the key is available.
+
 ## ⚠️ Avant d'installer / قبل التثبيت — OBLIGATOIRE
 
 **Français.**

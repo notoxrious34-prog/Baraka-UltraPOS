@@ -14,9 +14,10 @@ Rust/TypeScript Engineer, acting as a brilliant technical co-founder to the Owne
   (*Quincaillerie Générale — Détail, Artisan & Gros*).
 - **Activity B:** Men's Underwear, Hosiery & Apparel
   (*Sous-vêtements & Textile Homme — Détail, Demi-Gros, Gros & Super-Gros*).
-**Baseline:** `HEAD = v1.2.1` (`0c93239a`, 281 commits, 19 immutable migrations
-`0001..0019`, ADRs through `ADR-109`, modularized `dto/` + `ipc/`, active FTS5,
-signed updater `UPD-001`, silent `XP-410B` TSPL/BITMAP printing).
+**Baseline:** `HEAD = v1.3.0` (`53c50a5`, 300 commits, 22 immutable migrations
+`0001..0022`, ADRs through `120` (`119`–`120` PROPOSED), Waves 1–2 shipped as
+v1.3.x (version policy ratified 2026-11-15: v1.3.1 repairs / v1.4.0 visuals /
+v2.0 completion); field bundle unsigned — updater signature pending key.
 **Production status:** LIVE IN DAILY COMMERCIAL PRODUCTION (Activity B).
 Every rule below is permanent law until a future constitution ratifies its successor.
 

@@ -259,12 +259,33 @@ describe("category product payloads", () => {
         salePrice: "",
         costPrice: "",
         wholesalePrice: "",
+        bulkPrice: "",
         initialStock: "",
         printAfter: true,
       },
       "cat-1",
     );
     expect(wire.category_id).toBe("cat-1");
+  });
+
+  it("carries the bulk super-gros price on the creation wire (F-A1)", () => {
+    const wire = buildModalWire({
+      sku: "SLIP-M-001",
+      barcode: "",
+      nameAr: "",
+      nameFr: "Slip",
+      preset: "PCS",
+      customAr: "",
+      customFr: "",
+      salePrice: "800",
+      costPrice: "450",
+      wholesalePrice: "620",
+      bulkPrice: "580",
+      initialStock: "",
+      printAfter: true,
+    });
+    expect(wire.units[0]?.super_gros_price_centimes).toBe("58000");
+    expect(wire.units[0]?.wholesale_price_centimes).toBe("62000");
   });
 
   it("stays unassigned on creation without a rayon", () => {
@@ -279,6 +300,7 @@ describe("category product payloads", () => {
       salePrice: "",
       costPrice: "",
       wholesalePrice: "",
+      bulkPrice: "",
       initialStock: "",
       printAfter: true,
     });

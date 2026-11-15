@@ -63,6 +63,8 @@ export interface ModalFormData {
   costPrice: string;
   /** Artisan/wholesale DZD price (blank = none, falls back to sale price). */
   wholesalePrice: string;
+  /** Super-gros DZD price (blank = none, falls back to wholesale; BRK-117). */
+  bulkPrice: string;
   initialStock: string;
   printAfter: boolean;
 }
@@ -79,6 +81,7 @@ export function emptyModalForm(): ModalFormData {
     salePrice: "",
     costPrice: "",
     wholesalePrice: "",
+    bulkPrice: "",
     initialStock: "",
     printAfter: true,
   };
@@ -140,6 +143,10 @@ export function validateModalForm(data: ModalFormData): Partial<Record<string, I
   if (wholesale !== null) {
     errors.wholesalePrice = wholesale;
   }
+  const bulk = priceError(data.bulkPrice);
+  if (bulk !== null) {
+    errors.bulkPrice = bulk;
+  }
   if (!isBlank(data.initialStock)) {
     try {
       const micro = parseQtyToMicro(data.initialStock);
@@ -189,8 +196,8 @@ export function buildModalWire(data: ModalFormData, categoryId?: string | null):
       data.costPrice.trim() === "" ? "0" : parseMoneyToCentimes(data.costPrice),
     wholesale_price_centimes:
       data.wholesalePrice.trim() === "" ? null : parseMoneyToCentimes(data.wholesalePrice),
-    // No bulk input at creation (editable later); explicit null = honest wire.
-    super_gros_price_centimes: null,
+    super_gros_price_centimes:
+      data.bulkPrice.trim() === "" ? null : parseMoneyToCentimes(data.bulkPrice),
     is_base_unit: true,
     is_default_selling: true,
   };
@@ -713,6 +720,21 @@ export function ProductCreateModal({
                 className={`${inputClass} font-mono`}
               />
               {fieldError(errors, "wholesalePrice", locale)}
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-bold">
+                {t(locale, "bulk_price")} (DZD)
+              </span>
+              <input
+                value={form.bulkPrice}
+                inputMode="decimal"
+                dir="ltr"
+                onChange={(event) => {
+                  patch("bulkPrice", event.target.value);
+                }}
+                className={`${inputClass} font-mono`}
+              />
+              {fieldError(errors, "bulkPrice", locale)}
             </label>
           </div>
           <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-3 py-2 dark:bg-slate-800">

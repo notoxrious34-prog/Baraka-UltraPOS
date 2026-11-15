@@ -29,6 +29,7 @@ import { formatInstant } from "@/lib/datetime";
 import { creditEquationFromDocument } from "@/lib/credit-equation";
 import { formatWireColisage } from "@/lib/colisage";
 import { PrintStatusIndicator } from "@/components/pos/PrintStatusIndicator";
+import { useConversionModalStore } from "@/stores/conversion-modal-store";
 import type { Locale } from "@/types/pos";
 import "./document-print.css";
 import {
@@ -455,6 +456,7 @@ export function DocumentDetailsView(props: {
 
 export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactElement {
   const { locale, document } = props;
+  const openWithDocument = useConversionModalStore((state) => state.openWithDocument);
   const [reprintState, setReprintState] = useState<"idle" | "sending" | "ok" | "fail">("idle");
   const [reprintError, setReprintError] = useState<string | null>(null);
   const [details, setDetails] = useState<DocumentDetailsWire | null>(null);
@@ -774,6 +776,20 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
           {t(locale, "documents.close")}
         </button>
       </div>
+
+      {document.document_type === "DEVIS" && document.status === "FINALIZED" && (
+        <button
+          type="button"
+          data-testid="devis-convert"
+          onClick={() => {
+            openWithDocument("devis_to_bl", document);
+            props.onClose();
+          }}
+          className="h-11 w-full shrink-0 rounded-lg bg-accent-500 text-sm font-black text-slate-950 hover:bg-amber-400"
+        >
+          {t(locale, "conversion.convert_to_bl")}
+        </button>
+      )}
 
       <div className="flex flex-col gap-1 rounded-lg border border-slate-200 p-3 text-xs dark:border-slate-700">
         <p>

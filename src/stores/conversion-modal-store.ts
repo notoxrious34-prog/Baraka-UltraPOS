@@ -134,6 +134,8 @@ interface ConversionModalState {
   setSearchQuery: (query: string) => void;
   runSearch: () => Promise<void>;
   selectDocument: (doc: DocumentSummaryWireDto) => Promise<void>;
+  /** One-tap entry (DSN-113): open the modal with a document pre-selected. */
+  openWithDocument: (tab: ConversionTab, doc: DocumentSummaryWireDto) => void;
   setTender: (method: TenderMethod, value: string) => void;
   setDocumentLanguage: (lang: "FR" | "AR") => void;
   submitDevisToBl: () => Promise<void>;
@@ -201,6 +203,15 @@ export const useConversionModalStore = create<ConversionModalState>()((set, get)
         activeTab: initialTab ?? "devis_to_bl",
       });
       void fetchRecent();
+    },
+
+    openWithDocument: (tab, doc) => {
+      set({
+        ...initialState,
+        isOpen: true,
+        activeTab: tab,
+      });
+      void get().selectDocument(doc);
     },
 
     closeModal: () => {

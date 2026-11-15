@@ -1,7 +1,7 @@
-# Baraka UltraPOS v2.0 — Guide de l'opérateur / دليل المشغّل
+# Baraka UltraPOS v1.3.0 — Guide de l'opérateur / دليل المشغّل
 
 > Practical counter handbook for the shop owner and cashiers (FR/AR).
-> Covers what changed from v1.2.x to v2.0: credit equation, colisage,
+> Covers what changed from v1.2.x to v1.3.0: credit equation, colisage,
 > credit radar, commercial profile, Super-Gros tier, last-price recall.
 > Nothing below changes the ledger: it stays the single truth.
 

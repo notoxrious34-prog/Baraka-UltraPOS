@@ -140,6 +140,7 @@ describe("CartTableView tier and Margin Guard pills", () => {
       lines,
       selectedLineIndex: 0,
       locale: "fr-DZ" as const,
+      customerId: null,
       customerTier,
       margins,
       shielded: false,

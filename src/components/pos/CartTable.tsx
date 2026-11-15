@@ -18,6 +18,7 @@ import { t } from "@/lib/i18n";
 import { addBig, formatMoney, formatQty, subBig } from "@/lib/money";
 import { colisageShares, formatColisage } from "@/lib/colisage";
 import { UnitSelectPopover, factorTag, isBaseUnit } from "@/features/pos/UnitSelectPopover";
+import { LastPriceChip } from "@/components/pos/LastPriceChip";
 
 import type { CartLine, CustomerTier, LineMargin, Locale } from "@/types/pos";
 
@@ -36,6 +37,8 @@ export interface CartTableViewProps {
   lines: CartLine[];
   selectedLineIndex: number;
   locale: Locale;
+  /** Named-customer id for last-price recall (`null` = guest, DSN-106). */
+  customerId: string | null;
   /** Active customer tier (drives PRO/GROS pills + tier totals). */
   customerTier: CustomerTier;
   /** Last preview Margin Guard readout (indexed by cart line order). */
@@ -55,6 +58,7 @@ export function CartTableView({
   lines,
   selectedLineIndex,
   locale,
+  customerId,
   customerTier,
   margins,
   shielded,
@@ -173,6 +177,14 @@ export function CartTableView({
                     </p>
                   );
                 })()}
+                {unit !== undefined && customerId !== null && (
+                  <LastPriceChip
+                    locale={locale}
+                    customerId={customerId}
+                    productId={line.productId}
+                    unitId={unit.unitId}
+                  />
+                )}
                 {(tierPriced || belowCost) && (
                   <span className="mt-0.5 flex flex-wrap gap-1">
                     {tierPriced && (
@@ -371,6 +383,7 @@ export function CartTable(): ReactElement {
       lines={lines}
       selectedLineIndex={selectedLineIndex}
       locale={locale}
+      customerId={customer.kind === "named" ? customer.id : null}
       customerTier={customer.kind === "named" ? customer.tier : "retail"}
       margins={previewMargins}
       shielded={shielded}

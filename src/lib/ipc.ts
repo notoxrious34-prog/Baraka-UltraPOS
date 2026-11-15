@@ -22,6 +22,7 @@ import type {
   DocType,
   ImportProductRow,
   ImportProductsReport,
+  LastPriceMemory,
   Locale,
   PaymentMethodCode,
   SaleReceipt,
@@ -890,6 +891,43 @@ export async function ipcGetCustomer(
   return call<CustomerDetail>("customers_get", {
     request: { session_token: sessionToken, customer_id: customerId },
   });
+}
+
+/** Last transacted price recall (BRK-111, read-only). Resolves `null` when
+ * the backend reports no cell (never sold to this customer). */
+export async function ipcGetLastPrice(
+  sessionToken: string,
+  customerId: string,
+  productId: string,
+  unitId: string,
+): Promise<LastPriceMemory | null> {
+  const response = await call<{
+    price_centimes: string | null;
+    discount_per_unit_centimes: string | null;
+    document_id: string | null;
+    sold_at: string | null;
+  }>("customers_last_price", {
+    request: {
+      session_token: sessionToken,
+      customer_id: customerId,
+      product_id: productId,
+      unit_id: unitId,
+    },
+  });
+  if (
+    response.price_centimes === null ||
+    response.discount_per_unit_centimes === null ||
+    response.document_id === null ||
+    response.sold_at === null
+  ) {
+    return null;
+  }
+  return {
+    priceCentimes: response.price_centimes,
+    discountPerUnitCentimes: response.discount_per_unit_centimes,
+    documentId: response.document_id,
+    soldAt: response.sold_at,
+  };
 }
 
 /** List customers (active only). */

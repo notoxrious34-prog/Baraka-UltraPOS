@@ -76,6 +76,7 @@ function viewProps(lines: CartLine[], popoverKey: string | null = null) {
     lines,
     selectedLineIndex: 0,
     locale: "fr-DZ" as const,
+    customerId: null,
     customerTier: "retail" as const,
     margins: [],
     shielded: false,

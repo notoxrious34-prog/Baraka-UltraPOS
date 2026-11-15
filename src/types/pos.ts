@@ -87,6 +87,14 @@ export type ActiveCustomer = GuestCustomer | NamedCustomer;
 /** Pricing tier (mirrors CustomerTier; wire codes are lowercase). */
 export type CustomerTier = "retail" | "artisan" | "wholesale" | "super_gros";
 
+/** Last transacted price memory cell (mirrors LastPriceResponse, BRK-111). */
+export interface LastPriceMemory {
+  priceCentimes: string;
+  discountPerUnitCentimes: string;
+  documentId: string;
+  soldAt: string;
+}
+
 /** Customer list row (mirrors CustomerSummaryDto). */
 export interface CustomerSummary {
   id: string;

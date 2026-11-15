@@ -25,6 +25,7 @@ import {
   type TicketPrintStrings,
 } from "@/features/tickets/graphique-ticket";
 import { formatMoney, formatQty } from "@/lib/money";
+import { formatInstant } from "@/lib/datetime";
 import { creditEquationFromDocument } from "@/lib/credit-equation";
 import { formatWireColisage } from "@/lib/colisage";
 import { PrintStatusIndicator } from "@/components/pos/PrintStatusIndicator";
@@ -781,7 +782,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
         </p>
         <p>
           <span className="font-bold text-slate-500">{t(locale, "documents.colDate")}: </span>
-          <bdi dir="ltr">{document.created_at}</bdi>
+          {formatInstant(document.created_at, locale)}
         </p>
         <p>
           <span className="font-bold text-slate-500">{t(locale, "documents.colItems")}: </span>
@@ -826,7 +827,7 @@ export function DocumentDetailDrawer(props: DocumentDetailDrawerProps): ReactEle
         <DocumentDetailsView locale={locale} details={details} />
       ) : null}
 
-      <PrintStatusIndicator documentId={document.id} />
+      <PrintStatusIndicator documentId={document.id} actionless />
 
       {details !== null && canPrintA4(document.document_type) && (
         <button

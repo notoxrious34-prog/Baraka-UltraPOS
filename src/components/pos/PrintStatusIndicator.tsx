@@ -11,11 +11,16 @@ import { ipcGetPrintStatus, ipcReprint, type PrintStatus } from "@/lib/ipc";
 
 interface PrintStatusIndicatorProps {
   documentId: string;
+  /** Hide the inline reprint button (owner screen already offers a print action). */
+  actionless?: boolean;
 }
 
 const TERMINAL = new Set(["DONE", "FAILED"]);
 
-export function PrintStatusIndicator({ documentId }: PrintStatusIndicatorProps): ReactElement {
+export function PrintStatusIndicator({
+  documentId,
+  actionless = false,
+}: PrintStatusIndicatorProps): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
   const session = useSessionStore((state) => state.session);
   const [status, setStatus] = useState<PrintStatus | null>(null);
@@ -102,14 +107,16 @@ export function PrintStatusIndicator({ documentId }: PrintStatusIndicatorProps):
     <div className="flex flex-col gap-1" aria-live="polite">
       <div className="flex items-center justify-between gap-2">
         <span className={`rounded-full px-2 py-1 text-[11px] font-black ${tone}`}>{label}</span>
-        <button
-          type="button"
-          onClick={reprint}
-          disabled={reprinting}
-          className="rounded-md bg-slate-200 px-2 py-1 text-[11px] font-black hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700"
-        >
-          {reprinting ? t(locale, "print.reprinting") : t(locale, "print.reprint")}
-        </button>
+        {!actionless && (
+          <button
+            type="button"
+            onClick={reprint}
+            disabled={reprinting}
+            className="rounded-md bg-slate-200 px-2 py-1 text-[11px] font-black hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700"
+          >
+            {reprinting ? t(locale, "print.reprinting") : t(locale, "print.reprint")}
+          </button>
+        )}
       </div>
       {status !== null && status.status === "FAILED" && (
         <p

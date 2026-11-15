@@ -319,7 +319,14 @@ export function CustomerSelectModal(): ReactElement {
                   )}
                 </span>
                 <span className="shrink-0 rounded-full bg-slate-300 px-2 py-0.5 font-mono text-[10px] font-black dark:bg-slate-600">
-                  {customer.credit_policy}
+                  {t(
+                    locale,
+                    customer.credit_policy === "DISABLED"
+                      ? "customers.blocked"
+                      : customer.credit_policy === "LIMITED"
+                        ? "customers.limited"
+                        : "customers.unlimited",
+                  )}
                 </span>
               </button>
               {customer.credit_policy !== "DISABLED" && (

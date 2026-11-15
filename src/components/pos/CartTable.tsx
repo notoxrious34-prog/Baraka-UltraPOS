@@ -189,13 +189,14 @@ export function CartTableView({
                   <span className="mt-0.5 flex flex-wrap gap-1">
                     {tierPriced && (
                       <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                        {customerTier === "artisan"
-                          ? locale === "ar-DZ"
-                            ? "سعر مهني"
-                            : "PRO"
-                          : locale === "ar-DZ"
-                            ? "سعر جملة"
-                            : "GROS"}
+                        {t(
+                          locale,
+                          customerTier === "artisan"
+                            ? "tier_artisan"
+                            : customerTier === "super_gros"
+                              ? "tier_super_gros"
+                              : "tier_wholesale",
+                        )}
                       </span>
                     )}
                     {belowCost && margin !== undefined && (

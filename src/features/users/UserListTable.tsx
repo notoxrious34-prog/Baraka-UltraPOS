@@ -9,6 +9,7 @@
 
 import type { ReactElement } from "react";
 import { t } from "@/lib/i18n";
+import { formatInstant } from "@/lib/datetime";
 import type { Locale } from "@/types/pos";
 import type { UserInfo } from "@/lib/ipc";
 import { roleBadgeClass, roleLabel, statusBadgeClass } from "./user-helpers";
@@ -96,7 +97,7 @@ export function UserListTable({
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-xs tabular-nums text-ink-muted">
-                  <bdi dir="ltr">{user.created_at}</bdi>
+                  {formatInstant(user.created_at, locale)}
                 </td>
                 <td className="whitespace-nowrap px-3 py-2">
                   <button

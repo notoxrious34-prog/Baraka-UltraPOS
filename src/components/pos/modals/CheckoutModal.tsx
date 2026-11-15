@@ -279,7 +279,8 @@ export function CheckoutModal(): ReactElement {
         if (previewRequestIdRef.current !== requestId) {
           return;
         }
-        setPreview(null);
+        // Keep the last good preview on screen (stale totals + error badge)
+        // instead of collapsing every figure to "…" (AUD-061).
         const code = typeof failure === "string" ? failure : "INTERNAL_ERROR";
         setPreviewError(translateBackendError(code, usePosUiStore.getState().locale));
       })
@@ -558,7 +559,7 @@ export function CheckoutModal(): ReactElement {
     });
   };
 
-  /** Format a backend preview total ("…" while no valid preview exists). */
+  /** Format a backend preview total ("…" while no preview has ever succeeded). */
   const fmt = (value: string | null | undefined): string =>
     value === null || value === undefined ? "…" : formatMoney(value, locale);
 

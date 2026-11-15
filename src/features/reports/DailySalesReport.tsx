@@ -3,7 +3,7 @@
  * Source: reports.dailySales (committed TICKET/FACTURE/BL only).
  */
 
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
@@ -33,23 +33,40 @@ export function DailySalesReport(): ReactElement {
   const [rows, setRows] = useState<DailySalesRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
 
   const token = session?.token ?? null;
+
+  // Auto-load on open and on range change (F-B9): the report never sits
+  // empty behind the Apply button; Apply stays as an explicit refresh.
+  useEffect(() => {
+    if (token === null) {
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    ipcDailySales(token, range)
+      .then((loaded) => {
+        if (!cancelled) {
+          setRows(loaded);
+          setLoading(false);
+        }
+      })
+      .catch((failure: unknown) => {
+        if (!cancelled) {
+          setError(typeof failure === "string" ? failure : "INTERNAL_ERROR");
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, range, reloadTick]);
+
   if (token === null) {
     return <div />;
   }
-
-  const fetch = async (): Promise<void> => {
-    setLoading(true);
-    setError(null);
-    try {
-      setRows(await ipcDailySales(token, range));
-    } catch (failure: unknown) {
-      setError(typeof failure === "string" ? failure : "INTERNAL_ERROR");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const kpi = (
     label: string,
@@ -64,7 +81,7 @@ export function DailySalesReport(): ReactElement {
   return (
     <div className="flex flex-col gap-3">
       <h3 className="text-base font-black">{t(locale, "rep.daily")}</h3>
-      <ReportDateRangePicker value={range} onChange={setRange} onApply={() => void fetch()} applying={loading} />
+      <ReportDateRangePicker value={range} onChange={setRange} onApply={() => setReloadTick((tick) => tick + 1)} applying={loading} />
       {loading && <p className="text-xs font-bold">{t(locale, "rep.loading")}</p>}
       {error !== null && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-bold text-red-700 dark:bg-red-900/30 dark:text-red-200">

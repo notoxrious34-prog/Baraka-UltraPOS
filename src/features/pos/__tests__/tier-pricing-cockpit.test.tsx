@@ -154,23 +154,23 @@ describe("CartTableView tier and Margin Guard pills", () => {
     };
   }
 
-  it("shows the PRO pill and tier price for artisan customers", () => {
+  it("shows the artisan pill and tier price for artisan customers", () => {
     const html = renderToStaticMarkup(<CartTableView {...viewProps([tierLine("8500")], "artisan")} />);
-    expect(html).toContain("PRO");
+    expect(html).toContain("Artisan / Pro");
     expect(html).toContain("85,00 DZD");
   });
 
-  it("shows the GROS pill for wholesale customers", () => {
+  it("shows the wholesale pill for wholesale customers", () => {
     const html = renderToStaticMarkup(
       <CartTableView {...viewProps([tierLine("8500")], "wholesale")} />,
     );
-    expect(html).toContain("GROS");
+    expect(html).toContain("Gros");
   });
 
   it("shows no tier pill for retail customers", () => {
     const html = renderToStaticMarkup(<CartTableView {...viewProps([tierLine("8500")])} />);
-    expect(html).not.toContain("PRO");
-    expect(html).not.toContain("GROS");
+    expect(html).not.toContain("Artisan / Pro");
+    expect(html).not.toContain("Gros");
   });
 
   it("pulses the below-cost warning with the formatted margin", () => {

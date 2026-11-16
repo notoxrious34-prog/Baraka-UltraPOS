@@ -45,6 +45,14 @@ aucune imprimante (reportée avec accord du propriétaire).
   تصميم المزامنة (مؤجل) + الالتقاط الصوتي (خلف علم).
 - القيود: بلا توقيع (تثبيت يدوي) · نسخة احتياطية إجبارية · بلا طابعات.
 
+## Livrable / الملف
+
+- `Baraka UltraPOS_1.3.1_x64-setup.exe` — 224 594 338 bytes (~214 MB)
+- `SHA-256: 920725af78d23e4b1a926308eb88878b5b0be69f862363ae7f4369adad158499`
+- `.sig` non produite (pas de `TAURI_SIGNING_PRIVATE_KEY`) — installation
+  manuelle ; sauvegarde obligatoire avant install (refus de downgrade
+  `v1.2.1` sur base v22/v23).
+
 ## Vérification / التحقق
 
 - `G1 fmt ✓ · G2 clippy -D warnings ✓ · G3 662 passed / 0 failed / 7 ignored ✓`

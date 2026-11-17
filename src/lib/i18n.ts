@@ -1378,7 +1378,7 @@ const ar: Record<I18nKey, string> = {
   "cart.guest": "زبون نقدي",
   "totals.subtotal": "المجموع HT",
   "totals.discount": "التخفيض العام",
-  "totals.tva": "الضريبة TVA",
+  "totals.tva": "الضريبة",
   "totals.timbre": "الطابع الجبائي",
   "totals.total": "المجموع TTC",
   "credit.unlimited": "ائتمان غير محدود",

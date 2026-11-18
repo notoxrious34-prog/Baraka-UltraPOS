@@ -94,7 +94,21 @@ describe("silent-print surface (red until DSN-098 lands)", () => {
   it("passes copies exactly once (no double multiplication)", () => {
     const facade = readSrc("src", "lib", "tspl-print.ts");
     expect(facade).toContain("validateTsplCopies(input.copies)");
-    const bridge = readSrc("src", "lib", "ipc.ts");
+    const bridge = [
+      "ipc.ts",
+      "ipc-kernel.ts",
+      "ipc-auth.ts",
+      "ipc-catalog.ts",
+      "ipc-inventory.ts",
+      "ipc-users.ts",
+      "ipc-sales.ts",
+      "ipc-customers.ts",
+      "ipc-printing.ts",
+      "ipc-cash.ts",
+      "ipc-suppliers.ts",
+      "ipc-reports.ts",
+      "ipc-backups.ts",
+    ].map((file) => readSrc("src", "lib", file)).join("\n");
     expect(bridge).toContain("copies: job.copies");
     expect(bridge).not.toMatch(/copies\s*\*/);
   });

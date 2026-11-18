@@ -55,7 +55,21 @@ describe("LastPriceChip", () => {
 
 describe("DSN-106 wiring pins", () => {
   it("ipcGetLastPrice targets customers_last_price and maps nulls to unknown", () => {
-    const ipc = source("src/lib/ipc.ts");
+    const ipc = [
+      "src/lib/ipc.ts",
+      "src/lib/ipc-kernel.ts",
+      "src/lib/ipc-auth.ts",
+      "src/lib/ipc-catalog.ts",
+      "src/lib/ipc-inventory.ts",
+      "src/lib/ipc-users.ts",
+      "src/lib/ipc-sales.ts",
+      "src/lib/ipc-customers.ts",
+      "src/lib/ipc-printing.ts",
+      "src/lib/ipc-cash.ts",
+      "src/lib/ipc-suppliers.ts",
+      "src/lib/ipc-reports.ts",
+      "src/lib/ipc-backups.ts",
+    ].map((file) => source(file)).join("\n");
     expect(ipc).toContain("customers_last_price");
     expect(ipc).toContain("ipcGetLastPrice");
   });

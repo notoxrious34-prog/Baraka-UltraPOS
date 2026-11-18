@@ -154,7 +154,21 @@ describe("DSN-082 reason + typed-gate (FAIL-before: unimplemented)", () => {
   });
 
   it("threads reason through all four IPC delete wrappers", () => {
-    const IPC_SRC = readSrc("src", "lib", "ipc.ts");
+    const IPC_SRC = [
+      "ipc.ts",
+      "ipc-kernel.ts",
+      "ipc-auth.ts",
+      "ipc-catalog.ts",
+      "ipc-inventory.ts",
+      "ipc-users.ts",
+      "ipc-sales.ts",
+      "ipc-customers.ts",
+      "ipc-printing.ts",
+      "ipc-cash.ts",
+      "ipc-suppliers.ts",
+      "ipc-reports.ts",
+      "ipc-backups.ts",
+    ].map((file) => readSrc("src", "lib", file)).join("\n");
     for (const fn of [
       "ipcDeleteProduct",
       "ipcDeleteCustomer",

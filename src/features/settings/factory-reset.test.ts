@@ -24,7 +24,21 @@ const readSrc = (...parts: string[]): string => readFileSync(join(ROOT, ...parts
 
 const SECTION_SRC = readSrc("src", "features", "settings", "FactoryResetSection.tsx");
 const TAB_SRC = readSrc("src", "features", "settings", "BackupSettingsTab.tsx");
-const IPC_SRC = readSrc("src", "lib", "ipc.ts");
+const IPC_SRC = [
+  "ipc.ts",
+  "ipc-kernel.ts",
+  "ipc-auth.ts",
+  "ipc-catalog.ts",
+  "ipc-inventory.ts",
+  "ipc-users.ts",
+  "ipc-sales.ts",
+  "ipc-customers.ts",
+  "ipc-printing.ts",
+  "ipc-cash.ts",
+  "ipc-suppliers.ts",
+  "ipc-reports.ts",
+  "ipc-backups.ts",
+].map((file) => readSrc("src", "lib", file)).join("\n");
 const I18N_SRC = readSrc("src", "lib", "i18n.ts");
 
 describe("expected token derivation (store-name wire, never hardcoded)", () => {

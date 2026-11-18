@@ -4,8 +4,8 @@ use baraka_application::errors::ApplicationError;
 use baraka_application::use_cases::printing::{
     GetPrintStatusUseCase, GetPrinterSettingsUseCase, GetVerticalProfileUseCase,
     ReprintDocumentUseCase, SaveStoreIdentityUseCase, SaveVerticalProfileUseCase,
-    TestPrintDeviceOutcome, TestPrintUseCase, UpdatePrinterSettingsUseCase,
-    UpdateTsplMediaSettingsUseCase,
+    TestPrintDeviceOutcome, TestPrintUseCase, UpdatePrinterRoleSettingsUseCase,
+    UpdatePrinterSettingsUseCase, UpdateTsplMediaSettingsUseCase,
 };
 use baraka_application::use_cases::sales::{GetFiscalSettingsUseCase, UpdateFiscalSettingsUseCase};
 use baraka_application::use_cases::tspl_printing::{
@@ -330,6 +330,13 @@ pub fn printer_get_settings(
         tspl_offset_y_mm: settings.tspl_offset_y_mm,
         // TEMPORARY-DIAGNOSTIC (BRK-100): probe switch wire.
         tspl_probe_mode: settings.tspl_probe_mode.clone(),
+        // BRK-113 dual-printer roles.
+        receipt_transport: settings.receipt_transport.clone(),
+        receipt_queue_name: settings.receipt_queue_name.clone(),
+        receipt_queue_name_fallback: settings.receipt_queue_name_fallback.clone(),
+        label_transport: settings.label_transport.clone(),
+        label_queue_name: settings.label_queue_name.clone(),
+        label_queue_name_fallback: settings.label_queue_name_fallback.clone(),
     })
 }
 
@@ -372,6 +379,27 @@ pub fn printer_update_settings(
             )
             .map_err(|error| error_code(&error))?;
     }
+    // BRK-113 dual-printer roles ride a separate validated write
+    // (only when addressed).
+    if request.receipt_transport.is_some()
+        || request.receipt_queue_name.is_some()
+        || request.receipt_queue_name_fallback.is_some()
+        || request.label_transport.is_some()
+        || request.label_queue_name.is_some()
+        || request.label_queue_name_fallback.is_some()
+    {
+        settings = UpdatePrinterRoleSettingsUseCase::new(state.printer_settings.as_ref())
+            .execute(
+                &session,
+                request.receipt_transport.as_deref(),
+                request.receipt_queue_name.as_deref(),
+                request.receipt_queue_name_fallback.as_deref(),
+                request.label_transport.as_deref(),
+                request.label_queue_name.as_deref(),
+                request.label_queue_name_fallback.as_deref(),
+            )
+            .map_err(|error| error_code(&error))?;
+    }
     Ok(PrinterSettingsDto {
         serial_port: settings.serial_port,
         serial_baud: settings.serial_baud,
@@ -387,6 +415,13 @@ pub fn printer_update_settings(
         tspl_offset_y_mm: settings.tspl_offset_y_mm,
         // TEMPORARY-DIAGNOSTIC (BRK-100): probe switch wire.
         tspl_probe_mode: settings.tspl_probe_mode,
+        // BRK-113 dual-printer roles.
+        receipt_transport: settings.receipt_transport,
+        receipt_queue_name: settings.receipt_queue_name,
+        receipt_queue_name_fallback: settings.receipt_queue_name_fallback,
+        label_transport: settings.label_transport,
+        label_queue_name: settings.label_queue_name,
+        label_queue_name_fallback: settings.label_queue_name_fallback,
     })
 }
 

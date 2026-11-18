@@ -98,20 +98,77 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
                     && *offset <= baraka_domain::printing::TSPL_CALIB_MM_MAX
             })
             .unwrap_or(0);
+        // BRK-113: legacy globals seed the receipt role (single-printer
+        // backward compatibility); unknown stored arms fall back (writes are
+        // validated LOUDLY upstream).
+        let legacy_transport = self
+            .read_key("printer.transport")
+            .map(|value| value.trim().to_string())
+            .filter(|value| {
+                value == baraka_domain::printing::TRANSPORT_SERIAL
+                    || value == baraka_domain::printing::TRANSPORT_SPOOLER
+            })
+            .unwrap_or_else(|| baraka_domain::printing::TRANSPORT_SERIAL.to_string());
+        let legacy_queue = self
+            .read_key("printer.queue_name")
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_default();
+        // Role arms: role key wins; the receipt role inherits the legacy
+        // arm, the label role never does (domain rule). Invalid stored
+        // spellings fall back to the receipt arm (same read posture as
+        // every other key here).
+        let role_transport = |role: baraka_domain::printing::PrintRole| -> String {
+            let role_value = self
+                .read_key(&role.transport_key())
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
+            let legacy = if role == baraka_domain::printing::PrintRole::Receipt {
+                Some(legacy_transport.as_str())
+            } else {
+                None
+            };
+            baraka_domain::printing::resolve_role_transport(role, role_value.as_deref(), legacy)
+                .unwrap_or_else(|_| legacy_transport.clone())
+        };
+        // Role queues: role key wins; the receipt role inherits the legacy
+        // queue (shared-USB-printer merchants need zero reconfiguration).
+        // The label fallback key is read raw (`""` = no fallback).
+        let role_queue = |role: baraka_domain::printing::PrintRole| -> String {
+            self.read_key(&role.queue_key())
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| {
+                    if role == baraka_domain::printing::PrintRole::Receipt {
+                        legacy_queue.clone()
+                    } else {
+                        String::new()
+                    }
+                })
+        };
+        let role_fallback_queue = |role: baraka_domain::printing::PrintRole| -> String {
+            self.read_key(&role.fallback_queue_key())
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .unwrap_or_default()
+        };
         Ok(PrinterSettings {
             serial_port: self.read_key("printer.serial_port").unwrap_or_default(),
             serial_baud: baud,
             paper_width_dots: width.dot_width(),
             paper_width_mm: width.as_mm(),
-            transport: self
-                .read_key("printer.transport")
-                .map(|value| value.trim().to_string())
-                .filter(|value| {
-                    value == baraka_domain::printing::TRANSPORT_SERIAL
-                        || value == baraka_domain::printing::TRANSPORT_SPOOLER
-                })
-                .unwrap_or_else(|| baraka_domain::printing::TRANSPORT_SERIAL.to_string()),
-            queue_name: self.read_key("printer.queue_name").unwrap_or_default(),
+            transport: legacy_transport.clone(),
+            queue_name: legacy_queue.clone(),
+            receipt_transport: role_transport(baraka_domain::printing::PrintRole::Receipt),
+            receipt_queue_name: role_queue(baraka_domain::printing::PrintRole::Receipt),
+            receipt_queue_name_fallback: role_fallback_queue(
+                baraka_domain::printing::PrintRole::Receipt,
+            ),
+            label_transport: role_transport(baraka_domain::printing::PrintRole::Label),
+            label_queue_name: role_queue(baraka_domain::printing::PrintRole::Label),
+            label_queue_name_fallback: role_fallback_queue(
+                baraka_domain::printing::PrintRole::Label,
+            ),
             ticket_render_mode: self
                 .read_key("printer.ticket_render_mode")
                 .map(|value| value.trim().to_string())
@@ -162,15 +219,71 @@ impl PrinterSettingsPort for SqlitePrinterSettings {
         // Transport arm and queue name: `None` keeps the stored value.
         // Both were validated upstream before any write.
         if let Some(selection) = transport {
-            pairs.push(("printer.transport", selection.trim().to_string()));
+            let arm = selection.trim().to_string();
+            pairs.push(("printer.transport", arm.clone()));
+            // BRK-113: the legacy global IS the receipt role — mirror it so
+            // role-key readers (router, TSPL gates) see the same value.
+            pairs.push(("printer.receipt.transport", arm));
         }
         if let Some(queue) = queue_name {
-            pairs.push(("printer.queue_name", queue.trim().to_string()));
+            let trimmed = queue.trim().to_string();
+            pairs.push(("printer.queue_name", trimmed.clone()));
+            pairs.push(("printer.receipt.queue_name", trimmed));
         }
         // Ticket render mode: `None` keeps the stored mode. Validated
         // upstream before any write.
         if let Some(mode) = ticket_render_mode {
             pairs.push(("printer.ticket_render_mode", mode.trim().to_string()));
+        }
+        run_transaction(&mut guard, |tx| {
+            for (key, value) in &pairs {
+                write_key(tx, key, value, &stamp)?;
+            }
+            Ok(())
+        })
+        .map_err(|_| store_failure())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn update_printer_role_settings(
+        &self,
+        receipt_transport: Option<&str>,
+        receipt_queue_name: Option<&str>,
+        receipt_queue_name_fallback: Option<&str>,
+        label_transport: Option<&str>,
+        label_queue_name: Option<&str>,
+        label_queue_name_fallback: Option<&str>,
+    ) -> Result<(), ApplicationError> {
+        let mut guard = self.lock()?;
+        let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let mut pairs: Vec<(&str, String)> = Vec::new();
+        // Role keys: `None` keeps the stored value. All validated upstream.
+        if let Some(selection) = receipt_transport {
+            pairs.push(("printer.receipt.transport", selection.trim().to_string()));
+            // Mirror to the legacy keys so pre-BRK-113 readers keep working.
+            pairs.push(("printer.transport", selection.trim().to_string()));
+        }
+        if let Some(queue) = receipt_queue_name {
+            pairs.push(("printer.receipt.queue_name", queue.trim().to_string()));
+            pairs.push(("printer.queue_name", queue.trim().to_string()));
+        }
+        if let Some(fallback) = receipt_queue_name_fallback {
+            pairs.push((
+                "printer.receipt.queue_name_fallback",
+                fallback.trim().to_string(),
+            ));
+        }
+        if let Some(selection) = label_transport {
+            pairs.push(("printer.label.transport", selection.trim().to_string()));
+        }
+        if let Some(queue) = label_queue_name {
+            pairs.push(("printer.label.queue_name", queue.trim().to_string()));
+        }
+        if let Some(fallback) = label_queue_name_fallback {
+            pairs.push((
+                "printer.label.queue_name_fallback",
+                fallback.trim().to_string(),
+            ));
         }
         run_transaction(&mut guard, |tx| {
             for (key, value) in &pairs {

@@ -1,6 +1,7 @@
 //! Printing use cases: reprint enqueue, status reads, store identity,
 //! and test-print diagnostics (TASK-BRK-056, ADR-065).
 
+use baraka_domain::printing::PrintRole;
 use baraka_domain::printing::{
     identity_caps, DecodeSummary, DecodedLine, PreviewLine, ReceiptDocument, ReceiptLanguage,
 };
@@ -417,7 +418,10 @@ where
         let device = if kind == "capture" {
             TestPrintDeviceOutcome::CaptureOnly
         } else {
-            match self.transport.send_raster(&bytes) {
+            match self
+                .transport
+                .send_raster_for_role(PrintRole::Receipt, &bytes)
+            {
                 Ok(()) => TestPrintDeviceOutcome::Sent,
                 Err(error) => TestPrintDeviceOutcome::DeviceError(device_error_code(&error)),
             }
@@ -543,6 +547,75 @@ where
             transport,
             queue_name,
             ticket_render_mode,
+        )?;
+        self.settings.get_printer_settings()
+    }
+}
+
+/// Persist the dual-printer role routing (TASK-BRK-113, ADMIN-gated).
+///
+/// Every `Some` arm must be `"serial"`/`"spooler"`; every `Some` queue must
+/// be non-empty and at most 220 chars; a `Some` fallback must pass the same
+/// queue rule (empty string clears it — `None` keeps the stored value).
+/// All rejected before any write; the write itself is one transaction.
+pub struct UpdatePrinterRoleSettingsUseCase<'a, P>
+where
+    P: ?Sized,
+{
+    settings: &'a P,
+}
+
+impl<'a, P> UpdatePrinterRoleSettingsUseCase<'a, P>
+where
+    P: crate::ports::PrinterSettingsPort + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(settings: &'a P) -> Self {
+        Self { settings }
+    }
+
+    /// Validate permission + role arms/queues, then persist atomically.
+    #[allow(clippy::too_many_arguments)]
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        receipt_transport: Option<&str>,
+        receipt_queue_name: Option<&str>,
+        receipt_queue_name_fallback: Option<&str>,
+        label_transport: Option<&str>,
+        label_queue_name: Option<&str>,
+        label_queue_name_fallback: Option<&str>,
+    ) -> Result<crate::ports::PrinterSettings, ApplicationError> {
+        if !session
+            .role
+            .has_permission(Permission::ManagePrinterSettings)
+        {
+            return Err(ApplicationError::Unauthorized);
+        }
+        for arm in [receipt_transport, label_transport].into_iter().flatten() {
+            baraka_domain::printing::validate_printer_transport(arm)?;
+        }
+        for queue in [
+            receipt_queue_name,
+            label_queue_name,
+            receipt_queue_name_fallback,
+            label_queue_name_fallback,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            // Empty fallback clears; non-empty values must pass the rule.
+            if !queue.trim().is_empty() {
+                baraka_domain::printing::validate_spooler_queue_name(queue)?;
+            }
+        }
+        self.settings.update_printer_role_settings(
+            receipt_transport,
+            receipt_queue_name,
+            receipt_queue_name_fallback,
+            label_transport,
+            label_queue_name,
+            label_queue_name_fallback,
         )?;
         self.settings.get_printer_settings()
     }

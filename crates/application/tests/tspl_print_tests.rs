@@ -56,6 +56,14 @@ impl PrinterSettingsPort for FakeSettings {
             paper_width_mm: 80,
             transport: self.transport.clone(),
             queue_name: "XP-410B".to_string(),
+            // BRK-113: the legacy single arm seeds both roles in this fake
+            // (mirrors the pre-split behavior the 25 tests were written for).
+            receipt_transport: self.transport.clone(),
+            receipt_queue_name: "XP-410B".to_string(),
+            receipt_queue_name_fallback: String::new(),
+            label_transport: self.transport.clone(),
+            label_queue_name: "XP-410B".to_string(),
+            label_queue_name_fallback: String::new(),
             ticket_render_mode: "graphique".to_string(),
             tspl_gap_mm: self.media.gap_mm,
             tspl_density: self.media.density,
@@ -86,6 +94,18 @@ impl PrinterSettingsPort for FakeSettings {
         _probe_mode: Option<String>,
         _offset_x_mm: Option<i32>,
         _offset_y_mm: Option<i32>,
+    ) -> Result<(), ApplicationError> {
+        panic!("out of scope for TSPL tests: settings are read-only here");
+    }
+
+    fn update_printer_role_settings(
+        &self,
+        _receipt_transport: Option<&str>,
+        _receipt_queue_name: Option<&str>,
+        _receipt_queue_name_fallback: Option<&str>,
+        _label_transport: Option<&str>,
+        _label_queue_name: Option<&str>,
+        _label_queue_name_fallback: Option<&str>,
     ) -> Result<(), ApplicationError> {
         panic!("out of scope for TSPL tests: settings are read-only here");
     }

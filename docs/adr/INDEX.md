@@ -144,5 +144,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-123 | Counter sync without sequence collision (S5 design; impl deferred) | PROPOSED |
 | ADR-124 | Split `tspl.rs` into 8 domain modules, pure motion (BRK-112) | ACCEPTED |
 | ADR-125 | Split `src/lib/ipc.ts` into 12 domain modules, pure motion (Wave 3) | ACCEPTED |
+| ADR-126 | Dual-printer role routing (receipt + label, per-role fallback; BRK-113) | ACCEPTED |
 
-Next free id: ADR-126.
+Next free id: ADR-127.

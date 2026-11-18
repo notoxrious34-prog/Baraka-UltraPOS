@@ -4,6 +4,7 @@ pub mod decode;
 pub mod paper;
 pub mod print_job;
 pub mod receipt_model;
+pub mod routing;
 pub mod transport;
 pub mod tspl;
 
@@ -14,6 +15,10 @@ pub use receipt_model::identity_caps;
 pub use receipt_model::{
     format_centimes_plain, format_qty_plain, DebtReceiptDocument, DecodeSummary, DecodedLine,
     PreviewLine, ReceiptDocument, ReceiptLanguage, ReceiptLine, ReceiptTotals, StoreIdentity,
+};
+pub use routing::{
+    resolve_role_queues, resolve_role_transport, should_try_fallback, PrintRole, RoleQueues,
+    PRINT_ROLE_LABEL, PRINT_ROLE_RECEIPT,
 };
 pub use transport::{
     validate_printer_transport, validate_spooler_queue_name, validate_ticket_render_mode,

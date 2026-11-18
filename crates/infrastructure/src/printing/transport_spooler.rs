@@ -34,7 +34,12 @@ impl SpoolerRawTransport {
 
     /// Configured queue name, or `None` when unconfigured.
     fn queue_name(&self) -> Option<String> {
-        self.setting("printer.queue_name").and_then(|queue| {
+        self.named_queue("printer.queue_name")
+    }
+
+    /// Read one trimmed non-empty queue key (BRK-113 role routing).
+    fn named_queue(&self, key: &str) -> Option<String> {
+        self.setting(key).and_then(|queue| {
             let trimmed = queue.trim().to_string();
             if trimmed.is_empty() {
                 None
@@ -42,6 +47,22 @@ impl SpoolerRawTransport {
                 Some(trimmed)
             }
         })
+    }
+
+    /// Send bytes to an explicit queue (BRK-113 per-role routing).
+    pub fn send_to_queue(&self, queue_name: &str, bytes: &[u8]) -> Result<(), ApplicationError> {
+        let queue = spooler_raw::SpoolerQueue::new(queue_name).map_err(Self::map_error)?;
+        spooler_raw::submit_raw(&queue, bytes).map_err(Self::map_error)
+    }
+
+    /// Probe one explicit queue without starting a document (BRK-113).
+    pub fn queue_available(&self, queue_name: &str) -> bool {
+        let Ok(queue) = spooler_raw::SpoolerQueue::new(queue_name) else {
+            return false;
+        };
+        // Probe opens + closes without starting a document: no empty
+        // job is ever spooled by an availability check.
+        queue.probe().is_ok()
     }
 
     /// Map a `spooler_raw` failure onto the existing error taxonomy.
@@ -66,19 +87,13 @@ impl PrinterTransportPort for SpoolerRawTransport {
         let queue_name = self.queue_name().ok_or(ApplicationError::Validation(
             DomainError::PrinterTransportUnavailable,
         ))?;
-        let queue = spooler_raw::SpoolerQueue::new(&queue_name).map_err(Self::map_error)?;
-        spooler_raw::submit_raw(&queue, bytes).map_err(Self::map_error)
+        self.send_to_queue(&queue_name, bytes)
     }
 
     fn is_available(&self) -> bool {
         let Some(queue_name) = self.queue_name() else {
             return false;
         };
-        let Ok(queue) = spooler_raw::SpoolerQueue::new(&queue_name) else {
-            return false;
-        };
-        // Probe opens + closes without starting a document: no empty
-        // job is ever spooled by an availability check.
-        queue.probe().is_ok()
+        self.queue_available(&queue_name)
     }
 }

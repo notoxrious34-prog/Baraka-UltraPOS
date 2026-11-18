@@ -22,7 +22,7 @@ use baraka_domain::printing::{
     label_text_needs_bitmap, label_text_plan, render_bitmap_job, render_calibration_pattern_40x20,
     render_label_40x20, render_label_40x20_mixed, render_ticket_80mm,
     render_ticket_80mm_mixed_versioned, render_ticket_80mm_versioned, render_ticket_ruler_80mm,
-    ticket_text_plan_v2, LabelBarcodeGeometry, LabelBitmap, LabelTextSlot, TicketOp,
+    ticket_text_plan_v2, LabelBarcodeGeometry, LabelBitmap, LabelTextSlot, PrintRole, TicketOp,
     TsplCaptionLang, TsplLabel, TsplMediaSetup, TsplTicket, TsplTicketCredit, TsplTicketLine,
     TsplTicketTotals, TRANSPORT_SPOOLER,
 };
@@ -43,13 +43,19 @@ pub struct TsplPrintOutcome {
     pub bytes_sent: usize,
 }
 
-/// Reject unless the `printer.transport` selector points at the spooler.
-fn require_spooler_transport<P>(settings: &P) -> Result<(), ApplicationError>
+/// Reject unless the print ROLE's arm points at the spooler (TSPL is
+/// spooler-only; the serial arm cannot take TSPL bytes). BRK-113: the gate
+/// reads the role arm, not the legacy global.
+fn require_role_spooler<P>(settings: &P, role: PrintRole) -> Result<(), ApplicationError>
 where
     P: PrinterSettingsPort + ?Sized,
 {
-    let selector = settings.get_printer_settings()?;
-    if selector.transport.trim() == TRANSPORT_SPOOLER {
+    let stored = settings.get_printer_settings()?;
+    let arm = match role {
+        PrintRole::Receipt => stored.receipt_transport,
+        PrintRole::Label => stored.label_transport,
+    };
+    if arm.trim() == TRANSPORT_SPOOLER {
         Ok(())
     } else {
         Err(ApplicationError::Validation(
@@ -145,7 +151,7 @@ where
         if !session.role.has_permission(Permission::PosSell) {
             return Err(ApplicationError::Unauthorized);
         }
-        require_spooler_transport(self.settings)?;
+        require_role_spooler(self.settings, PrintRole::Label)?;
         if price_centimes < 0 {
             return Err(ApplicationError::Validation(
                 DomainError::InvalidCanonicalString("TSPL_PRICE_MUST_BE_NON_NEGATIVE".to_string()),
@@ -196,7 +202,8 @@ where
         } else {
             render_label_40x20(&label)?
         };
-        self.transport.send_raster(&bytes)?;
+        self.transport
+            .send_raster_for_role(PrintRole::Label, &bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),
         })
@@ -453,7 +460,7 @@ where
         if !session.role.has_permission(Permission::ReprintDocument) {
             return Err(ApplicationError::Unauthorized);
         }
-        require_spooler_transport(self.settings)?;
+        require_role_spooler(self.settings, PrintRole::Receipt)?;
         let detail = GetSaleUseCase::new(self.documents).execute(session, document_id)?;
         let document = detail.document;
         let identity = self.identity.load_identity()?;
@@ -638,7 +645,8 @@ where
         } else {
             render_ticket_80mm_versioned(&ticket, document.template_version)?
         };
-        self.transport.send_raster(&bytes)?;
+        self.transport
+            .send_raster_for_role(PrintRole::Receipt, &bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),
         })
@@ -716,7 +724,7 @@ where
         if !session.role.has_permission(Permission::PosSell) {
             return Err(ApplicationError::Unauthorized);
         }
-        require_spooler_transport(self.settings)?;
+        require_role_spooler(self.settings, PrintRole::Receipt)?;
         let bytes = render_bitmap_job(
             &media_from_settings(self.settings)?,
             0,
@@ -726,7 +734,8 @@ where
             pixels,
             copies,
         )?;
-        self.transport.send_raster(&bytes)?;
+        self.transport
+            .send_raster_for_role(PrintRole::Receipt, &bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),
         })
@@ -770,7 +779,7 @@ where
         {
             return Err(ApplicationError::Unauthorized);
         }
-        require_spooler_transport(self.settings)?;
+        require_role_spooler(self.settings, PrintRole::Label)?;
         // Fixed ASCII brand by design: the self-test must be byte-identical
         // on every machine (the store name is owner data and may carry
         // non-ASCII bytes that this printer class silently rejects).
@@ -783,7 +792,8 @@ where
             copies: 1,
             media: media_from_settings(self.settings)?,
         })?;
-        self.transport.send_raster(&bytes)?;
+        self.transport
+            .send_raster_for_role(PrintRole::Label, &bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),
         })
@@ -825,9 +835,10 @@ where
         {
             return Err(ApplicationError::Unauthorized);
         }
-        require_spooler_transport(self.settings)?;
+        require_role_spooler(self.settings, PrintRole::Label)?;
         let bytes = render_calibration_pattern_40x20(&media_from_settings(self.settings)?)?;
-        self.transport.send_raster(&bytes)?;
+        self.transport
+            .send_raster_for_role(PrintRole::Label, &bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),
         })
@@ -869,9 +880,10 @@ where
         {
             return Err(ApplicationError::Unauthorized);
         }
-        require_spooler_transport(self.settings)?;
+        require_role_spooler(self.settings, PrintRole::Receipt)?;
         let bytes = render_ticket_ruler_80mm(&media_from_settings(self.settings)?)?;
-        self.transport.send_raster(&bytes)?;
+        self.transport
+            .send_raster_for_role(PrintRole::Receipt, &bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),
         })
@@ -914,7 +926,7 @@ where
         {
             return Err(ApplicationError::Unauthorized);
         }
-        require_spooler_transport(self.settings)?;
+        require_role_spooler(self.settings, PrintRole::Receipt)?;
         // Fixed ASCII payload by design: byte-identical on every machine
         // (store identity is owner data and may carry non-ASCII bytes that
         // this printer class silently rejects).
@@ -963,7 +975,8 @@ where
             is_reprint: false,
             media: media_from_settings(self.settings)?,
         })?;
-        self.transport.send_raster(&bytes)?;
+        self.transport
+            .send_raster_for_role(PrintRole::Receipt, &bytes)?;
         Ok(TsplPrintOutcome {
             bytes_sent: bytes.len(),
         })

@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use baraka_domain::errors::DomainError;
 use baraka_domain::printing::{
-    format_centimes_plain, format_qty_plain, DebtReceiptDocument, ReceiptDocument, ReceiptLanguage,
-    ReceiptLine, ReceiptTotals,
+    format_centimes_plain, format_qty_plain, DebtReceiptDocument, PrintRole, ReceiptDocument,
+    ReceiptLanguage, ReceiptLine, ReceiptTotals,
 };
 
 use crate::errors::ApplicationError;
@@ -298,7 +298,7 @@ where
             });
         }
     };
-    if !transport.is_available() {
+    if !transport.is_available_for_role(PrintRole::Receipt) {
         let attempt = claimed.attempt_count + 1;
         if attempt >= PRINT_MAX_ATTEMPTS {
             let reason = "EXHAUSTED_MAX_RETRIES: NO_PRINTER_CONFIGURED".to_string();
@@ -314,7 +314,7 @@ where
             delay: retry_delay(attempt),
         });
     }
-    match transport.send_raster(&bytes) {
+    match transport.send_raster_for_role(PrintRole::Receipt, &bytes) {
         Ok(()) => {
             jobs.mark_done(&claimed.job_id)?;
             Ok(JobOutcome::Done {
@@ -431,7 +431,7 @@ where
     // Bounded unavailable-printer path: an unconfigured or unreachable
     // transport consumes retry budget instead of spinning forever. After
     // PRINT_MAX_ATTEMPTS the job fails terminally with NO_PRINTER_CONFIGURED.
-    if !transport.is_available() {
+    if !transport.is_available_for_role(PrintRole::Receipt) {
         let attempt = claimed.attempt_count + 1;
         if attempt >= PRINT_MAX_ATTEMPTS {
             let reason = "EXHAUSTED_MAX_RETRIES: NO_PRINTER_CONFIGURED".to_string();
@@ -447,7 +447,7 @@ where
             delay: retry_delay(attempt),
         });
     }
-    match transport.send_raster(&bytes) {
+    match transport.send_raster_for_role(PrintRole::Receipt, &bytes) {
         Ok(()) => {
             jobs.mark_done(&claimed.job_id)?;
             Ok(JobOutcome::Done {

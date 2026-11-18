@@ -1504,6 +1504,18 @@ pub struct PrinterSettings {
     pub transport: String,
     /// Exact Windows spooler queue name (`""` when unconfigured).
     pub queue_name: String,
+    /// Receipt-role transport arm (BRK-113; legacy `transport` seeds it).
+    pub receipt_transport: String,
+    /// Receipt-role primary spooler queue (BRK-113; legacy seeds it).
+    pub receipt_queue_name: String,
+    /// Receipt-role fallback spooler queue (`""` = no fallback).
+    pub receipt_queue_name_fallback: String,
+    /// Label-role transport arm (BRK-113; default `"spooler"` for XP-410B).
+    pub label_transport: String,
+    /// Label-role primary spooler queue (BRK-113).
+    pub label_queue_name: String,
+    /// Label-role fallback spooler queue (`""` = no fallback).
+    pub label_queue_name_fallback: String,
     /// Ticket render mode: `"escpos"` (default) or `"graphique"` (ADR-104).
     pub ticket_render_mode: String,
     /// TSPL label inter-label gap in mm (default 3, OWNER-VERIFY ruler).
@@ -1538,6 +1550,23 @@ pub trait PrinterSettingsPort: Send + Sync {
         transport: Option<&str>,
         queue_name: Option<&str>,
         ticket_render_mode: Option<&str>,
+    ) -> Result<(), ApplicationError>;
+
+    /// Persist the dual-printer role routing (BRK-113, ADMIN-gated upstream;
+    /// `None` keeps the stored value; `Some` values are validated upstream
+    /// before any write). Separate from `update_printer_settings` so
+    /// existing callers keep compiling untouched. Receipt writes also mirror
+    /// to the legacy `printer.transport` / `printer.queue_name` keys so
+    /// pre-BRK-113 readers keep working.
+    #[allow(clippy::too_many_arguments)]
+    fn update_printer_role_settings(
+        &self,
+        receipt_transport: Option<&str>,
+        receipt_queue_name: Option<&str>,
+        receipt_queue_name_fallback: Option<&str>,
+        label_transport: Option<&str>,
+        label_queue_name: Option<&str>,
+        label_queue_name_fallback: Option<&str>,
     ) -> Result<(), ApplicationError>;
 
     /// Persist the TSPL media setup (ADMIN-gated upstream; `None` keeps the
@@ -1625,6 +1654,23 @@ pub trait PrinterTransportPort: Send + Sync {
 
     /// True when a configured transport endpoint is reachable.
     fn is_available(&self) -> bool;
+
+    /// Transmit bytes on behalf of one print role (BRK-113 dual-printer
+    /// routing). The default routes to the legacy single-arm `send_raster`
+    /// so existing fakes keep compiling untouched.
+    fn send_raster_for_role(
+        &self,
+        _role: baraka_domain::printing::PrintRole,
+        bytes: &[u8],
+    ) -> Result<(), ApplicationError> {
+        self.send_raster(bytes)
+    }
+
+    /// Role-scoped availability probe (BRK-113). Defaults to the legacy
+    /// single-arm probe.
+    fn is_available_for_role(&self, _role: baraka_domain::printing::PrintRole) -> bool {
+        self.is_available()
+    }
 }
 
 /// Receipt raster renderer port (pure-Rust pipeline in infrastructure).

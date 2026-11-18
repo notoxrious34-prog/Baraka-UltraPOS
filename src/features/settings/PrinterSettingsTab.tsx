@@ -18,6 +18,7 @@ import { useSessionStore } from "@/stores/session-store";
 import type { Locale } from "@/types/pos";
 import {
   ipcGetPrinterSettings,
+  ipcUpdatePrinterRoleSettings,
   ipcUpdatePrinterSettings,
   printingTestPrint,
   printingTestTsplLabel,
@@ -86,6 +87,107 @@ function Section({
   );
 }
 
+// BRK-113: one role routing group — arm toggle + primary/fallback queues.
+function RoleGroup({
+  title,
+  desc,
+  arm,
+  onArm,
+  queue,
+  onQueue,
+  fallback,
+  onFallback,
+  disabled,
+  armButton,
+  inputClass,
+  locale,
+}: {
+  title: string;
+  desc: string;
+  arm: PrinterTransport;
+  onArm: (arm: PrinterTransport) => void;
+  queue: string;
+  onQueue: (value: string) => void;
+  fallback: string;
+  onFallback: (value: string) => void;
+  disabled: boolean;
+  armButton: (active: boolean) => string;
+  inputClass: string;
+  locale: Locale;
+}): ReactElement {
+  return (
+    <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+      <p className="text-sm font-black">{title}</p>
+      <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{desc}</p>
+      <div
+        role="group"
+        aria-label={title}
+        className="mt-2 flex gap-1 rounded border border-slate-300 p-1 dark:border-slate-600"
+      >
+        <button
+          type="button"
+          aria-pressed={arm === "serial"}
+          disabled={disabled}
+          onClick={() => {
+            onArm("serial");
+          }}
+          className={armButton(arm === "serial")}
+        >
+          <SettingsIcon className="h-4 w-4" />
+          <span>{t(locale, "settings.printerTransportSerial")}</span>
+        </button>
+        <button
+          type="button"
+          aria-pressed={arm === "spooler"}
+          disabled={disabled}
+          onClick={() => {
+            onArm("spooler");
+          }}
+          className={armButton(arm === "spooler")}
+        >
+          <PrinterIcon className="h-4 w-4" />
+          <span>{t(locale, "settings.printerTransportSpooler")}</span>
+        </button>
+      </div>
+      {arm === "spooler" ? (
+        <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-bold">{t(locale, "settings.rolePrimaryQueue")}</span>
+            <bdi dir="ltr" className="contents">
+              <input
+                className={`${inputClass} tabular-nums`}
+                value={queue}
+                disabled={disabled}
+                placeholder={t(locale, "settings.printerQueuePlaceholder")}
+                onChange={(event) => {
+                  onQueue(event.target.value);
+                }}
+              />
+            </bdi>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-bold">{t(locale, "settings.roleFallbackQueue")}</span>
+            <bdi dir="ltr" className="contents">
+              <input
+                className={`${inputClass} tabular-nums`}
+                value={fallback}
+                disabled={disabled}
+                placeholder="—"
+                onChange={(event) => {
+                  onFallback(event.target.value);
+                }}
+              />
+            </bdi>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {t(locale, "settings.roleFallbackHelp")}
+            </span>
+          </label>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabProps): ReactElement {
   const hasPermission = useSessionStore((state) => state.hasPermission);
   const canSaveSettings = hasPermission("MANAGE_PRINTER_SETTINGS");
@@ -96,6 +198,14 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
   const [transport, setTransport] = useState<PrinterTransport>("serial");
   const [renderMode, setRenderMode] = useState<TicketRenderMode>("escpos");
   const [queueName, setQueueName] = useState("");
+  // BRK-113 dual-printer roles: counter receipts vs dedicated 40x20 labels.
+  const [receiptTransport, setReceiptTransport] = useState<PrinterTransport>("serial");
+  const [receiptQueue, setReceiptQueue] = useState("");
+  const [receiptFallback, setReceiptFallback] = useState("");
+  const [labelTransport, setLabelTransport] = useState<PrinterTransport>("spooler");
+  const [labelQueue, setLabelQueue] = useState("");
+  const [labelFallback, setLabelFallback] = useState("");
+  const [savingRoles, setSavingRoles] = useState(false);
   // LIVE-2026-11-06: TSPL media for the 40x20 label stock. Plain integer
   // counts (digits only, backend re-validates ranges) — never money.
   const [tsplGapMm, setTsplGapMm] = useState("3");
@@ -124,6 +234,12 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
           setTransport(settings.transport);
           setRenderMode(settings.ticketRenderMode);
           setQueueName(settings.queueName);
+          setReceiptTransport(settings.receiptTransport);
+          setReceiptQueue(settings.receiptQueueName);
+          setReceiptFallback(settings.receiptQueueNameFallback);
+          setLabelTransport(settings.labelTransport);
+          setLabelQueue(settings.labelQueueName);
+          setLabelFallback(settings.labelQueueNameFallback);
           setProbeMode(settings.tsplProbeMode);
           setTsplGapMm(String(settings.tsplGapMm));
           setTsplDensity(String(settings.tsplDensity));
@@ -204,6 +320,12 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
       setTransport(settings.transport);
       setRenderMode(settings.ticketRenderMode);
       setQueueName(settings.queueName);
+      setReceiptTransport(settings.receiptTransport);
+      setReceiptQueue(settings.receiptQueueName);
+      setReceiptFallback(settings.receiptQueueNameFallback);
+      setLabelTransport(settings.labelTransport);
+      setLabelQueue(settings.labelQueueName);
+      setLabelFallback(settings.labelQueueNameFallback);
       setProbeMode(settings.tsplProbeMode);
       setTsplGapMm(String(settings.tsplGapMm));
       setTsplDensity(String(settings.tsplDensity));
@@ -215,6 +337,53 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
       setNotice({ tone: "error", text: String(failure) });
     } finally {
       setSaving(false);
+    }
+  }
+
+  // BRK-113: persist the two role routings in one validated write.
+  // A spooler arm with an empty primary queue is blocked inline (no IPC);
+  // an empty fallback clears the fallback server-side.
+  async function handleSaveRoles(): Promise<void> {
+    if (loading || savingRoles || !canSaveSettings) {
+      return;
+    }
+    const primaryReceipt = receiptQueue.trim();
+    const fallbackReceipt = receiptFallback.trim();
+    const primaryLabel = labelQueue.trim();
+    const fallbackLabel = labelFallback.trim();
+    if (receiptTransport === "spooler" && primaryReceipt === "") {
+      setNotice({ tone: "error", text: t(locale, "settings.roleQueueRequired") });
+      return;
+    }
+    if (labelTransport === "spooler" && primaryLabel === "") {
+      setNotice({ tone: "error", text: t(locale, "settings.roleQueueRequired") });
+      return;
+    }
+    setSavingRoles(true);
+    setNotice(null);
+    try {
+      const settings = await ipcUpdatePrinterRoleSettings(sessionToken, {
+        receiptTransport,
+        receiptQueueName: primaryReceipt,
+        receiptQueueNameFallback: fallbackReceipt,
+        labelTransport,
+        labelQueueName: primaryLabel,
+        labelQueueNameFallback: fallbackLabel,
+      });
+      // Backend mirrors receipt → legacy, so refresh everything.
+      setTransport(settings.transport);
+      setQueueName(settings.queueName);
+      setReceiptTransport(settings.receiptTransport);
+      setReceiptQueue(settings.receiptQueueName);
+      setReceiptFallback(settings.receiptQueueNameFallback);
+      setLabelTransport(settings.labelTransport);
+      setLabelQueue(settings.labelQueueName);
+      setLabelFallback(settings.labelQueueNameFallback);
+      setNotice({ tone: "success", text: t(locale, "settings.saved") });
+    } catch (failure) {
+      setNotice({ tone: "error", text: String(failure) });
+    } finally {
+      setSavingRoles(false);
     }
   }
 
@@ -334,8 +503,8 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
     transport === "spooler"
       ? `${tsplGapMm} / ${tsplDensity} / ${tsplSpeed} mm · X${tsplOffsetXMm} Y${tsplOffsetYMm}`
       : "—";
-  const labelIndex = "04";
-  const testsIndex = transport === "spooler" ? "05" : "04";
+  const labelIndex = "05";
+  const testsIndex = transport === "spooler" ? "06" : "05";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
@@ -470,6 +639,54 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
 
       <Section
         index="02"
+        title={t(locale, "settings.sectionRoles")}
+        desc={t(locale, "settings.sectionRolesDesc")}
+      >
+      <RoleGroup
+        title={t(locale, "settings.roleReceipt")}
+        desc={t(locale, "settings.roleReceiptDesc")}
+        arm={receiptTransport}
+        onArm={setReceiptTransport}
+        queue={receiptQueue}
+        onQueue={setReceiptQueue}
+        fallback={receiptFallback}
+        onFallback={setReceiptFallback}
+        disabled={saving || savingRoles}
+        armButton={transportButton}
+        inputClass={inputClass}
+        locale={locale}
+      />
+      <RoleGroup
+        title={t(locale, "settings.roleLabel")}
+        desc={t(locale, "settings.roleLabelDesc")}
+        arm={labelTransport}
+        onArm={setLabelTransport}
+        queue={labelQueue}
+        onQueue={setLabelQueue}
+        fallback={labelFallback}
+        onFallback={setLabelFallback}
+        disabled={saving || savingRoles}
+        armButton={transportButton}
+        inputClass={inputClass}
+        locale={locale}
+      />
+      <div>
+        <button
+          type="button"
+          onClick={() => {
+            void handleSaveRoles();
+          }}
+          disabled={savingRoles || saving || !canSaveSettings}
+          title={canSaveSettings ? undefined : t(locale, "settings.printerManageReservedGuidance")}
+          className="rounded bg-accent-500 px-3 py-1.5 text-sm font-bold text-slate-950 disabled:opacity-50"
+        >
+          {savingRoles ? t(locale, "settings.saving") : t(locale, "settings.save")}
+        </button>
+      </div>
+      </Section>
+
+      <Section
+        index="03"
         title={t(locale, "settings.sectionTicket")}
         desc={t(locale, "settings.sectionTicketDesc")}
       >
@@ -521,7 +738,7 @@ export function PrinterSettingsTab({ locale, sessionToken }: PrinterSettingsTabP
       </Section>
 
       <Section
-        index="03"
+        index="04"
         title={t(locale, "settings.sectionDiag")}
         desc={t(locale, "settings.sectionDiagDesc")}
       >

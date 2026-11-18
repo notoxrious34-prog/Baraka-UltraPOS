@@ -185,6 +185,18 @@ pub struct PrinterSettingsDto {
     pub tspl_offset_y_mm: i32,
     /// TEMPORARY-DIAGNOSTIC probe mode wire spelling (BRK-100).
     pub tspl_probe_mode: String,
+    /// Receipt-role transport arm (BRK-113 dual-printer routing).
+    pub receipt_transport: String,
+    /// Receipt-role primary spooler queue.
+    pub receipt_queue_name: String,
+    /// Receipt-role fallback spooler queue (`""` = no fallback).
+    pub receipt_queue_name_fallback: String,
+    /// Label-role transport arm (BRK-113; `XP-410B` default `spooler`).
+    pub label_transport: String,
+    /// Label-role primary spooler queue.
+    pub label_queue_name: String,
+    /// Label-role fallback spooler queue (`""` = no fallback).
+    pub label_queue_name_fallback: String,
 }
 
 /// Serial printer configuration update.
@@ -205,6 +217,24 @@ pub struct UpdatePrinterSettingsRequest {
     /// Spooler queue name (absent keeps stored queue).
     #[serde(default)]
     pub queue_name: Option<String>,
+    /// Receipt-role transport arm (`serial`/`spooler`; absent keeps stored).
+    #[serde(default)]
+    pub receipt_transport: Option<String>,
+    /// Receipt-role primary spooler queue (absent keeps stored).
+    #[serde(default)]
+    pub receipt_queue_name: Option<String>,
+    /// Receipt-role fallback queue (empty clears; absent keeps stored).
+    #[serde(default)]
+    pub receipt_queue_name_fallback: Option<String>,
+    /// Label-role transport arm (`serial`/`spooler`; absent keeps stored).
+    #[serde(default)]
+    pub label_transport: Option<String>,
+    /// Label-role primary spooler queue (absent keeps stored).
+    #[serde(default)]
+    pub label_queue_name: Option<String>,
+    /// Label-role fallback queue (empty clears; absent keeps stored).
+    #[serde(default)]
+    pub label_queue_name_fallback: Option<String>,
     /// Ticket render mode ("escpos" or "graphique"; absent keeps
     /// stored mode).
     #[serde(default)]

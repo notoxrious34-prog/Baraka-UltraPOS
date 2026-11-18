@@ -215,6 +215,18 @@ export interface PrinterSettings {
   paperWidthMm: number;
   transport: PrinterTransport;
   queueName: string;
+  /** Receipt-role arm (BRK-113): receipts/reports ride this transport. */
+  receiptTransport: PrinterTransport;
+  /** Receipt-role primary spooler queue. */
+  receiptQueueName: string;
+  /** Receipt-role fallback queue ("" = no fallback). */
+  receiptQueueNameFallback: string;
+  /** Label-role arm (BRK-113): 40x20 labels ride this transport. */
+  labelTransport: PrinterTransport;
+  /** Label-role primary spooler queue. */
+  labelQueueName: string;
+  /** Label-role fallback queue ("" = no fallback). */
+  labelQueueNameFallback: string;
   ticketRenderMode: TicketRenderMode;
   /** TEMPORARY-DIAGNOSTIC probe mode (BRK-100 — remove in lock-in). */
   tsplProbeMode: TsplProbeMode;
@@ -229,6 +241,17 @@ export interface PrinterSettings {
 
 function toTicketRenderMode(raw: unknown): TicketRenderMode {
   return raw === 'graphique' ? 'graphique' : 'escpos';
+}
+
+/** Parse a role arm: receipt falls back to serial, label to spooler. */
+function toRoleTransport(raw: unknown, fallback: PrinterTransport): PrinterTransport {
+  if (raw === 'spooler') return 'spooler';
+  if (raw === 'serial') return 'serial';
+  return fallback;
+}
+
+function toQueueName(raw: unknown): string {
+  return typeof raw === 'string' ? raw : '';
 }
 
 /** Read serial printer configuration. */
@@ -256,6 +279,26 @@ export async function ipcGetPrinterSettings(sessionToken: string): Promise<Print
     paperWidthMm: wire.paper_width_mm,
     transport: wire.transport === 'spooler' ? 'spooler' : 'serial',
     queueName: typeof wire.queue_name === 'string' ? wire.queue_name : '',
+    receiptTransport: toRoleTransport(
+      (wire as { receipt_transport?: unknown }).receipt_transport,
+      'serial',
+    ),
+    receiptQueueName: toQueueName(
+      (wire as { receipt_queue_name?: unknown }).receipt_queue_name,
+    ),
+    receiptQueueNameFallback: toQueueName(
+      (wire as { receipt_queue_name_fallback?: unknown }).receipt_queue_name_fallback,
+    ),
+    labelTransport: toRoleTransport(
+      (wire as { label_transport?: unknown }).label_transport,
+      'spooler',
+    ),
+    labelQueueName: toQueueName(
+      (wire as { label_queue_name?: unknown }).label_queue_name,
+    ),
+    labelQueueNameFallback: toQueueName(
+      (wire as { label_queue_name_fallback?: unknown }).label_queue_name_fallback,
+    ),
     ticketRenderMode: toTicketRenderMode(
       (wire as { ticket_render_mode?: unknown }).ticket_render_mode,
     ),
@@ -331,6 +374,100 @@ export async function ipcUpdatePrinterSettings(
     paperWidthMm: wire.paper_width_mm,
     transport: wire.transport === 'spooler' ? 'spooler' : 'serial',
     queueName: typeof wire.queue_name === 'string' ? wire.queue_name : '',
+    receiptTransport: toRoleTransport(
+      (wire as { receipt_transport?: unknown }).receipt_transport,
+      'serial',
+    ),
+    receiptQueueName: toQueueName(
+      (wire as { receipt_queue_name?: unknown }).receipt_queue_name,
+    ),
+    receiptQueueNameFallback: toQueueName(
+      (wire as { receipt_queue_name_fallback?: unknown }).receipt_queue_name_fallback,
+    ),
+    labelTransport: toRoleTransport(
+      (wire as { label_transport?: unknown }).label_transport,
+      'spooler',
+    ),
+    labelQueueName: toQueueName(
+      (wire as { label_queue_name?: unknown }).label_queue_name,
+    ),
+    labelQueueNameFallback: toQueueName(
+      (wire as { label_queue_name_fallback?: unknown }).label_queue_name_fallback,
+    ),
+    ticketRenderMode: toTicketRenderMode(wire.ticket_render_mode),
+    tsplProbeMode: toTsplProbeMode(wire.tspl_probe_mode),
+    tsplGapMm: wire.tspl_gap_mm,
+    tsplDensity: wire.tspl_density,
+    tsplSpeed: wire.tspl_speed,
+    tsplOffsetXMm: wire.tspl_offset_x_mm,
+    tsplOffsetYMm: wire.tspl_offset_y_mm,
+  };
+}
+
+/**
+ * BRK-113 role patch: every field optional — `undefined` keeps the stored
+ * value server-side; an empty fallback string clears it. Call ONLY when at
+ * least one role field is addressed (the command layer skips otherwise).
+ */
+export interface PrinterRolePatch {
+  receiptTransport?: PrinterTransport;
+  receiptQueueName?: string;
+  receiptQueueNameFallback?: string;
+  labelTransport?: PrinterTransport;
+  labelQueueName?: string;
+  labelQueueNameFallback?: string;
+}
+
+/** Persist the dual-printer role routing (ADMIN only server-side). */
+export async function ipcUpdatePrinterRoleSettings(
+  sessionToken: string,
+  patch: PrinterRolePatch,
+): Promise<PrinterSettings> {
+  const wire = await call<{
+    serial_port: string;
+    serial_baud: number;
+    paper_width_dots: number;
+    paper_width_mm: number;
+    transport: string;
+    queue_name: string;
+    receipt_transport: string;
+    receipt_queue_name: string;
+    receipt_queue_name_fallback: string;
+    label_transport: string;
+    label_queue_name: string;
+    label_queue_name_fallback: string;
+    ticket_render_mode: string;
+    tspl_probe_mode: string;
+    tspl_gap_mm: number;
+    tspl_density: number;
+    tspl_speed: number;
+    tspl_offset_x_mm: number;
+    tspl_offset_y_mm: number;
+  }>("printer_update_settings", {
+    request: {
+      session_token: sessionToken,
+      // Role keys only — every other key stays untouched server-side.
+      receipt_transport: patch.receiptTransport ?? null,
+      receipt_queue_name: patch.receiptQueueName ?? null,
+      receipt_queue_name_fallback: patch.receiptQueueNameFallback ?? null,
+      label_transport: patch.labelTransport ?? null,
+      label_queue_name: patch.labelQueueName ?? null,
+      label_queue_name_fallback: patch.labelQueueNameFallback ?? null,
+    },
+  });
+  return {
+    serialPort: wire.serial_port,
+    serialBaud: wire.serial_baud,
+    paperWidthDots: wire.paper_width_dots,
+    paperWidthMm: wire.paper_width_mm,
+    transport: wire.transport === 'spooler' ? 'spooler' : 'serial',
+    queueName: toQueueName(wire.queue_name),
+    receiptTransport: toRoleTransport(wire.receipt_transport, 'serial'),
+    receiptQueueName: toQueueName(wire.receipt_queue_name),
+    receiptQueueNameFallback: toQueueName(wire.receipt_queue_name_fallback),
+    labelTransport: toRoleTransport(wire.label_transport, 'spooler'),
+    labelQueueName: toQueueName(wire.label_queue_name),
+    labelQueueNameFallback: toQueueName(wire.label_queue_name_fallback),
     ticketRenderMode: toTicketRenderMode(wire.ticket_render_mode),
     tsplProbeMode: toTsplProbeMode(wire.tspl_probe_mode),
     tsplGapMm: wire.tspl_gap_mm,

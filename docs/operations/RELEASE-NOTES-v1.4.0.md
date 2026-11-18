@@ -31,4 +31,7 @@
 
 ## Livrable
 - `target/release/bundle/nsis/Baraka UltraPOS_1.4.0_x64-setup.exe`
-- (taille + SHA-256 ci-dessous après build / الحجم والبصمة بعد البناء)
+- taille : 224592963 octets (~214 Mo) / الحجم
+- SHA-256 : `1320322f652289622e93a22b9e1867fa3e80ad04c9d8b50e1a38e55d1c9fbb68`
+- sans `.sig` (`G8-EXIT:1` : pas de `TAURI_SIGNING_PRIVATE_KEY` — installation manuelle uniquement ;
+  التثبيت يدوي فقط)

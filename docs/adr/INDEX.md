@@ -142,5 +142,6 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-121 | Unified stockout threshold (amends ADR-037; BRK-120 Option A) | PROPOSED |
 | ADR-122 | Quantity breaks over tier price (`min(tier, break)`; BRK-121a/b, S3/S4 radar) | ACCEPTED |
 | ADR-123 | Counter sync without sequence collision (S5 design; impl deferred) | PROPOSED |
+| ADR-124 | Split `tspl.rs` into 8 domain modules, pure motion (BRK-112) | ACCEPTED |
 
-Next free id: ADR-124.
+Next free id: ADR-125.

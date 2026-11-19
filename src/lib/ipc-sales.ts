@@ -92,6 +92,12 @@ export interface CheckoutRequestWire {
    */
   allow_negative_stock: boolean;
   notes: string | null;
+  /**
+   * Manager PIN override unlocking below-cost lines for this sale only
+   * (DSN-115). `null` locks every red line. The PIN modal (manager path)
+   * fills this; the cashier path always sends `null`.
+   */
+  below_cost_override: { username: string; pin: string } | null;
 }
 
 /** Commit a sale atomically; rejects with a backend wire code on failure. */

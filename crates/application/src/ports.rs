@@ -366,8 +366,30 @@ pub struct MatrixCellWrite {
     pub axis2_sort: i64,
 }
 
+/// Default-selling unit descriptor riding a 2D-grid row (DSN-108): everything
+/// the POS grid needs to build a cart line in ONE query — never N+1.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatrixViewUnit {
+    /// Default-selling unit id.
+    pub unit_id: UnitId,
+    /// Unit name (Arabic).
+    pub unit_name_ar: String,
+    /// Unit name (French).
+    pub unit_name_fr: String,
+    /// Units of base per selling unit, in micros.
+    pub factor_micro: i64,
+    /// Unit-level barcode, if any.
+    pub unit_barcode: Option<String>,
+    /// Wholesale tier price in centimes, if set.
+    pub wholesale_price_centimes: Option<i64>,
+    /// Super-gros tier price in centimes, if set.
+    pub super_gros_price_centimes: Option<i64>,
+    /// True when this unit is also the base unit.
+    pub is_base_unit: bool,
+}
+
 /// One 2D-grid row for DSN-108/109: the cell, its backing product, live
-/// totals, and the default-selling price — in ONE query, never N+1.
+/// totals, and the default-selling unit — in ONE query, never N+1.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VariantMatrixViewRow {
     /// First-axis value.
@@ -386,6 +408,9 @@ pub struct VariantMatrixViewRow {
     pub on_hand_micro: i64,
     /// Default-selling unit price in centimes, if a default unit exists.
     pub sale_price_centimes: Option<i64>,
+    /// Default-selling unit descriptor, if a default unit exists.
+    /// `None` disables the grid cell (no sellable unit to order).
+    pub default_unit: Option<MatrixViewUnit>,
 }
 
 /// Variant-matrix persistence port (TASK-BRK-114, Wave 4).
@@ -416,6 +441,9 @@ pub trait VariantMatrixRepository: Send + Sync {
         &self,
         model_id: baraka_domain::catalog::VariantModelId,
     ) -> Result<Vec<VariantMatrixViewRow>, ApplicationError>;
+
+    /// List models for the POS grid picker (DSN-108), ordered by Arabic name.
+    fn list_models(&self) -> Result<Vec<baraka_domain::catalog::VariantModel>, ApplicationError>;
 }
 
 /// Narrow availability probe for the série composer (TASK-BRK-115).

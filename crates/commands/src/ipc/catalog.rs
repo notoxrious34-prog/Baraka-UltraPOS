@@ -15,7 +15,8 @@ use baraka_application::use_cases::catalog::{
 use baraka_application::use_cases::deletion::DeleteProductUseCase;
 use baraka_application::use_cases::variant_matrix::{
     CellOverrideInput, ComposeSerieInput, ComposeSerieUseCase, GenerateVariantMatrixInput,
-    GenerateVariantMatrixUseCase, GetModelMatrixViewUseCase, SerieLineInput,
+    GenerateVariantMatrixUseCase, GetModelMatrixViewUseCase, ListVariantModelsUseCase,
+    SerieLineInput,
 };
 use baraka_domain::catalog::{Category, CategoryId, ProductId, UnitId, VariantModelId};
 use baraka_domain::inventory::WarehouseId;
@@ -25,9 +26,10 @@ use crate::dto::{
     ComposeSerieResponseDto, CreateCategoryRequestDto, CreateProductDto, DefineKitDto,
     DeleteEntityRequestDto, DeleteEntityResultDto, GenerateVariantMatrixDto,
     GenerateVariantMatrixResponseDto, GetProductDto, ImportProductsRequestDto,
-    ImportProductsResponseDto, ImportRowErrorDto, ListPriceBreaksDto, MatrixViewRequestDto,
-    PriceBreakDto, ProductResponseDto, ReplacePriceBreaksDto, SerieShortfallDto,
-    UpdateCategoryRequestDto, UpdateProductDto, VariantMatrixViewRowDto,
+    ImportProductsResponseDto, ImportRowErrorDto, ListPriceBreaksDto, ListVariantModelsRequestDto,
+    MatrixViewRequestDto, MatrixViewUnitDto, PriceBreakDto, ProductResponseDto,
+    ReplacePriceBreaksDto, SerieShortfallDto, UpdateCategoryRequestDto, UpdateProductDto,
+    VariantMatrixViewRowDto, VariantModelDto,
 };
 
 /// `catalog_create_product` command: atomic product + unit-set creation.
@@ -537,6 +539,42 @@ pub fn catalog_matrix_view(
                 .map(|barcode| barcode.as_str().to_string()),
             on_hand_micro: row.on_hand_micro.to_string(),
             sale_price_centimes: row.sale_price_centimes.map(|price| price.to_string()),
+            default_unit: row.default_unit.map(|unit| MatrixViewUnitDto {
+                unit_id: unit.unit_id.to_string(),
+                unit_name_ar: unit.unit_name_ar,
+                unit_name_fr: unit.unit_name_fr,
+                factor_micro: unit.factor_micro.to_string(),
+                unit_barcode: unit.unit_barcode,
+                wholesale_price_centimes: unit
+                    .wholesale_price_centimes
+                    .map(|price| price.to_string()),
+                super_gros_price_centimes: unit
+                    .super_gros_price_centimes
+                    .map(|price| price.to_string()),
+                is_base_unit: unit.is_base_unit,
+            }),
+        })
+        .collect())
+}
+
+/// `catalog_matrix_models` command: model picker for the POS 2D grid (DSN-108).
+#[tauri::command(rename_all = "snake_case")]
+pub fn catalog_matrix_models(
+    state: tauri::State<'_, AppState>,
+    request: ListVariantModelsRequestDto,
+) -> Result<Vec<VariantModelDto>, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let models = ListVariantModelsUseCase::new(state.matrix.as_ref())
+        .execute(&session)
+        .map_err(|error| error_code(&error))?;
+    Ok(models
+        .into_iter()
+        .map(|model| VariantModelDto {
+            model_id: model.id.0.to_string(),
+            name_ar: model.name_ar,
+            name_fr: model.name_fr,
+            axis1_name: model.axis1_name,
+            axis2_name: model.axis2_name,
         })
         .collect())
 }

@@ -382,6 +382,51 @@ pub struct VariantMatrixViewRowDto {
     pub on_hand_micro: String,
     /// Default-selling unit price in centimes, if a default unit exists.
     pub sale_price_centimes: Option<String>,
+    /// Default-selling unit descriptor, if a default unit exists.
+    pub default_unit: Option<MatrixViewUnitDto>,
+}
+
+/// Default-selling unit descriptor riding a 2D-grid row (DSN-108).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MatrixViewUnitDto {
+    /// Default-selling unit id (UUID string).
+    pub unit_id: String,
+    /// Unit name (Arabic).
+    pub unit_name_ar: String,
+    /// Unit name (French).
+    pub unit_name_fr: String,
+    /// Units of base per selling unit, in micros.
+    pub factor_micro: String,
+    /// Unit-level barcode, if any.
+    pub unit_barcode: Option<String>,
+    /// Wholesale tier price in centimes, if set.
+    pub wholesale_price_centimes: Option<String>,
+    /// Super-gros tier price in centimes, if set.
+    pub super_gros_price_centimes: Option<String>,
+    /// True when this unit is also the base unit.
+    pub is_base_unit: bool,
+}
+
+/// Variant model descriptor for the POS grid picker (DSN-108).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VariantModelDto {
+    /// Model id (UUID string).
+    pub model_id: String,
+    /// Model name (Arabic).
+    pub name_ar: String,
+    /// Model name (French).
+    pub name_fr: String,
+    /// First-axis label (e.g. "اللون").
+    pub axis1_name: String,
+    /// Second-axis label (e.g. "المقاس").
+    pub axis2_name: String,
+}
+
+/// Variant model list request (DSN-108 grid picker).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ListVariantModelsRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
 }
 
 /// One série line: a first-axis value plus pieces per single série (BRK-115).

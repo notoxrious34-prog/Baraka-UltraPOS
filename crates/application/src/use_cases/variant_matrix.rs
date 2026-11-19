@@ -273,6 +273,30 @@ where
     }
 }
 
+/// List variant models for the POS grid picker (DSN-108).
+pub struct ListVariantModelsUseCase<'a, V>
+where
+    V: ?Sized,
+{
+    matrix: &'a V,
+}
+
+impl<'a, V> ListVariantModelsUseCase<'a, V>
+where
+    V: VariantMatrixRepository + ?Sized,
+{
+    /// Wire the use case to its port.
+    pub fn new(matrix: &'a V) -> Self {
+        Self { matrix }
+    }
+
+    /// Fetch every model, ordered by Arabic name.
+    pub fn execute(&self, session: &SessionContext) -> Result<Vec<VariantModel>, ApplicationError> {
+        require(session, Permission::PosSell)?;
+        self.matrix.list_models()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -469,6 +493,18 @@ mod tests {
             _: VariantModelId,
         ) -> Result<Vec<VariantMatrixViewRow>, ApplicationError> {
             Ok(Vec::new())
+        }
+
+        fn list_models(&self) -> Result<Vec<VariantModel>, ApplicationError> {
+            let mut models: Vec<VariantModel> = self
+                .models
+                .lock()
+                .expect("models")
+                .values()
+                .cloned()
+                .collect();
+            models.sort_by(|left, right| left.name_ar.cmp(&right.name_ar));
+            Ok(models)
         }
     }
 

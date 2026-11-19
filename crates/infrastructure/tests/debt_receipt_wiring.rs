@@ -29,9 +29,9 @@ use baraka_domain::sales::{
 };
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::{
-    SqliteCatalogRepository, SqliteCheckoutRepository, SqliteCustomerRepository,
-    SqliteDocumentRepository, SqlitePrintJobRepository, SqliteStockRepository,
-    SqliteWarehouseRepository,
+    Argon2PasswordHasher, SqliteCatalogRepository, SqliteCheckoutRepository,
+    SqliteCustomerRepository, SqliteDocumentRepository, SqlitePrintJobRepository,
+    SqliteStockRepository, SqliteUserRepository, SqliteWarehouseRepository,
 };
 use baraka_infrastructure::persistence::connection::open_connection;
 use baraka_infrastructure::persistence::migration::run_migrations;
@@ -49,6 +49,8 @@ struct Harness {
     warehouses: SqliteWarehouseRepository,
     customers: SqliteCustomerRepository,
     checkout: SqliteCheckoutRepository,
+    users: SqliteUserRepository,
+    hasher: Argon2PasswordHasher,
     documents: SqliteDocumentRepository,
     jobs: SqlitePrintJobRepository,
 }
@@ -73,6 +75,8 @@ fn setup() -> Harness {
         warehouses: SqliteWarehouseRepository::new(Arc::clone(&shared)),
         customers: SqliteCustomerRepository::new(Arc::clone(&shared)),
         checkout: SqliteCheckoutRepository::new(Arc::clone(&shared)),
+        users: SqliteUserRepository::new(Arc::clone(&shared)),
+        hasher: Argon2PasswordHasher,
         documents: SqliteDocumentRepository::new(Arc::clone(&shared)),
         jobs: SqlitePrintJobRepository::new(Arc::clone(&shared)),
     }
@@ -455,6 +459,8 @@ fn commit_sale(
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(
         &session_with(Role::Gerant),
@@ -477,6 +483,7 @@ fn commit_sale(
                 amount_centimes: 30_000,
             }],
             allow_negative_stock: false,
+            below_cost_override: None,
             notes: None,
 
             timbre_enabled: true,

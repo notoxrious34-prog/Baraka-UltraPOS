@@ -23,8 +23,9 @@ use crate::ports::{
     CheckoutCommand, CheckoutPayment, CheckoutReceipt, CheckoutRepository, Clock,
     ColisageShareView, ConvertBlToFactureCommand, ConvertBlToFactureResult,
     ConvertDevisToBlCommand, ConvertDevisToBlResult, ConvertLeafDeduction, CustomerRepository,
-    DocumentRepository, DocumentSearchFilter, DocumentSummary, LeafDeduction, PricedCheckoutLine,
-    ProductRepository, SessionContext, StockRepository, StoredPayment, WarehouseRepository,
+    DocumentRepository, DocumentSearchFilter, DocumentSummary, LeafDeduction, PasswordHasher,
+    PricedCheckoutLine, ProductRepository, SessionContext, StockRepository, StoredPayment,
+    UserRepository, WarehouseRepository,
 };
 use crate::services::kit_expansion_service::expand_for_movement;
 use crate::services::sale_pricing_service::{verify_cart_line, VerifiedLine};
@@ -131,6 +132,17 @@ where
     Ok((verified, priced))
 }
 
+/// Manager PIN override unlocking below-cost lines for ONE sale (DSN-115,
+/// `Plancher de Négociation`). The PIN is verified against the stored hash
+/// inside the atomic pre-check; it is never logged and never persisted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManagerOverride {
+    /// Manager login name (trimmed at the IPC edge).
+    pub username: String,
+    /// Manager PIN in clear (hashed comparison only).
+    pub pin: String,
+}
+
 /// Checkout request (typed; IPC parses wire strings into this shape).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckoutInput {
@@ -153,6 +165,10 @@ pub struct CheckoutInput {
     /// Explicit in-session confirmation of sale-on-shortage
     /// (TASK-BRK-033). Privileged roles only; silently ignored otherwise.
     pub allow_negative_stock: bool,
+    /// Manager PIN override unlocking below-cost lines for this sale only
+    /// (DSN-115). `None` locks every red line; a present-but-invalid
+    /// override rejects LOUDLY instead of silently dropping.
+    pub below_cost_override: Option<ManagerOverride>,
     /// Operator note, if any.
     pub notes: Option<String>,
     /// Fiscal stamp toggle resolved from `fiscal.timbre_enabled` at the IPC
@@ -161,33 +177,77 @@ pub struct CheckoutInput {
 }
 
 /// Atomic sale orchestrator (pre-validates, then issues one atomic call).
-pub struct CheckoutSaleUseCase<'a, P, U, C, W>
+pub struct CheckoutSaleUseCase<'a, P, U, C, W, X, H>
 where
     P: ?Sized,
     U: ?Sized,
     C: ?Sized,
     W: ?Sized,
+    X: ?Sized,
+    H: ?Sized,
 {
     products: &'a P,
     customers: &'a U,
     checkout: &'a C,
     warehouses: &'a W,
+    users: &'a X,
+    hasher: &'a H,
 }
 
-impl<'a, P, U, C, W> CheckoutSaleUseCase<'a, P, U, C, W>
+impl<'a, P, U, C, W, X, H> CheckoutSaleUseCase<'a, P, U, C, W, X, H>
 where
     P: ProductRepository + ?Sized,
     U: CustomerRepository + ?Sized,
     C: CheckoutRepository + ?Sized,
     W: WarehouseRepository + ?Sized,
+    X: UserRepository + ?Sized,
+    H: PasswordHasher + ?Sized,
 {
     /// Wire the use case to its ports.
-    pub fn new(products: &'a P, customers: &'a U, checkout: &'a C, warehouses: &'a W) -> Self {
+    pub fn new(
+        products: &'a P,
+        customers: &'a U,
+        checkout: &'a C,
+        warehouses: &'a W,
+        users: &'a X,
+        hasher: &'a H,
+    ) -> Self {
         Self {
             products,
             customers,
             checkout,
             warehouses,
+            users,
+            hasher,
+        }
+    }
+
+    /// Verify a manager PIN override for this sale only (DSN-115).
+    ///
+    /// The named user must exist, be active, and carry `PriceOverride`
+    /// (Gérant/Admin), and the PIN must match the stored hash. Every
+    /// failure collapses to one LOUD code so callers cannot distinguish
+    /// "unknown user" from "wrong PIN".
+    fn verify_manager_override(&self, username: &str, pin: &str) -> Result<bool, ApplicationError> {
+        let name = username.trim();
+        if name.is_empty() || pin.is_empty() {
+            return Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED"));
+        }
+        let user = match self.users.find_by_username(name)? {
+            Some(found) => found,
+            None => return Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED")),
+        };
+        if !user.is_active || !user.role.has_permission(Permission::PriceOverride) {
+            return Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED"));
+        }
+        let valid = match self.users.get_pin_hash(user.id)? {
+            Some(hash) => self.hasher.verify(pin, &hash)?,
+            None => false,
+        };
+        if valid {
+            Ok(true)
+        } else {
+            Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED"))
         }
     }
 
@@ -246,6 +306,19 @@ where
             tier,
             input.timbre_enabled,
         )?;
+        // Margin-guard lock (DSN-115): any line priced strictly below cost
+        // locks the whole commit unless a manager PIN unlocks THIS sale.
+        // The preview reports the same red lines advisory — the lock lives
+        // here, never in the UI.
+        if verified.iter().any(|line| line.is_below_cost) {
+            let unlocked = match &input.below_cost_override {
+                Some(over) => self.verify_manager_override(&over.username, &over.pin)?,
+                None => false,
+            };
+            if !unlocked {
+                return Err(coded("MARGIN_GUARD_BELOW_COST"));
+            }
+        }
         // Credit authorization (reads only).
         let mut credit_amount: i128 = 0;
         for payment in &input.payments {

@@ -31,6 +31,15 @@ pub struct PaymentLineDto {
     pub amount_centimes: String,
 }
 
+/// Manager PIN override unlocking below-cost lines for one sale (DSN-115).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ManagerOverrideDto {
+    /// Manager login name.
+    pub manager_username: String,
+    /// Manager PIN in clear (hashed comparison only, never logged).
+    pub manager_pin: String,
+}
+
 /// Atomic checkout request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckoutSaleRequest {
@@ -56,6 +65,9 @@ pub struct CheckoutSaleRequest {
     /// Privileged roles only; ignored otherwise. Defaults to false.
     #[serde(default)]
     pub allow_negative_stock: bool,
+    /// Manager PIN override unlocking below-cost lines for this sale only
+    /// (DSN-115). `None` locks every red line.
+    pub below_cost_override: Option<ManagerOverrideDto>,
     /// Operator note, if any.
     pub notes: Option<String>,
 }

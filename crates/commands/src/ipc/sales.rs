@@ -7,8 +7,9 @@ use baraka_application::errors::ApplicationError;
 use baraka_application::ports::DocumentSearchFilter;
 use baraka_application::use_cases::sales::{
     CartLineInput, CheckoutInput, CheckoutSaleUseCase, ClosingInput, ClosingPaymentInput,
-    ConvertBlToFactureUseCase, ConvertDevisToBlInput, ConvertDevisToBlUseCase, PaymentInput,
-    PreviewSaleTotalsUseCase, PreviewTotalsInput, SearchDocumentsUseCase, StockShortageWarning,
+    ConvertBlToFactureUseCase, ConvertDevisToBlInput, ConvertDevisToBlUseCase, ManagerOverride,
+    PaymentInput, PreviewSaleTotalsUseCase, PreviewTotalsInput, SearchDocumentsUseCase,
+    StockShortageWarning,
 };
 use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
@@ -96,6 +97,10 @@ pub fn sales_checkout(
         .map_err(|error| error_code(&error))?,
         payments,
         allow_negative_stock: request.allow_negative_stock,
+        below_cost_override: request.below_cost_override.map(|over| ManagerOverride {
+            username: over.manager_username.trim().to_string(),
+            pin: over.manager_pin,
+        }),
         notes: request.notes,
         timbre_enabled: state.fiscal.timbre_enabled().unwrap_or(true),
     };
@@ -104,6 +109,8 @@ pub fn sales_checkout(
         state.customers.as_ref(),
         state.checkout.as_ref(),
         state.warehouses.as_ref(),
+        state.users.as_ref(),
+        state.hasher.as_ref(),
     )
     .execute(&session, input, &state.terminal_id)
     .map_err(|error| error_code(&error))?;

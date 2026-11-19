@@ -24,8 +24,9 @@ use baraka_domain::sales::{
 };
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::{
-    SqliteCashSessionRepository, SqliteCatalogRepository, SqliteCheckoutRepository,
-    SqliteCustomerRepository, SqliteStockRepository, SqliteWarehouseRepository,
+    Argon2PasswordHasher, SqliteCashSessionRepository, SqliteCatalogRepository,
+    SqliteCheckoutRepository, SqliteCustomerRepository, SqliteStockRepository,
+    SqliteUserRepository, SqliteWarehouseRepository,
 };
 use baraka_infrastructure::persistence::connection::open_connection;
 use baraka_infrastructure::persistence::migration::run_migrations;
@@ -49,6 +50,8 @@ struct Harness {
     customers: SqliteCustomerRepository,
     checkout: SqliteCheckoutRepository,
     cash: SqliteCashSessionRepository,
+    users: SqliteUserRepository,
+    hasher: Argon2PasswordHasher,
     terminal_id: String,
     warehouse_id: WarehouseId,
 }
@@ -114,6 +117,8 @@ fn setup() -> Harness {
         customers: SqliteCustomerRepository::new(Arc::clone(&shared)),
         checkout: SqliteCheckoutRepository::new(Arc::clone(&shared)),
         cash: SqliteCashSessionRepository::new(Arc::clone(&shared)),
+        users: SqliteUserRepository::new(Arc::clone(&shared)),
+        hasher: Argon2PasswordHasher,
         terminal_id,
         warehouse_id: warehouse.id,
     }
@@ -232,6 +237,7 @@ fn cash_checkout_input(
             amount_centimes: cash,
         }],
         allow_negative_stock: false,
+        below_cost_override: None,
         notes: None,
 
         timbre_enabled: true,
@@ -438,6 +444,8 @@ fn checkout_without_open_session_is_atomically_rejected() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(
         &caissier(),
@@ -486,6 +494,8 @@ fn cash_sale_inserts_single_sale_cash_in_net_of_change() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(&caissier(), input, &harness.terminal_id)
     .expect("checkout");
@@ -535,6 +545,8 @@ fn fully_credit_sale_inserts_zero_cash_movements() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(&gerant(), input, &harness.terminal_id)
     .expect("credit checkout");
@@ -566,6 +578,8 @@ fn mixed_sale_nets_only_cash_portion() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(&gerant(), input, &harness.terminal_id)
     .expect("mixed");
@@ -649,6 +663,8 @@ fn closing_freezes_expected_and_blocks_sales() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(&caissier(), input, &harness.terminal_id)
     .expect("sale");
@@ -668,6 +684,8 @@ fn closing_freezes_expected_and_blocks_sales() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(
         &caissier(),
@@ -710,6 +728,8 @@ fn cancel_closing_reverts_and_repermits_sales() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(
         &caissier(),

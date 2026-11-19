@@ -12,7 +12,7 @@ use baraka_application::ports::{
 };
 use baraka_application::use_cases::variant_matrix::{
     CellOverrideInput, GenerateVariantMatrixInput, GenerateVariantMatrixUseCase,
-    GetModelMatrixViewUseCase,
+    GetModelMatrixViewUseCase, ListVariantModelsUseCase,
 };
 use baraka_domain::catalog::{
     Category, CategoryId, PriceBreak, Product, ProductId, ProductUnit, Sku, UnitId,
@@ -164,6 +164,28 @@ fn generation_persists_model_cells_and_view_atomically() {
     assert_eq!(view[0].sale_price_centimes, Some(27_000));
     assert_eq!(view[1].sale_price_centimes, Some(25_000));
     assert!(view.iter().all(|row| row.on_hand_micro == 0));
+
+    // The default-selling unit rides every row: one query, no N+1.
+    let first = view[0]
+        .default_unit
+        .as_ref()
+        .expect("default unit rides the row");
+    assert_eq!(first.unit_name_ar, "قطعة");
+    assert_eq!(first.unit_name_fr, "Pièce");
+    assert_eq!(first.factor_micro, 10_000);
+    assert_eq!(first.wholesale_price_centimes, Some(22_000));
+    assert_eq!(first.super_gros_price_centimes, Some(20_000));
+    assert!(first.is_base_unit);
+    assert!(view.iter().all(|row| row.default_unit.is_some()));
+
+    // The picker lists models ordered by Arabic name.
+    let models = ListVariantModelsUseCase::new(&harness.matrix)
+        .execute(&session())
+        .expect("models");
+    assert_eq!(models.len(), 1);
+    assert_eq!(models[0].id, output.model_id);
+    assert_eq!(models[0].name_fr, "SERIE COTON");
+    assert_eq!(models[0].axis2_name, "Couleur");
 
     // Inherited rung rides along re-keyed on every cell.
     for row in &view {

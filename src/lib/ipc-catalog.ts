@@ -309,6 +309,19 @@ export interface VariantMatrixRowWire {
   barcode: string | null;
   on_hand_micro: string;
   sale_price_centimes: string | null;
+  default_unit: MatrixGridUnitWire | null;
+}
+
+/** Default-selling unit riding a 2D-grid row (DSN-108). One row = one cart line. */
+export interface MatrixGridUnitWire {
+  unit_id: string;
+  unit_name_ar: string;
+  unit_name_fr: string;
+  factor_micro: string;
+  unit_barcode: string | null;
+  wholesale_price_centimes: string | null;
+  super_gros_price_centimes: string | null;
+  is_base_unit: boolean;
 }
 
 /** Read a model's 2D grid in display order (DSN-108/109 feed). */
@@ -318,6 +331,24 @@ export async function ipcMatrixView(
 ): Promise<VariantMatrixRowWire[]> {
   return call<VariantMatrixRowWire[]>("catalog_matrix_view", {
     request: { session_token: sessionToken, model_id: modelId },
+  });
+}
+
+/** Variant model descriptor for the POS grid picker (DSN-108). */
+export interface VariantModelWire {
+  model_id: string;
+  name_ar: string;
+  name_fr: string;
+  axis1_name: string;
+  axis2_name: string;
+}
+
+/** List variant models for the POS grid picker. */
+export async function ipcMatrixModels(
+  sessionToken: string,
+): Promise<VariantModelWire[]> {
+  return call<VariantModelWire[]>("catalog_matrix_models", {
+    request: { session_token: sessionToken },
   });
 }
 

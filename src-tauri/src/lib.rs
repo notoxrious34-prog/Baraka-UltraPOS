@@ -255,6 +255,7 @@ pub fn run() {
             baraka_commands::ipc::catalog_replace_price_breaks,
             baraka_commands::ipc::catalog_generate_variant_matrix,
             baraka_commands::ipc::catalog_matrix_view,
+            baraka_commands::ipc::catalog_matrix_models,
             baraka_commands::ipc::catalog_compose_serie,
             baraka_commands::ipc::category_list,
             baraka_commands::ipc::category_create,

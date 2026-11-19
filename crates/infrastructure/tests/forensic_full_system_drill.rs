@@ -315,6 +315,7 @@ fn checkout_input(
             amount_centimes: cash,
         }],
         allow_negative_stock: false,
+        below_cost_override: None,
         notes: None,
 
         timbre_enabled: true,
@@ -357,6 +358,8 @@ fn pillar_01_caisse_pos_sale_pipeline() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(
         &caissier(),
@@ -410,6 +413,8 @@ fn pillar_01b_tier_pricing_and_margin_guard() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(
         &caissier(),
@@ -533,6 +538,8 @@ fn pillar_03_clients_credit_lifecycle() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(&caissier(), credit_input, &harness.terminal_id)
     .expect("credit sale");
@@ -610,6 +617,8 @@ fn pillar_04_documents_factures_and_return() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(
         &caissier(),
@@ -767,6 +776,8 @@ fn pillar_06_rapports() {
         &harness.customers,
         &harness.checkout,
         &harness.warehouses,
+        &harness.users,
+        &harness.hasher,
     )
     .execute(
         &caissier(),

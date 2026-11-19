@@ -28,8 +28,9 @@ use baraka_domain::role::Role;
 use baraka_domain::sales::{DocumentLanguage, DocumentType, PaymentMethod};
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::{
-    SqliteCatalogRepository, SqliteCheckoutRepository, SqliteCustomerRepository,
-    SqliteStockRepository, SqliteWarehouseRepository,
+    Argon2PasswordHasher, SqliteCatalogRepository, SqliteCheckoutRepository,
+    SqliteCustomerRepository, SqliteStockRepository, SqliteUserRepository,
+    SqliteWarehouseRepository,
 };
 use baraka_infrastructure::persistence::connection::open_connection;
 use baraka_infrastructure::persistence::migration::run_migrations;
@@ -512,6 +513,8 @@ struct DrillDb {
     warehouses: SqliteWarehouseRepository,
     customers: SqliteCustomerRepository,
     checkout: SqliteCheckoutRepository,
+    users: SqliteUserRepository,
+    hasher: Argon2PasswordHasher,
     warehouse_id: WarehouseId,
     session: SessionContext,
     anchors: Anchors,
@@ -542,6 +545,8 @@ fn seed_drill_db() -> DrillDb {
     let warehouses = SqliteWarehouseRepository::new(Arc::clone(&shared));
     let customers = SqliteCustomerRepository::new(Arc::clone(&shared));
     let checkout = SqliteCheckoutRepository::new(Arc::clone(&shared));
+    let users = SqliteUserRepository::new(Arc::clone(&shared));
+    let hasher = Argon2PasswordHasher;
 
     let warehouse_id = WarehouseId::new();
     warehouses
@@ -679,6 +684,8 @@ fn seed_drill_db() -> DrillDb {
         warehouses,
         customers,
         checkout,
+        users,
+        hasher,
         warehouse_id,
         session: session_with(Role::Vendeur),
         anchors: Anchors {
@@ -891,8 +898,14 @@ fn drill_atomic_sale_two_items_cash() {
     assert_eq!(before_vis, STOCK_MICRO_PER_PRODUCT);
     assert_eq!(before_cle, STOCK_MICRO_PER_PRODUCT);
 
-    let checkout =
-        CheckoutSaleUseCase::new(&db.catalog, &db.customers, &db.checkout, &db.warehouses);
+    let checkout = CheckoutSaleUseCase::new(
+        &db.catalog,
+        &db.customers,
+        &db.checkout,
+        &db.warehouses,
+        &db.users,
+        &db.hasher,
+    );
     let cash_tender: i64 = 200_000;
     let receipt = checkout
         .execute(
@@ -925,6 +938,7 @@ fn drill_atomic_sale_two_items_cash() {
                     amount_centimes: cash_tender,
                 }],
                 allow_negative_stock: false,
+                below_cost_override: None,
                 notes: None,
 
                 timbre_enabled: true,

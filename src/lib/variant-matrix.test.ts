@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import {
   ipcGenerateVariantMatrix,
+  ipcMatrixModels,
   ipcMatrixView,
   type GenerateVariantMatrixWire,
 } from "@/lib/ipc";
@@ -105,6 +106,16 @@ describe("variant-matrix IPC contract (BRK-114)", () => {
         barcode: "CELL-M-BLANC",
         on_hand_micro: "0",
         sale_price_centimes: "27000",
+        default_unit: {
+          unit_id: "44444444-4444-4444-4444-444444444444",
+          unit_name_ar: "قطعة",
+          unit_name_fr: "Pièce",
+          factor_micro: "10000",
+          unit_barcode: null,
+          wholesale_price_centimes: "22000",
+          super_gros_price_centimes: "20000",
+          is_base_unit: true,
+        },
       },
     ]);
     const rows = await ipcMatrixView("tok", "22222222-2222-2222-2222-222222222222");
@@ -116,6 +127,27 @@ describe("variant-matrix IPC contract (BRK-114)", () => {
     );
     expect(rows[0]!.on_hand_micro).toBe("0");
     expect(rows[0]!.sale_price_centimes).toBe("27000");
+    expect(rows[0]!.default_unit!.unit_name_ar).toBe("قطعة");
+    expect(rows[0]!.default_unit!.factor_micro).toBe("10000");
+  });
+
+  it("lists models through catalog_matrix_models for the grid picker", async () => {
+    primeSession("tok");
+    invokeMock.mockResolvedValue([
+      {
+        model_id: "22222222-2222-2222-2222-222222222222",
+        name_ar: "سيرية قطن",
+        name_fr: "SERIE COTON",
+        axis1_name: "Taille",
+        axis2_name: "Couleur",
+      },
+    ]);
+    const models = await ipcMatrixModels("tok");
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+    const [command, args] = invokeMock.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(command).toBe("catalog_matrix_models");
+    expect((args.request as Record<string, unknown>).session_token).toBe("tok");
+    expect(models[0]!.axis2_name).toBe("Couleur");
   });
 
   it("propagates backend rejections verbatim", async () => {

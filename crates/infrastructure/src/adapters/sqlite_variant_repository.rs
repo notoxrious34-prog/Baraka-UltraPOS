@@ -12,9 +12,11 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
-use baraka_application::ports::{MatrixCellWrite, VariantMatrixRepository, VariantMatrixViewRow};
+use baraka_application::ports::{
+    MatrixCellWrite, MatrixViewUnit, VariantMatrixRepository, VariantMatrixViewRow,
+};
 use baraka_domain::catalog::{
-    Barcode, ProductId, Sku, VariantCell, VariantCellId, VariantModel, VariantModelId,
+    Barcode, ProductId, Sku, UnitId, VariantCell, VariantCellId, VariantModel, VariantModelId,
 };
 use baraka_domain::errors::DomainError;
 use chrono::{SecondsFormat, Utc};
@@ -278,7 +280,10 @@ impl VariantMatrixRepository for SqliteVariantMatrixRepository {
                 "SELECT c.axis1_value, c.axis2_value, p.id, p.sku, p.name_ar, p.barcode,
                         COALESCE((SELECT SUM(s.quantity_micro) FROM stock_levels s
                                   WHERE s.product_id = p.id), 0),
-                        u.sale_price_centimes
+                        u.sale_price_centimes,
+                        u.id, u.unit_name_ar, u.unit_name_fr, u.factor_micro,
+                        u.barcode, u.wholesale_price_centimes,
+                        u.super_gros_price_centimes, u.is_base_unit
                  FROM variant_cells c
                  JOIN products p ON p.id = c.product_id
                  LEFT JOIN product_units u
@@ -298,6 +303,14 @@ impl VariantMatrixRepository for SqliteVariantMatrixRepository {
                     row.get::<_, Option<String>>(5)?,
                     row.get::<_, i64>(6)?,
                     row.get::<_, Option<i64>>(7)?,
+                    row.get::<_, Option<String>>(8)?,
+                    row.get::<_, Option<String>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
+                    row.get::<_, Option<i64>>(11)?,
+                    row.get::<_, Option<String>>(12)?,
+                    row.get::<_, Option<i64>>(13)?,
+                    row.get::<_, Option<i64>>(14)?,
+                    row.get::<_, Option<i64>>(15)?,
                 ))
             })
             .map_err(|_| store_failure())?;
@@ -312,6 +325,14 @@ impl VariantMatrixRepository for SqliteVariantMatrixRepository {
                 barcode_raw,
                 on_hand_micro,
                 sale_price_centimes,
+                unit_id_raw,
+                unit_name_ar,
+                unit_name_fr,
+                factor_micro,
+                unit_barcode,
+                wholesale_price_centimes,
+                super_gros_price_centimes,
+                is_base_unit,
             ) = row.map_err(|_| store_failure())?;
             let product_id = product_raw
                 .parse::<Uuid>()
@@ -322,6 +343,31 @@ impl VariantMatrixRepository for SqliteVariantMatrixRepository {
                 .map(|raw| Barcode::new(&raw))
                 .transpose()
                 .map_err(|_| store_failure())?;
+            let default_unit = match (
+                unit_id_raw,
+                unit_name_ar,
+                unit_name_fr,
+                factor_micro,
+                is_base_unit,
+            ) {
+                (Some(id_raw), Some(ar), Some(fr), Some(factor), Some(base)) => {
+                    let unit_id = id_raw
+                        .parse::<Uuid>()
+                        .map(UnitId)
+                        .map_err(|_| store_failure())?;
+                    Some(MatrixViewUnit {
+                        unit_id,
+                        unit_name_ar: ar,
+                        unit_name_fr: fr,
+                        factor_micro: factor,
+                        unit_barcode,
+                        wholesale_price_centimes,
+                        super_gros_price_centimes,
+                        is_base_unit: base != 0,
+                    })
+                }
+                _ => None,
+            };
             view.push(VariantMatrixViewRow {
                 axis1_value,
                 axis2_value,
@@ -331,8 +377,58 @@ impl VariantMatrixRepository for SqliteVariantMatrixRepository {
                 barcode,
                 on_hand_micro,
                 sale_price_centimes,
+                default_unit,
             });
         }
         Ok(view)
+    }
+
+    fn list_models(&self) -> Result<Vec<VariantModel>, ApplicationError> {
+        let guard = self.lock()?;
+        let mut query = guard
+            .prepare(
+                "SELECT id, name_ar, name_fr, axis1_name, axis2_name, category_id, is_active
+                 FROM variant_models ORDER BY name_ar",
+            )
+            .map_err(|_| store_failure())?;
+        let rows = query
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, i64>(6)?,
+                ))
+            })
+            .map_err(|_| store_failure())?;
+        let mut models = Vec::new();
+        for row in rows {
+            let (id_raw, name_ar, name_fr, axis1_name, axis2_name, category_id, is_active) =
+                row.map_err(|_| store_failure())?;
+            let id = id_raw
+                .parse::<Uuid>()
+                .map(VariantModelId)
+                .map_err(|_| store_failure())?;
+            let category = category_id
+                .map(|raw| {
+                    raw.parse::<Uuid>()
+                        .map(baraka_domain::catalog::CategoryId::from)
+                        .map_err(|_| store_failure())
+                })
+                .transpose()?;
+            models.push(VariantModel {
+                id,
+                name_ar,
+                name_fr,
+                axis1_name,
+                axis2_name,
+                category_id: category,
+                is_active: is_active != 0,
+            });
+        }
+        Ok(models)
     }
 }

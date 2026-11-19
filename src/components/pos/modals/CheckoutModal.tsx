@@ -451,6 +451,8 @@ export function CheckoutModal(): ReactElement {
       // it for roles without the standing grant.
       allow_negative_stock: allowNegativeStock,
       notes: null,
+      // Cashier path: no manager override, below-cost lines stay locked.
+      below_cost_override: null,
     }));
     if (dispatch === null) {
       return;

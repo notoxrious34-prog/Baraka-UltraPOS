@@ -37,6 +37,7 @@ function requestFor(commandId: string): CheckoutRequestWire {
     payments: [{ payment_method: "CASH", amount_centimes: "30050" }],
     allow_negative_stock: false,
     notes: null,
+    below_cost_override: null,
   };
 }
 

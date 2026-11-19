@@ -27,8 +27,8 @@ use baraka_domain::sales::{
 };
 use baraka_domain::user::UserId;
 use baraka_infrastructure::adapters::{
-    SqliteCatalogRepository, SqliteCheckoutRepository, SqliteCustomerRepository,
-    SqliteWarehouseRepository,
+    Argon2PasswordHasher, SqliteCatalogRepository, SqliteCheckoutRepository,
+    SqliteCustomerRepository, SqliteUserRepository, SqliteWarehouseRepository,
 };
 use baraka_infrastructure::persistence::connection::open_connection;
 use baraka_infrastructure::persistence::migration::run_migrations;
@@ -266,6 +266,7 @@ fn build_input(
         global_discount_centimes: 0,
         payments,
         allow_negative_stock: false,
+        below_cost_override: None,
         notes: None,
 
         timbre_enabled: true,
@@ -282,7 +283,16 @@ fn run_checkout(
     let catalog = SqliteCatalogRepository::new(Arc::clone(&stack.shared));
     let warehouses = SqliteWarehouseRepository::new(Arc::clone(&stack.shared));
     let checkout = SqliteCheckoutRepository::new(Arc::clone(&stack.shared));
-    let use_case = CheckoutSaleUseCase::new(&catalog, &customers, &checkout, &warehouses);
+    let users = SqliteUserRepository::new(Arc::clone(&stack.shared));
+    let hasher = Argon2PasswordHasher;
+    let use_case = CheckoutSaleUseCase::new(
+        &catalog,
+        &customers,
+        &checkout,
+        &warehouses,
+        &users,
+        &hasher,
+    );
     use_case
         .execute(
             &stack.session,

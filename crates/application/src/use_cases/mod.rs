@@ -17,6 +17,7 @@ pub mod studio_printing;
 pub mod suppliers;
 pub mod tspl_printing;
 pub mod users;
+pub mod variant_matrix;
 
 use baraka_domain::errors::DomainError;
 use baraka_domain::models::{HealthSnapshot, PaymentMode, SaleLine};

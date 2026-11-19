@@ -255,3 +255,68 @@ export async function ipcImportProducts(
     },
   });
 }
+
+/** One per-cell override at matrix generation (mirrors VariantCellOverrideDto). */
+export interface VariantCellOverrideWire {
+  axis1: string;
+  axis2: string;
+  /** Replacement sale price in centimes, canonical string (`None` = inherit). */
+  sale_price_centimes: string | null;
+  barcode: string | null;
+}
+
+/** Generation input (mirrors GenerateVariantMatrixDto). Money as strings. */
+export interface GenerateVariantMatrixWire {
+  name_ar: string;
+  name_fr: string;
+  axis1_name: string;
+  axis2_name: string;
+  axis1_values: string[];
+  axis2_values: string[];
+  base_sku: string;
+  category_id: string | null;
+  template_product_id: string;
+  overrides: VariantCellOverrideWire[];
+}
+
+/** Generation result: the model id plus every minted SKU (BRK-114). */
+export interface GenerateVariantMatrixResult {
+  model_id: string;
+  cell_count: number;
+  skus: string[];
+}
+
+/**
+ * Atomically fan a template product out into one product per
+ * (`axis1`, `axis2`) cell. Rejects verbatim on bridge errors.
+ */
+export async function ipcGenerateVariantMatrix(
+  sessionToken: string,
+  input: GenerateVariantMatrixWire,
+): Promise<GenerateVariantMatrixResult> {
+  return call<GenerateVariantMatrixResult>("catalog_generate_variant_matrix", {
+    request: { session_token: sessionToken, ...input },
+  });
+}
+
+/** One 2D-grid row (mirrors VariantMatrixViewRowDto). Micros/prices as strings. */
+export interface VariantMatrixRowWire {
+  axis1_value: string;
+  axis2_value: string;
+  product_id: string;
+  sku: string;
+  name_ar: string;
+  barcode: string | null;
+  on_hand_micro: string;
+  sale_price_centimes: string | null;
+}
+
+/** Read a model's 2D grid in display order (DSN-108/109 feed). */
+export async function ipcMatrixView(
+  sessionToken: string,
+  modelId: string,
+): Promise<VariantMatrixRowWire[]> {
+  return call<VariantMatrixRowWire[]>("catalog_matrix_view", {
+    request: { session_token: sessionToken, model_id: modelId },
+  });
+}

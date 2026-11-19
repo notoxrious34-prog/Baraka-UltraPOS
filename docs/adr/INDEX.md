@@ -141,9 +141,10 @@ Recorded as stated in that package. Not independently re-verified by the current
 | ADR-120 | Visual track v1.4.0 scope: P1→P5 + R3/R4 + DSN-113 (AUD-VIS-001) | PROPOSED |
 | ADR-121 | Unified stockout threshold (amends ADR-037; BRK-120 Option A) | PROPOSED |
 | ADR-122 | Quantity breaks over tier price (`min(tier, break)`; BRK-121a/b, S3/S4 radar) | ACCEPTED |
-| ADR-123 | Counter sync without sequence collision (S5 design; impl deferred) | PROPOSED |
+| ADR-123 | Counter sync without sequence collision (S5 design; ACCEPTED, impl after Wave 4 schema) | ACCEPTED |
 | ADR-124 | Split `tspl.rs` into 8 domain modules, pure motion (BRK-112) | ACCEPTED |
 | ADR-125 | Split `src/lib/ipc.ts` into 12 domain modules, pure motion (Wave 3) | ACCEPTED |
 | ADR-126 | Dual-printer role routing (receipt + label, per-role fallback; BRK-113) | ACCEPTED |
+| ADR-127 | Wave 4 prioritization, owner votes 1–11, new proposals 12–17, BRK-114 launch | ACCEPTED |
 
-Next free id: ADR-127.
+Next free id: ADR-128 (DSN-116 reserved).

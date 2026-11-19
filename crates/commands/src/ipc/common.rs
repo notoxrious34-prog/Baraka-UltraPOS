@@ -13,7 +13,7 @@ use baraka_application::ports::{
     PrinterTransportPort, ProductRepository, PurchaseRepository, ReceiptRendererPort,
     ReportingRepository, ReturnRepository, SessionContext, SessionStore, SessionToken,
     StockRepository, StoreIdentityPort, SupplierRepository, TsplLabelRasterPort, UserRepository,
-    VerticalProfilePort, WarehouseRepository,
+    VariantMatrixRepository, VerticalProfilePort, WarehouseRepository,
 };
 use baraka_application::use_cases::catalog::{
     NewUnitInput, ProductDetail, ProductImportRepository, UnitUpsert,
@@ -49,6 +49,8 @@ pub struct AppState {
     pub imports: Arc<dyn ProductImportRepository>,
     /// Category persistence.
     pub categories: Arc<dyn CategoryRepository>,
+    /// Variant-matrix persistence (same SQLite store, matrix port, BRK-114).
+    pub matrix: Arc<dyn VariantMatrixRepository>,
     /// Warehouse persistence.
     pub warehouses: Arc<dyn WarehouseRepository>,
     /// Stock engine persistence.

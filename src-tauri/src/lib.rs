@@ -21,7 +21,8 @@ use baraka_infrastructure::adapters::{
     SqliteCustomerRepository, SqliteDocumentRepository, SqliteFiscalSettings,
     SqlitePrintJobRepository, SqlitePrinterSettings, SqlitePurchaseRepository,
     SqliteReportingRepository, SqliteReturnRepository, SqliteStockRepository,
-    SqliteSupplierRepository, SqliteUserRepository, SqliteWarehouseRepository, SystemClock,
+    SqliteSupplierRepository, SqliteUserRepository, SqliteVariantMatrixRepository,
+    SqliteWarehouseRepository, SystemClock,
 };
 use baraka_infrastructure::persistence::connection::{
     ensure_database_dir, open_connection, resolve_database_path,
@@ -157,6 +158,7 @@ pub fn run() {
                 catalog: catalog.clone(),
                 imports: catalog.clone(),
                 categories: catalog.clone(),
+                matrix: Arc::new(SqliteVariantMatrixRepository::new(catalog.connection())),
                 warehouses: Arc::new(SqliteWarehouseRepository::new(Arc::clone(&db))),
                 stock: Arc::new(SqliteStockRepository::new(Arc::clone(&db))),
                 customers: Arc::new(SqliteCustomerRepository::new(Arc::clone(&db))),
@@ -251,6 +253,8 @@ pub fn run() {
             baraka_commands::ipc::catalog_import_products,
             baraka_commands::ipc::catalog_list_price_breaks,
             baraka_commands::ipc::catalog_replace_price_breaks,
+            baraka_commands::ipc::catalog_generate_variant_matrix,
+            baraka_commands::ipc::catalog_matrix_view,
             baraka_commands::ipc::category_list,
             baraka_commands::ipc::category_create,
             baraka_commands::ipc::category_update,

@@ -342,6 +342,82 @@ pub trait CategoryRepository: Send + Sync {
     fn update_category(&self, category: &Category) -> Result<(), ApplicationError>;
 }
 
+/// One variant cell to persist: the generated product, its full inherited
+/// unit set, and the inherited price-break rungs (re-keyed to the new
+/// unit ids by the caller). The repository writes the model row, every
+/// cell, and every inherited rung in ONE `BEGIN IMMEDIATE` transaction —
+/// a half-written matrix is worse than none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MatrixCellWrite {
+    /// Generated cell product (fresh id + planned SKU + override barcode).
+    pub product: Product,
+    /// Inherited ladder (fresh unit ids, barcodes stripped, sale override
+    /// applied to the default-selling unit).
+    pub units: Vec<ProductUnit>,
+    /// Inherited rungs: new unit id + its rung list (may be empty).
+    pub breaks: Vec<(UnitId, Vec<PriceBreak>)>,
+    /// First-axis value.
+    pub axis1_value: String,
+    /// Second-axis value.
+    pub axis2_value: String,
+    /// Display rank of the first-axis value.
+    pub axis1_sort: i64,
+    /// Display rank of the second-axis value.
+    pub axis2_sort: i64,
+}
+
+/// One 2D-grid row for DSN-108/109: the cell, its backing product, live
+/// totals, and the default-selling price — in ONE query, never N+1.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VariantMatrixViewRow {
+    /// First-axis value.
+    pub axis1_value: String,
+    /// Second-axis value.
+    pub axis2_value: String,
+    /// Backing product id.
+    pub product_id: ProductId,
+    /// Backing product SKU.
+    pub sku: Sku,
+    /// Arabic product name.
+    pub name_ar: String,
+    /// Product-level barcode, if any.
+    pub barcode: Option<Barcode>,
+    /// On-hand summed across ALL warehouses, in base-unit micros.
+    pub on_hand_micro: i64,
+    /// Default-selling unit price in centimes, if a default unit exists.
+    pub sale_price_centimes: Option<i64>,
+}
+
+/// Variant-matrix persistence port (TASK-BRK-114, Wave 4).
+pub trait VariantMatrixRepository: Send + Sync {
+    /// Write the model row plus every cell (products + units + cells +
+    /// inherited rungs) in ONE `BEGIN IMMEDIATE` transaction — a
+    /// half-written matrix is worse than none.
+    fn generate_matrix(
+        &self,
+        model: &baraka_domain::catalog::VariantModel,
+        cells: &[MatrixCellWrite],
+    ) -> Result<(), ApplicationError>;
+
+    /// Fetch a model by id.
+    fn find_variant_model(
+        &self,
+        id: baraka_domain::catalog::VariantModelId,
+    ) -> Result<Option<baraka_domain::catalog::VariantModel>, ApplicationError>;
+
+    /// List a model's cells in display order.
+    fn matrix_cells(
+        &self,
+        model_id: baraka_domain::catalog::VariantModelId,
+    ) -> Result<Vec<baraka_domain::catalog::VariantCell>, ApplicationError>;
+
+    /// 2D-grid view in ONE query (display order, stock + price inline).
+    fn matrix_view(
+        &self,
+        model_id: baraka_domain::catalog::VariantModelId,
+    ) -> Result<Vec<VariantMatrixViewRow>, ApplicationError>;
+}
+
 /// One direct BOM edge (header id carried by the call, not the row).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KitComponentRow {

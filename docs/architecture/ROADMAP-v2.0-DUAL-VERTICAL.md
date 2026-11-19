@@ -40,35 +40,32 @@ no floats; atomic sale untouched; Gates G1–G7 per wave; innovation section
 - `TASK-DSN-106` — Last-price chip in cart (`Dernier prix: …`) with override audit.
 - `TASK-DOC-048` — v2.0 Wave 1–2 operator guide (FR/AR).
 
-## WAVE 3 — Print Powerhouse & Code Health
+## WAVE 3 — Print Powerhouse & Code Health (engine done; one non-blocking hardware gate open)
 **Goal:** two printers, two label studios, zero monoliths.
-- `TASK-BRK-112` — Split `tspl.rs` (4,036 LOC) into domain submodules
-  (ADR-108/109 standard: pure motion, path-stable, proof-pinned).
-- `TASK-BRK-113` — Dual-printer routing: independent **Counter Receipt** +
-  **Dedicated `XP-410B` Label** roles with per-role fallback queues.
-- `TASK-DSN-107` — Label Studio: Textile template (giant Size badge, Model,
-  Color, Pack badge, wholesale price-hide toggle) + Hardware template
-  (barcode-forward, unit + length/Ø line).
-- `TASK-PRT-06` — On-ruler verification pack for both studios (40×20 liner).
-- Frontend twin (same wave): split `src/lib/ipc.ts` (3,170 LOC) per-domain.
+- `TASK-BRK-112` — Split `tspl.rs` (4,036 LOC) into domain submodules — DONE (`2e92a8b`, `ADR-124 ACCEPTED`).
+- `TASK-BRK-113` — Dual-printer routing — DONE (`690c0a4`, `ADR-126 ACCEPTED`).
+- `TASK-DSN-107` — Label Studio (Textile + Hardware) — DONE (`345a313`).
+- `TASK-PRT-06` — On-ruler verification pack — **OPEN HARDWARE OWNER GATE (non-blocking)**: runs on-site once the `XP-410B` is connected; blocks neither Wave 4 nor Wave 5 (`ADR-127 §1`).
+- Frontend twin: `src/lib/ipc.ts` split per-domain — DONE (`864bfe4`, `ADR-125 ACCEPTED`).
 
-## WAVE 4 — Matrix Engine & Série Builder
+## WAVE 4 — Matrix Engine & Série Builder (`ADR-127` binding order)
 **Goal:** order 200 variants as fast as one barcode scan.
-- `TASK-BRK-114` — Variant-matrix engine (`Parent Model/Ref × Size ×
-  Color/Finish`, migration `0021+`): 1-click variant/SKU/barcode generation,
-  per-variant stock, atomic multi-line deduction.
-- `TASK-BRK-115` — Assorted *Série* builder on `product_kit_items`
-  (`1 Série = 2M + 4L + 4XL + 2XXL`) with component-availability precheck.
-- `TASK-DSN-108` — Rapid 2D grid order entry in POS (keyboard-first, FR/AR).
-- `TASK-DSN-109` — Purchases matrix receiving + Série composer.
-- `TASK-AUD-060` — Matrix/kit atomicity + FTS5-recall audit.
+- `TASK-BRK-114` — Variant-matrix engine (`Parent Model × Size × Color/Finish`, migration `0024+`): 1-click variant/SKU/barcode generation, per-variant stock, atomic multi-line deduction. **IN PROGRESS (first unit).**
+- `TASK-BRK-115` — Assorted *Série* builder on `product_kit_items` (with component-availability precheck).
+- `TASK-DSN-108` — Rapid 2D grid order entry in POS (keyboard-first, FR/AR) **+ `DSN-115` bargaining-floor guard alongside** (silent signal, `PIN Gérant` unlock).
+- `TASK-BRK-126` — Priceless warehouse prep sheet (*Bon de Préparation*: cart → Colisage-exploded checklist, zero prices).
+- `TASK-DSN-109` — Purchases matrix receiving + *Série* composer **with supplier price-deviation alert** (last price + 90-day average, proposal 7).
+- `TASK-BRK-127` — Payment behavior indicator + standalone `Versement Seul` receipt (frozen four-term equation).
+- `TASK-BRK-125` — Atomic size/color exchange engine (*Échange Express*, `0 DZD` at equal historic price).
+- `TASK-AUD-060` — Matrix/kit atomicity + FTS5-recall audit **with the `G3+` perf gate** (10k SKUs / 1M movements).
 
-## WAVE 5 — Commercial Intelligence
+## WAVE 5 — Commercial Intelligence (starts immediately after Wave 4 closes)
 **Goal:** the system warns before the shelf (or the ledger) bleeds.
-- `TASK-BRK-116` — Signals engine: `Rupture de Série`/broken size-run alerts,
-  seasonality & dead-stock radar, model profitability, credit-aging buckets.
+- `TASK-BRK-116` — Signals engine (`Rupture de Série`/broken size-run alerts, seasonality & dead-stock radar, model profitability, credit-aging buckets) with **per-profile thresholds** (textile vs hardware).
 - `TASK-DSN-110` — Intelligence cockpit (alerts + radar + aging, FR/AR, dark-ready).
-- `TASK-REL-063` — v2.0 release bundle (G8) with trial-installer evidence chain.
+- `TASK-DSN-117` — Offline available-assortment catalog for WhatsApp/PDF (live sizes/colors + *Série* fill, price mode wholesale/super-gros/none).
+- `TASK-REL-063` — v2.0 release bundle (G8) with trial-installer evidence chain, **preceded by the readiness wave**: `BRK-128` dual USB backup on cash close (+48h alert), training Sandbox, idle fiscal seam (`XS`), local `.sig` signing + one-click updater.
+- After Wave 5: `BRK-124` counter sync (schema already covers matrix/série tables); owner reading companion (dual-mode, LAN-only); scanner stocktake; `PRT-06` field session whenever hardware lands.
 
 ---
 

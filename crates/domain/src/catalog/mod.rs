@@ -6,6 +6,7 @@ pub mod price_breaks;
 pub mod product;
 pub mod search_normalization;
 pub mod unit;
+pub mod variant_matrix;
 
 pub use category::{Category, CategoryId};
 pub use kit::{validate_kit_edges, KitItem};
@@ -16,3 +17,7 @@ pub use search_normalization::{
     tokenize_query, ALGERIAN_HARDWARE_DICTIONARY,
 };
 pub use unit::{convert_to_base_micros, validate_unit_set, ProductUnit, UnitId};
+pub use variant_matrix::{
+    plan_variant_matrix, CellSpecOverride, MatrixPlan, PlannedCell, VariantCell, VariantCellId,
+    VariantMatrixSpec, VariantModel, VariantModelDraft, VariantModelId, MAX_MATRIX_CELLS,
+};

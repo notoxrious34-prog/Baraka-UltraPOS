@@ -13,14 +13,19 @@ use baraka_application::use_cases::catalog::{
     UpdateProductInput, UpdateProductUseCase,
 };
 use baraka_application::use_cases::deletion::DeleteProductUseCase;
-use baraka_domain::catalog::{Category, CategoryId, ProductId, UnitId};
+use baraka_application::use_cases::variant_matrix::{
+    CellOverrideInput, GenerateVariantMatrixInput, GenerateVariantMatrixUseCase,
+    GetModelMatrixViewUseCase,
+};
+use baraka_domain::catalog::{Category, CategoryId, ProductId, UnitId, VariantModelId};
 
 use crate::dto::{
     CatalogMetricsDto, CatalogSearchRequestDto, CategoryResponseDto, CreateCategoryRequestDto,
-    CreateProductDto, DefineKitDto, DeleteEntityRequestDto, DeleteEntityResultDto, GetProductDto,
+    CreateProductDto, DefineKitDto, DeleteEntityRequestDto, DeleteEntityResultDto,
+    GenerateVariantMatrixDto, GenerateVariantMatrixResponseDto, GetProductDto,
     ImportProductsRequestDto, ImportProductsResponseDto, ImportRowErrorDto, ListPriceBreaksDto,
-    PriceBreakDto, ProductResponseDto, ReplacePriceBreaksDto, UpdateCategoryRequestDto,
-    UpdateProductDto,
+    MatrixViewRequestDto, PriceBreakDto, ProductResponseDto, ReplacePriceBreaksDto,
+    UpdateCategoryRequestDto, UpdateProductDto, VariantMatrixViewRowDto,
 };
 
 /// `catalog_create_product` command: atomic product + unit-set creation.
@@ -441,4 +446,95 @@ pub fn catalog_replace_price_breaks(
             },
         )
         .map_err(|error| error_code(&error))
+}
+
+/// `catalog_generate_variant_matrix` command: atomic variant-matrix generation (BRK-114).
+#[tauri::command(rename_all = "snake_case")]
+pub fn catalog_generate_variant_matrix(
+    state: tauri::State<'_, AppState>,
+    request: GenerateVariantMatrixDto,
+) -> Result<GenerateVariantMatrixResponseDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let category_id = request
+        .category_id
+        .as_deref()
+        .map(|text| parse_wire_id(text, "category_id").map(CategoryId::from))
+        .transpose()
+        .map_err(|error| error_code(&error))?;
+    let template_product_id = parse_wire_id(&request.template_product_id, "template_product_id")
+        .map(ProductId::from)
+        .map_err(|error| error_code(&error))?;
+    let mut overrides = Vec::with_capacity(request.overrides.len());
+    for over in &request.overrides {
+        let sale_price_centimes = over
+            .sale_price_centimes
+            .as_deref()
+            .map(|text| parse_wire_int(text, "sale_price_centimes"))
+            .transpose()
+            .map_err(|error| error_code(&error))?;
+        overrides.push(CellOverrideInput {
+            axis1: over.axis1.clone(),
+            axis2: over.axis2.clone(),
+            sale_price_centimes,
+            barcode: over.barcode.clone(),
+        });
+    }
+    let output = GenerateVariantMatrixUseCase::new(
+        state.catalog.as_ref(),
+        state.categories.as_ref(),
+        state.matrix.as_ref(),
+    )
+    .execute(
+        &session,
+        GenerateVariantMatrixInput {
+            name_ar: request.name_ar,
+            name_fr: request.name_fr,
+            axis1_name: request.axis1_name,
+            axis2_name: request.axis2_name,
+            axis1_values: request.axis1_values,
+            axis2_values: request.axis2_values,
+            base_sku: request.base_sku,
+            category_id,
+            template_product_id,
+            overrides,
+        },
+        &state.terminal_id,
+    )
+    .map_err(|error| error_code(&error))?;
+    Ok(GenerateVariantMatrixResponseDto {
+        model_id: output.model_id.0.to_string(),
+        cell_count: output.cell_count,
+        skus: output.skus,
+    })
+}
+
+/// `catalog_matrix_view` command: 2D-grid read path for DSN-108/109 (BRK-114).
+#[tauri::command(rename_all = "snake_case")]
+pub fn catalog_matrix_view(
+    state: tauri::State<'_, AppState>,
+    request: MatrixViewRequestDto,
+) -> Result<Vec<VariantMatrixViewRowDto>, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let model_id = parse_wire_id(&request.model_id, "model_id")
+        .map(VariantModelId)
+        .map_err(|error| error_code(&error))?;
+    let rows = GetModelMatrixViewUseCase::new(state.matrix.as_ref())
+        .execute(&session, model_id)
+        .map_err(|error| error_code(&error))?;
+    Ok(rows
+        .into_iter()
+        .map(|row| VariantMatrixViewRowDto {
+            axis1_value: row.axis1_value,
+            axis2_value: row.axis2_value,
+            product_id: row.product_id.to_string(),
+            sku: row.sku.as_str().to_string(),
+            name_ar: row.name_ar,
+            barcode: row
+                .barcode
+                .as_ref()
+                .map(|barcode| barcode.as_str().to_string()),
+            on_hand_micro: row.on_hand_micro.to_string(),
+            sale_price_centimes: row.sale_price_centimes.map(|price| price.to_string()),
+        })
+        .collect())
 }

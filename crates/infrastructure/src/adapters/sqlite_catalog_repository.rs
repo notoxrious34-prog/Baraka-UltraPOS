@@ -149,6 +149,12 @@ impl SqliteCatalogRepository {
         Self { db }
     }
 
+    /// Share the connection with sibling port implementations
+    /// (variant-matrix engine, BRK-114).
+    pub fn connection(&self) -> Arc<Mutex<Connection>> {
+        Arc::clone(&self.db)
+    }
+
     fn lock(&self) -> Result<MutexGuard<'_, Connection>, ApplicationError> {
         self.db
             .lock()

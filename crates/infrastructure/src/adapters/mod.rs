@@ -23,6 +23,7 @@ pub mod sqlite_return_repository;
 pub mod sqlite_stock_repository;
 pub mod sqlite_supplier_repository;
 pub mod sqlite_user_repository;
+pub mod sqlite_variant_repository;
 pub mod sqlite_warehouse_repository;
 pub mod system_clock;
 
@@ -47,6 +48,7 @@ pub use sqlite_return_repository::SqliteReturnRepository;
 pub use sqlite_stock_repository::SqliteStockRepository;
 pub use sqlite_supplier_repository::SqliteSupplierRepository;
 pub use sqlite_user_repository::SqliteUserRepository;
+pub use sqlite_variant_repository::SqliteVariantMatrixRepository;
 pub use sqlite_warehouse_repository::SqliteWarehouseRepository;
 pub use system_clock::SystemClock;
 

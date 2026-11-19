@@ -302,3 +302,84 @@ pub struct ReplacePriceBreaksDto {
     /// Replacement rungs (unsorted accepted; validated server-side).
     pub rungs: Vec<PriceBreakDto>,
 }
+
+/// One per-cell override at matrix generation (BRK-114).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VariantCellOverrideDto {
+    /// First-axis value the override targets.
+    pub axis1: String,
+    /// Second-axis value the override targets.
+    pub axis2: String,
+    /// Replacement sale price in centimes (`None` = inherit template).
+    pub sale_price_centimes: Option<String>,
+    /// Replacement product-level barcode (unique plan-wide).
+    pub barcode: Option<String>,
+}
+
+/// Variant-matrix generation request (BRK-114, Wave 4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GenerateVariantMatrixDto {
+    /// Authorizing session token (catalog managers only).
+    pub session_token: String,
+    /// Arabic model name.
+    pub name_ar: String,
+    /// French model name.
+    pub name_fr: String,
+    /// First axis display name (`Taille`, `Dimension` …).
+    pub axis1_name: String,
+    /// Second axis display name (`Couleur`, `Finition` …).
+    pub axis2_name: String,
+    /// First-axis values.
+    pub axis1_values: Vec<String>,
+    /// Second-axis values.
+    pub axis2_values: Vec<String>,
+    /// Base SKU every cell SKU derives from.
+    pub base_sku: String,
+    /// Owning category id (UUID string), inherited by every cell.
+    pub category_id: Option<String>,
+    /// Template product id (UUID string) lending ladder, tiers, rungs.
+    pub template_product_id: String,
+    /// Per-cell overrides.
+    pub overrides: Vec<VariantCellOverrideDto>,
+}
+
+/// Variant-matrix generation response: the model id plus every minted SKU.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GenerateVariantMatrixResponseDto {
+    /// Persisted model id (UUID string).
+    pub model_id: String,
+    /// Minted cells.
+    pub cell_count: usize,
+    /// Every minted SKU in display order.
+    pub skus: Vec<String>,
+}
+
+/// Matrix 2D-grid view request (DSN-108/109 read path).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MatrixViewRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Model id (UUID string).
+    pub model_id: String,
+}
+
+/// One 2D-grid row: the cell, its backing product, live totals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VariantMatrixViewRowDto {
+    /// First-axis value.
+    pub axis1_value: String,
+    /// Second-axis value.
+    pub axis2_value: String,
+    /// Backing product id (UUID string).
+    pub product_id: String,
+    /// Backing product SKU.
+    pub sku: String,
+    /// Arabic product name.
+    pub name_ar: String,
+    /// Product-level barcode, if any.
+    pub barcode: Option<String>,
+    /// On-hand summed across ALL warehouses, in base-unit micros.
+    pub on_hand_micro: String,
+    /// Default-selling unit price in centimes, if a default unit exists.
+    pub sale_price_centimes: Option<String>,
+}

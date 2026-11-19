@@ -34,7 +34,10 @@ pub(crate) fn require_any(
     }
 }
 
-fn require(session: &SessionContext, permission: Permission) -> Result<(), ApplicationError> {
+pub(crate) fn require(
+    session: &SessionContext,
+    permission: Permission,
+) -> Result<(), ApplicationError> {
     require_any(session, &[permission])
 }
 

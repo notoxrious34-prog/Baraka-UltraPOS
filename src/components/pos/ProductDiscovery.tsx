@@ -15,6 +15,7 @@ import { useSessionStore } from "@/stores/session-store";
 import { useCatalogSearch } from "@/hooks/use-catalog-search";
 import { QuickProductPalette } from "@/features/pos/QuickProductPalette";
 import { QuickProductsConfigModal } from "@/features/pos/QuickProductsConfigModal";
+import { MatrixGridPanel } from "@/components/pos/MatrixGridPanel";
 import { useQuickProductsStore } from "@/stores/quick-products-store";
 import { ipcGetStock } from "@/lib/ipc";
 import {
@@ -83,6 +84,7 @@ export function ProductDiscovery(): ReactElement {
   const [voiceOn] = useState(() => isVoicePickingEnabled() && isSpeechRecognitionSupported());
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [matrixOpen, setMatrixOpen] = useState(false);
   const stopVoice = useRef<(() => void) | null>(null);
   useEffect(() => {
     return () => {
@@ -308,11 +310,39 @@ export function ProductDiscovery(): ReactElement {
           />
           {t(locale, "pos.quickProductsToggle")}
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMatrixOpen((open) => !open);
+          }}
+          aria-pressed={matrixOpen}
+          title={t(locale, "matrix.toggle")}
+          aria-label={t(locale, "matrix.toggle")}
+          className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-600/50 ${
+            matrixOpen
+              ? "border-primary-600 bg-primary-50 text-primary-700 hover:bg-primary-100 dark:border-primary-500 dark:bg-primary-950/40 dark:text-primary-300"
+              : "border-slate-300 bg-white text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+          }`}
+        >
+          <span
+            aria-hidden="true"
+            className={`grid h-4 w-4 shrink-0 grid-cols-2 gap-px ${matrixOpen ? "text-primary-600" : "text-slate-400"}`}
+          >
+            <span className="rounded-[2px] bg-current" />
+            <span className="rounded-[2px] bg-current" />
+            <span className="rounded-[2px] bg-current" />
+            <span className="rounded-[2px] bg-current" />
+          </span>
+          {t(locale, "matrix.toggle")}
+        </button>
       </div>
 
       <QuickProductPalette />
       <QuickProductsConfigModal />
 
+      {matrixOpen ? (
+        <MatrixGridPanel />
+      ) : (
       <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
         {warehouse === null && (
           <p className="p-4 text-center text-sm font-semibold text-slate-500">
@@ -410,6 +440,7 @@ export function ProductDiscovery(): ReactElement {
           })}
         </div>
       </div>
+      )}
     </section>
   );
 }

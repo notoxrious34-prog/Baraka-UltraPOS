@@ -28,7 +28,8 @@ export type ActiveModal =
   | "cash-open"
   | "cash-close"
   | "cash-expense"
-  | "parked";
+  | "parked"
+  | "prep-sheet";
 
 /** One purchasable packaging snapshot carried inside a cart line. */
 export interface CartUnitSnapshot {

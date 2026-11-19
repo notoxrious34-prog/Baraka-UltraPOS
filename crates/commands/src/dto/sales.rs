@@ -315,6 +315,43 @@ pub struct PaymentDto {
     pub amount_centimes: String,
 }
 
+/// One cart line to explode on the prep sheet (BRK-126).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrepSheetLineDto {
+    /// Product id (UUID string).
+    pub product_id: String,
+    /// Selling unit id (UUID string).
+    pub unit_id: String,
+    /// Quantity in selling-unit micros.
+    pub quantity_micro: String,
+}
+
+/// Priceless prep-sheet build request (BRK-126).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BuildPrepSheetRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Cart lines in display order.
+    pub lines: Vec<PrepSheetLineDto>,
+}
+
+/// One exploded checklist line: NO price field exists by design.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrepSheetLineResponse {
+    /// Product id (UUID string).
+    pub product_id: String,
+    /// Product SKU.
+    pub sku: String,
+    /// Arabic product name.
+    pub name_ar: String,
+    /// French product name.
+    pub name_fr: String,
+    /// Total quantity in base micros.
+    pub quantity_base_micro: String,
+    /// Whole-rung shares, largest rung first.
+    pub shares: Vec<ColisageShareDto>,
+}
+
 /// Full sale view response.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GetSaleResponse {

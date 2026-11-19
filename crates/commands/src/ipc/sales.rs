@@ -5,6 +5,7 @@ use super::{
 };
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::DocumentSearchFilter;
+use baraka_application::use_cases::prep_sheet::{BuildPrepSheetUseCase, PrepSheetLineInput};
 use baraka_application::use_cases::sales::{
     CartLineInput, CheckoutInput, CheckoutSaleUseCase, ClosingInput, ClosingPaymentInput,
     ConvertBlToFactureUseCase, ConvertDevisToBlInput, ConvertDevisToBlUseCase, ManagerOverride,
@@ -17,10 +18,11 @@ use baraka_domain::inventory::WarehouseId;
 use baraka_domain::sales::{CustomerId, DocumentId, DocumentLanguage, DocumentType, PaymentMethod};
 
 use crate::dto::{
-    CheckoutSaleRequest, CheckoutSaleResponse, ConvertBlToFactureRequest,
-    ConvertBlToFactureResponse, ConvertDevisToBlRequest, ConvertDevisToBlResponse,
-    DocumentSearchRequest, DocumentSearchResponse, DocumentSummaryDto, LineMarginDto,
-    PreviewTotalsRequest, PreviewTotalsResponse, StockShortageWarningDto,
+    BuildPrepSheetRequest, CheckoutSaleRequest, CheckoutSaleResponse, ColisageShareDto,
+    ConvertBlToFactureRequest, ConvertBlToFactureResponse, ConvertDevisToBlRequest,
+    ConvertDevisToBlResponse, DocumentSearchRequest, DocumentSearchResponse, DocumentSummaryDto,
+    LineMarginDto, PrepSheetLineResponse, PreviewTotalsRequest, PreviewTotalsResponse,
+    StockShortageWarningDto,
 };
 
 /// Parse an explicit sale-time language (`AR` or `FR` exactly).
@@ -344,4 +346,52 @@ pub fn documents_search(
         });
     }
     Ok(DocumentSearchResponse { documents })
+}
+
+/// `sales_build_prep_sheet` command: priceless warehouse checklist
+/// (`Bon de Préparation`, BRK-126). Explodes live cart lines into
+/// whole-rung Colisage shares; the response carries NO price field.
+#[tauri::command(rename_all = "snake_case")]
+pub fn sales_build_prep_sheet(
+    state: tauri::State<'_, AppState>,
+    request: BuildPrepSheetRequest,
+) -> Result<Vec<PrepSheetLineResponse>, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let mut lines = Vec::with_capacity(request.lines.len());
+    for line in &request.lines {
+        lines.push(PrepSheetLineInput {
+            product_id: parse_wire_id(&line.product_id, "product_id")
+                .map(baraka_domain::catalog::ProductId)
+                .map_err(|error| error_code(&error))?,
+            unit_id: parse_wire_id(&line.unit_id, "unit_id")
+                .map(baraka_domain::catalog::UnitId)
+                .map_err(|error| error_code(&error))?,
+            quantity_micro: parse_wire_int(&line.quantity_micro, "quantity_micro")
+                .map_err(|error| error_code(&error))?,
+        });
+    }
+    let sheet = BuildPrepSheetUseCase::new(state.catalog.as_ref())
+        .execute(&session, &lines)
+        .map_err(|error| error_code(&error))?;
+    Ok(sheet
+        .into_iter()
+        .map(|line| PrepSheetLineResponse {
+            product_id: line.product_id.to_string(),
+            sku: line.sku,
+            name_ar: line.name_ar,
+            name_fr: line.name_fr,
+            quantity_base_micro: line.quantity_base_micro.to_string(),
+            shares: line
+                .shares
+                .into_iter()
+                .map(|share| ColisageShareDto {
+                    unit_id: share.unit_id,
+                    unit_name_fr: share.unit_name_fr,
+                    unit_name_ar: share.unit_name_ar,
+                    factor_micro: share.factor_micro,
+                    count: share.count,
+                })
+                .collect(),
+        })
+        .collect())
 }

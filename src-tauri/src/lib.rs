@@ -271,6 +271,7 @@ pub fn run() {
             baraka_commands::ipc::stock_transfer,
             baraka_commands::ipc::sales_checkout,
             baraka_commands::ipc::sales_preview_totals,
+            baraka_commands::ipc::sales_build_prep_sheet,
             baraka_commands::ipc::convert_devis_to_bl,
             baraka_commands::ipc::convert_bl_to_facture,
             baraka_commands::ipc::sales_create_draft,

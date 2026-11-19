@@ -8,6 +8,7 @@ pub mod customers;
 pub mod deletion;
 pub mod factory_reset;
 pub mod inventory;
+pub mod prep_sheet;
 pub mod printing;
 pub mod purchases;
 pub mod reports;

@@ -129,6 +129,42 @@ export async function ipcCheckout(request: CheckoutRequestWire): Promise<SaleRec
   };
 }
 
+/** One cart line to explode on the prep sheet (mirrors PrepSheetLineDto). */
+export interface PrepSheetLineWire {
+  product_id: string;
+  unit_id: string;
+  quantity_micro: string;
+}
+
+/** One whole-rung checklist share (mirrors ColisageShareDto). Counts are integers, NOT money. */
+export interface PrepSheetShareWire {
+  unit_id: string;
+  unit_name_fr: string;
+  unit_name_ar: string;
+  factor_micro: number;
+  count: number;
+}
+
+/** One exploded checklist line — NO price field exists by design. */
+export interface PrepSheetLineResult {
+  product_id: string;
+  sku: string;
+  name_ar: string;
+  name_fr: string;
+  quantity_base_micro: string;
+  shares: PrepSheetShareWire[];
+}
+
+/** Build the priceless warehouse checklist (Bon de Préparation, BRK-126). */
+export async function ipcBuildPrepSheet(
+  sessionToken: string,
+  lines: PrepSheetLineWire[],
+): Promise<PrepSheetLineResult[]> {
+  return call<PrepSheetLineResult[]>("sales_build_prep_sheet", {
+    request: { session_token: sessionToken, lines },
+  });
+}
+
 /** One leaf-level stock shortage (mirrors StockShortageWarningDto). */
 export interface StockShortageWarningWire {
   product_id: string;

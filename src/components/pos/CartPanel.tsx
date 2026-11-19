@@ -22,6 +22,8 @@ export function CartPanel(): ReactElement {
   const setDocType = useCartStore((state) => state.setDocType);
   const shielded = usePrivacyShieldStore((state) => state.shielded);
   const toggleShield = usePrivacyShieldStore((state) => state.toggleShield);
+  const openModal = usePosUiStore((state) => state.openModal);
+  const lineCount = useCartStore((state) => state.lines.length);
 
   // DSN-103 Cost/Margin Privacy Shield: Ctrl+H masks cost/margin figures
   // from counter eyes. Skipped while typing (inputs hold the keystroke).
@@ -86,6 +88,18 @@ export function CartPanel(): ReactElement {
           }`}
         >
           [H] {shielded ? t(locale, "cart.shieldActive") : t(locale, "cart.shieldInactive")}
+        </button>
+        <button
+          key="prep-sheet"
+          type="button"
+          onClick={() => {
+            openModal("prep-sheet");
+          }}
+          disabled={lineCount === 0}
+          title={t(locale, "prep.title")}
+          className="shrink-0 rounded-lg bg-amber-500 px-2 py-2 text-xs font-black text-white hover:bg-amber-600 disabled:opacity-40 dark:bg-amber-600 dark:hover:bg-amber-500"
+        >
+          {t(locale, "prep.title")}
         </button>
       </div>
 

@@ -418,6 +418,35 @@ pub trait VariantMatrixRepository: Send + Sync {
     ) -> Result<Vec<VariantMatrixViewRow>, ApplicationError>;
 }
 
+/// Narrow availability probe for the série composer (TASK-BRK-115).
+/// Implemented by the stock repository; kept separate so the composer
+/// depends on one read method instead of the whole stock port.
+pub trait SerieAvailabilityPort: Send + Sync {
+    /// On-hand in base micros for one product in one warehouse
+    /// (0 when no level row exists).
+    fn component_on_hand(
+        &self,
+        product_id: ProductId,
+        warehouse_id: WarehouseId,
+    ) -> Result<i64, ApplicationError>;
+}
+
+/// Every stock engine doubles as the série availability probe (BRK-115):
+/// the probe IS the level read, so the precheck can never drift from
+/// the engine it reports on.
+impl<T> SerieAvailabilityPort for T
+where
+    T: StockRepository + ?Sized,
+{
+    fn component_on_hand(
+        &self,
+        product_id: ProductId,
+        warehouse_id: WarehouseId,
+    ) -> Result<i64, ApplicationError> {
+        StockRepository::get_stock_level(self, product_id, warehouse_id)
+    }
+}
+
 /// One direct BOM edge (header id carried by the call, not the row).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KitComponentRow {

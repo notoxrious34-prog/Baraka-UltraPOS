@@ -14,17 +14,19 @@ use baraka_application::use_cases::catalog::{
 };
 use baraka_application::use_cases::deletion::DeleteProductUseCase;
 use baraka_application::use_cases::variant_matrix::{
-    CellOverrideInput, GenerateVariantMatrixInput, GenerateVariantMatrixUseCase,
-    GetModelMatrixViewUseCase,
+    CellOverrideInput, ComposeSerieInput, ComposeSerieUseCase, GenerateVariantMatrixInput,
+    GenerateVariantMatrixUseCase, GetModelMatrixViewUseCase, SerieLineInput,
 };
 use baraka_domain::catalog::{Category, CategoryId, ProductId, UnitId, VariantModelId};
+use baraka_domain::inventory::WarehouseId;
 
 use crate::dto::{
-    CatalogMetricsDto, CatalogSearchRequestDto, CategoryResponseDto, CreateCategoryRequestDto,
-    CreateProductDto, DefineKitDto, DeleteEntityRequestDto, DeleteEntityResultDto,
-    GenerateVariantMatrixDto, GenerateVariantMatrixResponseDto, GetProductDto,
-    ImportProductsRequestDto, ImportProductsResponseDto, ImportRowErrorDto, ListPriceBreaksDto,
-    MatrixViewRequestDto, PriceBreakDto, ProductResponseDto, ReplacePriceBreaksDto,
+    CatalogMetricsDto, CatalogSearchRequestDto, CategoryResponseDto, ComposeSerieDto,
+    ComposeSerieResponseDto, CreateCategoryRequestDto, CreateProductDto, DefineKitDto,
+    DeleteEntityRequestDto, DeleteEntityResultDto, GenerateVariantMatrixDto,
+    GenerateVariantMatrixResponseDto, GetProductDto, ImportProductsRequestDto,
+    ImportProductsResponseDto, ImportRowErrorDto, ListPriceBreaksDto, MatrixViewRequestDto,
+    PriceBreakDto, ProductResponseDto, ReplacePriceBreaksDto, SerieShortfallDto,
     UpdateCategoryRequestDto, UpdateProductDto, VariantMatrixViewRowDto,
 };
 
@@ -537,4 +539,65 @@ pub fn catalog_matrix_view(
             sale_price_centimes: row.sale_price_centimes.map(|price| price.to_string()),
         })
         .collect())
+}
+
+/// `catalog_compose_serie` command: resolve a size run into a kit plus a
+/// tolerant availability report (BRK-115).
+#[tauri::command(rename_all = "snake_case")]
+pub fn catalog_compose_serie(
+    state: tauri::State<'_, AppState>,
+    request: ComposeSerieDto,
+) -> Result<ComposeSerieResponseDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let kit_id = parse_wire_id(&request.kit_id, "kit_id")
+        .map(ProductId::from)
+        .map_err(|error| error_code(&error))?;
+    let model_id = parse_wire_id(&request.model_id, "model_id")
+        .map(VariantModelId)
+        .map_err(|error| error_code(&error))?;
+    let warehouse_id = request
+        .warehouse_id
+        .as_deref()
+        .map(|text| parse_wire_id(text, "warehouse_id").map(WarehouseId::from))
+        .transpose()
+        .map_err(|error| error_code(&error))?;
+    let output = ComposeSerieUseCase::new(
+        state.catalog.as_ref(),
+        state.matrix.as_ref(),
+        state.stock.as_ref(),
+    )
+    .execute(
+        &session,
+        ComposeSerieInput {
+            kit_id,
+            model_id,
+            axis2_value: request.axis2_value,
+            lines: request
+                .lines
+                .into_iter()
+                .map(|line| SerieLineInput {
+                    axis1_value: line.axis1_value,
+                    pieces: line.pieces,
+                })
+                .collect(),
+            warehouse_id,
+            serie_count: request.serie_count,
+        },
+    )
+    .map_err(|error| error_code(&error))?;
+    Ok(ComposeSerieResponseDto {
+        kit_id: output.kit_id.to_string(),
+        component_count: output.component_count,
+        total_pieces: output.total_pieces,
+        shortfalls: output
+            .shortfalls
+            .into_iter()
+            .map(|shortfall| SerieShortfallDto {
+                product_id: shortfall.product_id.to_string(),
+                sku: shortfall.sku,
+                required_micro: shortfall.required_micro.to_string(),
+                on_hand_micro: shortfall.on_hand_micro.to_string(),
+            })
+            .collect(),
+    })
 }

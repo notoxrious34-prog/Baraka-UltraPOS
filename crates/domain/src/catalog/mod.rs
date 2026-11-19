@@ -18,6 +18,7 @@ pub use search_normalization::{
 };
 pub use unit::{convert_to_base_micros, validate_unit_set, ProductUnit, UnitId};
 pub use variant_matrix::{
-    plan_variant_matrix, CellSpecOverride, MatrixPlan, PlannedCell, VariantCell, VariantCellId,
-    VariantMatrixSpec, VariantModel, VariantModelDraft, VariantModelId, MAX_MATRIX_CELLS,
+    plan_serie_composition, plan_variant_matrix, CellSpecOverride, MatrixPlan, PlannedCell,
+    PlannedSerieLine, SerieLineRequest, VariantCell, VariantCellId, VariantMatrixSpec,
+    VariantModel, VariantModelDraft, VariantModelId, MAX_MATRIX_CELLS, MAX_SERIE_PIECES,
 };

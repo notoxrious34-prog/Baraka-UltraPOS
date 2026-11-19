@@ -461,3 +461,147 @@ mod tests {
         );
     }
 }
+
+/// One requested série line: an axis1 value plus pieces per single série.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SerieLineRequest<'a> {
+    /// First-axis value (`M`, `44`, `Ø18` …).
+    pub axis1_value: &'a str,
+    /// Pieces of this size per single série.
+    pub pieces: u32,
+}
+
+/// Planned série line: index into the model's cell roster plus pieces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlannedSerieLine {
+    /// Index into the roster slice passed to [`plan_serie_composition`].
+    pub cell_index: usize,
+    /// Pieces of this cell per single série.
+    pub pieces: u32,
+}
+
+/// Hard ceiling on pieces per single série (accident guard).
+pub const MAX_SERIE_PIECES: u32 = 10_000;
+
+/// Resolve a série composition against a model's cell roster.
+///
+/// The roster carries `(axis1, axis2)` pairs — in practice the caller feeds
+/// `matrix_cells` mapped to value pairs. Every requested size must resolve
+/// to exactly one roster cell carrying `axis2_value`, duplicates match
+/// case-insensitively, and the piece total stays under [`MAX_SERIE_PIECES`].
+/// Pure: no I/O, indices out.
+pub fn plan_serie_composition(
+    roster: &[(String, String)],
+    axis2_value: &str,
+    lines: &[SerieLineRequest<'_>],
+) -> Result<Vec<PlannedSerieLine>, DomainError> {
+    let invalid = |name: &str| DomainError::InvalidCanonicalString(name.to_string());
+    let color = axis2_value.trim();
+    if color.is_empty() {
+        return Err(invalid("SERIE_COLOR_EMPTY"));
+    }
+    if lines.is_empty() {
+        return Err(invalid("SERIE_EMPTY"));
+    }
+    if lines.iter().any(|line| line.pieces == 0) {
+        return Err(invalid("SERIE_QTY_ZERO"));
+    }
+    let total: u32 = lines
+        .iter()
+        .map(|line| line.pieces)
+        .try_fold(0u32, |sum, pieces| sum.checked_add(pieces))
+        .ok_or_else(|| invalid("SERIE_TOO_LARGE"))?;
+    if total > MAX_SERIE_PIECES {
+        return Err(invalid("SERIE_TOO_LARGE"));
+    }
+    let color_hit = roster
+        .iter()
+        .any(|(_, axis2)| normalize_token(axis2) == normalize_token(color));
+    if !color_hit {
+        return Err(invalid("SERIE_UNKNOWN_COLOR"));
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut plan = Vec::with_capacity(lines.len());
+    for line in lines {
+        if line.axis1_value.trim().is_empty() {
+            return Err(invalid("SERIE_SIZE_EMPTY"));
+        }
+        if !seen.insert(normalize_token(line.axis1_value)) {
+            return Err(invalid("SERIE_SIZE_DUPLICATE"));
+        }
+        let mut hit = None;
+        for (index, (axis1, axis2)) in roster.iter().enumerate() {
+            if normalize_token(axis2) == normalize_token(color)
+                && normalize_token(axis1) == normalize_token(line.axis1_value)
+            {
+                hit = Some(index);
+                break;
+            }
+        }
+        match hit {
+            Some(cell_index) => plan.push(PlannedSerieLine {
+                cell_index,
+                pieces: line.pieces,
+            }),
+            None => return Err(invalid("SERIE_UNKNOWN_SIZE")),
+        }
+    }
+    Ok(plan)
+}
+
+#[cfg(test)]
+mod serie_tests {
+    use super::*;
+
+    fn roster() -> Vec<(String, String)> {
+        vec![
+            ("M".to_string(), "NOIR".to_string()),
+            ("L".to_string(), "NOIR".to_string()),
+            ("XL".to_string(), "NOIR".to_string()),
+            ("XXL".to_string(), "NOIR".to_string()),
+            ("M".to_string(), "BLANC".to_string()),
+        ]
+    }
+
+    fn lines<'x>(requests: &'x [(&'x str, u32)]) -> Vec<SerieLineRequest<'x>> {
+        requests
+            .iter()
+            .map(|(size, pieces)| SerieLineRequest {
+                axis1_value: size,
+                pieces: *pieces,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn classic_serie_resolves_to_cell_indices_in_order() {
+        let plan = plan_serie_composition(
+            &roster(),
+            "NOIR",
+            &lines(&[("M", 2), ("L", 4), ("XL", 4), ("XXL", 2)]),
+        )
+        .expect("classic 2-4-4-2 série");
+        assert_eq!(plan.len(), 4);
+        assert_eq!(plan[0].cell_index, 0);
+        assert_eq!(plan[3].pieces, 2);
+    }
+
+    #[test]
+    fn unknown_color_size_dup_and_zero_reject_loudly() {
+        let roster = roster();
+        assert!(plan_serie_composition(&roster, "ROUGE", &lines(&[("M", 2)])).is_err());
+        assert!(plan_serie_composition(&roster, "NOIR", &lines(&[("XXXL", 2)])).is_err());
+        assert!(plan_serie_composition(&roster, "NOIR", &lines(&[("M", 1), ("m", 1)])).is_err());
+        assert!(plan_serie_composition(&roster, "NOIR", &lines(&[("M", 0)])).is_err());
+        assert!(plan_serie_composition(&roster, " ", &lines(&[("M", 2)])).is_err());
+        assert!(plan_serie_composition(&roster, "NOIR", &[]).is_err());
+    }
+
+    #[test]
+    fn absurd_totals_reject_before_any_persist() {
+        let roster = roster();
+        assert!(
+            plan_serie_composition(&roster, "NOIR", &lines(&[("M", 9_999), ("L", 9_999)])).is_err()
+        );
+    }
+}

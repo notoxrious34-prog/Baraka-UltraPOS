@@ -9,17 +9,19 @@
 use std::collections::HashMap;
 
 use baraka_domain::catalog::{
-    plan_variant_matrix, validate_unit_set, Barcode, CategoryId, Product, ProductId, Sku, UnitId,
-    VariantMatrixSpec, VariantModel, VariantModelId,
+    plan_serie_composition, plan_variant_matrix, validate_kit_edges, validate_unit_set, Barcode,
+    CategoryId, KitItem, Product, ProductId, SerieLineRequest, Sku, UnitId, VariantMatrixSpec,
+    VariantModel, VariantModelId,
 };
 use baraka_domain::errors::DomainError;
+use baraka_domain::inventory::WarehouseId;
 use baraka_domain::primitives::Money;
 use baraka_domain::role::Permission;
 
 use super::catalog::{require, require_any, MANAGE_PERMISSIONS};
 use crate::errors::ApplicationError;
 use crate::ports::{
-    CategoryRepository, MatrixCellWrite, ProductRepository, SessionContext,
+    CategoryRepository, MatrixCellWrite, ProductRepository, SerieAvailabilityPort, SessionContext,
     VariantMatrixRepository, VariantMatrixViewRow,
 };
 
@@ -283,8 +285,9 @@ mod tests {
     use uuid::Uuid;
 
     #[derive(Default)]
-    struct FakeProducts {
-        products: Mutex<HashMap<ProductId, (Product, Vec<ProductUnit>)>>,
+    pub(crate) struct FakeProducts {
+        pub(crate) products: Mutex<HashMap<ProductId, (Product, Vec<ProductUnit>)>>,
+        pub(crate) kits: Mutex<HashMap<ProductId, Vec<baraka_domain::catalog::KitItem>>>,
     }
 
     impl ProductRepository for FakeProducts {
@@ -328,9 +331,13 @@ mod tests {
 
         fn define_kit(
             &self,
-            _: ProductId,
-            _: &[baraka_domain::catalog::KitItem],
+            kit_id: ProductId,
+            items: &[baraka_domain::catalog::KitItem],
         ) -> Result<(), ApplicationError> {
+            self.kits
+                .lock()
+                .expect("kits")
+                .insert(kit_id, items.to_vec());
             Ok(())
         }
 
@@ -414,9 +421,10 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct FakeMatrix {
-        models: Mutex<HashMap<VariantModelId, VariantModel>>,
-        writes: Mutex<Vec<(VariantModel, Vec<MatrixCellWrite>)>>,
+    pub(crate) struct FakeMatrix {
+        pub(crate) models: Mutex<HashMap<VariantModelId, VariantModel>>,
+        pub(crate) writes: Mutex<Vec<(VariantModel, Vec<MatrixCellWrite>)>>,
+        pub(crate) cells: Mutex<HashMap<VariantModelId, Vec<baraka_domain::catalog::VariantCell>>>,
     }
 
     impl VariantMatrixRepository for FakeMatrix {
@@ -445,9 +453,15 @@ mod tests {
 
         fn matrix_cells(
             &self,
-            _: VariantModelId,
+            model_id: VariantModelId,
         ) -> Result<Vec<baraka_domain::catalog::VariantCell>, ApplicationError> {
-            Ok(Vec::new())
+            Ok(self
+                .cells
+                .lock()
+                .expect("cells")
+                .get(&model_id)
+                .cloned()
+                .unwrap_or_default())
         }
 
         fn matrix_view(
@@ -458,7 +472,7 @@ mod tests {
         }
     }
 
-    fn session() -> SessionContext {
+    pub(crate) fn session() -> SessionContext {
         SessionContext {
             token: SessionToken::new_random(),
             user_id: UserId(Uuid::new_v4()),
@@ -621,6 +635,462 @@ mod tests {
         assert!(
             view.execute(&session(), VariantModelId::new()).is_err(),
             "unknown model"
+        );
+    }
+}
+
+/// One requested série line: a size plus pieces per single série.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SerieLineInput {
+    /// First-axis value (`M`, `44`, `Ø18` …).
+    pub axis1_value: String,
+    /// Pieces of this size per single série.
+    pub pieces: u32,
+}
+
+/// Compose-série input: a kit header plus a size run on one color.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComposeSerieInput {
+    /// Série header product (must exist with `is_kit`).
+    pub kit_id: ProductId,
+    /// Source variant model.
+    pub model_id: VariantModelId,
+    /// Second-axis value the série runs on (`NOIR` …).
+    pub axis2_value: String,
+    /// Size run (`2M + 4L + 4XL + 2XXL` …).
+    pub lines: Vec<SerieLineInput>,
+    /// Warehouse for the availability precheck (`None` = structural only).
+    pub warehouse_id: Option<WarehouseId>,
+    /// How many séries the precheck covers (≥1 when a warehouse is given).
+    pub serie_count: u32,
+}
+
+/// One reported shortfall: required vs on-hand in base micros.
+/// Tolerant by design: reported in the output, never blocking composition
+/// (a série template is defined BEFORE its components are received).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SerieShortfall {
+    /// Component product running short.
+    pub product_id: ProductId,
+    /// Component SKU for the operator message.
+    pub sku: String,
+    /// Required base micros (`qty_per_serie × serie_count`).
+    pub required_micro: i64,
+    /// On-hand base micros in the precheck warehouse.
+    pub on_hand_micro: i64,
+}
+
+/// Compose-série output: persisted kit plus the availability report.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComposeSerieOutput {
+    /// Série header product.
+    pub kit_id: ProductId,
+    /// Persisted components.
+    pub component_count: usize,
+    /// Pieces per single série.
+    pub total_pieces: u32,
+    /// Shortfalls in the precheck warehouse (empty when sufficient
+    /// or when no warehouse was given).
+    pub shortfalls: Vec<SerieShortfall>,
+}
+
+/// Compose a size-run série onto a kit header (TASK-BRK-115).
+///
+/// Structural validation (header, model, cells, activity, default units,
+/// acyclicity) rejects LOUDLY with nothing persisted; the stock precheck
+/// only REPORTS shortfalls so a série can be defined before receiving.
+pub struct ComposeSerieUseCase<'a, P, V, A>
+where
+    P: ?Sized,
+    V: ?Sized,
+    A: ?Sized,
+{
+    products: &'a P,
+    matrix: &'a V,
+    availability: &'a A,
+}
+
+impl<'a, P, V, A> ComposeSerieUseCase<'a, P, V, A>
+where
+    P: ProductRepository + ?Sized,
+    V: VariantMatrixRepository + ?Sized,
+    A: SerieAvailabilityPort + ?Sized,
+{
+    /// Wire the use case to its ports.
+    pub fn new(products: &'a P, matrix: &'a V, availability: &'a A) -> Self {
+        Self {
+            products,
+            matrix,
+            availability,
+        }
+    }
+
+    /// Resolve the size run, precheck availability, persist the kit graph.
+    pub fn execute(
+        &self,
+        session: &SessionContext,
+        input: ComposeSerieInput,
+    ) -> Result<ComposeSerieOutput, ApplicationError> {
+        require_any(session, &MANAGE_PERMISSIONS)?;
+        let invalid = |name: &str| {
+            ApplicationError::Validation(DomainError::InvalidCanonicalString(name.to_string()))
+        };
+        let (kit, _) = match self.products.find_by_id(input.kit_id)? {
+            Some(found) => found,
+            None => return Err(ApplicationError::NotFound("kit product".to_string())),
+        };
+        if !kit.is_kit {
+            return Err(ApplicationError::Validation(
+                DomainError::InvalidKitComponent,
+            ));
+        }
+        if self.matrix.find_variant_model(input.model_id)?.is_none() {
+            return Err(ApplicationError::NotFound("variant_model".to_string()));
+        }
+        let cells = self.matrix.matrix_cells(input.model_id)?;
+        let roster: Vec<(String, String)> = cells
+            .iter()
+            .map(|cell| (cell.axis1_value.clone(), cell.axis2_value.clone()))
+            .collect();
+        let line_refs: Vec<SerieLineRequest<'_>> = input
+            .lines
+            .iter()
+            .map(|line| SerieLineRequest {
+                axis1_value: line.axis1_value.as_str(),
+                pieces: line.pieces,
+            })
+            .collect();
+        let plan = plan_serie_composition(&roster, &input.axis2_value, &line_refs)
+            .map_err(ApplicationError::Validation)?;
+        if input.warehouse_id.is_some() && input.serie_count == 0 {
+            return Err(invalid("SERIE_COUNT_ZERO"));
+        }
+        let mut kit_items = Vec::with_capacity(plan.len());
+        let mut components = Vec::with_capacity(plan.len());
+        let mut total_pieces: u32 = 0;
+        for planned in &plan {
+            let cell = &cells[planned.cell_index];
+            let (component, component_units) = match self.products.find_by_id(cell.product_id)? {
+                Some(found) => found,
+                None => {
+                    return Err(ApplicationError::Validation(
+                        DomainError::InvalidKitComponent,
+                    ))
+                }
+            };
+            if !component.is_active {
+                return Err(ApplicationError::Validation(
+                    DomainError::InvalidKitComponent,
+                ));
+            }
+            let default_unit = component_units
+                .iter()
+                .find(|unit| unit.is_default_selling)
+                .ok_or_else(|| {
+                    ApplicationError::Validation(DomainError::InvalidCanonicalString(
+                        "SERIE_NO_DEFAULT_UNIT".to_string(),
+                    ))
+                })?;
+            let quantity_micro = i64::from(planned.pieces)
+                .checked_mul(default_unit.factor_micro.micros())
+                .ok_or_else(|| invalid("SERIE_QTY_OVERFLOW"))?;
+            total_pieces = total_pieces
+                .checked_add(planned.pieces)
+                .ok_or_else(|| invalid("SERIE_TOO_LARGE"))?;
+            components.push(cell.product_id);
+            kit_items.push(KitItem {
+                kit_product_id: input.kit_id,
+                component_product_id: cell.product_id,
+                unit_id: default_unit.id,
+                quantity_micro: baraka_domain::primitives::QtyMicro::from_micros(quantity_micro),
+            });
+        }
+        let stored: Vec<(ProductId, ProductId)> = self
+            .products
+            .get_all_kit_edges()?
+            .into_iter()
+            .filter(|(from, _)| *from != input.kit_id)
+            .collect();
+        validate_kit_edges(input.kit_id, &components, &stored)
+            .map_err(ApplicationError::Validation)?;
+        let mut shortfalls = Vec::new();
+        if let Some(warehouse_id) = input.warehouse_id {
+            for item in &kit_items {
+                let (component, _) = self
+                    .products
+                    .find_by_id(item.component_product_id)?
+                    .expect("component re-read");
+                let required = item
+                    .quantity_micro
+                    .micros()
+                    .checked_mul(i64::from(input.serie_count))
+                    .ok_or_else(|| invalid("SERIE_QTY_OVERFLOW"))?;
+                let on_hand = self
+                    .availability
+                    .component_on_hand(item.component_product_id, warehouse_id)?;
+                if on_hand < required {
+                    shortfalls.push(SerieShortfall {
+                        product_id: item.component_product_id,
+                        sku: component.sku.as_str().to_string(),
+                        required_micro: required,
+                        on_hand_micro: on_hand,
+                    });
+                }
+            }
+        }
+        self.products.define_kit(input.kit_id, &kit_items)?;
+        Ok(ComposeSerieOutput {
+            kit_id: input.kit_id,
+            component_count: kit_items.len(),
+            total_pieces,
+            shortfalls,
+        })
+    }
+}
+
+#[cfg(test)]
+mod serie_compose_tests {
+    use super::tests::{session, FakeMatrix, FakeProducts};
+    use super::*;
+    use baraka_domain::catalog::{ProductUnit, VariantCellId};
+    use baraka_domain::inventory::WarehouseId as WhId;
+    use baraka_domain::primitives::FactorMicro;
+    use std::sync::Mutex;
+
+    #[derive(Default)]
+    struct FakeAvailability {
+        levels: Mutex<HashMap<(ProductId, WhId), i64>>,
+    }
+
+    impl SerieAvailabilityPort for FakeAvailability {
+        fn component_on_hand(
+            &self,
+            product_id: ProductId,
+            warehouse_id: WhId,
+        ) -> Result<i64, ApplicationError> {
+            Ok(self
+                .levels
+                .lock()
+                .expect("levels")
+                .get(&(product_id, warehouse_id))
+                .copied()
+                .unwrap_or(0))
+        }
+    }
+
+    fn cell_product(products: &FakeProducts, sku: &str) -> ProductId {
+        let id = ProductId::new();
+        let unit = ProductUnit {
+            id: UnitId::new(),
+            product_id: id,
+            unit_name_ar: "قطعة".to_string(),
+            unit_name_fr: "Pièce".to_string(),
+            factor_micro: FactorMicro::from_micros(10_000),
+            barcode: None,
+            sale_price: Money::from_centimes(25_000),
+            purchase_price: Money::from_centimes(15_000),
+            wholesale_price: None,
+            super_gros_price: None,
+            is_base_unit: true,
+            is_default_selling: true,
+        };
+        products.products.lock().expect("products").insert(
+            id,
+            (
+                Product {
+                    id,
+                    sku: Sku::new(sku).expect("sku"),
+                    barcode: None,
+                    name_ar: sku.to_string(),
+                    name_fr: sku.to_string(),
+                    category_id: None,
+                    is_kit: false,
+                    is_active: true,
+                },
+                vec![unit],
+            ),
+        );
+        id
+    }
+
+    fn kit_header(products: &FakeProducts) -> ProductId {
+        let id = ProductId::new();
+        products.products.lock().expect("products").insert(
+            id,
+            (
+                Product {
+                    id,
+                    sku: Sku::new("SERIE-NOIR-2442").expect("sku"),
+                    barcode: None,
+                    name_ar: "سيرية نوار".to_string(),
+                    name_fr: "SERIE NOIR".to_string(),
+                    category_id: None,
+                    is_kit: true,
+                    is_active: true,
+                },
+                Vec::new(),
+            ),
+        );
+        id
+    }
+
+    fn model_with_cells(matrix: &FakeMatrix, cells: &[(ProductId, &str, &str)]) -> VariantModelId {
+        let model_id = VariantModelId::new();
+        matrix.models.lock().expect("models").insert(
+            model_id,
+            VariantModel {
+                id: model_id,
+                name_ar: "سيرية".to_string(),
+                name_fr: "SERIE".to_string(),
+                axis1_name: "Taille".to_string(),
+                axis2_name: "Couleur".to_string(),
+                category_id: None,
+                is_active: true,
+            },
+        );
+        matrix.cells.lock().expect("cells").insert(
+            model_id,
+            cells
+                .iter()
+                .enumerate()
+                .map(
+                    |(index, (product_id, axis1, axis2))| baraka_domain::catalog::VariantCell {
+                        id: VariantCellId::new(),
+                        model_id,
+                        product_id: *product_id,
+                        axis1_value: (*axis1).to_string(),
+                        axis2_value: (*axis2).to_string(),
+                        axis1_sort: index as i64,
+                        axis2_sort: 0,
+                    },
+                )
+                .collect(),
+        );
+        model_id
+    }
+
+    fn compose_input(kit_id: ProductId, model_id: VariantModelId) -> ComposeSerieInput {
+        ComposeSerieInput {
+            kit_id,
+            model_id,
+            axis2_value: "NOIR".to_string(),
+            lines: vec![
+                SerieLineInput {
+                    axis1_value: "M".to_string(),
+                    pieces: 2,
+                },
+                SerieLineInput {
+                    axis1_value: "L".to_string(),
+                    pieces: 4,
+                },
+                SerieLineInput {
+                    axis1_value: "XL".to_string(),
+                    pieces: 4,
+                },
+                SerieLineInput {
+                    axis1_value: "XXL".to_string(),
+                    pieces: 2,
+                },
+            ],
+            warehouse_id: None,
+            serie_count: 1,
+        }
+    }
+
+    #[test]
+    fn compose_persists_kit_graph_and_reports_tolerant_shortfalls() {
+        let products = FakeProducts::default();
+        let matrix = FakeMatrix::default();
+        let availability = FakeAvailability::default();
+        let kit_id = kit_header(&products);
+        let m = cell_product(&products, "CTN-100-M-NOIR");
+        let l = cell_product(&products, "CTN-100-L-NOIR");
+        let xl = cell_product(&products, "CTN-100-XL-NOIR");
+        let xxl = cell_product(&products, "CTN-100-XXL-NOIR");
+        let model_id = model_with_cells(
+            &matrix,
+            &[
+                (m, "M", "NOIR"),
+                (l, "L", "NOIR"),
+                (xl, "XL", "NOIR"),
+                (xxl, "XXL", "NOIR"),
+            ],
+        );
+        let warehouse = WhId::new();
+        // 2 séries: M needs 4×10_000=40_000 (has 1_000_000), L needs 80_000
+        // (has 10_000 → short), XL/XXL unchecked lines below cover exactness.
+        availability
+            .levels
+            .lock()
+            .expect("levels")
+            .insert((m, warehouse), 1_000_000);
+        availability
+            .levels
+            .lock()
+            .expect("levels")
+            .insert((l, warehouse), 10_000);
+        availability
+            .levels
+            .lock()
+            .expect("levels")
+            .insert((xl, warehouse), 80_000);
+        availability
+            .levels
+            .lock()
+            .expect("levels")
+            .insert((xxl, warehouse), 40_000);
+        let compose = ComposeSerieUseCase::new(&products, &matrix, &availability);
+        let mut input = compose_input(kit_id, model_id);
+        input.warehouse_id = Some(warehouse);
+        input.serie_count = 2;
+        let output = compose.execute(&session(), input).expect("composes");
+        assert_eq!(output.component_count, 4);
+        assert_eq!(output.total_pieces, 12);
+        assert_eq!(output.shortfalls.len(), 1, "only L runs short");
+        assert_eq!(output.shortfalls[0].product_id, l);
+        assert_eq!(output.shortfalls[0].required_micro, 80_000);
+        assert_eq!(output.shortfalls[0].on_hand_micro, 10_000);
+        // Tolerant: the kit graph persisted DESPITE the shortfall.
+        let stored = products.kits.lock().expect("kits");
+        let items = stored.get(&kit_id).expect("kit persisted");
+        assert_eq!(items.len(), 4);
+        let m_item = items
+            .iter()
+            .find(|item| item.component_product_id == m)
+            .expect("M");
+        assert_eq!(m_item.quantity_micro.micros(), 20_000);
+    }
+
+    #[test]
+    fn compose_rejects_structural_failures_with_nothing_persisted() {
+        let products = FakeProducts::default();
+        let matrix = FakeMatrix::default();
+        let availability = FakeAvailability::default();
+        let kit_id = kit_header(&products);
+        let m = cell_product(&products, "CTN-100-M-NOIR");
+        let model_id = model_with_cells(&matrix, &[(m, "M", "NOIR")]);
+        let compose = ComposeSerieUseCase::new(&products, &matrix, &availability);
+        // Unknown size.
+        let mut bad = compose_input(kit_id, model_id);
+        bad.lines.push(SerieLineInput {
+            axis1_value: "XXXL".to_string(),
+            pieces: 1,
+        });
+        assert!(compose.execute(&session(), bad).is_err());
+        // Non-kit header.
+        let bad = compose_input(m, model_id);
+        assert!(compose.execute(&session(), bad).is_err());
+        // Missing model.
+        let bad = compose_input(kit_id, VariantModelId::new());
+        assert!(compose.execute(&session(), bad).is_err());
+        // Zero serie count with a warehouse.
+        let mut bad = compose_input(kit_id, model_id);
+        bad.warehouse_id = Some(WhId::new());
+        bad.serie_count = 0;
+        assert!(compose.execute(&session(), bad).is_err());
+        assert!(
+            products.kits.lock().expect("kits").is_empty(),
+            "no kit graph on structural failure"
         );
     }
 }

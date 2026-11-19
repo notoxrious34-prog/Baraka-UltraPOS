@@ -320,3 +320,48 @@ export async function ipcMatrixView(
     request: { session_token: sessionToken, model_id: modelId },
   });
 }
+
+/** One série line: a first-axis value plus pieces per single série (BRK-115). */
+export interface SerieLineWire {
+  axis1_value: string;
+  pieces: number;
+}
+
+/** Série composition input (mirrors ComposeSerieDto). Micros as strings. */
+export interface ComposeSerieWire {
+  kit_id: string;
+  model_id: string;
+  axis2_value: string;
+  lines: SerieLineWire[];
+  warehouse_id: string | null;
+  serie_count: number;
+}
+
+/** One reported shortfall (mirrors SerieShortfallDto). */
+export interface SerieShortfallWire {
+  product_id: string;
+  sku: string;
+  required_micro: string;
+  on_hand_micro: string;
+}
+
+/** Série composition result: persisted kit plus the availability report (BRK-115). */
+export interface ComposeSerieResult {
+  kit_id: string;
+  component_count: number;
+  total_pieces: number;
+  shortfalls: SerieShortfallWire[];
+}
+
+/**
+ * Resolve a size run into a kit and report availability tolerantly.
+ * Rejects verbatim on bridge errors.
+ */
+export async function ipcComposeSerie(
+  sessionToken: string,
+  input: ComposeSerieWire,
+): Promise<ComposeSerieResult> {
+  return call<ComposeSerieResult>("catalog_compose_serie", {
+    request: { session_token: sessionToken, ...input },
+  });
+}

@@ -383,3 +383,57 @@ pub struct VariantMatrixViewRowDto {
     /// Default-selling unit price in centimes, if a default unit exists.
     pub sale_price_centimes: Option<String>,
 }
+
+/// One série line: a first-axis value plus pieces per single série (BRK-115).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerieLineDto {
+    /// First-axis value (`M`, `44`, `Ø18` …).
+    pub axis1_value: String,
+    /// Pieces of this size per single série.
+    pub pieces: u32,
+}
+
+/// Série composition request: resolve a size run on one color into a kit (BRK-115).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComposeSerieDto {
+    /// Authorizing session token (catalog managers only).
+    pub session_token: String,
+    /// Série header product id (UUID string, must carry `is_kit`).
+    pub kit_id: String,
+    /// Source variant-model id (UUID string).
+    pub model_id: String,
+    /// Second-axis value the série runs on (`NOIR` …).
+    pub axis2_value: String,
+    /// Size run (`2M + 4L + 4XL + 2XXL` …).
+    pub lines: Vec<SerieLineDto>,
+    /// Precheck warehouse id (UUID string, omit for structural-only compose).
+    pub warehouse_id: Option<String>,
+    /// How many séries the precheck covers (≥1 when a warehouse is given).
+    pub serie_count: u32,
+}
+
+/// One reported shortfall: required vs on-hand in base-unit micros (BRK-115).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerieShortfallDto {
+    /// Component product id (UUID string).
+    pub product_id: String,
+    /// Component SKU.
+    pub sku: String,
+    /// Required base micros, canonical string.
+    pub required_micro: String,
+    /// On-hand base micros in the precheck warehouse, canonical string.
+    pub on_hand_micro: String,
+}
+
+/// Série composition response: persisted kit plus the availability report (BRK-115).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComposeSerieResponseDto {
+    /// Série header product id (UUID string).
+    pub kit_id: String,
+    /// Persisted components.
+    pub component_count: usize,
+    /// Pieces per single série.
+    pub total_pieces: u32,
+    /// Shortfalls in the precheck warehouse (empty when sufficient or skipped).
+    pub shortfalls: Vec<SerieShortfallDto>,
+}

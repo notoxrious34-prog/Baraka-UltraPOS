@@ -15,6 +15,9 @@ use baraka_application::ports::{
     PrinterSettingsPort, PrinterTransportPort, SessionContext, SessionToken, StoreIdentityPort,
     StoredPayment, UpdateUserInput, UserRecord, UserRepository, WarehouseRepository,
 };
+use baraka_application::use_cases::studio_printing::{
+    PreviewStudioLabelUseCase, PrintStudioLabelUseCase, StudioLabelFields, StudioTemplate,
+};
 use baraka_application::use_cases::tspl_printing::{
     PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplCalibrationUseCase,
     PrintTsplLabelUseCase, PrintTsplTestTicketUseCase, PrintTsplTicketRulerUseCase,
@@ -1404,4 +1407,242 @@ fn ticket_zero_per_unit_discount_prints_no_badge() {
         "zero badge collapses, got:\n{text}"
     );
     assert!(text.contains("27.00"), "net total untouched, got:\n{text}");
+}
+
+// ── Label Studio (DSN-107): template-indexed silent prints to the LABEL
+// role — same fakes, same spooler-only gate, same zero-write contract.
+
+fn textile_retail_fields() -> StudioLabelFields<'static> {
+    StudioLabelFields {
+        line1: "COTON ML",
+        line2: "XL",
+        line3: "NOIR",
+        line4: "PACK 6 PCS",
+        hide_price: false,
+    }
+}
+
+fn hardware_fields() -> StudioLabelFields<'static> {
+    StudioLabelFields {
+        line1: "CHEVILLE MOLLY M8",
+        line2: "PCS",
+        line3: "O8X32MM",
+        line4: "",
+        hide_price: false,
+    }
+}
+
+#[test]
+fn studio_template_wire_parsing_is_pinned() {
+    assert_eq!(
+        StudioTemplate::from_wire("textile").expect("textile"),
+        StudioTemplate::Textile
+    );
+    assert_eq!(
+        StudioTemplate::from_wire("hardware").expect("hardware"),
+        StudioTemplate::Hardware
+    );
+    assert!(
+        StudioTemplate::from_wire("classic").is_err(),
+        "unknown template rejected LOUDLY"
+    );
+}
+
+#[test]
+fn studio_textile_retail_spools_price_and_reports_count() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let outcome = PrintStudioLabelUseCase::new(&settings, &transport)
+        .execute(
+            &session_with(Role::Caissier),
+            StudioTemplate::Textile,
+            &textile_retail_fields(),
+            Some(25_000),
+            "TXL001",
+            2,
+        )
+        .expect("spooler studio print");
+    let payloads = transport.payloads();
+    assert_eq!(payloads.len(), 1, "exactly one spooler submission");
+    assert_eq!(outcome.bytes_sent, payloads[0].len());
+    let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
+    assert!(text.starts_with("SIZE 40 mm, 20 mm\r\n"));
+    assert!(text.contains("\"COTON ML\""), "model F2");
+    assert!(text.contains("\"XL\""), "giant size");
+    assert!(
+        text.contains("\"250.00 DZD\""),
+        "kernel centimes transcribed"
+    );
+    assert!(
+        text.contains("BARCODE 59,126,\"128\",28,0,0,2,2,\"TXL001\""),
+        "bars y126 h28 pinned, got:\n{text}"
+    );
+    assert!(text.ends_with("PRINT 1,2\r\n"));
+}
+
+#[test]
+fn studio_textile_wholesale_hide_drops_the_price() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let fields = StudioLabelFields {
+        hide_price: true,
+        ..textile_retail_fields()
+    };
+    let outcome = PrintStudioLabelUseCase::new(&settings, &transport)
+        .execute(
+            &session_with(Role::Caissier),
+            StudioTemplate::Textile,
+            &fields,
+            None,
+            "TXL001",
+            1,
+        )
+        .expect("wholesale hide prints");
+    let payloads = transport.payloads();
+    let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
+    assert!(!text.contains("250"), "no price bytes ride");
+    assert!(text.contains("\"COTON ML\""), "model still prints");
+    assert_eq!(outcome.bytes_sent, payloads[0].len());
+}
+
+#[test]
+fn studio_hardware_spools_barcode_forward() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    PrintStudioLabelUseCase::new(&settings, &transport)
+        .execute(
+            &session_with(Role::Caissier),
+            StudioTemplate::Hardware,
+            &hardware_fields(),
+            Some(4_500),
+            "HW0001",
+            1,
+        )
+        .expect("spooler hardware print");
+    let payloads = transport.payloads();
+    let text = String::from_utf8(payloads[0].clone()).expect("ascii-clean TSPL");
+    assert!(
+        text.contains("BARCODE 59,16,\"128\",56,0,0,2,2,\"HW0001\""),
+        "hero bars y16 h56 pinned, got:\n{text}"
+    );
+    assert!(text.contains("\"CHEVILLE MOLLY M8\""), "designation");
+    assert!(text.contains("PCS · O8X32MM"), "unit + dimension compose");
+    assert!(text.contains("\"45.00 DZD\""), "price transcribed");
+    assert!(text.ends_with("PRINT 1,1\r\n"));
+}
+
+#[test]
+fn studio_preview_parity_print_bytes_equal_job_len() {
+    let settings = spooler();
+    let transport = FakeTransport::new();
+    let outcome = PrintStudioLabelUseCase::new(&settings, &transport)
+        .execute(
+            &session_with(Role::Caissier),
+            StudioTemplate::Textile,
+            &textile_retail_fields(),
+            Some(25_000),
+            "TXL001",
+            1,
+        )
+        .expect("single-copy studio print");
+    let preview = PreviewStudioLabelUseCase::new(&settings)
+        .execute(
+            &session_with(Role::Caissier),
+            StudioTemplate::Textile,
+            &textile_retail_fields(),
+            Some(25_000),
+            "TXL001",
+        )
+        .expect("studio preview");
+    assert_eq!(
+        outcome.bytes_sent, preview.job_len,
+        "DOC-03: the preview measures the printed job"
+    );
+    let slots: Vec<&str> = preview
+        .lines
+        .iter()
+        .map(|line| line.slot.as_str())
+        .collect();
+    assert_eq!(
+        slots,
+        vec![
+            "studio_model",
+            "studio_size",
+            "studio_color",
+            "studio_pack",
+            "studio_price"
+        ],
+        "wire spelling pinned"
+    );
+    assert_eq!((preview.barcode.x_dots, preview.barcode.y_dots), (59, 126));
+}
+
+#[test]
+fn studio_contradictions_reject_loudly_without_touching_the_queue() {
+    let settings = spooler();
+    // hide + shown price, hardware hide, missing price (both templates),
+    // negative price, zero copies. No unauthorized-role case: every role
+    // carries PosSell BY DESIGN (role.rs: Vendeur:121, Caissier:123,
+    // Gerant:138, Admin:169), so the label gate admits all four — the
+    // gate itself is proven by the Caissier-allowed paths above.
+    let hidden = StudioLabelFields {
+        hide_price: true,
+        ..textile_retail_fields()
+    };
+    for (template, fields, price, copies) in [
+        (StudioTemplate::Textile, hidden, Some(25_000), 1),
+        (StudioTemplate::Hardware, hidden, None, 1),
+        (StudioTemplate::Textile, textile_retail_fields(), None, 1),
+        (StudioTemplate::Hardware, hardware_fields(), None, 1),
+        (
+            StudioTemplate::Textile,
+            textile_retail_fields(),
+            Some(-100),
+            1,
+        ),
+        (
+            StudioTemplate::Textile,
+            textile_retail_fields(),
+            Some(25_000),
+            0,
+        ),
+    ] {
+        let transport = FakeTransport::new();
+        let before = transport.payloads().len();
+        let result = PrintStudioLabelUseCase::new(&settings, &transport).execute(
+            &session_with(Role::Caissier),
+            template,
+            &fields,
+            price,
+            "TXL001",
+            copies,
+        );
+        assert!(result.is_err(), "contradiction rejected: {template:?}");
+        assert_eq!(transport.payloads().len(), before, "queue untouched");
+    }
+    assert!(
+        StudioTemplate::from_wire("ticket").is_err(),
+        "unknown wire template"
+    );
+    // Non-spooler Label arm refuses before any render.
+    let serial = FakeSettings {
+        transport: "serial".to_string(),
+        media: TsplMediaSetup::default(),
+    };
+    let transport = FakeTransport::new();
+    let refused = PrintStudioLabelUseCase::new(&serial, &transport)
+        .execute(
+            &session_with(Role::Caissier),
+            StudioTemplate::Textile,
+            &textile_retail_fields(),
+            Some(25_000),
+            "TXL001",
+            1,
+        )
+        .expect_err("serial arm refused");
+    assert!(matches!(
+        refused,
+        ApplicationError::Validation(DomainError::TsplTransportRequiresSpooler)
+    ));
+    assert!(transport.payloads().is_empty(), "queue untouched");
 }

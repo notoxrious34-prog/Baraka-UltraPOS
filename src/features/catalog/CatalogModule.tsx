@@ -18,6 +18,7 @@ import type { CatalogMetricsDto } from "@/lib/ipc";
 import { ipcDeleteProduct, type DeleteEntityResult } from "@/lib/ipc";
 import { ipcGetPrinterSettings } from "@/lib/ipc";
 import { SilentLabelModal } from "@/features/catalog/SilentLabelModal";
+import { StudioLabelModal } from "@/features/catalog/StudioLabelModal";
 import { SafeDeleteModal } from "@/components/common/SafeDeleteModal";
 import { formatMoney, formatQty } from "@/lib/money";
 import type { CatalogProduct } from "@/types/pos";
@@ -268,6 +269,8 @@ export interface CatalogHubViewProps {
   onRefresh: () => void;
   onNew: () => void;
   onPrintLabel: (product: CatalogProduct) => void;
+  /** Studio entry (DSN-107): absent = no studio button (frozen non-spooler path untouched). */
+  onPrintStudioLabel?: (product: CatalogProduct) => void;
   onEdit: (product: CatalogProduct) => void;
   onDelete: (product: CatalogProduct) => void;
   onToggleActive: (product: CatalogProduct) => void;
@@ -650,6 +653,20 @@ export function CatalogHubView(props: CatalogHubViewProps): ReactElement {
                       >
                         🏷️
                       </button>
+                      {props.onPrintStudioLabel !== undefined && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            props.onPrintStudioLabel?.(product);
+                          }}
+                          aria-label={t(locale, "cat.printStudioLabel")}
+                          title={t(locale, "cat.printStudioLabel")}
+                          data-testid="catalog-studio-label"
+                          className="shrink-0 rounded-md bg-slate-200 px-2 py-1 text-xs font-black hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+                        >
+                          Studio
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={!canManage}
@@ -716,6 +733,7 @@ export function CatalogModule(): ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [labelProduct, setLabelProduct] = useState<CatalogProduct | null>(null);
+  const [studioProduct, setStudioProduct] = useState<CatalogProduct | null>(null);
   // Spooler transport owns the silent 40x20 TSPL modal; anything else keeps
   // the frozen dialog-bound label modal (entry point unchanged either way).
   const [spoolerMode, setSpoolerMode] = useState(false);
@@ -1013,6 +1031,7 @@ export function CatalogModule(): ReactElement {
           setIsCreateOpen(true);
         }}
         onPrintLabel={setLabelProduct}
+        onPrintStudioLabel={spoolerMode ? setStudioProduct : undefined}
         onEdit={setEditProduct}
         onDelete={setDeleteProduct}
         onToggleActive={toggleActive}
@@ -1041,6 +1060,16 @@ export function CatalogModule(): ReactElement {
           token={activeToken}
           onClose={() => {
             setLabelProduct(null);
+          }}
+        />
+      )}
+      {studioProduct !== null && spoolerMode && (
+        <StudioLabelModal
+          product={studioProduct}
+          isOpen
+          token={activeToken}
+          onClose={() => {
+            setStudioProduct(null);
           }}
         />
       )}

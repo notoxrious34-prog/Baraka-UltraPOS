@@ -38,7 +38,7 @@ function formatDisplayName(product: CatalogProduct, locale: Locale): string {
  * the domain rejects out-of-range copies loudly
  * (`TsplCopiesOutOfRange`, `tspl.rs:523`), so no silent misprint.
  * (TASK-DSN-101: AUD-049 Phase-1 documentation.) */
-function toIntOrNull(raw: string): number | null {
+export function toIntOrNull(raw: string): number | null {
   const trimmed = raw.trim();
   if (!/^\d+$/.test(trimmed)) {
     return null;

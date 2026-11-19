@@ -155,6 +155,98 @@ export async function ipcPreviewTsplLabel(
   };
 }
 
+/** Label Studio template selector (mirrors the StudioTemplate wire spelling). */
+export type StudioTemplate = 'textile' | 'hardware';
+
+/**
+ * Label Studio print input (mirrors StudioLabelRequest). Money never
+ * travels as a float: `priceCentimes` is a canonical centime string,
+ * `null` = wholesale price-hide (textile only — the backend rejects a
+ * shown price + hide flag, or a missing price, loudly).
+ */
+export interface StudioLabelJob {
+  template: StudioTemplate;
+  line1: string;
+  line2: string;
+  line3: string;
+  line4: string;
+  hidePrice: boolean;
+  priceCentimes: string | null;
+  barcode: string;
+  copies: number;
+}
+
+/** Silent studio-template print to the LABEL role (button-triggered, spooler only). */
+export async function ipcPrintTsplStudioLabel(
+  sessionToken: string,
+  job: StudioLabelJob,
+): Promise<number> {
+  const wire = await call<TsplPrintWire>('print_tspl_studio_label', {
+    request: {
+      session_token: sessionToken,
+      template: job.template,
+      line1: job.line1,
+      line2: job.line2,
+      line3: job.line3,
+      line4: job.line4,
+      hide_price: job.hidePrice,
+      price_centimes: job.priceCentimes,
+      barcode: job.barcode,
+      copies: job.copies,
+    },
+  });
+  return wire.bytes_sent;
+}
+
+/**
+ * Label Studio preview input (mirrors StudioLabelPreviewRequest —
+ * same fields as the print job minus copies, single-copy preview).
+ */
+export interface StudioLabelPreviewJob {
+  template: StudioTemplate;
+  line1: string;
+  line2: string;
+  line3: string;
+  line4: string;
+  hidePrice: boolean;
+  priceCentimes: string | null;
+  barcode: string;
+}
+
+/** Read-only studio plan (DOC-03) — the modal renders these lines verbatim. */
+export async function ipcPreviewTsplStudioLabel(
+  sessionToken: string,
+  job: StudioLabelPreviewJob,
+): Promise<TsplLabelPreview> {
+  const wire = await call<TsplLabelPreviewWire>('preview_tspl_studio_label', {
+    request: {
+      session_token: sessionToken,
+      template: job.template,
+      line1: job.line1,
+      line2: job.line2,
+      line3: job.line3,
+      line4: job.line4,
+      hide_price: job.hidePrice,
+      price_centimes: job.priceCentimes,
+      barcode: job.barcode,
+    },
+  });
+  return {
+    lines: wire.lines.map((line) => ({
+      slot: line.slot,
+      text: line.text,
+      x: line.x,
+      y: line.y,
+      cellH: line.cell_h,
+    })),
+    barcodeX: wire.barcode_x,
+    barcodeY: wire.barcode_y,
+    barcodeWidth: wire.barcode_width,
+    barcodeHeight: wire.barcode_height,
+    jobLen: wire.job_len,
+  };
+}
+
 /** Silent 80 mm ticket print (button-triggered, spooler only — never a dialog). */
 export async function ipcPrintTsplTicket(
   sessionToken: string,

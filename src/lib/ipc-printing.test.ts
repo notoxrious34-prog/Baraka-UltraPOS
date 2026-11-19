@@ -15,6 +15,8 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   getStoreIdentity,
   ipcPreviewTsplLabel,
+  ipcPreviewTsplStudioLabel,
+  ipcPrintTsplStudioLabel,
   ipcUpdatePrinterSettings,
   printingTestPrint,
   printingTestTsplCalibration,
@@ -406,5 +408,146 @@ describe("VT-04 updatePrinterSettings TSPL media (LIVE-2026-11-06)", () => {
     expect(settings.tsplSpeed).toBe(4);
     expect(settings.tsplOffsetXMm).toBe(1);
     expect(settings.tsplOffsetYMm).toBe(-1);
+  });
+});
+
+describe("VT-08 printTsplStudioLabel (DSN-107)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fakeTauriWindow();
+    primeSession();
+  });
+  afterEach(() => {
+    clearTauriWindow();
+  });
+
+  it("sends the studio print request with canonical money", async () => {
+    invokeMock.mockResolvedValueOnce({ bytes_sent: 412 });
+    const bytes = await ipcPrintTsplStudioLabel("tok-idn-1", {
+      template: "hardware",
+      line1: "CHEVILLE MOLLY M8",
+      line2: "PCS",
+      line3: "O8X32MM",
+      line4: "",
+      hidePrice: false,
+      priceCentimes: "4500",
+      barcode: "HW0001",
+      copies: 1,
+    });
+    expect(invokeMock).toHaveBeenCalledWith("print_tspl_studio_label", {
+      session_token: "tok-idn-1",
+      request: {
+        session_token: "tok-idn-1",
+        template: "hardware",
+        line1: "CHEVILLE MOLLY M8",
+        line2: "PCS",
+        line3: "O8X32MM",
+        line4: "",
+        hide_price: false,
+        price_centimes: "4500",
+        barcode: "HW0001",
+        copies: 1,
+      },
+    });
+    expect(bytes).toBe(412);
+  });
+
+  it("rides price null on wholesale hide (textile only)", async () => {
+    invokeMock.mockResolvedValueOnce({ bytes_sent: 388 });
+    await ipcPrintTsplStudioLabel("tok-idn-1", {
+      template: "textile",
+      line1: "COTON ML",
+      line2: "XL",
+      line3: "NOIR",
+      line4: "PACK 6 PCS",
+      hidePrice: true,
+      priceCentimes: null,
+      barcode: "TXL001",
+      copies: 2,
+    });
+    expect(invokeMock).toHaveBeenCalledWith(
+      "print_tspl_studio_label",
+      expect.objectContaining({
+        request: expect.objectContaining({ hide_price: true, price_centimes: null }),
+      }),
+    );
+  });
+
+  it("a validation error propagates as a typed code", async () => {
+    invokeMock.mockRejectedValueOnce("STUDIO_PRICE_REQUIRED");
+    await expect(
+      ipcPrintTsplStudioLabel("tok-idn-1", {
+        template: "textile",
+        line1: "COTON ML",
+        line2: "XL",
+        line3: "NOIR",
+        line4: "PACK 6 PCS",
+        hidePrice: false,
+        priceCentimes: null,
+        barcode: "TXL001",
+        copies: 1,
+      }),
+    ).rejects.toBe("STUDIO_PRICE_REQUIRED");
+  });
+});
+
+describe("VT-09 previewTsplStudioLabel (DSN-107, DOC-03)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fakeTauriWindow();
+    primeSession();
+  });
+  afterEach(() => {
+    clearTauriWindow();
+  });
+
+  it("sends the studio preview request and maps lines verbatim", async () => {
+    invokeMock.mockResolvedValueOnce({
+      lines: [
+        { slot: "studio_model", text: "COTON ML", x: 16, y: 16, cell_h: 20 },
+        { slot: "studio_size", text: "XL", x: 74, y: 40, cell_h: 48 },
+        { slot: "studio_color", text: "NOIR", x: 196, y: 44, cell_h: 12 },
+        { slot: "studio_pack", text: "PACK 6 PCS", x: 196, y: 60, cell_h: 12 },
+        { slot: "studio_price", text: "250.00 DZD", x: 16, y: 92, cell_h: 32 },
+      ],
+      barcode_x: 59,
+      barcode_y: 126,
+      barcode_width: 202,
+      barcode_height: 28,
+      job_len: 402,
+    });
+    const result = await ipcPreviewTsplStudioLabel("tok-idn-1", {
+      template: "textile",
+      line1: "COTON ML",
+      line2: "XL",
+      line3: "NOIR",
+      line4: "PACK 6 PCS",
+      hidePrice: false,
+      priceCentimes: "25000",
+      barcode: "TXL001",
+    });
+    expect(invokeMock).toHaveBeenCalledWith("preview_tspl_studio_label", {
+      session_token: "tok-idn-1",
+      request: {
+        session_token: "tok-idn-1",
+        template: "textile",
+        line1: "COTON ML",
+        line2: "XL",
+        line3: "NOIR",
+        line4: "PACK 6 PCS",
+        hide_price: false,
+        price_centimes: "25000",
+        barcode: "TXL001",
+      },
+    });
+    expect(result.lines).toHaveLength(5);
+    expect(result.lines[1]).toEqual({ slot: "studio_size", text: "XL", x: 74, y: 40, cellH: 48 });
+    expect(result).toMatchObject({
+      barcodeX: 59,
+      barcodeY: 126,
+      barcodeWidth: 202,
+      barcodeHeight: 28,
+      jobLen: 402,
+    });
   });
 });

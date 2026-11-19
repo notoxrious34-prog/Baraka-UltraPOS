@@ -68,6 +68,7 @@ pub mod common;
 pub mod label;
 pub mod media;
 pub mod probe;
+pub mod studio;
 pub mod ticket_model;
 pub mod ticket_plan;
 pub mod ticket_render;
@@ -86,6 +87,7 @@ pub(crate) use common::{
 pub use label::*;
 pub use media::*;
 pub use probe::*;
+pub use studio::*;
 pub use ticket_model::*;
 pub use ticket_plan::*;
 pub use ticket_render::*;

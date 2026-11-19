@@ -13,6 +13,7 @@ pub mod purchases;
 pub mod reports;
 pub mod returns;
 pub mod sales;
+pub mod studio_printing;
 pub mod suppliers;
 pub mod tspl_printing;
 pub mod users;

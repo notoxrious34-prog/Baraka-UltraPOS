@@ -14,16 +14,20 @@ use crate::errors::DomainError;
 
 /// 2 mm safe box on 40x20 mm (owner agreement L-margins): x 16..304.
 /// Everything prints inside; the die-cut edge never touches ink.
-const LABEL_SAFE_LEFT: i64 = 16;
-const LABEL_SAFE_WIDTH: i64 = 288;
+/// `pub(crate)`: the studio templates share the identical box (DOC-03
+/// single-sourced geometry — the preview reads the same origin).
+pub(crate) const LABEL_SAFE_LEFT: i64 = 16;
+pub(crate) const LABEL_SAFE_WIDTH: i64 = 288;
 /// Label Code128 bar height: 38 dots leaves a 2-dot gap to the human
 /// line at y=146 (bars 106..144, text 146..158, 2-dot bottom margin).
 const LABEL_BARCODE_HEIGHT: i64 = 38;
 /// Diacritic headroom for shaped Arabic (marks above/below the cell).
-const LABEL_BITMAP_PAD_DOTS: i64 = 4;
+/// `pub(crate)`: the studio templates size their bitmap boxes alike.
+pub(crate) const LABEL_BITMAP_PAD_DOTS: i64 = 4;
 
 /// Monospace cell width of a label TEXT face (DOC-06 containment checks).
-fn label_face_width_dots(font: &str, scale: i64) -> i64 {
+/// `pub(crate)`: shared with the studio templates (one face table).
+pub(crate) fn label_face_width_dots(font: &str, scale: i64) -> i64 {
     let cell = match font {
         // Native 32x48 face: same geometry as "3"x2 (see the old Price arm).
         "5" => FONT_3_W * 2,
@@ -38,7 +42,8 @@ fn label_face_width_dots(font: &str, scale: i64) -> i64 {
 
 /// Reject a calibration-shifted TEXT line that leaves the 320x160 media
 /// (DOC-06): a shift is a correction, never a silent clip.
-fn check_calibrated_text(
+/// `pub(crate)`: shared with the studio templates.
+pub(crate) fn check_calibrated_text(
     x_dots: i64,
     y_dots: i64,
     width_dots: i64,
@@ -57,6 +62,8 @@ fn check_calibrated_text(
 }
 
 /// Which TEXT line of the 40x20 label a bitmap replaces (PRT-02).
+/// Studio variants (DSN-107) are appended — existing discriminants never
+/// shift, so stored/derived slot indexes stay stable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LabelTextSlot {
     Brand,
@@ -65,7 +72,18 @@ pub enum LabelTextSlot {
     Price,
     Currency,
     Human,
+    StudioModel,
+    StudioSize,
+    StudioColor,
+    StudioPack,
+    StudioPrice,
+    StudioHwName,
+    StudioHwDim,
+    StudioHwPrice,
 }
+
+/// Slot universe size (bitmap-slot duplicate guards).
+pub(crate) const LABEL_TEXT_SLOT_COUNT: usize = 14;
 
 impl LabelTextSlot {
     /// Stable wire spelling for previews and logs (DOC-03).
@@ -78,6 +96,14 @@ impl LabelTextSlot {
             LabelTextSlot::Price => "price",
             LabelTextSlot::Currency => "currency",
             LabelTextSlot::Human => "human",
+            LabelTextSlot::StudioModel => "studio_model",
+            LabelTextSlot::StudioSize => "studio_size",
+            LabelTextSlot::StudioColor => "studio_color",
+            LabelTextSlot::StudioPack => "studio_pack",
+            LabelTextSlot::StudioPrice => "studio_price",
+            LabelTextSlot::StudioHwName => "studio_hw_name",
+            LabelTextSlot::StudioHwDim => "studio_hw_dim",
+            LabelTextSlot::StudioHwPrice => "studio_hw_price",
         }
     }
 }
@@ -243,7 +269,11 @@ pub fn label_text_needs_bitmap(content: &str, probe: TsplProbeMode) -> bool {
 /// diagnostic probe. French accents ride `CODEPAGE UTF-8` (built-in
 /// glyphs); Arabic/CJK/emoji have no printer glyphs and must travel as
 /// a bitmap — failing LOUDLY here instead of a dead label.
-fn check_label_text_printable(content: &str, probe: TsplProbeMode) -> Result<(), DomainError> {
+/// `pub(crate)`: shared with the studio templates.
+pub(crate) fn check_label_text_printable(
+    content: &str,
+    probe: TsplProbeMode,
+) -> Result<(), DomainError> {
     if probe == TsplProbeMode::NoCodepage {
         return Ok(());
     }
@@ -262,6 +292,119 @@ fn check_label_text_printable(content: &str, probe: TsplProbeMode) -> Result<(),
             "LABEL_TEXT_UNPRINTABLE".to_string(),
         ))
     }
+}
+
+/// Emit one planned TEXT line into the job — a `BITMAP` chunk when the
+/// slot carries a raster (PRT-02 Arabic/CJK path, bottom-aligned to the
+/// TEXT cell), otherwise the plain `TEXT` command. One emission path for
+/// the classic and studio renderers (DSN-107): the preview, the plain
+/// and the mixed jobs all share it, so byte-identity is structural.
+/// `pub(crate)`: the studio templates call it per planned line.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn emit_label_plan_line(
+    job: &mut Vec<u8>,
+    line: &LabelTextLine,
+    font: &str,
+    scale: i64,
+    bitmaps: &[(LabelTextSlot, LabelBitmap)],
+    probe: TsplProbeMode,
+    dx: i64,
+    dy: i64,
+) -> Result<(), DomainError> {
+    let invalid = |name: &str| DomainError::InvalidCanonicalString(name.to_string());
+    if let Some((_, raster)) = bitmaps.iter().find(|(slot, _)| slot == &line.slot) {
+        if raster.data.len() != raster.width_bytes * raster.height_rows {
+            return Err(invalid("LABEL_BITMAP_LENGTH_MISMATCH"));
+        }
+        if raster.width_bytes == 0 || raster.height_rows == 0 {
+            return Err(invalid("BITMAP_DIMENSIONS_MUST_BE_POSITIVE"));
+        }
+        if raster
+            .width_bytes
+            .checked_mul(8)
+            .filter(|dots| *dots <= BITMAP_MAX_WIDTH_DOTS)
+            .is_none()
+        {
+            return Err(invalid("BITMAP_WIDTH_TOO_WIDE"));
+        }
+        if raster.height_rows > BITMAP_MAX_HEIGHT_DOTS {
+            return Err(invalid("BITMAP_TOO_TALL"));
+        }
+        if raster.data.iter().all(|byte| *byte == 0x00)
+            || raster.data.iter().all(|byte| *byte == 0xFF)
+        {
+            return Err(invalid("BITMAP_BLANK_IMAGE"));
+        }
+        let width_dots =
+            i64::try_from(raster.width_bytes * 8).map_err(|_| invalid("BITMAP_TOO_LARGE"))?;
+        let height_dots =
+            i64::try_from(raster.height_rows).map_err(|_| invalid("BITMAP_TOO_LARGE"))?;
+        if width_dots > line.box_w_dots || height_dots > line.box_h_dots {
+            return Err(invalid("LABEL_BITMAP_EXCEEDS_SLOT"));
+        }
+        // Bottom-align to the TEXT cell (taller rasters grow upward).
+        let bitmap_y = line.y_dots + line.cell_h_dots - height_dots;
+        let (sx, sby) = (line.x_dots + dx, bitmap_y + dy);
+        if sx < 0
+            || sby < 0
+            || sx + width_dots > LABEL_WIDTH_DOTS
+            || sby + height_dots > LABEL_HEIGHT_DOTS
+        {
+            return Err(invalid("LABEL_CALIBRATION_OUT_OF_AREA"));
+        }
+        job.extend_from_slice(
+            format!(
+                "BITMAP {},{},{},{},0,",
+                sx, sby, raster.width_bytes, raster.height_rows
+            )
+            .as_bytes(),
+        );
+        job.extend_from_slice(&raster.data);
+        job.extend_from_slice(b"\r\n");
+    } else {
+        check_label_text_printable(&line.text, probe)?;
+        let mut text_out: Vec<String> = Vec::new();
+        let (sx, sy) = (line.x_dots + dx, line.y_dots + dy);
+        let width_dots = i64::try_from(line.text.chars().count()).unwrap_or(i64::MAX)
+            * label_face_width_dots(font, scale);
+        check_calibrated_text(sx, sy, width_dots, line.cell_h_dots)?;
+        push_text(&mut text_out, sx, sy, font, scale, &line.text, probe);
+        job.extend_from_slice(text_out.join("\r\n").as_bytes());
+        job.extend_from_slice(b"\r\n");
+    }
+    Ok(())
+}
+
+/// Emit the centered Code128 symbol plus the `PRINT 1,n` trailer (one
+/// path for classic + studio; the symbol always spools, decoupled from
+/// any currency row). `pub(crate)`: the studio templates finish alike.
+pub(crate) fn finish_label_job(
+    job: &mut Vec<u8>,
+    geometry: &LabelBarcodeGeometry,
+    barcode_sanitized: &str,
+    copies: u32,
+    dx: i64,
+    dy: i64,
+) -> Result<(), DomainError> {
+    let (sbx, sby) = (geometry.x_dots + dx, geometry.y_dots + dy);
+    if sbx < 0
+        || sby < 0
+        || sbx + geometry.width_dots > LABEL_WIDTH_DOTS
+        || sby + geometry.height_dots > LABEL_HEIGHT_DOTS
+    {
+        return Err(DomainError::InvalidCanonicalString(
+            "LABEL_CALIBRATION_OUT_OF_AREA".to_string(),
+        ));
+    }
+    job.extend_from_slice(
+        format!(
+            "BARCODE {sbx},{sby},\"128\",{},0,0,2,2,\"{barcode_sanitized}\"\r\n",
+            geometry.height_dots
+        )
+        .as_bytes(),
+    );
+    job.extend_from_slice(format!("PRINT 1,{copies}\r\n").as_bytes());
+    Ok(())
 }
 
 /// Render the 40x20 mm label. Exact bytes are pinned in module tests.
@@ -296,7 +439,7 @@ pub fn render_label_40x20_mixed(
         return Err(DomainError::TsplBarcodeTooWide);
     }
     let code = |name: &str| DomainError::InvalidCanonicalString(name.to_string());
-    let mut seen = [false; 6];
+    let mut seen = [false; LABEL_TEXT_SLOT_COUNT];
     for (slot, _) in bitmaps {
         let index = *slot as usize;
         if seen[index] {
@@ -307,7 +450,6 @@ pub fn render_label_40x20_mixed(
     let barcode = sanitize_tspl_text(label.barcode);
     // Single-sourced geometry (DOC-03): the preview reads the same origin.
     let geometry = label_barcode_geometry(label.barcode)?;
-    let (bx, by, bh) = (geometry.x_dots, geometry.y_dots, geometry.height_dots);
     let probe = label.media.probe_mode;
     // DOC-06: software calibration — every emitted coordinate below is
     // shifted; zero keeps the goldens byte-identical.
@@ -317,87 +459,20 @@ pub fn render_label_40x20_mixed(
     let mut job: Vec<u8> = head.join("\r\n").into_bytes();
     job.extend_from_slice(b"\r\n");
     for line in &label_text_plan(label) {
-        if let Some((_, raster)) = bitmaps.iter().find(|(slot, _)| slot == &line.slot) {
-            if raster.data.len() != raster.width_bytes * raster.height_rows {
-                return Err(code("LABEL_BITMAP_LENGTH_MISMATCH"));
-            }
-            if raster.width_bytes == 0 || raster.height_rows == 0 {
-                return Err(code("BITMAP_DIMENSIONS_MUST_BE_POSITIVE"));
-            }
-            if raster
-                .width_bytes
-                .checked_mul(8)
-                .filter(|dots| *dots <= BITMAP_MAX_WIDTH_DOTS)
-                .is_none()
-            {
-                return Err(code("BITMAP_WIDTH_TOO_WIDE"));
-            }
-            if raster.height_rows > BITMAP_MAX_HEIGHT_DOTS {
-                return Err(code("BITMAP_TOO_TALL"));
-            }
-            if raster.data.iter().all(|byte| *byte == 0x00)
-                || raster.data.iter().all(|byte| *byte == 0xFF)
-            {
-                return Err(code("BITMAP_BLANK_IMAGE"));
-            }
-            let width_dots =
-                i64::try_from(raster.width_bytes * 8).map_err(|_| code("BITMAP_TOO_LARGE"))?;
-            let height_dots =
-                i64::try_from(raster.height_rows).map_err(|_| code("BITMAP_TOO_LARGE"))?;
-            if width_dots > line.box_w_dots || height_dots > line.box_h_dots {
-                return Err(code("LABEL_BITMAP_EXCEEDS_SLOT"));
-            }
-            // Bottom-align to the TEXT cell (taller rasters grow upward).
-            let bitmap_y = line.y_dots + line.cell_h_dots - height_dots;
-            let (sx, sby) = (line.x_dots + dx, bitmap_y + dy);
-            if sx < 0
-                || sby < 0
-                || sx + width_dots > LABEL_WIDTH_DOTS
-                || sby + height_dots > LABEL_HEIGHT_DOTS
-            {
-                return Err(code("LABEL_CALIBRATION_OUT_OF_AREA"));
-            }
-            job.extend_from_slice(
-                format!(
-                    "BITMAP {},{},{},{},0,",
-                    sx, sby, raster.width_bytes, raster.height_rows
-                )
-                .as_bytes(),
-            );
-            job.extend_from_slice(&raster.data);
-            job.extend_from_slice(b"\r\n");
-        } else {
-            check_label_text_printable(&line.text, probe)?;
-            let mut text_out: Vec<String> = Vec::new();
-            let (font, scale) = match line.slot {
-                LabelTextSlot::Brand | LabelTextSlot::Currency | LabelTextSlot::Human => ("1", 1),
-                LabelTextSlot::NameLine1 | LabelTextSlot::NameLine2 => ("2", 1),
-                // Redesign price: native 24x32 face (agreement L2).
-                LabelTextSlot::Price => ("4", 1),
-            };
-            let (sx, sy) = (line.x_dots + dx, line.y_dots + dy);
-            let width_dots = i64::try_from(line.text.chars().count()).unwrap_or(i64::MAX)
-                * label_face_width_dots(font, scale);
-            check_calibrated_text(sx, sy, width_dots, line.cell_h_dots)?;
-            push_text(&mut text_out, sx, sy, font, scale, &line.text, probe);
-            job.extend_from_slice(text_out.join("\r\n").as_bytes());
-            job.extend_from_slice(b"\r\n");
-        }
+        let (font, scale) = match line.slot {
+            LabelTextSlot::Brand | LabelTextSlot::Currency | LabelTextSlot::Human => ("1", 1),
+            LabelTextSlot::NameLine1 | LabelTextSlot::NameLine2 => ("2", 1),
+            // Redesign price: native 24x32 face (agreement L2).
+            LabelTextSlot::Price => ("4", 1),
+            // Studio slots never occur in the classic plan — LOUD, never a
+            // silent wrong face.
+            _ => return Err(code("LABEL_UNKNOWN_SLOT")),
+        };
+        emit_label_plan_line(&mut job, line, font, scale, bitmaps, probe, dx, dy)?;
     }
     // The symbol always spools (agreement L5: centered, quiet-zoned,
     // decoupled from the currency row).
-    let (sbx, sby) = (bx + dx, by + dy);
-    if sbx < 0
-        || sby < 0
-        || sbx + geometry.width_dots > LABEL_WIDTH_DOTS
-        || sby + geometry.height_dots > LABEL_HEIGHT_DOTS
-    {
-        return Err(code("LABEL_CALIBRATION_OUT_OF_AREA"));
-    }
-    job.extend_from_slice(
-        format!("BARCODE {sbx},{sby},\"128\",{bh},0,0,2,2,\"{barcode}\"\r\n").as_bytes(),
-    );
-    job.extend_from_slice(format!("PRINT 1,{}\r\n", label.copies).as_bytes());
+    finish_label_job(&mut job, &geometry, &barcode, label.copies, dx, dy)?;
     Ok(job)
 }
 

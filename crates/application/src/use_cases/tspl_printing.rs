@@ -46,7 +46,8 @@ pub struct TsplPrintOutcome {
 /// Reject unless the print ROLE's arm points at the spooler (TSPL is
 /// spooler-only; the serial arm cannot take TSPL bytes). BRK-113: the gate
 /// reads the role arm, not the legacy global.
-fn require_role_spooler<P>(settings: &P, role: PrintRole) -> Result<(), ApplicationError>
+/// `pub(crate)`: the studio renderer gates through the same arm.
+pub(crate) fn require_role_spooler<P>(settings: &P, role: PrintRole) -> Result<(), ApplicationError>
 where
     P: PrinterSettingsPort + ?Sized,
 {
@@ -66,7 +67,8 @@ where
 
 /// Load the stored TSPL media setup (defaults when keys are absent; the
 /// renderer re-validates — out-of-range stored values reject loudly there).
-fn media_from_settings<P>(settings: &P) -> Result<TsplMediaSetup, ApplicationError>
+/// `pub(crate)`: the studio renderer reads the same stored media.
+pub(crate) fn media_from_settings<P>(settings: &P) -> Result<TsplMediaSetup, ApplicationError>
 where
     P: PrinterSettingsPort + ?Sized,
 {
@@ -82,6 +84,45 @@ where
         offset_y_mm: stored.tspl_offset_y_mm,
         probe_mode,
     })
+}
+
+/// Rasterize every non-Latin TEXT line of a label plan (PRT-02 shared
+/// path — classic + studio print/preview all ride it, so the mixed job
+/// the preview measures is the job the printer eats). Without a rasterer
+/// attached nothing is rasterized here; the plan's own render then
+/// rejects LOUDLY instead of previewing a job the printer would eat.
+/// `pub(crate)`: the studio use cases share it.
+pub(crate) fn rasterize_label_plan<R>(
+    raster: &R,
+    plan: &[baraka_domain::printing::LabelTextLine],
+    probe: baraka_domain::printing::TsplProbeMode,
+) -> Result<Vec<(LabelTextSlot, LabelBitmap)>, ApplicationError>
+where
+    R: TsplLabelRasterPort + ?Sized,
+{
+    let mut bitmaps: Vec<(LabelTextSlot, LabelBitmap)> = Vec::new();
+    for line in plan {
+        if !baraka_domain::printing::label_text_needs_bitmap(&line.text, probe) {
+            continue;
+        }
+        let rastered = raster.rasterize_label_text(
+            &line.text,
+            line.cell_h_dots as f32,
+            u32::try_from(line.box_w_dots)
+                .map_err(|_| ApplicationError::Port("TSPL_LABEL_BOX_TOO_WIDE".to_string()))?,
+            u32::try_from(line.box_h_dots)
+                .map_err(|_| ApplicationError::Port("TSPL_LABEL_BOX_TOO_TALL".to_string()))?,
+        )?;
+        bitmaps.push((
+            line.slot,
+            LabelBitmap {
+                width_bytes: rastered.width_bytes,
+                height_rows: rastered.height_rows,
+                data: rastered.data,
+            },
+        ));
+    }
+    Ok(bitmaps)
 }
 
 /// Silent 40x20 mm shelf-label print (brand + name + price + Code128).
@@ -168,36 +209,13 @@ where
             copies,
             media,
         };
-        let bytes = if label_text_plan(&label)
+        let plan = label_text_plan(&label);
+        let bytes = if plan
             .iter()
             .any(|line| label_text_needs_bitmap(&line.text, label.media.probe_mode))
         {
-            // PRT-02: at least one slot needs pixels — rasterize each
-            // non-Latin line at its TEXT cell size and emit the mixed job.
-            let mut bitmaps: Vec<(LabelTextSlot, LabelBitmap)> = Vec::new();
-            for line in label_text_plan(&label) {
-                if !label_text_needs_bitmap(&line.text, label.media.probe_mode) {
-                    continue;
-                }
-                let raster = self.label_raster.rasterize_label_text(
-                    &line.text,
-                    line.cell_h_dots as f32,
-                    u32::try_from(line.box_w_dots).map_err(|_| {
-                        ApplicationError::Port("TSPL_LABEL_BOX_TOO_WIDE".to_string())
-                    })?,
-                    u32::try_from(line.box_h_dots).map_err(|_| {
-                        ApplicationError::Port("TSPL_LABEL_BOX_TOO_TALL".to_string())
-                    })?,
-                )?;
-                bitmaps.push((
-                    line.slot,
-                    LabelBitmap {
-                        width_bytes: raster.width_bytes,
-                        height_rows: raster.height_rows,
-                        data: raster.data,
-                    },
-                ));
-            }
+            // PRT-02: at least one slot needs pixels — shared raster path.
+            let bitmaps = rasterize_label_plan(self.label_raster, &plan, label.media.probe_mode)?;
             render_label_40x20_mixed(&label, &bitmaps)?
         } else {
             render_label_40x20(&label)?
@@ -319,30 +337,9 @@ where
             .iter()
             .any(|line| label_text_needs_bitmap(&line.text, label.media.probe_mode));
         let job = if needs_bitmap {
-            let mut bitmaps: Vec<(LabelTextSlot, LabelBitmap)> = Vec::new();
-            for line in &plan {
-                if !label_text_needs_bitmap(&line.text, label.media.probe_mode) {
-                    continue;
-                }
-                let raster = self.preview_raster.rasterize_label_text(
-                    &line.text,
-                    line.cell_h_dots as f32,
-                    u32::try_from(line.box_w_dots).map_err(|_| {
-                        ApplicationError::Port("TSPL_LABEL_BOX_TOO_WIDE".to_string())
-                    })?,
-                    u32::try_from(line.box_h_dots).map_err(|_| {
-                        ApplicationError::Port("TSPL_LABEL_BOX_TOO_TALL".to_string())
-                    })?,
-                )?;
-                bitmaps.push((
-                    line.slot,
-                    LabelBitmap {
-                        width_bytes: raster.width_bytes,
-                        height_rows: raster.height_rows,
-                        data: raster.data,
-                    },
-                ));
-            }
+            // PRT-02: shared raster path — the preview measures the job
+            // the printer eats.
+            let bitmaps = rasterize_label_plan(self.preview_raster, &plan, label.media.probe_mode)?;
             render_label_40x20_mixed(&label, &bitmaps)?
         } else {
             render_label_40x20(&label)?

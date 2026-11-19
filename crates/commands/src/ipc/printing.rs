@@ -8,6 +8,9 @@ use baraka_application::use_cases::printing::{
     UpdatePrinterSettingsUseCase, UpdateTsplMediaSettingsUseCase,
 };
 use baraka_application::use_cases::sales::{GetFiscalSettingsUseCase, UpdateFiscalSettingsUseCase};
+use baraka_application::use_cases::studio_printing::{
+    PreviewStudioLabelUseCase, PrintStudioLabelUseCase, StudioLabelFields, StudioTemplate,
+};
 use baraka_application::use_cases::tspl_printing::{
     PreviewTsplLabelUseCase, PrintRawBitmapUseCase, PrintTsplCalibrationUseCase,
     PrintTsplLabelUseCase, PrintTsplTestLabelUseCase, PrintTsplTestTicketUseCase,
@@ -18,11 +21,11 @@ use baraka_domain::role::Permission;
 use crate::dto::{
     DecodeSummaryDto, FiscalSettingsDto, PreviewLineDto, PrintStatusResponse, PrinterSettingsDto,
     RawBitmapRequest, ReprintRequest, ReprintResponse, SaveStoreIdentityRequest,
-    SaveVerticalProfileRequest, StoreIdentityDto, StoreIdentityResponse, TestPrintRequest,
-    TestPrintResponse, TsplCalibrationRequest, TsplLabelPreviewRequest, TsplLabelPreviewResponse,
-    TsplLabelRequest, TsplPreviewLineDto, TsplPrintResponse, TsplTestLabelRequest,
-    TsplTestTicketRequest, TsplTicketRequest, UpdateFiscalSettingsRequestDto,
-    UpdatePrinterSettingsRequest, VerticalProfileResponse,
+    SaveVerticalProfileRequest, StoreIdentityDto, StoreIdentityResponse, StudioLabelPreviewRequest,
+    StudioLabelRequest, TestPrintRequest, TestPrintResponse, TsplCalibrationRequest,
+    TsplLabelPreviewRequest, TsplLabelPreviewResponse, TsplLabelRequest, TsplPreviewLineDto,
+    TsplPrintResponse, TsplTestLabelRequest, TsplTestTicketRequest, TsplTicketRequest,
+    UpdateFiscalSettingsRequestDto, UpdatePrinterSettingsRequest, VerticalProfileResponse,
 };
 
 /// `documents_get_print_status` command: latest outbox state for a document.
@@ -132,6 +135,103 @@ pub fn preview_tspl_label(
         request.barcode.trim(),
     )
     .map_err(|error| error_code(&error))?;
+    Ok(TsplLabelPreviewResponse {
+        lines: preview
+            .lines
+            .into_iter()
+            .map(|line| TsplPreviewLineDto {
+                slot: line.slot.as_str().to_string(),
+                text: line.text,
+                x: line.x_dots,
+                y: line.y_dots,
+                cell_h: line.cell_h_dots,
+            })
+            .collect(),
+        barcode_x: preview.barcode.x_dots,
+        barcode_y: preview.barcode.y_dots,
+        barcode_width: preview.barcode.width_dots,
+        barcode_height: preview.barcode.height_dots,
+        job_len: preview.job_len,
+    })
+}
+
+/// `print_tspl_studio_label` command (DSN-107): silent studio-template
+/// print to the LABEL role — button-triggered only, spooler only, no
+/// dialog. The price travels as canonical centime string (`None` =
+/// wholesale hide, textile only); contradictions reject LOUDLY.
+#[tauri::command(rename_all = "snake_case")]
+pub fn print_tspl_studio_label(
+    state: tauri::State<'_, AppState>,
+    request: StudioLabelRequest,
+) -> Result<TsplPrintResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let template =
+        StudioTemplate::from_wire(&request.template).map_err(|error| error_code(&error))?;
+    let price_centimes = request
+        .price_centimes
+        .as_deref()
+        .map(|raw| parse_wire_int(raw, "price_centimes"))
+        .transpose()
+        .map_err(|error| error_code(&error))?;
+    let outcome = PrintStudioLabelUseCase::new(
+        state.printer_settings.as_ref(),
+        state.printer_transport.as_ref(),
+    )
+    .with_label_raster(state.label_raster.as_ref())
+    .execute(
+        &session,
+        template,
+        &StudioLabelFields {
+            line1: request.line1.trim(),
+            line2: request.line2.trim(),
+            line3: request.line3.trim(),
+            line4: request.line4.trim(),
+            hide_price: request.hide_price,
+        },
+        price_centimes,
+        request.barcode.trim(),
+        request.copies,
+    )
+    .map_err(|error| error_code(&error))?;
+    Ok(TsplPrintResponse {
+        bytes_sent: outcome.bytes_sent,
+    })
+}
+
+/// `preview_tspl_studio_label` command (DSN-107): read-only studio plan
+/// (DOC-03) — same construction as the studio print path (`DZD`, stored
+/// media, Label role untouched), single copy. The modal renders these
+/// lines instead of its own strings.
+#[tauri::command(rename_all = "snake_case")]
+pub fn preview_tspl_studio_label(
+    state: tauri::State<'_, AppState>,
+    request: StudioLabelPreviewRequest,
+) -> Result<TsplLabelPreviewResponse, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let template =
+        StudioTemplate::from_wire(&request.template).map_err(|error| error_code(&error))?;
+    let price_centimes = request
+        .price_centimes
+        .as_deref()
+        .map(|raw| parse_wire_int(raw, "price_centimes"))
+        .transpose()
+        .map_err(|error| error_code(&error))?;
+    let preview = PreviewStudioLabelUseCase::new(state.printer_settings.as_ref())
+        .with_preview_raster(state.label_raster.as_ref())
+        .execute(
+            &session,
+            template,
+            &StudioLabelFields {
+                line1: request.line1.trim(),
+                line2: request.line2.trim(),
+                line3: request.line3.trim(),
+                line4: request.line4.trim(),
+                hide_price: request.hide_price,
+            },
+            price_centimes,
+            request.barcode.trim(),
+        )
+        .map_err(|error| error_code(&error))?;
     Ok(TsplLabelPreviewResponse {
         lines: preview
             .lines

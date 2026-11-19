@@ -74,6 +74,56 @@ pub struct TsplLabelPreviewRequest {
     pub barcode: String,
 }
 
+/// Label Studio print request (DSN-107): template-indexed lines.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StudioLabelRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Template selector (`"textile"` | `"hardware"`).
+    pub template: String,
+    /// Model (textile) | designation (hardware).
+    pub line1: String,
+    /// Size (textile) | sale unit (hardware).
+    pub line2: String,
+    /// Color (textile) | dimension, `""` = absent (hardware).
+    pub line3: String,
+    /// Pack badge (textile; ignored by hardware).
+    pub line4: String,
+    /// Wholesale price-hide (textile only; hardware rejects it).
+    pub hide_price: bool,
+    /// Selling price in integer centimes (canonical string); `None` =
+    /// wholesale hide (textile only).
+    pub price_centimes: Option<String>,
+    /// Code128 payload (SKU/barcode).
+    pub barcode: String,
+    /// Copies, 1..=99 (enforced in PRINT m,n, never by resending).
+    pub copies: u32,
+}
+
+/// Label Studio preview request (DSN-107): same fields, single copy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StudioLabelPreviewRequest {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Template selector (`"textile"` | `"hardware"`).
+    pub template: String,
+    /// Model (textile) | designation (hardware).
+    pub line1: String,
+    /// Size (textile) | sale unit (hardware).
+    pub line2: String,
+    /// Color (textile) | dimension, `""` = absent (hardware).
+    pub line3: String,
+    /// Pack badge (textile; ignored by hardware).
+    pub line4: String,
+    /// Wholesale price-hide (textile only; hardware rejects it).
+    pub hide_price: bool,
+    /// Selling price in integer centimes (canonical string); `None` =
+    /// wholesale hide (textile only).
+    pub price_centimes: Option<String>,
+    /// Code128 payload (SKU/barcode).
+    pub barcode: String,
+}
+
 /// One engine preview line (DOC-03): exact text the renderer would
 /// spool, TEXT origin, printer cell — the modal renders these in order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

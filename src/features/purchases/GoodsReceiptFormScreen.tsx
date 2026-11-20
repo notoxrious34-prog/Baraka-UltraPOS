@@ -8,7 +8,7 @@ import { useEffect, useState, type ReactElement } from "react";
 import { t, translateBackendError } from "@/lib/i18n";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { useSessionStore } from "@/stores/session-store";
-import { ipcReceiveGoods } from "@/lib/ipc";
+import { ipcPreviewReceiveDeviations, ipcReceiveGoods, type ReceiveDeviation } from "@/lib/ipc";
 import { formatMoney, newCommandId } from "@/lib/money";
 import type { PurchaseDocumentView } from "@/types/supplier";
 import { toLineInputs, type PurchaseRow } from "@/lib/purchase-lines";
@@ -29,7 +29,9 @@ export function GoodsReceiptFormScreen({ token, supplierId }: Props): ReactEleme
   const [bcId, setBcId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deviations, setDeviations] = useState<ReceiveDeviation[] | null>(null);
   const [done, setDone] = useState<PurchaseDocumentView | null>(null);
 
   useEffect(() => {
@@ -40,6 +42,29 @@ export function GoodsReceiptFormScreen({ token, supplierId }: Props): ReactEleme
 
   const resolvedSupplier = supplierId ?? pasted.trim();
   const activeWarehouse = warehouseId !== "" ? warehouseId : (defaultWarehouse?.id ?? "");
+
+  const preview = async (): Promise<void> => {
+    if (previewBusy) {
+      return;
+    }
+    const lines = toLineInputs(rows);
+    if (lines === null) {
+      setError("PURCHASE_LINE_QUANTITY_INVALID");
+      return;
+    }
+    setPreviewBusy(true);
+    setError(null);
+    try {
+      // Advisory only: threshold 1000 bps = 10% over last + 90-day average.
+      setDeviations(await ipcPreviewReceiveDeviations(token, lines, 1000));
+    } catch (failure: unknown) {
+      setError(typeof failure === "string" ? failure : "INTERNAL_ERROR");
+    } finally {
+      setPreviewBusy(false);
+    }
+  };
+
+  const flagged = deviations === null ? [] : deviations.filter((line) => line.flagged);
 
   const submit = async (): Promise<void> => {
     if (busy) {
@@ -71,6 +96,7 @@ export function GoodsReceiptFormScreen({ token, supplierId }: Props): ReactEleme
       );
       setDone(view);
       setRows([]);
+      setDeviations(null);
     } catch (failure: unknown) {
       setError(typeof failure === "string" ? failure : "INTERNAL_ERROR");
     } finally {
@@ -124,6 +150,37 @@ export function GoodsReceiptFormScreen({ token, supplierId }: Props): ReactEleme
           {t(locale, "pur.created")}: <span className="font-mono">{done.number}</span> ·{" "}
           {done.status} · {formatMoney(done.totalCentimes, locale)}
         </p>
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          void preview();
+        }}
+        disabled={previewBusy || rows.length === 0}
+        className="h-9 rounded-lg border border-amber-500 text-xs font-black text-amber-700 hover:bg-amber-50 disabled:opacity-40 dark:text-amber-300 dark:hover:bg-amber-900/20"
+      >
+        {previewBusy ? t(locale, "pur.submitting") : t(locale, "pur.checkCosts")}
+      </button>
+      {deviations !== null && flagged.length === 0 && (
+        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+          {t(locale, "pur.costClear")}
+        </p>
+      )}
+      {flagged.length > 0 && (
+        <div className="rounded-md bg-amber-50 px-3 py-2 dark:bg-amber-900/30">
+          <p className="text-sm font-black text-amber-800 dark:text-amber-200">
+            {t(locale, "pur.costFlag")} ({flagged.length})
+          </p>
+          {flagged.map((line) => (
+            <p
+              key={line.productId}
+              className="font-mono text-xs font-bold text-amber-700 dark:text-amber-300"
+            >
+              {line.productId.slice(0, 8)} · +{line.deltaVsLastBps ?? 0} bps
+              {line.lastCostCentimes !== null && ` · ${formatMoney(line.lastCostCentimes, locale)}`}
+            </p>
+          ))}
+        </div>
       )}
       <button
         type="button"

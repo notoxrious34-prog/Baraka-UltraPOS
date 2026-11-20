@@ -11,6 +11,8 @@ pub mod inventory;
 pub mod prep_sheet;
 pub mod printing;
 pub mod purchases;
+pub mod receive_deviations;
+pub mod receive_matrix;
 pub mod reports;
 pub mod returns;
 pub mod sales;

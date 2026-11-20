@@ -249,6 +249,81 @@ pub struct ReceiveGoodsRequestDto {
     pub lines: Vec<PurchaseLineRequestDto>,
 }
 
+/// `purchases.previewReceiveDeviations` request (DSN-109, proposal 7).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PreviewReceiveDeviationsRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Receipt lines under cost review.
+    pub lines: Vec<ReceiveCostLineRequestDto>,
+    /// Flag threshold in basis points (e.g. 1000 = 10%).
+    pub threshold_bps: i64,
+}
+
+/// One receipt line under cost review.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReceiveCostLineRequestDto {
+    /// Product id.
+    pub product_id: String,
+    /// Handling unit id.
+    pub unit_id: String,
+    /// Quantity in unit micros.
+    pub quantity_micro: String,
+    /// Proposed unit cost in centimes.
+    pub unit_cost_centimes: String,
+}
+
+/// Advisory deviation verdict for one receipt line (never blocks).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReceiveDeviationDto {
+    /// Product id.
+    pub product_id: String,
+    /// Last posted receipt cost, if any history exists.
+    pub last_cost_centimes: Option<String>,
+    /// 90-day average receipt cost, if any history exists.
+    pub average90_cost_centimes: Option<String>,
+    /// Signed drift vs last in basis points, if a last cost exists.
+    pub delta_vs_last_bps: Option<i64>,
+    /// Signed drift vs the 90-day average in basis points, if it exists.
+    pub delta_vs_avg_bps: Option<i64>,
+    /// True only when the cost beats both references by more than the
+    /// threshold. No history never flags.
+    pub flagged: bool,
+}
+
+/// `purchases.receiveMatrixGoods` request (DSN-109): a size run lands
+/// through the model's default selling units.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReceiveMatrixGoodsRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Client idempotency key.
+    pub command_id: String,
+    /// Supplier id.
+    pub supplier_id: String,
+    /// Receiving warehouse id.
+    pub warehouse_id: String,
+    /// Variant model id the cells belong to.
+    pub model_id: String,
+    /// Source BC id for a receipt against an order (None = standalone).
+    pub source_bc_id: Option<String>,
+    /// Non-empty cell set.
+    pub cells: Vec<MatrixReceiveCellRequestDto>,
+}
+
+/// One size cell: quantity in default-unit micros, cost per that unit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MatrixReceiveCellRequestDto {
+    /// First-axis value (e.g. `"M"`).
+    pub axis1: String,
+    /// Second-axis value (e.g. `"Rouge"`).
+    pub axis2: String,
+    /// Quantity in default-selling-unit micros.
+    pub quantity_micro: String,
+    /// Unit cost in centimes per default unit.
+    pub unit_cost_centimes: String,
+}
+
 /// `purchases.recordInvoice` request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecordSupplierInvoiceRequestDto {

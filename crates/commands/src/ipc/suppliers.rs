@@ -6,6 +6,12 @@ use baraka_application::use_cases::purchases::{
     CreatePurchaseOrderUseCase, GetPurchaseDocumentUseCase, ReceiveGoodsUseCase,
     RecordSupplierInvoiceUseCase, RecordSupplierPaymentUseCase, UpdatePurchaseOrderUseCase,
 };
+use baraka_application::use_cases::receive_deviations::{
+    PreviewReceiveDeviationsUseCase, ReceiveCostLineInput,
+};
+use baraka_application::use_cases::receive_matrix::{
+    MatrixReceiveCellInput, ReceiveMatrixGoodsInput, ReceiveMatrixGoodsUseCase,
+};
 use baraka_application::use_cases::suppliers::{
     CreateSupplierUseCase, GetSupplierStatementUseCase, GetSupplierUseCase, ListSuppliersUseCase,
     SearchSuppliersUseCase, UpdateSupplierUseCase,
@@ -15,11 +21,13 @@ use baraka_domain::inventory::WarehouseId;
 
 use crate::dto::{
     CreatePurchaseOrderRequestDto, CreateSupplierRequestDto, DeleteEntityRequestDto,
-    DeleteEntityResultDto, PurchaseLineRequestDto, PurchaseOrderDto, PurchaseOrderLineDto,
-    ReceiveGoodsRequestDto, RecordSupplierInvoiceRequestDto, RecordSupplierPaymentRequestDto,
-    SearchSuppliersRequestDto, SearchSuppliersResponseDto, SupplierDto, SupplierIdRequestDto,
-    SupplierLedgerEntryDto, SupplierPaymentOutcomeDto, SupplierStatementDto,
-    UpdatePurchaseOrderRequestDto, UpdateSupplierRequestDto,
+    DeleteEntityResultDto, MatrixReceiveCellRequestDto, PreviewReceiveDeviationsRequestDto,
+    PurchaseLineRequestDto, PurchaseOrderDto, PurchaseOrderLineDto, ReceiveCostLineRequestDto,
+    ReceiveDeviationDto, ReceiveGoodsRequestDto, ReceiveMatrixGoodsRequestDto,
+    RecordSupplierInvoiceRequestDto, RecordSupplierPaymentRequestDto, SearchSuppliersRequestDto,
+    SearchSuppliersResponseDto, SupplierDto, SupplierIdRequestDto, SupplierLedgerEntryDto,
+    SupplierPaymentOutcomeDto, SupplierStatementDto, UpdatePurchaseOrderRequestDto,
+    UpdateSupplierRequestDto,
 };
 
 fn to_supplier_dto(view: &baraka_application::ports::SupplierView) -> SupplierDto {
@@ -338,6 +346,121 @@ pub fn purchases_receive_goods(
     )
     .map_err(|error| error_code(&error))?;
     Ok(to_purchase_order_dto(&view))
+}
+
+/// `purchases.previewReceiveDeviations` command: advisory cost review
+/// (DSN-109, proposal 7). Read-only: never touches stock or ledgers.
+#[tauri::command(rename_all = "snake_case")]
+pub fn purchases_preview_receive_deviations(
+    state: tauri::State<'_, AppState>,
+    request: PreviewReceiveDeviationsRequestDto,
+) -> Result<Vec<ReceiveDeviationDto>, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let mut lines = Vec::with_capacity(request.lines.len());
+    for line in &request.lines {
+        lines.push(parse_receive_cost_line(line)?);
+    }
+    let verdicts = PreviewReceiveDeviationsUseCase::new(state.purchases.as_ref())
+        .execute(&session, &lines, request.threshold_bps)
+        .map_err(|error| error_code(&error))?;
+    Ok(verdicts
+        .iter()
+        .map(|verdict| ReceiveDeviationDto {
+            product_id: verdict.product_id.to_string(),
+            last_cost_centimes: verdict.last_cost_centimes.map(|cost| cost.to_string()),
+            average90_cost_centimes: verdict.average90_cost_centimes.map(|cost| cost.to_string()),
+            delta_vs_last_bps: verdict.delta_vs_last_bps,
+            delta_vs_avg_bps: verdict.delta_vs_avg_bps,
+            flagged: verdict.flagged,
+        })
+        .collect())
+}
+
+/// `purchases.receiveMatrixGoods` command: a size run lands through the
+/// model's default selling units (DSN-109), one atomic BR.
+#[tauri::command(rename_all = "snake_case")]
+pub fn purchases_receive_matrix_goods(
+    state: tauri::State<'_, AppState>,
+    request: ReceiveMatrixGoodsRequestDto,
+) -> Result<PurchaseOrderDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let supplier_id = parse_supplier_id(&request.supplier_id)?;
+    let mut cells = Vec::with_capacity(request.cells.len());
+    for cell in &request.cells {
+        cells.push(parse_matrix_receive_cell(cell)?);
+    }
+    let source_bc_id = request
+        .source_bc_id
+        .as_deref()
+        .map(|text| {
+            parse_wire_id(text, "source_bc_id")
+                .map(|id| id.to_string())
+                .map_err(|error| error_code(&error))
+        })
+        .transpose()?;
+    let view = ReceiveMatrixGoodsUseCase::new(
+        state.purchases.as_ref(),
+        state.suppliers.as_ref(),
+        state.warehouses.as_ref(),
+        state.matrix.as_ref(),
+    )
+    .execute(
+        &session,
+        ReceiveMatrixGoodsInput {
+            supplier_id,
+            warehouse_id: parse_wire_id(&request.warehouse_id, "warehouse_id")
+                .map(WarehouseId::from)
+                .map_err(|error| error_code(&error))?,
+            model_id: parse_wire_id(&request.model_id, "model_id")
+                .map(baraka_domain::catalog::VariantModelId)
+                .map_err(|error| error_code(&error))?,
+            cells,
+            source_bc_id,
+            terminal_id: state.terminal_id.clone(),
+            command_id: request.command_id.clone(),
+        },
+    )
+    .map_err(|error| error_code(&error))?;
+    Ok(to_purchase_order_dto(&view))
+}
+
+fn parse_receive_cost_line(
+    line: &ReceiveCostLineRequestDto,
+) -> Result<ReceiveCostLineInput, String> {
+    Ok(ReceiveCostLineInput {
+        product_id: parse_wire_id(&line.product_id, "product_id")
+            .map(ProductId::from)
+            .map_err(|error| error_code(&error))?,
+        unit_id: parse_wire_id(&line.unit_id, "unit_id")
+            .map(UnitId::from)
+            .map_err(|error| error_code(&error))?,
+        quantity_micro: parse_wire_int(&line.quantity_micro, "quantity_micro")
+            .map_err(|error| error_code(&error))?,
+        unit_cost_centimes: parse_wire_int(&line.unit_cost_centimes, "unit_cost_centimes")
+            .map_err(|error| error_code(&error))?,
+    })
+}
+
+fn parse_matrix_receive_cell(
+    cell: &MatrixReceiveCellRequestDto,
+) -> Result<MatrixReceiveCellInput, String> {
+    if cell.axis1.trim().is_empty() || cell.axis2.trim().is_empty() {
+        return Err(error_code(
+            &baraka_application::errors::ApplicationError::Validation(
+                baraka_domain::errors::DomainError::InvalidCanonicalString(
+                    "INVALID_MATRIX_CELL".to_string(),
+                ),
+            ),
+        ));
+    }
+    Ok(MatrixReceiveCellInput {
+        axis1: cell.axis1.trim().to_string(),
+        axis2: cell.axis2.trim().to_string(),
+        quantity_micro: parse_wire_int(&cell.quantity_micro, "quantity_micro")
+            .map_err(|error| error_code(&error))?,
+        unit_cost_centimes: parse_wire_int(&cell.unit_cost_centimes, "unit_cost_centimes")
+            .map_err(|error| error_code(&error))?,
+    })
 }
 
 /// `purchases.recordInvoice` command: FF commit, exactly one ledger DEBIT.

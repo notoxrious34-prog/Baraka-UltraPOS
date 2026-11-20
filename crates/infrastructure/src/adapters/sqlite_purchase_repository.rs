@@ -14,10 +14,10 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
 use baraka_application::ports::{
-    PurchaseDocumentView, PurchaseLineInput, PurchaseLineView, PurchaseRepository,
+    CostReference, PurchaseDocumentView, PurchaseLineInput, PurchaseLineView, PurchaseRepository,
     SupplierPaymentOutcome,
 };
-use baraka_domain::catalog::convert_to_base_micros;
+use baraka_domain::catalog::{convert_to_base_micros, ProductId};
 use baraka_domain::errors::DomainError;
 use baraka_domain::inventory::{StockMovementType, WarehouseId};
 use baraka_domain::primitives::{FactorMicro, Money, QtyMicro};
@@ -363,6 +363,46 @@ fn insert_purchase_document(
 }
 
 impl PurchaseRepository for SqlitePurchaseRepository {
+    fn purchase_cost_reference(
+        &self,
+        product_id: ProductId,
+    ) -> Result<CostReference, ApplicationError> {
+        let conn = self.lock()?;
+        let last_cost_centimes: Option<i64> = conn
+            .query_row(
+                "SELECT i.unit_price_centimes
+                 FROM document_items i
+                 JOIN documents d ON d.id = i.document_id
+                 WHERE d.type = 'BR' AND i.product_id = ?1
+                 ORDER BY d.created_at DESC, d.id DESC, i.id DESC
+                 LIMIT 1",
+                params![product_id.to_string()],
+                |row| row.get(0),
+            )
+            .map(Some)
+            .or_else(|error| match error {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                other => Err(other),
+            })
+            .map_err(|error| map_purchase_error(InfrastructureError::from(error)))?;
+        let (average90_cost_centimes, samples_90d): (Option<i64>, i64) = conn
+            .query_row(
+                "SELECT CAST(AVG(i.unit_price_centimes) AS INTEGER), COUNT(*)
+                 FROM document_items i
+                 JOIN documents d ON d.id = i.document_id
+                 WHERE d.type = 'BR' AND i.product_id = ?1
+                   AND d.created_at >= datetime('now', '-90 days')",
+                params![product_id.to_string()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|error| map_purchase_error(InfrastructureError::from(error)))?;
+        Ok(CostReference {
+            last_cost_centimes,
+            average90_cost_centimes,
+            samples_90d,
+        })
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn create_order(
         &self,

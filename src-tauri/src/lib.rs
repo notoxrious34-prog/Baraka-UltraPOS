@@ -340,6 +340,8 @@ pub fn run() {
             baraka_commands::ipc::purchases_create_order,
             baraka_commands::ipc::purchases_update_order,
             baraka_commands::ipc::purchases_receive_goods,
+            baraka_commands::ipc::purchases_preview_receive_deviations,
+            baraka_commands::ipc::purchases_receive_matrix_goods,
             baraka_commands::ipc::purchases_record_invoice,
             baraka_commands::ipc::purchases_record_payment,
             baraka_commands::ipc::purchases_get_document,

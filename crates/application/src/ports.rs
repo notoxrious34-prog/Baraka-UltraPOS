@@ -2184,6 +2184,17 @@ pub struct PurchaseLineInput {
     pub unit_cost_centimes: i64,
 }
 
+/// Last purchase cost and 90-day average for one product (DSN-109).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CostReference {
+    /// Most recent posted receipt (BR) line unit cost, if any.
+    pub last_cost_centimes: Option<i64>,
+    /// Mean unit cost over receipt lines posted in the last 90 days, if any.
+    pub average90_cost_centimes: Option<i64>,
+    /// Receipt lines inside the 90-day window.
+    pub samples_90d: i64,
+}
+
 /// Stored purchase line view.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PurchaseLineView {
@@ -2274,6 +2285,14 @@ pub trait PurchaseRepository: Send + Sync {
         request_canonical: &str,
         actor: UserId,
     ) -> Result<PurchaseDocumentView, ApplicationError>;
+
+    /// Last purchase cost and 90-day average for one product (DSN-109,
+    /// proposal 7). Costs come from posted receipt (BR) lines only;
+    /// `None` references mean "no history" — never zero.
+    fn purchase_cost_reference(
+        &self,
+        product_id: ProductId,
+    ) -> Result<CostReference, ApplicationError>;
 
     /// Record supplier invoice (FF): exactly one ledger DEBIT; stock only
     /// when no source BR (standalone combined receipt, ADR-029).

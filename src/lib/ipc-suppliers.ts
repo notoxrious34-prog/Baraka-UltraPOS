@@ -3,7 +3,8 @@
  * Backend command mapping (sovereign contract):
  *   suppliers_create / suppliers_update / suppliers_get / suppliers_search /
  *   suppliers_get_statement / purchases_create_order / purchases_update_order /
- *   purchases_receive_goods / purchases_record_invoice /
+ *   purchases_receive_goods / purchases_preview_receive_deviations /
+ *   purchases_receive_matrix_goods / purchases_record_invoice /
  *   purchases_record_payment / purchases_get_document - exact backend names.
  * All money crosses as centime strings; all quantities as micro strings.
  * Split from `ipc.ts` (Wave 3); byte-identical motion.
@@ -316,6 +317,98 @@ export async function ipcReceiveGoods(
     },
   });
   return toPurchaseDocument(wire);
+}
+
+/** Receive a matrix size run through default units (DSN-109); one atomic BR. */
+export async function ipcReceiveMatrixGoods(
+  sessionToken: string,
+  commandId: string,
+  sourceBcId: string | null,
+  supplierId: string,
+  warehouseId: string,
+  modelId: string,
+  cells: MatrixReceiveCellInput[],
+): Promise<PurchaseDocumentView> {
+  const wire = await call<PurchaseDocumentWire>("purchases_receive_matrix_goods", {
+    request: {
+      session_token: sessionToken,
+      command_id: commandId,
+      source_bc_id: sourceBcId,
+      supplier_id: supplierId,
+      warehouse_id: warehouseId,
+      model_id: modelId,
+      cells: cells.map((cell) => ({
+        axis1: cell.axis1,
+        axis2: cell.axis2,
+        quantity_micro: cell.quantityMicro,
+        unit_cost_centimes: cell.unitCostCentimes,
+      })),
+    },
+  });
+  return toPurchaseDocument(wire);
+}
+
+/** One size cell under receipt (quantities as micro strings, cost as centime string). */
+export interface MatrixReceiveCellInput {
+  axis1: string;
+  axis2: string;
+  quantityMicro: string;
+  unitCostCentimes: string;
+}
+
+/** One receipt line under cost review. */
+export interface ReceiveCostLineInput {
+  productId: string;
+  unitId: string;
+  quantityMicro: string;
+  unitCostCentimes: string;
+}
+
+/** Advisory deviation verdict for one receipt line (never blocks). */
+export interface ReceiveDeviation {
+  productId: string;
+  lastCostCentimes: string | null;
+  average90CostCentimes: string | null;
+  deltaVsLastBps: number | null;
+  deltaVsAvgBps: number | null;
+  flagged: boolean;
+}
+
+interface ReceiveDeviationWire {
+  product_id: string;
+  last_cost_centimes: string | null;
+  average90_cost_centimes: string | null;
+  delta_vs_last_bps: number | null;
+  delta_vs_avg_bps: number | null;
+  flagged: boolean;
+}
+
+/** Advisory cost review (DSN-109, proposal 7); read-only, Gerant/Admin only. */
+export async function ipcPreviewReceiveDeviations(
+  sessionToken: string,
+  lines: ReceiveCostLineInput[],
+  thresholdBps: number,
+): Promise<ReceiveDeviation[]> {
+  const wire = await call<ReceiveDeviationWire[]>("purchases_preview_receive_deviations", {
+    request: {
+      session_token: sessionToken,
+      lines: lines.map((line) => ({
+        product_id: line.productId,
+        unit_id: line.unitId,
+        quantity_micro: line.quantityMicro,
+        unit_cost_centimes: line.unitCostCentimes,
+      })),
+      threshold_bps: thresholdBps,
+    },
+  });
+  return wire.map((verdict) => ({
+    productId: verdict.product_id,
+    lastCostCentimes: verdict.last_cost_centimes,
+    average90CostCentimes: verdict.average90_cost_centimes,
+    deltaVsLastBps: verdict.delta_vs_last_bps,
+    deltaVsAvgBps: verdict.delta_vs_avg_bps,
+    flagged: verdict.flagged,
+  }));
 }
 
 /** Record a supplier invoice (FF); optional source BR (ADR-029). */

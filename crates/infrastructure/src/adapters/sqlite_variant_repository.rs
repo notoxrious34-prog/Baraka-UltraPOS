@@ -278,7 +278,7 @@ impl VariantMatrixRepository for SqliteVariantMatrixRepository {
         let mut query = guard
             .prepare(
                 "SELECT c.axis1_value, c.axis2_value, p.id, p.sku, p.name_ar, p.barcode,
-                        COALESCE((SELECT SUM(s.quantity_micro) FROM stock_levels s
+                        COALESCE((SELECT SUM(s.quantity_base_micro) FROM stock_levels s
                                   WHERE s.product_id = p.id), 0),
                         u.sale_price_centimes,
                         u.id, u.unit_name_ar, u.unit_name_fr, u.factor_micro,

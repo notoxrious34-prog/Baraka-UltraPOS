@@ -25,6 +25,25 @@ use uuid::Uuid;
 
 use crate::persistence::transaction::run_transaction;
 
+/// The DSN-108/109 2D grid query (single statement, never N+1).
+///
+/// Shared as a `pub(crate)` const so the AUD-060 plan-guard test pins the
+/// exact shipped SQL instead of a copy that could drift.
+pub(crate) const MATRIX_VIEW_SQL: &str =
+    "SELECT c.axis1_value, c.axis2_value, p.id, p.sku, p.name_ar, p.barcode,
+            COALESCE((SELECT SUM(s.quantity_base_micro) FROM stock_levels s
+                      WHERE s.product_id = p.id), 0),
+            u.sale_price_centimes,
+            u.id, u.unit_name_ar, u.unit_name_fr, u.factor_micro,
+            u.barcode, u.wholesale_price_centimes,
+            u.super_gros_price_centimes, u.is_base_unit
+     FROM variant_cells c
+     JOIN products p ON p.id = c.product_id
+     LEFT JOIN product_units u
+       ON u.product_id = p.id AND u.is_default_selling = 1
+     WHERE c.model_id = ?1
+     ORDER BY c.axis1_sort, c.axis2_sort";
+
 /// Static, non-leaking mapping for unexpected storage failures.
 fn store_failure() -> ApplicationError {
     ApplicationError::Port("variant-matrix store failure".to_string())
@@ -276,21 +295,7 @@ impl VariantMatrixRepository for SqliteVariantMatrixRepository {
     ) -> Result<Vec<VariantMatrixViewRow>, ApplicationError> {
         let guard = self.lock()?;
         let mut query = guard
-            .prepare(
-                "SELECT c.axis1_value, c.axis2_value, p.id, p.sku, p.name_ar, p.barcode,
-                        COALESCE((SELECT SUM(s.quantity_base_micro) FROM stock_levels s
-                                  WHERE s.product_id = p.id), 0),
-                        u.sale_price_centimes,
-                        u.id, u.unit_name_ar, u.unit_name_fr, u.factor_micro,
-                        u.barcode, u.wholesale_price_centimes,
-                        u.super_gros_price_centimes, u.is_base_unit
-                 FROM variant_cells c
-                 JOIN products p ON p.id = c.product_id
-                 LEFT JOIN product_units u
-                   ON u.product_id = p.id AND u.is_default_selling = 1
-                 WHERE c.model_id = ?1
-                 ORDER BY c.axis1_sort, c.axis2_sort",
-            )
+            .prepare(MATRIX_VIEW_SQL)
             .map_err(|_| store_failure())?;
         let rows = query
             .query_map([model_id.0.to_string()], |row| {
@@ -430,5 +435,33 @@ impl VariantMatrixRepository for SqliteVariantMatrixRepository {
             });
         }
         Ok(models)
+    }
+}
+
+#[cfg(test)]
+mod plan_tests {
+    use super::MATRIX_VIEW_SQL;
+    use crate::persistence::connection::open_connection;
+    use crate::persistence::migration::run_migrations;
+
+    /// AUD-060 finding F-1 guard (TASK-BRK-129): the DSN-108 grid query must
+    /// never full-scan `stock_levels` — one SCAN per cell turned a 500-cell
+    /// model into a ~537ms counter freeze at 10k SKUs.
+    #[test]
+    fn matrix_view_never_scans_stock_levels() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut conn = open_connection(&dir.path().join("plan_guard.db")).expect("open");
+        run_migrations(&mut conn).expect("migrate");
+        let plan: Vec<String> = conn
+            .prepare(&format!("EXPLAIN QUERY PLAN {MATRIX_VIEW_SQL}"))
+            .expect("explain")
+            .query_map(["dummy-model"], |row| row.get::<_, String>(3))
+            .expect("rows")
+            .collect::<Result<_, _>>()
+            .expect("collect");
+        let scan = plan
+            .iter()
+            .any(|line| line.contains("SCAN s") || line.contains("SCAN stock_levels"));
+        assert!(!scan, "matrix_view full-scans stock_levels:\n{plan:#?}");
     }
 }

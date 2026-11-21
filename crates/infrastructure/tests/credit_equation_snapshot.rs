@@ -441,13 +441,13 @@ fn migration_0020_is_additive_on_a_populated_0019_database() {
     .expect("legacy finalized document");
 
     // Stage 2: the official upgrade path.
-    run_migrations(&mut conn).expect("upgrade to 0024");
+    run_migrations(&mut conn).expect("upgrade to 0025");
     let version: i64 = conn
         .query_row("SELECT MAX(version) FROM schema_migrations", [], |row| {
             row.get(0)
         })
         .expect("version");
-    assert_eq!(version, 24, "binary horizon must be 0024");
+    assert_eq!(version, 25, "binary horizon must be 0025");
 
     // Stage 3: zero data loss + legacy rows read back NULL (no backfilled lie).
     let balance: i64 = conn

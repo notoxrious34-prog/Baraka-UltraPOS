@@ -144,6 +144,11 @@ pub const MIGRATIONS: &[EmbeddedMigration] = &[
         name: "0024_variant_matrix.sql",
         sql: include_str!("../../migrations/0024_variant_matrix.sql"),
     },
+    EmbeddedMigration {
+        version: 25,
+        name: "0025_matrix_grid_covering_index.sql",
+        sql: include_str!("../../migrations/0025_matrix_grid_covering_index.sql"),
+    },
 ];
 
 /// This binary's migration horizon: the newest schema version it understands.

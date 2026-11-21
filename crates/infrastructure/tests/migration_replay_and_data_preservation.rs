@@ -597,7 +597,7 @@ fn downgrade_guard_probe_future_version_is_deterministic() {
     // so the synthetic future row coexists without tripping it).
     assert_parity(&db.conn, &baseline);
 
-    // Re-running is idempotent: still Ok, still 25 rows (24 known + future).
+    // Re-running is idempotent: still Ok, still 26 rows (25 known + future).
     run_migrations(&mut db.conn).expect("second run after probe");
     let total: i64 = db
         .conn
@@ -605,5 +605,5 @@ fn downgrade_guard_probe_future_version_is_deterministic() {
             row.get(0)
         })
         .expect("total rows");
-    assert_eq!(total, 25, "24 known + 1 future row, no duplication");
+    assert_eq!(total, 26, "25 known + 1 future row, no duplication");
 }

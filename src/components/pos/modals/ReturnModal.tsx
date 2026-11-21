@@ -29,6 +29,7 @@ import { createDebouncedSearchRunner } from "@/lib/debounced-search";
 import { formatMoney, formatQty } from "@/lib/money";
 import { ipcReprint } from "@/lib/ipc";
 import { ModalShell } from "@/components/pos/modals/ModalShell";
+import { ExchangeSection } from "@/components/pos/modals/ExchangeSection";
 import type { Locale } from "@/types/pos";
 
 function fmtQty(micro: bigint): string {
@@ -435,6 +436,8 @@ export function ReturnModal(): ReactElement {
                 {translateBackendError(s.errorMessage, locale)}
               </p>
             )}
+
+            <ExchangeSection locale={locale} />
 
             <div className="flex gap-2">
               <button

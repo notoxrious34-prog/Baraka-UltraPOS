@@ -336,3 +336,58 @@ pub struct DocumentsProcessReturnResponseDto {
     /// Settlement kind as requested (`CASH`, `CUSTOMER_CREDIT`, `NO_REFUND`).
     pub refund_method: String,
 }
+
+/// One alternate size/color sold inside an exchange (BRK-125).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExchangeNewItemDto {
+    /// Alternate product id (UUID string).
+    pub product_id: String,
+    /// Selling unit id (UUID string).
+    pub unit_id: String,
+    /// Sold magnitude in selling-unit micros.
+    pub quantity_micro: String,
+}
+
+/// Single-shot size/color exchange request (BRK-125, Échange Express).
+///
+/// Like the return facade, settlement travels as a plain method code and
+/// session/terminal/idempotency resolve at the edge. The method only
+/// matters when the net is negative (owed to the customer); a positive net
+/// is always collected in cash, a zero net moves no money.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DocumentsProcessExchangeRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Exchanged-against source document id (UUID string).
+    pub source_document_id: String,
+    /// Returned lines (non-empty).
+    pub return_items: Vec<ReturnItemInputDto>,
+    /// Alternate lines sold (non-empty).
+    pub new_items: Vec<ExchangeNewItemDto>,
+    /// Settlement selector for a negative net (`CASH`, `CUSTOMER_CREDIT`, `NO_REFUND`).
+    pub refund_method: String,
+    /// Manager PIN override unlocking below-cost alternates for this
+    /// exchange only (DSN-115 reuse).
+    pub below_cost_override: Option<ManagerOverrideDto>,
+    /// Operator note, if any.
+    pub notes: Option<String>,
+}
+
+/// Single-shot exchange response (BRK-125).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DocumentsProcessExchangeResponseDto {
+    /// New AVOIR document id (UUID string).
+    pub return_document_id: String,
+    /// New AVOIR gapless human number.
+    pub return_document_number: String,
+    /// New sale TICKET document id (UUID string).
+    pub sale_document_id: String,
+    /// New sale TICKET gapless human number.
+    pub sale_document_number: String,
+    /// Return total TTC in centimes (historic prices).
+    pub return_ttc_centimes: String,
+    /// Sale total TTC in centimes (last-price memory).
+    pub sale_ttc_centimes: String,
+    /// Net effect `sale - return` in centimes (0 at equal price).
+    pub net_centimes: String,
+}

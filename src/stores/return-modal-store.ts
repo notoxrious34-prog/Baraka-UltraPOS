@@ -17,13 +17,17 @@
 import { create } from "zustand";
 import {
   getDocumentReturnContext,
+  ipcSearchCatalog,
+  processSaleExchange,
   processSaleReturn,
   searchDocuments,
+  type ProcessExchangeResponse,
   type ProcessReturnResponse,
   type ReturnContextResponse,
 } from "@/lib/ipc";
 import { parseQtyToMicro } from "@/lib/money";
 import { useSessionStore } from "@/stores/session-store";
+import type { CatalogProduct } from "@/types/pos";
 
 export type ReturnRefundMethod = "CASH" | "CUSTOMER_CREDIT" | "NO_REFUND";
 
@@ -131,6 +135,16 @@ export function isGuestContext(context: ReturnContextResponse | null): boolean {
   return context.party_id === null;
 }
 
+/** One alternate size/color sold inside an exchange (canonical strings). */
+export interface ExchangeAlternate {
+  product_id: string;
+  product_name: string;
+  unit_id: string;
+  unit_name: string;
+  /** Selected magnitude in selling-unit micros, canonical string. */
+  quantity_micro: string;
+}
+
 function parseMicro(value: string): bigint {
   const trimmed = value.trim();
   if (!/^-?\d+$/.test(trimmed)) {
@@ -166,6 +180,16 @@ interface ReturnModalStoreState {
   notes: string;
   errorMessage: string | null;
   successResult: ProcessReturnResponse | null;
+  /** Alternate sizes/colors picked for an Échange Express. */
+  exchangeAlternates: ExchangeAlternate[];
+  altSearchQuery: string;
+  altSearchResults: CatalogProduct[];
+  isSearchingAlts: boolean;
+  managerUsername: string;
+  managerPin: string;
+  exchangeResult: ProcessExchangeResponse | null;
+  exchangeError: string | null;
+  isExchanging: boolean;
   openModal: (prefillDocumentId?: string) => Promise<void>;
   closeModal: () => void;
   setSearchQuery: (query: string) => void;
@@ -179,6 +203,13 @@ interface ReturnModalStoreState {
   setNotes: (notes: string) => void;
   submitReturn: () => Promise<boolean>;
   reset: () => void;
+  setAltSearchQuery: (query: string) => void;
+  searchAlternates: (query: string) => Promise<void>;
+  addAlternate: (product: CatalogProduct, unitId: string, qtyMicroStr: string) => void;
+  removeAlternate: (index: number) => void;
+  setManagerUsername: (username: string) => void;
+  setManagerPin: (pin: string) => void;
+  submitExchange: () => Promise<boolean>;
 }
 
 const initialState = {
@@ -195,6 +226,15 @@ const initialState = {
   notes: "",
   errorMessage: null as string | null,
   successResult: null as ProcessReturnResponse | null,
+  exchangeAlternates: [] as ExchangeAlternate[],
+  altSearchQuery: "",
+  altSearchResults: [] as CatalogProduct[],
+  isSearchingAlts: false,
+  managerUsername: "",
+  managerPin: "",
+  exchangeResult: null as ProcessExchangeResponse | null,
+  exchangeError: null as string | null,
+  isExchanging: false,
 };
 
 const UUID_RE =
@@ -217,6 +257,13 @@ export const useReturnModalStore = create<ReturnModalStoreState>()((set, get) =>
       set({
         context,
         quantities: {},
+        // A freshly loaded source invalidates any staged exchange.
+        exchangeAlternates: [],
+        altSearchQuery: "",
+        altSearchResults: [],
+        exchangeResult: null,
+        exchangeError: null,
+        managerPin: "",
         // Guest sales can never touch CustomerCredit: fall back to Cash.
         refundMethod:
           guest && get().refundMethod === "CUSTOMER_CREDIT" ? "CASH" : get().refundMethod,
@@ -392,6 +439,132 @@ export const useReturnModalStore = create<ReturnModalStoreState>()((set, get) =>
         return false;
       } finally {
         set({ isSubmitting: false });
+      }
+    },
+
+    setAltSearchQuery: (query) => {
+      set({ altSearchQuery: query });
+    },
+
+    searchAlternates: async (query) => {
+      const token = useSessionStore.getState().getSessionToken();
+      if (token === null) {
+        set({ exchangeError: "IPC_NO_ACTIVE_SESSION" });
+        return;
+      }
+      const trimmed = query.trim();
+      if (trimmed.length < 2) {
+        set({ altSearchResults: [] });
+        return;
+      }
+      set({ isSearchingAlts: true, exchangeError: null });
+      try {
+        const results = await ipcSearchCatalog(token, trimmed, 10, false);
+        set({ altSearchResults: results });
+      } catch (failure: unknown) {
+        set({
+          exchangeError: typeof failure === "string" ? failure : "INTERNAL_ERROR",
+          altSearchResults: [],
+        });
+      } finally {
+        set({ isSearchingAlts: false });
+      }
+    },
+
+    addAlternate: (product, unitId, qtyMicroStr) => {
+      const unit = product.units.find((entry) => entry.unit_id === unitId);
+      const qty = parseMicro(qtyMicroStr);
+      if (unit === undefined || qty <= 0n) {
+        return;
+      }
+      const name = product.name_fr !== "" ? product.name_fr : product.name_ar;
+      const unitName =
+        unit.unit_name_fr !== "" ? unit.unit_name_fr : unit.unit_name_ar;
+      set((state) => ({
+        exchangeAlternates: [
+          ...state.exchangeAlternates,
+          {
+            product_id: product.product_id,
+            product_name: name,
+            unit_id: unit.unit_id,
+            unit_name: unitName,
+            quantity_micro: qty.toString(),
+          },
+        ],
+        altSearchQuery: "",
+        altSearchResults: [],
+      }));
+    },
+
+    removeAlternate: (index) => {
+      set((state) => ({
+        exchangeAlternates: state.exchangeAlternates.filter((_, i) => i !== index),
+      }));
+    },
+
+    setManagerUsername: (username) => {
+      set({ managerUsername: username });
+    },
+
+    setManagerPin: (pin) => {
+      set({ managerPin: pin });
+    },
+
+    submitExchange: async () => {
+      const state = get();
+      if (state.isExchanging || state.context === null) {
+        return false;
+      }
+      const token = useSessionStore.getState().getSessionToken();
+      if (token === null) {
+        set({ exchangeError: "IPC_NO_ACTIVE_SESSION" });
+        return false;
+      }
+      const picked = state.context.items
+        .map((item) => ({
+          source_item_id: item.source_item_id,
+          quantity_micro: parseMicro(state.quantities[item.source_item_id] ?? "0"),
+        }))
+        .filter((entry) => entry.quantity_micro > 0n)
+        .map((entry) => ({
+          source_item_id: entry.source_item_id,
+          quantity_micro: entry.quantity_micro.toString(),
+        }));
+      if (picked.length === 0 || state.exchangeAlternates.length === 0) {
+        return false;
+      }
+      if (state.refundMethod === "CUSTOMER_CREDIT" && isGuestContext(state.context)) {
+        return false;
+      }
+      const username = state.managerUsername.trim();
+      // Synchronous lock: set before the first await so same-tick re-entry
+      // observes isExchanging (TASK-BRK-032 precedent).
+      set({ isExchanging: true, exchangeError: null });
+      try {
+        const trimmedNotes = state.notes.trim();
+        const result = await processSaleExchange({
+          session_token: token,
+          source_document_id: state.context.source_document_id,
+          return_items: picked,
+          new_items: state.exchangeAlternates.map((alt) => ({
+            product_id: alt.product_id,
+            unit_id: alt.unit_id,
+            quantity_micro: alt.quantity_micro,
+          })),
+          refund_method: state.refundMethod,
+          below_cost_override:
+            username === "" || state.managerPin === ""
+              ? null
+              : { manager_username: username, manager_pin: state.managerPin },
+          notes: trimmedNotes === "" ? null : trimmedNotes,
+        });
+        set({ exchangeResult: result, managerPin: "" });
+        return true;
+      } catch (failure: unknown) {
+        set({ exchangeError: typeof failure === "string" ? failure : "INTERNAL_ERROR" });
+        return false;
+      } finally {
+        set({ isExchanging: false });
       }
     },
 

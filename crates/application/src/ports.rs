@@ -1117,6 +1117,14 @@ pub trait ReturnRepository: Send + Sync {
         &self,
         order: &PersistReturnOrder,
     ) -> Result<PersistReturnReceipt, ApplicationError>;
+
+    /// Persist one validated exchange atomically (BRK-125): AVOIR +
+    /// offsetting sale TICKET + cell stock adjustments + net settlement,
+    /// all inside one transaction (or replay on identical canonical request).
+    fn persist_exchange(
+        &self,
+        order: &PersistExchangeOrder,
+    ) -> Result<PersistExchangeReceipt, ApplicationError>;
 }
 
 /// One validated return line for atomic persistence (all i64).
@@ -1213,6 +1221,96 @@ pub struct PersistReturnReceipt {
     pub return_document_id: String,
     /// New AVOIR gapless human number.
     pub return_document_number: String,
+}
+
+/// One new sale leg in an atomic exchange (BRK-125). The unit price
+/// replays the customer's last transacted price for that product x unit
+/// (0022); no discount, no TVA — the exchange prices the size, not a
+/// promotion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistExchangeSaleLine {
+    /// Alternate product sold.
+    pub product_id: ProductId,
+    /// Selling unit handled.
+    pub unit_id: UnitId,
+    /// Sold magnitude in selling-unit micros.
+    pub quantity_micro: i64,
+    /// Sold magnitude in base micros.
+    pub quantity_base_micro: i64,
+    /// Last-price unit price in centimes.
+    pub unit_price_centimes: i64,
+    /// Line HT (= price x qty, exact).
+    pub line_ht_centimes: i64,
+    /// Always 0: exchanges carry no TVA leg.
+    pub line_tva_centimes: i64,
+    /// Line TTC (= HT here).
+    pub line_ttc_centimes: i64,
+    /// Purchase price snapshot (margin base, catalog copy).
+    pub cost_price_centimes: i64,
+    /// Display order.
+    pub sort_order: i64,
+}
+
+/// Validated exchange order for atomic persistence (all i64).
+#[derive(Debug, Clone)]
+pub struct PersistExchangeOrder {
+    /// Client idempotency key (UUID string).
+    pub idempotency_key: String,
+    /// Canonical request hash input built by the use case.
+    pub request_canonical: String,
+    /// Exchanged-against source document id.
+    pub source_document_id: DocumentId,
+    /// Terminal identifier resolved from TerminalContext (never client input).
+    pub terminal_id: String,
+    /// Selling warehouse (source copy).
+    pub warehouse_id: WarehouseId,
+    /// Customer-facing receipt language (source copy).
+    pub document_language: DocumentLanguage,
+    /// Named customer the sale belongs to (source party copy, if any).
+    pub customer_id: Option<CustomerId>,
+    /// Return legs at historic transacted prices.
+    pub return_lines: Vec<PersistReturnLine>,
+    /// Return totals (HT, TVA, TTC).
+    pub return_ht_centimes: i64,
+    /// Return totals (HT, TVA, TTC).
+    pub return_tva_centimes: i64,
+    /// Return totals (HT, TVA, TTC).
+    pub return_ttc_centimes: i64,
+    /// New sale legs at last-price memory.
+    pub sale_lines: Vec<PersistExchangeSaleLine>,
+    /// Sale totals (HT, TVA, TTC).
+    pub sale_ht_centimes: i64,
+    /// Sale totals (HT, TVA, TTC).
+    pub sale_tva_centimes: i64,
+    /// Sale totals (HT, TVA, TTC).
+    pub sale_ttc_centimes: i64,
+    /// Net effect `sale_ttc - return_ttc` (0 at equal price).
+    pub net_centimes: i64,
+    /// Cash collected at the counter when the net is positive.
+    pub cash_in: Option<ReturnCashLeg>,
+    /// Drawer payout when the net is negative.
+    pub cash_out: Option<ReturnCashLeg>,
+    /// Ledger CREDIT leg when the net is negative to a named customer.
+    pub credit_leg: Option<ReturnCreditLeg>,
+    /// Acting operator.
+    pub actor: UserId,
+    /// Operator note, if any.
+    pub notes: Option<String>,
+}
+
+/// Atomic exchange receipt: both documents plus the net effect.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistExchangeReceipt {
+    /// New AVOIR document id (UUID string).
+    pub return_document_id: String,
+    /// New AVOIR gapless human number.
+    pub return_document_number: String,
+    /// New sale TICKET document id (UUID string).
+    pub sale_document_id: String,
+    /// New sale TICKET gapless human number.
+    pub sale_document_number: String,
+    /// Net effect `sale_ttc - return_ttc` in centimes.
+    pub net_centimes: i64,
 }
 
 /// Stored payment row view.

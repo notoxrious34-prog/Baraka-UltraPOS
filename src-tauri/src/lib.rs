@@ -282,6 +282,7 @@ pub fn run() {
             baraka_commands::ipc::returns_process,
             baraka_commands::ipc::documents_get_return_context,
             baraka_commands::ipc::documents_process_return,
+            baraka_commands::ipc::documents_process_exchange,
             baraka_commands::ipc::backups_create,
             baraka_commands::ipc::backups_list,
             baraka_commands::ipc::backups_verify,

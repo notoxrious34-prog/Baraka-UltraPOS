@@ -2,10 +2,15 @@
 use super::drafts::discounted_unit_price_text;
 use super::{error_code, parse_wire_id, parse_wire_int, require_session, AppState};
 use baraka_application::errors::ApplicationError;
+use baraka_application::use_cases::exchanges::{
+    ExchangeItemInput, ProcessExchangeCommand, ProcessExchangeUseCase,
+};
 use baraka_application::use_cases::returns::{
     ProcessReturnCommand, ProcessReturnUseCase, ProcessSaleReturnUseCase, RefundDestination,
     ReturnItemInput,
 };
+use baraka_application::use_cases::sales::ManagerOverride;
+use baraka_domain::catalog::{ProductId, UnitId};
 use baraka_domain::errors::DomainError;
 use baraka_domain::primitives::QtyMicro;
 use baraka_domain::sales::{CustomerId, DocumentId, DocumentType};
@@ -13,6 +18,7 @@ use baraka_domain::user::UserId;
 use uuid::Uuid;
 
 use crate::dto::{
+    DocumentsProcessExchangeRequestDto, DocumentsProcessExchangeResponseDto,
     DocumentsProcessReturnRequestDto, DocumentsProcessReturnResponseDto, ProcessReturnRequestDto,
     ProcessReturnResponseDto, RefundDestinationDto, ReturnContextResponseDto,
     ReturnableDocumentSummaryDto, ReturnableItemDto, ReturnableLineDto,
@@ -442,5 +448,114 @@ pub fn documents_process_return(
         return_document_number: result.return_document_number,
         total_refund_ttc_centimes: result.total_refund_ttc.centimes().to_string(),
         refund_method: method,
+    })
+}
+
+/// `documents_process_exchange` command: single-shot size/color exchange
+/// (BRK-125, Échange Express). Return legs reuse historic prices, alternates
+/// replay last-price memory, the net settles exactly (collect / pay out /
+/// nothing). Error codes follow the dedicated return taxonomy.
+#[tauri::command(rename_all = "snake_case")]
+pub fn documents_process_exchange(
+    state: tauri::State<'_, AppState>,
+    request: DocumentsProcessExchangeRequestDto,
+) -> Result<DocumentsProcessExchangeResponseDto, String> {
+    let session = require_session(&state, &request.session_token)?;
+    let source_id = parse_wire_id(&request.source_document_id, "source_document_id")
+        .map(DocumentId::from)
+        .map_err(|error| error_code(&error))?;
+    let mut return_items = Vec::with_capacity(request.return_items.len());
+    for line in &request.return_items {
+        return_items.push(ReturnItemInput {
+            source_item_id: parse_wire_id(&line.source_item_id, "source_item_id")
+                .map_err(|error| error_code(&error))?,
+            quantity_micro: QtyMicro::from_micros(
+                parse_wire_int(&line.quantity_micro, "quantity_micro")
+                    .map_err(|error| error_code(&error))?,
+            ),
+            reason: None,
+        });
+    }
+    let mut new_items = Vec::with_capacity(request.new_items.len());
+    for line in &request.new_items {
+        new_items.push(ExchangeItemInput {
+            product_id: parse_wire_id(&line.product_id, "product_id")
+                .map(ProductId::from)
+                .map_err(|error| error_code(&error))?,
+            unit_id: parse_wire_id(&line.unit_id, "unit_id")
+                .map(UnitId::from)
+                .map_err(|error| error_code(&error))?,
+            quantity_micro: parse_wire_int(&line.quantity_micro, "quantity_micro")
+                .map_err(|error| error_code(&error))?,
+        });
+    }
+    let method = request.refund_method.trim().to_uppercase();
+    let refund = match method.as_str() {
+        "CASH" => {
+            let active = state
+                .cash
+                .get_active_session(&state.terminal_id)
+                .map_err(|error| error_code(&error))?
+                .filter(|view| view.status == "OPEN")
+                .ok_or_else(|| "NO_ACTIVE_CASH_SESSION".to_string())?;
+            RefundDestination::Cash {
+                cash_session_id: active.id,
+            }
+        }
+        "CUSTOMER_CREDIT" => {
+            let party = state
+                .documents
+                .get_by_id(source_id)
+                .map_err(|error| error_code(&error))?
+                .and_then(|document| document.party_id.clone())
+                .ok_or_else(|| "MISSING_CUSTOMER_FOR_CREDIT_REFUND".to_string())?;
+            RefundDestination::CustomerCredit {
+                customer_id: parse_wire_id(&party, "party_id")
+                    .map(CustomerId::from)
+                    .map_err(|error| error_code(&error))?,
+            }
+        }
+        "NO_REFUND" => RefundDestination::NoRefund,
+        _ => {
+            return Err(error_code(&ApplicationError::Validation(
+                DomainError::InvalidCanonicalString("INVALID_REFUND_METHOD".to_string()),
+            )));
+        }
+    };
+    let result = ProcessExchangeUseCase::new(
+        state.documents.as_ref(),
+        state.returns.as_ref(),
+        state.customers.as_ref(),
+        state.cash.as_ref(),
+        state.catalog.as_ref(),
+        state.users.as_ref(),
+        state.hasher.as_ref(),
+    )
+    .execute(
+        &session,
+        ProcessExchangeCommand {
+            operator_id: session.user_id,
+            source_document_id: source_id,
+            return_items,
+            new_items,
+            refund,
+            below_cost_override: request.below_cost_override.map(|over| ManagerOverride {
+                username: over.manager_username.trim().to_string(),
+                pin: over.manager_pin,
+            }),
+            idempotency_key: Uuid::new_v4().to_string(),
+            terminal_id: state.terminal_id.clone(),
+            notes: request.notes,
+        },
+    )
+    .map_err(|error| return_wire_code(&error))?;
+    Ok(DocumentsProcessExchangeResponseDto {
+        return_document_id: result.avoir_id.to_string(),
+        return_document_number: result.avoir_number,
+        sale_document_id: result.sale_document_id.to_string(),
+        sale_document_number: result.sale_document_number,
+        return_ttc_centimes: result.return_ttc_centimes.to_string(),
+        sale_ttc_centimes: result.sale_ttc_centimes.to_string(),
+        net_centimes: result.net_centimes.to_string(),
     })
 }

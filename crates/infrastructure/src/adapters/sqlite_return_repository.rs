@@ -12,7 +12,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use baraka_application::errors::ApplicationError;
-use baraka_application::ports::{PersistReturnOrder, PersistReturnReceipt, ReturnRepository};
+use baraka_application::ports::{
+    PersistExchangeOrder, PersistExchangeReceipt, PersistReturnOrder, PersistReturnReceipt,
+    ReturnRepository,
+};
 use baraka_domain::errors::DomainError;
 use baraka_domain::inventory::StockMovementType;
 use baraka_domain::sales::{
@@ -62,6 +65,16 @@ fn read_customer_balance_in_tx(
 struct StoredReturnReceipt {
     return_document_id: String,
     return_document_number: String,
+}
+
+/// Exchange receipt stored for idempotent replay.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct StoredExchangeReceipt {
+    return_document_id: String,
+    return_document_number: String,
+    sale_document_id: String,
+    sale_document_number: String,
+    net_centimes: i64,
 }
 
 /// Receipt persistence over a shared SQLite connection.
@@ -129,6 +142,14 @@ impl ReturnRepository for SqliteReturnRepository {
     ) -> Result<PersistReturnReceipt, ApplicationError> {
         let mut guard = self.lock()?;
         persist_return_atomic(&mut guard, order).map_err(map_return_error)
+    }
+
+    fn persist_exchange(
+        &self,
+        order: &PersistExchangeOrder,
+    ) -> Result<PersistExchangeReceipt, ApplicationError> {
+        let mut guard = self.lock()?;
+        persist_exchange_atomic(&mut guard, order).map_err(map_return_error)
     }
 }
 
@@ -421,6 +442,475 @@ fn persist_return_atomic(
             &order.idempotency_key,
             &request_hash,
             "sales.process_return",
+            &stored,
+            &stamp,
+            &actor,
+        )?;
+        Ok(receipt)
+    })
+}
+
+/// Execute the full exchange bundle inside one `run_transaction` (BRK-125):
+/// idempotency lookup-or-replay, source FINALIZED re-check, gapless AVOIR +
+/// TICKET numbers, AVOIR header + source-linked items, `RETURN_IN` restock,
+/// sale TICKET header + items, `SALE_OUT` deductions, last-price memory
+/// advance, net settlement (`SALE_CASH_IN` / `REFUND_OUT` / ledger `CREDIT`),
+/// audit event, print outbox job, command log completion.
+#[allow(clippy::too_many_lines)]
+fn persist_exchange_atomic(
+    conn: &mut Connection,
+    order: &PersistExchangeOrder,
+) -> Result<PersistExchangeReceipt, InfrastructureError> {
+    let stamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
+    let fiscal_year = Utc::now().year();
+    let request_hash = checksum_of(&order.request_canonical);
+    let actor = order.actor.to_string();
+    let source_id = order.source_document_id.to_string();
+    run_transaction(conn, |tx| {
+        // a. Idempotency fast path (read committed state).
+        if let Some((stored_hash, payload)) = lookup_command(tx, &order.idempotency_key)? {
+            if let Some(stored) = evaluate_stored_json::<StoredExchangeReceipt>(
+                &stored_hash,
+                &payload,
+                &request_hash,
+            )? {
+                return Ok(PersistExchangeReceipt {
+                    return_document_id: stored.return_document_id,
+                    return_document_number: stored.return_document_number,
+                    sale_document_id: stored.sale_document_id,
+                    sale_document_number: stored.sale_document_number,
+                    net_centimes: stored.net_centimes,
+                });
+            }
+        }
+        // b. Authoritative source re-check (status may have moved since the
+        // use-case pre-check; the source itself is never sealed by exchanges).
+        let (source_status, source_warehouse): (String, String) = tx
+            .query_row(
+                "SELECT status, warehouse_id FROM documents WHERE id = ?1",
+                [&source_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|error| match error {
+                rusqlite::Error::QueryReturnedNoRows => tx_failure("SOURCE_NOT_FOUND".to_string()),
+                other => InfrastructureError::from(other),
+            })?;
+        if source_status != DocumentStatus::Finalized.code() {
+            return Err(tx_failure(BAD_SOURCE_STATUS.to_string()));
+        }
+        if source_warehouse != order.warehouse_id.to_string() {
+            return Err(tx_failure(BAD_SOURCE_STATUS.to_string()));
+        }
+        // c. Source party linkage for both headers.
+        let (party_type, party_id): (Option<String>, Option<String>) = tx.query_row(
+            "SELECT party_type, party_id FROM documents WHERE id = ?1",
+            [&source_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        // d. Gapless AVOIR + TICKET numbers (same allocator as every kind).
+        let avoir_sequence = allocate_in_tx(tx, DocumentType::Avoir.code(), fiscal_year).map_err(
+            |error| match error {
+                InfrastructureError::Migration(message)
+                    if message == sentinel::SEQUENCE_OVERFLOW =>
+                {
+                    tx_failure(sentinel::SEQUENCE_OVERFLOW.to_string())
+                }
+                other => other,
+            },
+        )?;
+        let sale_sequence =
+            allocate_in_tx(tx, DocumentType::Ticket.code(), fiscal_year).map_err(|error| {
+                match error {
+                    InfrastructureError::Migration(message)
+                        if message == sentinel::SEQUENCE_OVERFLOW =>
+                    {
+                        tx_failure(sentinel::SEQUENCE_OVERFLOW.to_string())
+                    }
+                    other => other,
+                }
+            })?;
+        let avoir_number = format_number(DocumentType::Avoir.prefix(), fiscal_year, avoir_sequence);
+        let sale_number = format_number(DocumentType::Ticket.prefix(), fiscal_year, sale_sequence);
+        let avoir_id = Uuid::new_v4().to_string();
+        let sale_id = Uuid::new_v4().to_string();
+        // e. AVOIR header (FINALIZED at birth). BRK-108 snapshot: an AVOIR
+        // moves the balance DOWN by the credit payout; freeze `Ancien Solde`
+        // before any ledger write.
+        let credit_snapshot: Option<CreditSnapshot> = match &order.credit_leg {
+            Some(credit) if credit.amount_centimes > 0 => {
+                let ancien = read_customer_balance_in_tx(tx, &credit.customer_id.to_string())?;
+                let delta = credit
+                    .amount_centimes
+                    .checked_neg()
+                    .ok_or_else(|| tx_failure(sentinel::OVERFLOW.to_string()))?;
+                Some(
+                    CreditSnapshot::freeze(ancien, delta)
+                        .map_err(|_| tx_failure(sentinel::OVERFLOW.to_string()))?,
+                )
+            }
+            _ => None,
+        };
+        tx.execute(
+            "INSERT INTO documents
+             (id, number, fiscal_year, type, party_type, party_id, source_document_id,
+              warehouse_id, document_language, language, subtotal_ht_centimes,
+              vat_total_centimes, global_discount_centimes, timbre_centimes,
+              rounding_centimes, ttc_centimes, paid_amount_centimes,
+              change_amount_centimes, payment_method, status, created_at,
+              created_by, revision, origin_device_id, notes,
+              credit_solde_before_centimes, credit_solde_after_centimes,
+              credit_delta_centimes)
+             VALUES (?1, ?2, ?3, 'AVOIR', ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10, 0, 0, 0,
+                     ?11, 0, 0, 'REFUND', 'FINALIZED', ?12, ?13, 1, ?14, ?15,
+                     ?16, ?17, ?18)",
+            rusqlite::params![
+                avoir_id,
+                avoir_number,
+                i64::from(fiscal_year),
+                party_type,
+                party_id,
+                source_id,
+                order.warehouse_id.to_string(),
+                order.document_language.to_string(),
+                order.return_ht_centimes,
+                order.return_tva_centimes,
+                order.return_ttc_centimes,
+                stamp,
+                actor,
+                &order.terminal_id,
+                order.notes.as_deref(),
+                credit_snapshot.map(CreditSnapshot::ancien_solde_centimes),
+                credit_snapshot.map(CreditSnapshot::nouveau_solde_centimes),
+                credit_snapshot.map(CreditSnapshot::credit_delta_centimes),
+            ],
+        )?;
+        // f. Source-linked return items.
+        for line in &order.return_lines {
+            tx.execute(
+                "INSERT INTO document_items
+                 (id, document_id, product_id, unit_id, source_item_id,
+                  quantity_micro, quantity_base_micro, unit_price_centimes,
+                  discount_centimes, discount_per_unit_centimes, tva_rate_micro,
+                  line_ht_centimes, line_tva_centimes, line_ttc_centimes,
+                  cost_price_centimes, sort_order)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 0, ?11, ?12, ?13, ?14, ?15)",
+                rusqlite::params![
+                    Uuid::new_v4().to_string(),
+                    avoir_id,
+                    line.product_id.to_string(),
+                    line.unit_id.to_string(),
+                    line.source_item_id,
+                    line.quantity_micro,
+                    line.quantity_base_micro,
+                    line.unit_price_centimes,
+                    line.discount_centimes,
+                    line.discount_per_unit_centimes,
+                    line.line_ht_centimes,
+                    line.line_tva_centimes,
+                    line.line_ttc_centimes,
+                    line.cost_price_centimes,
+                    line.sort_order,
+                ],
+            )?;
+        }
+        // g. Restock legs via the sale engine's own mechanism (RETURN_IN
+        // only grows levels; negative authorization is never requested).
+        for line in &order.return_lines {
+            apply_one(
+                tx,
+                &line.product_id.to_string(),
+                &order.warehouse_id.to_string(),
+                &line.unit_id.to_string(),
+                line.quantity_micro,
+                StockMovementType::ReturnIn,
+                Some("RETURN"),
+                Some(avoir_id.as_str()),
+                None,
+                false,
+                line.reason.as_deref(),
+                &actor,
+                &stamp,
+            )?;
+        }
+        // h. Exchange sale TICKET header (FINALIZED at birth). The customer
+        // already paid the source ticket: `paid` is only the collected net.
+        let (payment_method, paid_amount) = if order.net_centimes > 0 {
+            ("CASH", order.net_centimes)
+        } else if order.net_centimes < 0 {
+            ("REFUND", 0)
+        } else {
+            ("NONE", 0)
+        };
+        tx.execute(
+            "INSERT INTO documents
+             (id, number, fiscal_year, type, party_type, party_id, source_document_id,
+              warehouse_id, document_language, language, subtotal_ht_centimes,
+              vat_total_centimes, global_discount_centimes, timbre_centimes,
+              rounding_centimes, ttc_centimes, paid_amount_centimes,
+              change_amount_centimes, payment_method, status, created_at,
+              created_by, revision, origin_device_id, notes,
+              credit_solde_before_centimes, credit_solde_after_centimes,
+              credit_delta_centimes)
+             VALUES (?1, ?2, ?3, 'TICKET', ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10, 0, 0, 0,
+                     ?11, ?12, 0, ?13, 'FINALIZED', ?14, ?15, 1, ?16, ?17,
+                     NULL, NULL, NULL)",
+            rusqlite::params![
+                sale_id,
+                sale_number,
+                i64::from(fiscal_year),
+                party_type,
+                party_id,
+                source_id,
+                order.warehouse_id.to_string(),
+                order.document_language.to_string(),
+                order.sale_ht_centimes,
+                order.sale_tva_centimes,
+                order.sale_ttc_centimes,
+                paid_amount,
+                payment_method,
+                stamp,
+                actor,
+                &order.terminal_id,
+                order.notes.as_deref(),
+            ],
+        )?;
+        // i. Exchange sale items + last-price memory advance (BRK-111:
+        // the exchange IS a sale, so memory moves to the alternate).
+        for line in &order.sale_lines {
+            tx.execute(
+                "INSERT INTO document_items
+                 (id, document_id, product_id, unit_id,
+                  quantity_micro, quantity_base_micro, unit_price_centimes,
+                  discount_centimes, discount_per_unit_centimes, tva_rate_micro,
+                  line_ht_centimes, line_tva_centimes, line_ttc_centimes,
+                  cost_price_centimes, sort_order)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, NULL, 0, ?8, ?9, ?10, ?11, ?12)",
+                rusqlite::params![
+                    Uuid::new_v4().to_string(),
+                    sale_id,
+                    line.product_id.to_string(),
+                    line.unit_id.to_string(),
+                    line.quantity_micro,
+                    line.quantity_base_micro,
+                    line.unit_price_centimes,
+                    line.line_ht_centimes,
+                    line.line_tva_centimes,
+                    line.line_ttc_centimes,
+                    line.cost_price_centimes,
+                    line.sort_order,
+                ],
+            )?;
+            if let Some(customer_id) = order.customer_id {
+                tx.execute(
+                    "INSERT INTO customer_last_prices
+                     (customer_id, product_id, unit_id, price_centimes,
+                      discount_per_unit_centimes, document_id, sold_at)
+                     VALUES (?1, ?2, ?3, ?4, 0, ?5, ?6)
+                     ON CONFLICT (customer_id, product_id, unit_id)
+                     DO UPDATE SET price_centimes = excluded.price_centimes,
+                                   discount_per_unit_centimes =
+                                       excluded.discount_per_unit_centimes,
+                                   document_id = excluded.document_id,
+                                   sold_at = excluded.sold_at",
+                    rusqlite::params![
+                        customer_id.to_string(),
+                        line.product_id.to_string(),
+                        line.unit_id.to_string(),
+                        line.unit_price_centimes,
+                        sale_id,
+                        stamp,
+                    ],
+                )?;
+            }
+        }
+        // j. Sale deductions (SALE_OUT, strict: the alternate must be on
+        // hand — no negative authorization inside an exchange).
+        for line in &order.sale_lines {
+            apply_one(
+                tx,
+                &line.product_id.to_string(),
+                &order.warehouse_id.to_string(),
+                &line.unit_id.to_string(),
+                line.quantity_micro,
+                StockMovementType::SaleOut,
+                Some("SALE"),
+                Some(sale_id.as_str()),
+                None,
+                false,
+                order.notes.as_deref(),
+                &actor,
+                &stamp,
+            )?;
+        }
+        // k. Net settlement: collect the positive gap, pay out the negative
+        // one. Zero net moves no money at all.
+        if let Some(cash) = &order.cash_in {
+            if cash.amount_centimes > 0 {
+                let session_status: String = tx
+                    .query_row(
+                        "SELECT status FROM cash_sessions WHERE id = ?1",
+                        [&cash.cash_session_id],
+                        |row| row.get(0),
+                    )
+                    .map_err(|error| match error {
+                        rusqlite::Error::QueryReturnedNoRows => {
+                            tx_failure("NO_OPEN_CASH_SESSION".to_string())
+                        }
+                        other => InfrastructureError::from(other),
+                    })?;
+                if session_status != "OPEN" {
+                    return Err(tx_failure("NO_OPEN_CASH_SESSION".to_string()));
+                }
+                tx.execute(
+                    "INSERT INTO cash_movements
+                     (id, cash_session_id, movement_type, amount_centimes,
+                      reference_type, reference_id, description, created_at, created_by)
+                     VALUES (?1, ?2, 'SALE_CASH_IN', ?3, 'DOCUMENT', ?4, ?5, ?6, ?7)",
+                    rusqlite::params![
+                        Uuid::new_v4().to_string(),
+                        cash.cash_session_id,
+                        cash.amount_centimes,
+                        sale_id,
+                        format!("Encaissement échange {sale_number}"),
+                        stamp,
+                        actor,
+                    ],
+                )?;
+            }
+        }
+        if let Some(cash) = &order.cash_out {
+            if cash.amount_centimes > 0 {
+                let session_status: String = tx
+                    .query_row(
+                        "SELECT status FROM cash_sessions WHERE id = ?1",
+                        [&cash.cash_session_id],
+                        |row| row.get(0),
+                    )
+                    .map_err(|error| match error {
+                        rusqlite::Error::QueryReturnedNoRows => {
+                            tx_failure("NO_OPEN_CASH_SESSION".to_string())
+                        }
+                        other => InfrastructureError::from(other),
+                    })?;
+                if session_status != "OPEN" {
+                    return Err(tx_failure("NO_OPEN_CASH_SESSION".to_string()));
+                }
+                let payout = cash
+                    .amount_centimes
+                    .checked_neg()
+                    .ok_or_else(|| tx_failure(sentinel::OVERFLOW.to_string()))?;
+                tx.execute(
+                    "INSERT INTO cash_movements
+                     (id, cash_session_id, movement_type, amount_centimes,
+                      reference_type, reference_id, description, created_at, created_by)
+                     VALUES (?1, ?2, 'REFUND_OUT', ?3, 'AVOIR', ?4, ?5, ?6, ?7)",
+                    rusqlite::params![
+                        Uuid::new_v4().to_string(),
+                        cash.cash_session_id,
+                        payout,
+                        sale_id,
+                        format!("Remboursement échange {sale_number}"),
+                        stamp,
+                        actor,
+                    ],
+                )?;
+            }
+        }
+        if let Some(credit) = &order.credit_leg {
+            if credit.amount_centimes > 0 {
+                let current: Option<(i64, i64)> = tx
+                    .query_row(
+                        "SELECT current_balance_centimes, revision FROM customers WHERE id = ?1",
+                        [credit.customer_id.to_string()],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .map(Some)
+                    .or_else(|error| match error {
+                        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                        other => Err(other),
+                    })?;
+                let (balance, revision) =
+                    current.ok_or_else(|| tx_failure("CUSTOMER_MISSING".to_string()))?;
+                let new_balance = balance
+                    .checked_sub(credit.amount_centimes)
+                    .ok_or_else(|| tx_failure(sentinel::OVERFLOW.to_string()))?;
+                let sequence: i64 = tx.query_row(
+                    "SELECT COALESCE(MAX(sequence_no), 0) + 1 FROM customer_ledger",
+                    [],
+                    |row| row.get(0),
+                )?;
+                tx.execute(
+                    "INSERT INTO customer_ledger
+                     (id, sequence_no, customer_id, entry_type, amount_centimes,
+                      running_balance_centimes, document_type, document_id,
+                      created_by, created_at)
+                     VALUES (?1, ?2, ?3, 'CREDIT', ?4, ?5, 'AVOIR', ?6, ?7, ?8)",
+                    rusqlite::params![
+                        Uuid::new_v4().to_string(),
+                        sequence,
+                        credit.customer_id.to_string(),
+                        credit.amount_centimes,
+                        new_balance,
+                        avoir_id,
+                        actor,
+                        stamp,
+                    ],
+                )?;
+                let changed = tx.execute(
+                    "UPDATE customers
+                     SET current_balance_centimes = ?1, revision = revision + 1, updated_at = ?2
+                     WHERE id = ?3 AND revision = ?4",
+                    rusqlite::params![new_balance, stamp, credit.customer_id.to_string(), revision],
+                )?;
+                if changed != 1 {
+                    return Err(tx_failure("CONCURRENCY".to_string()));
+                }
+            }
+        }
+        // l. Audit event with TerminalContext origin.
+        let audit_json = format!(
+            "{{\"source_document_id\":\"{source_id}\",\"avoir_document_id\":\"{avoir_id}\",\"sale_document_id\":\"{sale_id}\",\"actor_user_id\":\"{actor}\",\"origin_device_id\":\"{origin}\",\"timestamp\":\"{stamp}\",\"net_centimes\":{net}}}",
+            origin = order.terminal_id,
+            net = order.net_centimes,
+        );
+        insert_cash_audit_row(
+            tx,
+            "PROCESS_EXCHANGE",
+            "DOCUMENT",
+            &sale_id,
+            None,
+            &audit_json,
+            &actor,
+            &stamp,
+        )?;
+        // m. Print outbox job for the customer-facing sale ticket.
+        let job_payload = serde_json::json!({
+            "document_id": sale_id,
+            "number": sale_number,
+            "total_ttc_centimes": order.sale_ttc_centimes,
+        })
+        .to_string();
+        enqueue_in_tx(tx, Some(sale_id.as_str()), "RECEIPT", &job_payload, &stamp)?;
+        // n. Idempotency completion with lost-race replay.
+        let receipt = PersistExchangeReceipt {
+            return_document_id: avoir_id.clone(),
+            return_document_number: avoir_number.clone(),
+            sale_document_id: sale_id.clone(),
+            sale_document_number: sale_number.clone(),
+            net_centimes: order.net_centimes,
+        };
+        let stored = StoredExchangeReceipt {
+            return_document_id: avoir_id,
+            return_document_number: avoir_number,
+            sale_document_id: sale_id,
+            sale_document_number: sale_number,
+            net_centimes: order.net_centimes,
+        };
+        append_or_replay(
+            tx,
+            &order.idempotency_key,
+            &request_hash,
+            "sales.process_exchange",
             &stored,
             &stamp,
             &actor,

@@ -13,7 +13,8 @@ use baraka_application::ports::{
     ConvertBlToFactureCommand, ConvertBlToFactureResult, ConvertDevisToBlCommand,
     ConvertDevisToBlResult, CreditOverview, CustomerLastPrice, CustomerRepository, CustomerSummary,
     CustomerUpdate, DeleteAudit, DocumentRepository, DocumentSearchFilter, DocumentSummary,
-    LedgerEntryRow, PaymentRecord, PersistReturnOrder, PersistReturnReceipt, ReturnRepository,
+    LedgerEntryRow, PaymentRecord, PersistExchangeOrder, PersistExchangeReceipt,
+    PersistReturnOrder, PersistReturnReceipt, ReturnRepository,
 };
 use baraka_application::use_cases::returns::{
     ProcessReturnCommand, ProcessReturnUseCase, RefundDestination, ReturnItemInput,
@@ -271,6 +272,20 @@ impl ReturnRepository for FakeReturns {
         Ok(PersistReturnReceipt {
             return_document_id: Uuid::new_v4().to_string(),
             return_document_number: "AVO-2026-000001".to_string(),
+        })
+    }
+
+    fn persist_exchange(
+        &self,
+        order: &PersistExchangeOrder,
+    ) -> Result<PersistExchangeReceipt, ApplicationError> {
+        let _ = order;
+        Ok(PersistExchangeReceipt {
+            return_document_id: Uuid::new_v4().to_string(),
+            return_document_number: "AVO-2026-000001".to_string(),
+            sale_document_id: Uuid::new_v4().to_string(),
+            sale_document_number: "TICK-2026-000001".to_string(),
+            net_centimes: 0,
         })
     }
 }

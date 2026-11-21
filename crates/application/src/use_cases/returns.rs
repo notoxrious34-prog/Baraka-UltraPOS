@@ -7,7 +7,7 @@
 use baraka_domain::errors::DomainError;
 use baraka_domain::primitives::{Money, QtyMicro};
 use baraka_domain::role::Permission;
-use baraka_domain::sales::{CustomerId, DocumentId, DocumentStatus, DocumentType};
+use baraka_domain::sales::{CustomerId, DocumentId, DocumentItem, DocumentStatus, DocumentType};
 use baraka_domain::user::UserId;
 use uuid::Uuid;
 
@@ -268,133 +268,8 @@ where
         let cumulative = self
             .returns
             .cumulative_returned_quantities(command.source_document_id)?;
-        let mut lines: Vec<PersistReturnLine> = Vec::with_capacity(command.items.len());
-        let mut seen: Vec<Uuid> = Vec::with_capacity(command.items.len());
-        let mut total_ht: i128 = 0;
-        let mut total_tva: i128 = 0;
-        for (index, item) in command.items.iter().enumerate() {
-            if item.quantity_micro.micros() <= 0 {
-                return Err(coded("INVALID_PAYMENT_AMOUNT"));
-            }
-            if seen.contains(&item.source_item_id) {
-                return Err(coded("DUPLICATE_RETURN_LINE"));
-            }
-            seen.push(item.source_item_id);
-            let original = source_items
-                .iter()
-                .find(|line| line.id == item.source_item_id)
-                .ok_or(ReturnError::ItemNotFound(item.source_item_id))?;
-            let already = cumulative
-                .get(&item.source_item_id.to_string())
-                .copied()
-                .unwrap_or(0);
-            let remaining = original
-                .quantity_micro
-                .checked_sub(already)
-                .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
-            if item.quantity_micro.micros() > remaining {
-                return Err(ReturnError::QuantityExceeded {
-                    item_id: item.source_item_id,
-                    requested_micro: item.quantity_micro.micros(),
-                    allowable_micro: remaining,
-                }
-                .into());
-            }
-            // Step 4: fixed-point line math (half-up, i128-checked).
-            let ret_qty = item.quantity_micro.micros();
-            // Per-unit discount path (BRK-096): exact, no division. The
-            // stored per-unit value replays the kernel arithmetic
-            // (`round(ret_qty x discounted PU)`); the stored lump stays
-            // `gross - net` exactly as at commit.
-            // Legacy path (`None`): the old lump pro-rating, unchanged —
-            // pre-BRK-096 lines reprice exactly as before.
-            let (net_ht, discount) = match original.discount_per_unit_centimes {
-                Some(discount_per_unit) => {
-                    let discounted_unit_price = original
-                        .unit_price_centimes
-                        .checked_sub(discount_per_unit)
-                        .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
-                    if discount_per_unit > original.unit_price_centimes {
-                        return Err(coded("INCOHERENT_RETURN_SOURCE"));
-                    }
-                    let net_ht = Money::from_centimes(discounted_unit_price)
-                        .checked_mul_qty(QtyMicro::from_micros(ret_qty))
-                        .map_err(ApplicationError::Validation)?
-                        .centimes();
-                    let gross_ht = Money::from_centimes(original.unit_price_centimes)
-                        .checked_mul_qty(QtyMicro::from_micros(ret_qty))
-                        .map_err(ApplicationError::Validation)?
-                        .centimes();
-                    let lump = gross_ht
-                        .checked_sub(net_ht)
-                        .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
-                    (net_ht, lump)
-                }
-                None => {
-                    let gross_ht = Money::from_centimes(original.unit_price_centimes)
-                        .checked_mul_qty(QtyMicro::from_micros(ret_qty))
-                        .map_err(ApplicationError::Validation)?
-                        .centimes();
-                    let pro_rated = mul_div_half_up(
-                        original.discount_centimes,
-                        ret_qty,
-                        original.quantity_micro,
-                    )?;
-                    let net = gross_ht
-                        .checked_sub(pro_rated)
-                        .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
-                    (net, pro_rated)
-                }
-            };
-            let line_tva = if original.line_ht_centimes == 0 {
-                0
-            } else {
-                mul_div_half_up(
-                    net_ht,
-                    original.line_tva_centimes,
-                    original.line_ht_centimes,
-                )?
-            };
-            let line_ttc = net_ht
-                .checked_add(line_tva)
-                .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
-            // Base-unit restock magnitude, proportional to the source line.
-            let quantity_base_micro = if original.quantity_micro == 0 {
-                0
-            } else {
-                mul_div_half_up(
-                    ret_qty,
-                    original.quantity_base_micro,
-                    original.quantity_micro,
-                )?
-            };
-            total_ht = total_ht
-                .checked_add(i128::from(net_ht))
-                .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
-            total_tva = total_tva
-                .checked_add(i128::from(line_tva))
-                .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
-            lines.push(PersistReturnLine {
-                source_item_id: item.source_item_id.to_string(),
-                product_id: original.product_id,
-                unit_id: original.unit_id,
-                quantity_micro: ret_qty,
-                quantity_base_micro,
-                unit_price_centimes: original.unit_price_centimes,
-                discount_centimes: discount,
-                discount_per_unit_centimes: original.discount_per_unit_centimes,
-                line_ht_centimes: net_ht,
-                line_tva_centimes: line_tva,
-                line_ttc_centimes: line_ttc,
-                cost_price_centimes: original.cost_price_centimes,
-                sort_order: index as i64,
-                reason: item.reason.clone(),
-            });
-        }
-        let total_ht = i64::try_from(total_ht)
-            .map_err(|_| ApplicationError::Validation(DomainError::MoneyOverflow))?;
-        let total_tva = i64::try_from(total_tva)
-            .map_err(|_| ApplicationError::Validation(DomainError::MoneyOverflow))?;
+        let (lines, total_ht, total_tva) =
+            price_return_legs(&source_items, &cumulative, &command.items)?;
         let total_ttc = total_ht
             .checked_add(total_tva)
             .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
@@ -441,6 +316,142 @@ where
             items_returned_count: command.items.len(),
         })
     }
+}
+
+/// Shared return-leg pricing (BRK-125): per-line ceiling validation against
+/// cumulative returns plus fixed-point line math (half-up, i128-checked),
+/// byte-identical to the former inline block in `ProcessSaleReturnUseCase`.
+/// Returns the priced legs with `(total_ht, total_tva)`.
+pub(crate) fn price_return_legs(
+    source_items: &[DocumentItem],
+    cumulative: &std::collections::HashMap<String, i64>,
+    items: &[ReturnItemInput],
+) -> Result<(Vec<PersistReturnLine>, i64, i64), ApplicationError> {
+    let mut lines: Vec<PersistReturnLine> = Vec::with_capacity(items.len());
+    let mut seen: Vec<Uuid> = Vec::with_capacity(items.len());
+    let mut total_ht: i128 = 0;
+    let mut total_tva: i128 = 0;
+    for (index, item) in items.iter().enumerate() {
+        if item.quantity_micro.micros() <= 0 {
+            return Err(coded("INVALID_PAYMENT_AMOUNT"));
+        }
+        if seen.contains(&item.source_item_id) {
+            return Err(coded("DUPLICATE_RETURN_LINE"));
+        }
+        seen.push(item.source_item_id);
+        let original = source_items
+            .iter()
+            .find(|line| line.id == item.source_item_id)
+            .ok_or(ReturnError::ItemNotFound(item.source_item_id))?;
+        let already = cumulative
+            .get(&item.source_item_id.to_string())
+            .copied()
+            .unwrap_or(0);
+        let remaining = original
+            .quantity_micro
+            .checked_sub(already)
+            .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+        if item.quantity_micro.micros() > remaining {
+            return Err(ReturnError::QuantityExceeded {
+                item_id: item.source_item_id,
+                requested_micro: item.quantity_micro.micros(),
+                allowable_micro: remaining,
+            }
+            .into());
+        }
+        // Fixed-point line math (half-up, i128-checked).
+        let ret_qty = item.quantity_micro.micros();
+        // Per-unit discount path (BRK-096): exact, no division. The
+        // stored per-unit value replays the kernel arithmetic
+        // (`round(ret_qty x discounted PU)`); the stored lump stays
+        // `gross - net` exactly as at commit.
+        // Legacy path (`None`): the old lump pro-rating, unchanged —
+        // pre-BRK-096 lines reprice exactly as before.
+        let (net_ht, discount) = match original.discount_per_unit_centimes {
+            Some(discount_per_unit) => {
+                let discounted_unit_price = original
+                    .unit_price_centimes
+                    .checked_sub(discount_per_unit)
+                    .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+                if discount_per_unit > original.unit_price_centimes {
+                    return Err(coded("INCOHERENT_RETURN_SOURCE"));
+                }
+                let net_ht = Money::from_centimes(discounted_unit_price)
+                    .checked_mul_qty(QtyMicro::from_micros(ret_qty))
+                    .map_err(ApplicationError::Validation)?
+                    .centimes();
+                let gross_ht = Money::from_centimes(original.unit_price_centimes)
+                    .checked_mul_qty(QtyMicro::from_micros(ret_qty))
+                    .map_err(ApplicationError::Validation)?
+                    .centimes();
+                let lump = gross_ht
+                    .checked_sub(net_ht)
+                    .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+                (net_ht, lump)
+            }
+            None => {
+                let gross_ht = Money::from_centimes(original.unit_price_centimes)
+                    .checked_mul_qty(QtyMicro::from_micros(ret_qty))
+                    .map_err(ApplicationError::Validation)?
+                    .centimes();
+                let pro_rated =
+                    mul_div_half_up(original.discount_centimes, ret_qty, original.quantity_micro)?;
+                let net = gross_ht
+                    .checked_sub(pro_rated)
+                    .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+                (net, pro_rated)
+            }
+        };
+        let line_tva = if original.line_ht_centimes == 0 {
+            0
+        } else {
+            mul_div_half_up(
+                net_ht,
+                original.line_tva_centimes,
+                original.line_ht_centimes,
+            )?
+        };
+        let line_ttc = net_ht
+            .checked_add(line_tva)
+            .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+        // Base-unit restock magnitude, proportional to the source line.
+        let quantity_base_micro = if original.quantity_micro == 0 {
+            0
+        } else {
+            mul_div_half_up(
+                ret_qty,
+                original.quantity_base_micro,
+                original.quantity_micro,
+            )?
+        };
+        total_ht = total_ht
+            .checked_add(i128::from(net_ht))
+            .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+        total_tva = total_tva
+            .checked_add(i128::from(line_tva))
+            .ok_or(ApplicationError::Validation(DomainError::MoneyOverflow))?;
+        lines.push(PersistReturnLine {
+            source_item_id: item.source_item_id.to_string(),
+            product_id: original.product_id,
+            unit_id: original.unit_id,
+            quantity_micro: ret_qty,
+            quantity_base_micro,
+            unit_price_centimes: original.unit_price_centimes,
+            discount_centimes: discount,
+            discount_per_unit_centimes: original.discount_per_unit_centimes,
+            line_ht_centimes: net_ht,
+            line_tva_centimes: line_tva,
+            line_ttc_centimes: line_ttc,
+            cost_price_centimes: original.cost_price_centimes,
+            sort_order: index as i64,
+            reason: item.reason.clone(),
+        });
+    }
+    let total_ht = i64::try_from(total_ht)
+        .map_err(|_| ApplicationError::Validation(DomainError::MoneyOverflow))?;
+    let total_tva = i64::try_from(total_tva)
+        .map_err(|_| ApplicationError::Validation(DomainError::MoneyOverflow))?;
+    Ok((lines, total_ht, total_tva))
 }
 
 /// Deterministic canonical request string for return idempotency.

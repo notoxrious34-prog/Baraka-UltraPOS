@@ -35,6 +35,45 @@ fn coded(code: &'static str) -> ApplicationError {
     ApplicationError::Validation(DomainError::InvalidCanonicalString(code.to_string()))
 }
 
+/// Verify a manager PIN override for one privileged operation (DSN-115).
+///
+/// The named user must exist, be active, and carry `PriceOverride`
+/// (Gérant/Admin), and the PIN must match the stored hash. Every
+/// failure collapses to one LOUD code so callers cannot distinguish
+/// "unknown user" from "wrong PIN". Shared by checkout and exchange —
+/// the lock always lives in the use case, never in the UI.
+pub(crate) fn verify_manager_override<UX, HX>(
+    users: &UX,
+    hasher: &HX,
+    username: &str,
+    pin: &str,
+) -> Result<bool, ApplicationError>
+where
+    UX: UserRepository + ?Sized,
+    HX: PasswordHasher + ?Sized,
+{
+    let name = username.trim();
+    if name.is_empty() || pin.is_empty() {
+        return Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED"));
+    }
+    let user = match users.find_by_username(name)? {
+        Some(found) => found,
+        None => return Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED")),
+    };
+    if !user.is_active || !user.role.has_permission(Permission::PriceOverride) {
+        return Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED"));
+    }
+    let valid = match users.get_pin_hash(user.id)? {
+        Some(hash) => hasher.verify(pin, &hash)?,
+        None => false,
+    };
+    if valid {
+        Ok(true)
+    } else {
+        Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED"))
+    }
+}
+
 /// One cart line as typed by the caller (strings parsed at the IPC edge).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CartLineInput {
@@ -222,35 +261,6 @@ where
         }
     }
 
-    /// Verify a manager PIN override for this sale only (DSN-115).
-    ///
-    /// The named user must exist, be active, and carry `PriceOverride`
-    /// (Gérant/Admin), and the PIN must match the stored hash. Every
-    /// failure collapses to one LOUD code so callers cannot distinguish
-    /// "unknown user" from "wrong PIN".
-    fn verify_manager_override(&self, username: &str, pin: &str) -> Result<bool, ApplicationError> {
-        let name = username.trim();
-        if name.is_empty() || pin.is_empty() {
-            return Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED"));
-        }
-        let user = match self.users.find_by_username(name)? {
-            Some(found) => found,
-            None => return Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED")),
-        };
-        if !user.is_active || !user.role.has_permission(Permission::PriceOverride) {
-            return Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED"));
-        }
-        let valid = match self.users.get_pin_hash(user.id)? {
-            Some(hash) => self.hasher.verify(pin, &hash)?,
-            None => false,
-        };
-        if valid {
-            Ok(true)
-        } else {
-            Err(coded("MARGIN_GUARD_OVERRIDE_REJECTED"))
-        }
-    }
-
     /// Validate the sale and commit it atomically.
     /// ADR-025: `terminal_id` is resolved from TerminalContext at the IPC
     /// edge (never client-supplied) and bound into the atomic command.
@@ -312,7 +322,9 @@ where
         // here, never in the UI.
         if verified.iter().any(|line| line.is_below_cost) {
             let unlocked = match &input.below_cost_override {
-                Some(over) => self.verify_manager_override(&over.username, &over.pin)?,
+                Some(over) => {
+                    verify_manager_override(self.users, self.hasher, &over.username, &over.pin)?
+                }
                 None => false,
             };
             if !unlocked {

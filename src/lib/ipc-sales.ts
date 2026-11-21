@@ -648,3 +648,52 @@ export async function processSaleReturn(
     request: { ...payload },
   });
 }
+
+/** One alternate size/color sold inside an exchange (mirrors ExchangeNewItemDto). */
+export interface ExchangeNewItem {
+  product_id: string;
+  unit_id: string;
+  quantity_micro: string;
+}
+
+/** Single-shot exchange payload (mirrors DocumentsProcessExchangeRequestDto). */
+export interface ProcessExchangeRequest {
+  session_token: string;
+  source_document_id: string;
+  return_items: Array<{
+    source_item_id: string;
+    quantity_micro: string;
+  }>;
+  new_items: ExchangeNewItem[];
+  refund_method: "CASH" | "CUSTOMER_CREDIT" | "NO_REFUND";
+  below_cost_override: { manager_username: string; manager_pin: string } | null;
+  notes: string | null;
+}
+
+/** Single-shot exchange result (mirrors DocumentsProcessExchangeResponseDto). */
+export interface ProcessExchangeResponse {
+  return_document_id: string;
+  return_document_number: string;
+  sale_document_id: string;
+  sale_document_number: string;
+  return_ttc_centimes: string;
+  sale_ttc_centimes: string;
+  net_centimes: string;
+}
+
+/**
+ * Validate and atomically persist a size/color exchange through the
+ * simplified facade (BRK-125, Échange Express). Return legs reuse historic
+ * prices, alternates replay last-price memory, the net settles exactly.
+ * Rejects with the dedicated return taxonomy verbatim
+ * (RETURN_QUANTITY_EXCEEDED, INVALID_SOURCE_DOCUMENT_STATE,
+ * NO_ACTIVE_CASH_SESSION, MISSING_CUSTOMER_FOR_CREDIT_REFUND,
+ * EXCHANGE_PRICE_UNKNOWN, EXCHANGE_REFUND_REQUIRED, …).
+ */
+export async function processSaleExchange(
+  payload: ProcessExchangeRequest,
+): Promise<ProcessExchangeResponse> {
+  return call<ProcessExchangeResponse>("documents_process_exchange", {
+    request: { ...payload },
+  });
+}

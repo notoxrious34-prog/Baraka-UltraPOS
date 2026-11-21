@@ -8,7 +8,7 @@
 
 import { useEffect, type ReactElement } from "react";
 import { t } from "@/lib/i18n";
-import { formatMoney } from "@/lib/money";
+import { maskMoney } from "@/lib/money";
 import type { CartUnitSnapshot, Locale } from "@/types/pos";
 
 export interface UnitSelectPopoverProps {
@@ -18,6 +18,8 @@ export interface UnitSelectPopoverProps {
   selectedUnitIndex: number;
   onSelectUnit: (index: number) => void;
   locale: Locale;
+  /** Privacy shield: mask unit prices (BRK-127). */
+  shielded: boolean;
 }
 
 /** Exact factor multiplier tag (`"1000000"` -> `"x100"`). Pure. */
@@ -41,6 +43,7 @@ export function UnitSelectPopover({
   selectedUnitIndex,
   onSelectUnit,
   locale,
+  shielded,
 }: UnitSelectPopoverProps): ReactElement | null {
   useEffect(() => {
     if (!isOpen) {
@@ -108,7 +111,7 @@ export function UnitSelectPopover({
                     : factorTag(unit.factorMicro)}
                 </span>
                 <span className="shrink-0 font-mono text-[11px] font-black text-primary-600 dark:text-sky-300">
-                  {formatMoney(unit.salePriceCentimes, locale)}
+                  {maskMoney(shielded, unit.salePriceCentimes, locale)}
                 </span>
                 {active && (
                   <span className="shrink-0 font-black text-primary-600" aria-hidden="true">

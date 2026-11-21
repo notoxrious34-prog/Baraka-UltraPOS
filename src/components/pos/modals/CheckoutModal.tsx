@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { useCartStore } from "@/stores/cart-store";
 import { usePosUiStore } from "@/stores/pos-ui-store";
+import { usePrivacyShieldStore } from "@/stores/privacy-shield-store";
 import { useSessionStore } from "@/stores/session-store";
 import { t, translateBackendError } from "@/lib/i18n";
 import { addBig, formatMoney, formatQty, parseMoneyToCentimes } from "@/lib/money";
@@ -166,6 +167,7 @@ export function CheckoutModal(): ReactElement {
   const clearCart = useCartStore((state) => state.clearCart);
   const session = useSessionStore((state) => state.session);
   const warehouse = useSessionStore((state) => state.warehouse);
+  const shielded = usePrivacyShieldStore((state) => state.shielded);
 
   const [cashText, setCashText] = useState("");
   const [creditText, setCreditText] = useState("0");
@@ -562,9 +564,13 @@ export function CheckoutModal(): ReactElement {
     });
   };
 
-  /** Format a backend preview total ("…" while no preview has ever succeeded). */
+  /** Format a backend preview total (`"…"` while no preview has ever succeeded). */
   const fmt = (value: string | null | undefined): string =>
     value === null || value === undefined ? "…" : formatMoney(value, locale);
+
+  /** Privacy shield (BRK-127): the breakdown masks, the payable TTC stays. */
+  const fmtBreakdown = (value: string | null | undefined): string =>
+    shielded ? "•••" : fmt(value);
 
   /** Format a backend micro quantity ("…" on non-canonical input). */
   const fmtQty = (value: string | null | undefined): string => {
@@ -681,19 +687,19 @@ export function CheckoutModal(): ReactElement {
         <div className="rounded-lg bg-slate-100 p-3 text-sm dark:bg-slate-800">
           <div className="flex justify-between py-0.5">
             <span>{t(locale, "totals.subtotal")}</span>
-            <span dir="ltr" className="font-mono font-bold">{fmt(preview?.subtotal_ht_centimes)}</span>
+            <span dir="ltr" className="font-mono font-bold">{fmtBreakdown(preview?.subtotal_ht_centimes)}</span>
           </div>
           <div className="flex justify-between py-0.5">
             <span>{t(locale, "totals.discount")}</span>
-            <span dir="ltr" className="font-mono font-bold">−{fmt(preview?.global_discount_centimes)}</span>
+            <span dir="ltr" className="font-mono font-bold">−{fmtBreakdown(preview?.global_discount_centimes)}</span>
           </div>
           <div className="flex justify-between py-0.5">
             <span>{t(locale, "totals.tva")}</span>
-            <span dir="ltr" className="font-mono font-bold">{fmt(preview?.tva_total_centimes)}</span>
+            <span dir="ltr" className="font-mono font-bold">{fmtBreakdown(preview?.tva_total_centimes)}</span>
           </div>
           <div className="flex justify-between py-0.5">
             <span>{t(locale, "totals.timbre")}</span>
-            <span dir="ltr" className="font-mono font-bold">{fmt(preview?.timbre_centimes)}</span>
+            <span dir="ltr" className="font-mono font-bold">{fmtBreakdown(preview?.timbre_centimes)}</span>
           </div>
           <div className="flex justify-between py-0.5 text-base font-black">
             <span>{t(locale, "totals.total")}</span>

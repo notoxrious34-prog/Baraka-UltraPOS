@@ -148,3 +148,19 @@ export function creditUsageBp(balanceCentimes: string, limitCentimes: string): b
 export function newCommandId(): string {
   return crypto.randomUUID();
 }
+
+/**
+ * Counter-eyes price rendering (BRK-127): masked `•••` while the privacy
+ * shield is on, exact `formatMoney` otherwise. Never throws — a masked
+ * branch skips parsing entirely, so garbage input also masks safely.
+ */
+export function maskMoney(
+  shielded: boolean,
+  centimesStr: string,
+  locale: "ar-DZ" | "fr-DZ",
+): string {
+  if (shielded) {
+    return "•••";
+  }
+  return formatMoney(centimesStr, locale);
+}

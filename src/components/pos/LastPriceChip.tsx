@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, type ReactElement } from "react";
 import { ipcGetLastPrice } from "@/lib/ipc";
-import { formatMoney } from "@/lib/money";
+import { maskMoney } from "@/lib/money";
 import { t } from "@/lib/i18n";
 import { useSessionStore } from "@/stores/session-store";
 import type { LastPriceMemory, Locale } from "@/types/pos";
@@ -17,6 +17,8 @@ interface LastPriceChipProps {
   customerId: string | null;
   productId: string;
   unitId: string;
+  /** Privacy shield: mask the recalled price (BRK-127). */
+  shielded: boolean;
 }
 
 /** Effective transacted price (`price - discount`), garbage-safe. */
@@ -30,7 +32,7 @@ export function effectiveLastPrice(cell: LastPriceMemory): string | null {
 }
 
 export function LastPriceChip(props: LastPriceChipProps): ReactElement | null {
-  const { locale, customerId, productId, unitId } = props;
+  const { locale, customerId, productId, unitId, shielded } = props;
   const token = useSessionStore((state) => state.session?.token ?? null);
   const [cell, setCell] = useState<LastPriceMemory | null>(null);
 
@@ -67,7 +69,7 @@ export function LastPriceChip(props: LastPriceChipProps): ReactElement | null {
   }
   let label: string;
   try {
-    label = formatMoney(net, locale);
+    label = maskMoney(shielded, net, locale);
   } catch {
     return null;
   }

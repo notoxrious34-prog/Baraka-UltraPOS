@@ -9,10 +9,12 @@ import { isCheckoutPermitted, useCashSessionStore } from "@/stores/cash-session-
 import { isCreditBlocked } from "@/hooks/use-pos-keyboard";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { t } from "@/lib/i18n";
-import { formatMoney } from "@/lib/money";
+import { maskMoney } from "@/lib/money";
+import { usePrivacyShieldStore } from "@/stores/privacy-shield-store";
 
 export function TotalsFooter(): ReactElement {
   const locale = usePosUiStore((state) => state.locale);
+  const shielded = usePrivacyShieldStore((state) => state.shielded);
   const openModal = usePosUiStore((state) => state.openModal);
   const lines = useCartStore((state) => state.lines);
   const customer = useCartStore((state) => state.customer);
@@ -32,22 +34,22 @@ export function TotalsFooter(): ReactElement {
     <div className="shrink-0 border-t border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
         <span>{t(locale, "totals.subtotal")}</span>
-        <span className="font-mono">{formatMoney(totals.gross, locale)}</span>
+        <span className="font-mono">{maskMoney(shielded, totals.gross, locale)}</span>
       </div>
       <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
         <span>{t(locale, "totals.discount")}</span>
-        <span className="font-mono">−{formatMoney(totals.globalDiscount, locale)}</span>
+        <span className="font-mono">−{maskMoney(shielded, totals.globalDiscount, locale)}</span>
       </div>
       <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
         <span>{t(locale, "totals.tva")}</span>
-        <span className="font-mono">{formatMoney("0", locale)}</span>
+        <span className="font-mono">{maskMoney(shielded, "0", locale)}</span>
       </div>
       <div className="mt-1 flex h-16 items-center justify-between rounded-lg bg-slate-950 px-3">
         <span className="text-sm font-black uppercase tracking-wide text-amber-400">
           {t(locale, "totals.total")}
         </span>
         <span className="font-mono text-4xl font-black tabular-nums text-amber-400">
-          {formatMoney(totals.net, locale)}
+          {maskMoney(shielded, totals.net, locale)}
         </span>
       </div>
       <button

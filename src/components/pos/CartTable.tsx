@@ -16,7 +16,7 @@ import { usePosUiStore } from "@/stores/pos-ui-store";
 import { usePrivacyShieldStore } from "@/stores/privacy-shield-store";
 import { useEnsurePriceBreaks } from "@/hooks/use-price-breaks";
 import { t } from "@/lib/i18n";
-import { addBig, formatMoney, formatQty, subBig } from "@/lib/money";
+import { addBig, formatQty, maskMoney, subBig } from "@/lib/money";
 import { colisageShares, formatColisage } from "@/lib/colisage";
 import { UnitSelectPopover, factorTag, isBaseUnit } from "@/features/pos/UnitSelectPopover";
 import { LastPriceChip } from "@/components/pos/LastPriceChip";
@@ -185,6 +185,7 @@ export function CartTableView({
                     customerId={customerId}
                     productId={line.productId}
                     unitId={unit.unitId}
+                    shielded={shielded}
                   />
                 )}
                 {(tierPriced || belowCost) && (
@@ -277,6 +278,7 @@ export function CartTableView({
                   selectedUnitIndex={line.unitIndex}
                   onSelectUnit={(index) => onSelectUnit(line.key, index)}
                   locale={locale}
+                  shielded={shielded}
                 />
               </td>
               <td className="px-1 py-2 text-end font-mono text-xs font-bold">
@@ -284,14 +286,14 @@ export function CartTableView({
                   hasLineDiscount ? (
                     <span>
                       <s className="font-medium text-slate-400">
-                        <bdi dir="ltr">{formatMoney(rawPu, locale)}</bdi>
+                        <bdi dir="ltr">{maskMoney(shielded, rawPu, locale)}</bdi>
                       </s>{" "}
                       <bdi dir="ltr" className="text-emerald-700 dark:text-emerald-300">
-                        {formatMoney(netPu, locale)}
+                        {maskMoney(shielded, netPu, locale)}
                       </bdi>
                     </span>
                   ) : (
-                    formatMoney(rawPu, locale)
+                    maskMoney(shielded, rawPu, locale)
                   )
                 ) : (
                   "—"
@@ -327,7 +329,7 @@ export function CartTableView({
                 </span>
               </td>
               <td className="px-1 py-2 text-end font-mono text-xs font-black">
-                {formatMoney(previewLineTotal(line, customerTier), locale)}
+                {maskMoney(shielded, previewLineTotal(line, customerTier), locale)}
               </td>
               <td className="px-1 py-2 text-center">
                 <button

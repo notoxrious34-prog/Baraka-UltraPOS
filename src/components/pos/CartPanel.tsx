@@ -22,6 +22,10 @@ export function CartPanel(): ReactElement {
   const setDocType = useCartStore((state) => state.setDocType);
   const shielded = usePrivacyShieldStore((state) => state.shielded);
   const toggleShield = usePrivacyShieldStore((state) => state.toggleShield);
+  const activeModal = usePosUiStore((state) => state.activeModal);
+  // BRK-127: no flip during payment — the lock freezes both directions
+  // while the checkout modal owns the screen.
+  const shieldLocked = activeModal === "checkout";
   const openModal = usePosUiStore((state) => state.openModal);
   const lineCount = useCartStore((state) => state.lines.length);
 
@@ -33,6 +37,9 @@ export function CartPanel(): ReactElement {
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName ?? "";
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable === true) {
+        return;
+      }
+      if (usePosUiStore.getState().activeModal === "checkout") {
         return;
       }
       event.preventDefault();
@@ -79,8 +86,9 @@ export function CartPanel(): ReactElement {
           onClick={() => {
             toggleShield();
           }}
+          disabled={shieldLocked}
           aria-pressed={shielded}
-          title="Ctrl+H"
+          title={shieldLocked ? t(locale, "cart.shieldLocked") : "Ctrl+H"}
           className={`shrink-0 rounded-lg px-2 py-2 text-xs font-black ${
             shielded
               ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"

@@ -41,13 +41,13 @@ describe("effectiveLastPrice", () => {
 describe("LastPriceChip", () => {
   it("renders nothing without a session (SSR-safe, no crash)", () => {
     const html = renderToStaticMarkup(
-      <LastPriceChip locale="fr-DZ" customerId="cust-1" productId="p-1" unitId="u-1" />,
+      <LastPriceChip locale="fr-DZ" customerId="cust-1" productId="p-1" unitId="u-1" shielded={false} />,
     );
     expect(html).toBe("");
   });
   it("renders nothing for guest customers", () => {
     const html = renderToStaticMarkup(
-      <LastPriceChip locale="ar-DZ" customerId={null} productId="p-1" unitId="u-1" />,
+      <LastPriceChip locale="ar-DZ" customerId={null} productId="p-1" unitId="u-1" shielded={false} />,
     );
     expect(html).toBe("");
   });

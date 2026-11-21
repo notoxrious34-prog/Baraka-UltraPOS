@@ -148,6 +148,7 @@ describe("UnitSelectPopover rendering", () => {
         selectedUnitIndex={1}
         onSelectUnit={noop}
         locale="fr-DZ"
+        shielded={false}
       />,
     );
     expect(html).toContain("Pièce");
@@ -167,6 +168,7 @@ describe("UnitSelectPopover rendering", () => {
         selectedUnitIndex={0}
         onSelectUnit={noop}
         locale="fr-DZ"
+        shielded={false}
       />,
     );
     expect(html).toBe("");

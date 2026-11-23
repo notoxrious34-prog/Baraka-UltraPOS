@@ -64,7 +64,7 @@ no floats; atomic sale untouched; Gates G1–G7 per wave; innovation section
 - `TASK-BRK-116` — Signals engine (`Rupture de Série`/broken size-run alerts, seasonality & dead-stock radar, model profitability, credit-aging buckets) with **per-profile thresholds** (textile vs hardware).
 - `TASK-DSN-110` — Intelligence cockpit (alerts + radar + aging, FR/AR, dark-ready).
 - `TASK-DSN-117` — Offline available-assortment catalog for WhatsApp/PDF (live sizes/colors + *Série* fill, price mode wholesale/super-gros/none).
-- `TASK-REL-063` — v2.0 release bundle (G8) with trial-installer evidence chain, **preceded by the readiness wave**: `BRK-128` dual USB backup on cash close (+48h alert), training Sandbox, idle fiscal seam (`XS`), local `.sig` signing + one-click updater.
+- `TASK-REL-063` — v2.0 release bundle (G8) with trial-installer evidence chain, **preceded by the readiness wave**: `BRK-128` dual USB backup on cash close (+48h alert) ✓ `936128e`, training Sandbox ✓ `2386ac9` (+runbook `docs/operations/training-sandbox.md`, live banner proof `brk131-sandbox-banner.png`), local `.sig` signing + one-click updater (runbook `docs/operations/local-signing.md`; key ceremony by owner) — open: idle fiscal seam (`XS`, needs spec).
 - After Wave 5: `BRK-124` counter sync (schema already covers matrix/série tables); owner reading companion (dual-mode, LAN-only); scanner stocktake; `PRT-06` field session whenever hardware lands.
 
 ---

@@ -7,6 +7,7 @@ import type { Locale } from "@/types/pos";
 
 const fr = {
   "app.title": "Baraka UltraPOS",
+  "app.sandboxBanner": "MODE FORMATION — base d'entraînement, pas la caisse réelle",
   "app.subtitle": "Quincaillerie Générale — Hors-ligne",
   "brand.tagline": "Système Baraka de gestion des ventes et du stock",
   "settings.tabAbout": "À propos",
@@ -1373,6 +1374,7 @@ export type I18nKey = keyof typeof fr;
 
 const ar: Record<I18nKey, string> = {
   "app.title": "بركة UltraPOS",
+  "app.sandboxBanner": "وضع التدريب — قاعدة تدريبية وليست الصندوق الحقيقي",
   "app.subtitle": "مواد البناء — يعمل دون إنترنت",
   "brand.tagline": "نظام بركة لإدارة المبيعات والمخزون",
   "settings.tabAbout": "حول",

@@ -32,6 +32,15 @@ pub struct HealthDto {
     pub offline_ready: bool,
 }
 
+/// Startup environment response (TASK-BRK-131, training sandbox).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnvironmentDto {
+    /// True only under a `BARAKA_DATA_DIR` override (NOT the live till).
+    pub sandbox: bool,
+    /// Sovereign terminal identifier (managed state, never client input).
+    pub terminal_id: String,
+}
+
 impl From<HealthSnapshot> for HealthDto {
     fn from(snapshot: HealthSnapshot) -> Self {
         Self {

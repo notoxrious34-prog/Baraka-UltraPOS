@@ -25,7 +25,10 @@ pub mod suppliers;
 // Kernel re-export: `AppState` and `app_health` keep their external paths
 // (`baraka_commands::ipc::AppState`); the helpers resolve the
 // `use super::{...}` imports at the top of every domain module.
-pub use common::{__cmd__app_health, __tauri_command_name_app_health, app_health, AppState};
+pub use common::{
+    __cmd__app_environment, __cmd__app_health, __tauri_command_name_app_environment,
+    __tauri_command_name_app_health, app_environment, app_health, AppState,
+};
 pub(crate) use common::{
     adjust_error_code, error_code, parse_cart_line_dto, parse_customer_tier, parse_payment_dto,
     parse_unit_dto, parse_upsert_unit_dto, parse_wire_id, parse_wire_int, require_session,

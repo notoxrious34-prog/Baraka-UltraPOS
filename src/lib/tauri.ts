@@ -36,6 +36,32 @@ export async function fetchAppHealth(): Promise<AppHealth> {
   };
 }
 
+/** Sandbox environment flag (mirrors EnvironmentDto). */
+export interface AppEnvironment {
+  sandbox: boolean;
+  terminalId: string;
+}
+
+/**
+ * Query the Rust core environment command.
+ * Browser dev mode degrades to a non-sandbox baseline (never claims
+ * sandbox falsely in the wrong direction: the banner only paints when
+ * the backend explicitly reports the override).
+ */
+export async function fetchAppEnvironment(): Promise<AppEnvironment> {
+  const runtime = detectRuntime();
+  if (runtime === "tauri") {
+    const { invoke } = await import("@tauri-apps/api/core");
+    interface EnvironmentWire {
+      sandbox: boolean;
+      terminal_id: string;
+    }
+    const wire = await invoke<EnvironmentWire>("app_environment");
+    return { sandbox: wire.sandbox, terminalId: wire.terminal_id };
+  }
+  return { sandbox: false, terminalId: "browser-dev" };
+}
+
 /** Narrow an unknown throw into a displayable French message. */
 export function toDisplayError(error: unknown): string {
   if (typeof error === "string" && error.trim().length > 0) {

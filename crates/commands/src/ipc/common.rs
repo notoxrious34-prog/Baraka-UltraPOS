@@ -26,8 +26,8 @@ use baraka_domain::sales::{CustomerTier, PaymentMethod};
 use uuid::Uuid;
 
 use crate::dto::{
-    CartLineItemDto, CommandErrorDto, HealthDto, KitItemDto, NewProductUnitDto, PaymentLineDto,
-    ProductResponseDto, ProductUnitDto, UpdateProductUnitDto,
+    CartLineItemDto, CommandErrorDto, EnvironmentDto, HealthDto, KitItemDto, NewProductUnitDto,
+    PaymentLineDto, ProductResponseDto, ProductUnitDto, UpdateProductUnitDto,
 };
 
 /// Shared backend handles for command handlers.
@@ -101,6 +101,9 @@ pub struct AppState {
     pub backup_dir: std::path::PathBuf,
     /// Sovereign terminal identifier (managed state, never client input).
     pub terminal_id: String,
+    /// Training-sandbox flag (TASK-BRK-131): true when the process runs on
+    /// a `BARAKA_DATA_DIR` override — the database is NOT the live till.
+    pub sandbox_mode: bool,
 }
 
 /// `app_health` command: returns the baseline health snapshot.
@@ -110,6 +113,21 @@ pub struct AppState {
 pub fn app_health() -> Result<HealthDto, CommandErrorDto> {
     let snapshot = baraka_application::use_cases::health_snapshot();
     Ok(HealthDto::from(snapshot))
+}
+
+/// `app_environment` command (TASK-BRK-131): sandbox flag + terminal id.
+///
+/// Read-only, session-free (the shell needs it before login to paint the
+/// training banner). `sandbox` is true only under a `BARAKA_DATA_DIR`
+/// override — the single source of truth, computed once at startup.
+#[tauri::command(rename_all = "snake_case")]
+pub fn app_environment(
+    state: tauri::State<'_, AppState>,
+) -> Result<EnvironmentDto, CommandErrorDto> {
+    Ok(EnvironmentDto {
+        sandbox: state.sandbox_mode,
+        terminal_id: state.terminal_id.clone(),
+    })
 }
 
 /// Map an application failure to a stable wire code.

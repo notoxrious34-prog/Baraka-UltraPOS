@@ -30,6 +30,7 @@ import {
   type IconProps,
 } from "@/components/icons";
 import { LoginScreen } from "@/features/auth/LoginScreen";
+import { SandboxBanner } from "@/components/common/SandboxBanner";
 import { FirstRunSetupScreen } from "@/features/auth/FirstRunSetupScreen";
 import { SuppliersModule } from "@/features/suppliers/SupplierListScreen";
 import { CustomersModule } from "@/features/customers/CustomersModule";
@@ -236,6 +237,7 @@ export function AppShell({
       lang={locale === "ar-DZ" ? "ar" : "fr"}
       className={`h-full ${locale === "ar-DZ" ? "font-arabic" : "font-sans"}`}
     >
+      <SandboxBanner />
       {getSessionToken() === null ? (
         <UnauthenticatedGate />
       ) : (

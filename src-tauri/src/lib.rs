@@ -184,6 +184,7 @@ pub fn run() {
                 factory_reset: backups,
                 backup_dir: data_dir.join("backups"),
                 terminal_id,
+                sandbox_mode: data_dir_override,
             };
             app.manage(state);
             let worker_handle = spawn_print_worker(
@@ -236,6 +237,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             baraka_commands::ipc::app_health,
+            baraka_commands::ipc::app_environment,
             baraka_commands::ipc::auth_login,
             baraka_commands::ipc::auth_logout,
             baraka_commands::ipc::check_first_run_status,

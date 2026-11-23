@@ -20,9 +20,9 @@ use baraka_infrastructure::adapters::{
     SqliteCashSessionRepository, SqliteCatalogRepository, SqliteCheckoutRepository,
     SqliteCustomerRepository, SqliteDocumentRepository, SqliteFiscalSettings,
     SqlitePrintJobRepository, SqlitePrinterSettings, SqlitePurchaseRepository,
-    SqliteReportingRepository, SqliteReturnRepository, SqliteStockRepository,
-    SqliteSupplierRepository, SqliteUserRepository, SqliteVariantMatrixRepository,
-    SqliteWarehouseRepository, SystemClock,
+    SqliteReportingRepository, SqliteReturnRepository, SqliteSignalRepository,
+    SqliteStockRepository, SqliteSupplierRepository, SqliteUserRepository,
+    SqliteVariantMatrixRepository, SqliteWarehouseRepository, SystemClock,
 };
 use baraka_infrastructure::persistence::connection::{
     ensure_database_dir, open_connection, resolve_database_path,
@@ -177,6 +177,7 @@ pub fn run() {
                 suppliers: Arc::new(SqliteSupplierRepository::new(Arc::clone(&db))),
                 purchases: Arc::new(SqlitePurchaseRepository::new(Arc::clone(&db))),
                 reports: Arc::new(SqliteReportingRepository::new(Arc::clone(&db))),
+                signals: Arc::new(SqliteSignalRepository::new(Arc::clone(&db))),
                 returns: Arc::new(SqliteReturnRepository::new(Arc::clone(&db))),
                 backups: backups.clone(),
                 backup_hardening: hardening,
@@ -356,6 +357,7 @@ pub fn run() {
             baraka_commands::ipc::reports_low_stock,
             baraka_commands::ipc::reports_replenishment_radar,
             baraka_commands::ipc::reports_unit_sales_mix,
+            baraka_commands::ipc::reports_signals,
             baraka_commands::ipc::reports_user_activity
         ])
         .build(tauri::generate_context!())

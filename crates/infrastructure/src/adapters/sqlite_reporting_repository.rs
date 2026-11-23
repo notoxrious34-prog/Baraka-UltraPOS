@@ -53,7 +53,7 @@ impl SqliteReportingRepository {
 /// Fixed-width ISO days compare lexicographically, so the day after `to`
 /// is computed by calendar rollover. Returns `None` on malformed input
 /// (use cases pre-validate; this is a second defensive gate).
-fn day_after(to: &str) -> Option<String> {
+pub(crate) fn day_after(to: &str) -> Option<String> {
     let year: i32 = to[0..4].parse().ok()?;
     let month: i32 = to[5..7].parse().ok()?;
     let day: i32 = to[8..10].parse().ok()?;

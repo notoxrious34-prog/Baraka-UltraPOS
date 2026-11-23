@@ -8,12 +8,13 @@ use baraka_application::use_cases::reports::{
 };
 
 use crate::dto::{
-    CashSessionHistoryRowDto, CashSessionsHistoryRequestDto, CreditOutstandingRowDto,
-    DailySalesSummaryDto, GrossMarginRowDto, LowStockRequestDto, LowStockRowDto,
+    AgingBucketsDto, BrokenCellDto, BrokenRunDto, CashSessionHistoryRowDto,
+    CashSessionsHistoryRequestDto, CreditOutstandingRowDto, DailySalesSummaryDto, DeadStockDto,
+    GrossMarginRowDto, LowStockRequestDto, LowStockRowDto, ModelMarginDto,
     ReplenishmentRadarRequestDto, ReplenishmentRowDto, ReportDateRangeRequestDto,
-    SalesByCategoryRowDto, SalesByProductRowDto, StockMovementHistoryRequestDto,
-    StockMovementRowDto, UnitMixRowDto, UnitSalesMixRequestDto, UserActivityRequestDto,
-    UserActivityRowDto,
+    SalesByCategoryRowDto, SalesByProductRowDto, SignalsRequestDto, SignalsResponseDto,
+    StockMovementHistoryRequestDto, StockMovementRowDto, UnitMixRowDto, UnitSalesMixRequestDto,
+    UserActivityRequestDto, UserActivityRowDto, VelocityDto,
 };
 
 fn to_daily_sales_dto(row: &baraka_application::ports::DailySalesRow) -> DailySalesSummaryDto {
@@ -333,4 +334,67 @@ pub fn reports_user_activity(
             new_value_json: row.new_value_json.clone(),
         })
         .collect())
+}
+
+/// `reports.signals` command (Gerant/Admin, read-only cockpit feed).
+#[tauri::command(rename_all = "snake_case")]
+pub fn reports_signals(
+    state: tauri::State<'_, AppState>,
+    request: SignalsRequestDto,
+) -> Result<SignalsResponseDto, String> {
+    use baraka_application::use_cases::signals::ComputeSignalsUseCase;
+    let session = require_session(&state, &request.session_token)?;
+    let output =
+        ComputeSignalsUseCase::new(state.signals.as_ref(), state.vertical_profile.as_ref())
+            .compute(&session, request.window_days.unwrap_or(30), None)
+            .map_err(|error| error_code(&error))?;
+    Ok(SignalsResponseDto {
+        profile: output.profile.as_str().to_string(),
+        broken_runs: output
+            .broken_runs
+            .into_iter()
+            .map(|run| BrokenRunDto {
+                model_id: run.model_id,
+                cells: run
+                    .cells
+                    .into_iter()
+                    .map(|cell| BrokenCellDto {
+                        axis1_value: cell.axis1_value,
+                        axis2_value: cell.axis2_value,
+                        sibling_units_sold: cell.sibling_units_sold.to_string(),
+                    })
+                    .collect(),
+            })
+            .collect(),
+        dead_stock: output
+            .dead_stock
+            .into_iter()
+            .map(|item| DeadStockDto {
+                product_id: item.product_id,
+                qty_on_hand_micro: item.qty_on_hand_micro.to_string(),
+                days_since_last_movement: item.days_since_last_movement.to_string(),
+            })
+            .collect(),
+        velocity: output.velocity.map(|velocity| VelocityDto {
+            units_per_day: velocity.units_per_day.to_string(),
+            is_slow: velocity.is_slow,
+            trend_bps: velocity.trend_bps.map(|trend| trend.to_string()),
+        }),
+        model_margins: output
+            .model_margins
+            .into_iter()
+            .map(|margin| ModelMarginDto {
+                model_id: margin.model_id,
+                revenue_centimes: margin.revenue_centimes.to_string(),
+                cogs_centimes: margin.cogs_centimes.to_string(),
+                margin_bps: margin.margin_bps.map(|bps| bps.to_string()),
+            })
+            .collect(),
+        aging: AgingBucketsDto {
+            bucket_0_30_centimes: output.aging.bucket_0_30.centimes().to_string(),
+            bucket_31_60_centimes: output.aging.bucket_31_60.centimes().to_string(),
+            bucket_61_90_centimes: output.aging.bucket_61_90.centimes().to_string(),
+            bucket_90_plus_centimes: output.aging.bucket_90_plus.centimes().to_string(),
+        },
+    })
 }

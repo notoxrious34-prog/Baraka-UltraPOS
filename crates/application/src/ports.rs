@@ -2731,6 +2731,97 @@ pub trait ReportingRepository: Send + Sync {
     ) -> Result<Vec<UserActivityRow>, ApplicationError>;
 }
 
+/// One matrix cell with demand evidence (TASK-BRK-116).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellDemandRow {
+    /// Variant model id.
+    pub model_id: String,
+    /// Caller-stable ordering key (axis1_sort, then axis2_sort).
+    pub cell_index: usize,
+    /// Human labels for the cockpit (`M / Noir`).
+    pub axis1_value: String,
+    pub axis2_value: String,
+    /// Product behind the cell.
+    pub product_id: String,
+    /// On-hand base micros summed across warehouses.
+    pub qty_on_hand_micro: i64,
+    /// Base units sold through committed sales inside the window.
+    pub units_sold_window: u64,
+}
+
+/// One stocked product with its last movement age (TASK-BRK-116).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProductRecencyRow {
+    /// Product id.
+    pub product_id: String,
+    /// On-hand base micros summed across warehouses.
+    pub qty_on_hand_micro: i64,
+    /// Days since the last stock movement; `None` = never moved.
+    pub days_since_last_movement: Option<u32>,
+}
+
+/// One model's settled economics inside the window (TASK-BRK-116).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelEconomicsRow {
+    /// Variant model id.
+    pub model_id: String,
+    /// Settled revenue (committed sales, centimes).
+    pub revenue_centimes: i64,
+    /// Settled cost of goods sold (committed lines, centimes).
+    pub cogs_centimes: i64,
+}
+
+/// One open ledger entry with its age (TASK-BRK-116).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreditExposureRow {
+    /// Customer id.
+    pub customer_id: String,
+    /// Signed entry amount in centimes (advances stay negative).
+    pub balance_centimes: i64,
+    /// Entry age in days.
+    pub age_days: u32,
+}
+
+/// One calendar day of demand (TASK-BRK-116).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DailyUnitsRow {
+    /// Calendar day (`YYYY-MM-DD`).
+    pub day: String,
+    /// Base units sold through committed sales.
+    pub base_units: u64,
+}
+
+/// Signal-economy read port (TASK-BRK-116, Wave 5).
+///
+/// Strictly read-only analytics over settled truth: committed sales,
+/// summed stock, open ledger entries. No thresholds here — the use case
+/// pairs these rows with [`baraka_domain::analytics::signals`]
+/// detectors and per-profile [`baraka_domain::analytics::signals::SignalThresholds`].
+pub trait SignalRepository: Send + Sync {
+    /// Every matrix cell with on-hand stock and window demand.
+    fn cell_demand(&self, window_days: u32) -> Result<Vec<CellDemandRow>, ApplicationError>;
+
+    /// Every stocked product with its last-movement age.
+    fn product_recency(&self) -> Result<Vec<ProductRecencyRow>, ApplicationError>;
+
+    /// Per-model settled revenue + COGS inside the window.
+    fn model_economics(&self, window_days: u32)
+        -> Result<Vec<ModelEconomicsRow>, ApplicationError>;
+
+    /// Open ledger entries, oldest first, capped at `limit`.
+    fn credit_exposure_entries(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<CreditExposureRow>, ApplicationError>;
+
+    /// Base units sold per calendar day in range (inclusive).
+    fn daily_units(
+        &self,
+        date_from: &str,
+        date_to: &str,
+    ) -> Result<Vec<DailyUnitsRow>, ApplicationError>;
+}
+
 /// Backup snapshot verification outcome.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BackupVerification {

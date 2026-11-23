@@ -12,8 +12,8 @@ use baraka_application::ports::{
     FiscalSettingsPort, PasswordHasher, PrintJobRepository, PrinterSettingsPort,
     PrinterTransportPort, ProductRepository, PurchaseRepository, ReceiptRendererPort,
     ReportingRepository, ReturnRepository, SessionContext, SessionStore, SessionToken,
-    StockRepository, StoreIdentityPort, SupplierRepository, TsplLabelRasterPort, UserRepository,
-    VariantMatrixRepository, VerticalProfilePort, WarehouseRepository,
+    SignalRepository, StockRepository, StoreIdentityPort, SupplierRepository, TsplLabelRasterPort,
+    UserRepository, VariantMatrixRepository, VerticalProfilePort, WarehouseRepository,
 };
 use baraka_application::use_cases::catalog::{
     NewUnitInput, ProductDetail, ProductImportRepository, UnitUpsert,
@@ -87,6 +87,8 @@ pub struct AppState {
     pub purchases: Arc<dyn PurchaseRepository>,
     /// Read-only reporting views over transactional tables.
     pub reports: Arc<dyn ReportingRepository>,
+    /// Signal-economy reads (same SQLite store, BRK-116).
+    pub signals: Arc<dyn SignalRepository>,
     /// Return bundle persistence (cumulative reads + atomic writes).
     pub returns: Arc<dyn ReturnRepository>,
     /// Backup snapshot persistence and audit rows.

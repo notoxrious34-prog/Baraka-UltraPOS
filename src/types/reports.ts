@@ -154,3 +154,56 @@ export interface UserActivityFilters extends ReportDateRange {
   limit: string;
   offset: string;
 }
+
+/** One broken cell (zero stock, live siblings). */
+export interface BrokenCell {
+  axis1Value: string;
+  axis2Value: string;
+  siblingUnitsSold: string;
+}
+
+/** One broken size run. */
+export interface BrokenRun {
+  modelId: string;
+  cells: BrokenCell[];
+}
+
+/** One dead-stock line. */
+export interface DeadStockLine {
+  productId: string;
+  qtyOnHandMicro: string;
+  daysSinceLastMovement: string;
+}
+
+/** One model's settled margin. */
+export interface ModelMarginLine {
+  modelId: string;
+  revenueCentimes: string;
+  cogsCentimes: string;
+  marginBps: string | null;
+}
+
+/** Credit exposure by age. */
+export interface SignalAging {
+  bucket030Centimes: string;
+  bucket3160Centimes: string;
+  bucket6190Centimes: string;
+  bucket90PlusCentimes: string;
+}
+
+/** Demand velocity over the window. */
+export interface SignalVelocity {
+  unitsPerDay: string;
+  isSlow: boolean;
+  trendBps: string | null;
+}
+
+/** Full signal-cockpit feed (BRK-116). */
+export interface SignalsFeed {
+  profile: string;
+  brokenRuns: BrokenRun[];
+  deadStock: DeadStockLine[];
+  velocity: SignalVelocity | null;
+  modelMargins: ModelMarginLine[];
+  aging: SignalAging;
+}

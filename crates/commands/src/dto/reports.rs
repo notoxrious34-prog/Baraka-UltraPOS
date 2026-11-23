@@ -307,3 +307,72 @@ pub struct LowStockRequestDto {
     /// Optional warehouse filter (`None` covers all warehouses).
     pub warehouse_id: Option<String>,
 }
+
+/// `reports.signals` request (Gerant/Admin, read-only cockpit feed).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignalsRequestDto {
+    /// Authorizing session token.
+    pub session_token: String,
+    /// Trailing window in days (`None` selects 30, clamped 1..=365).
+    pub window_days: Option<u32>,
+}
+
+/// One broken cell (zero stock, live siblings).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrokenCellDto {
+    pub axis1_value: String,
+    pub axis2_value: String,
+    pub sibling_units_sold: String,
+}
+
+/// One broken size run (model with starved cells).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrokenRunDto {
+    pub model_id: String,
+    pub cells: Vec<BrokenCellDto>,
+}
+
+/// One dead-stock line.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeadStockDto {
+    pub product_id: String,
+    pub qty_on_hand_micro: String,
+    pub days_since_last_movement: String,
+}
+
+/// One model's settled margin.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelMarginDto {
+    pub model_id: String,
+    pub revenue_centimes: String,
+    pub cogs_centimes: String,
+    pub margin_bps: Option<String>,
+}
+
+/// Credit exposure by age (centime strings).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgingBucketsDto {
+    pub bucket_0_30_centimes: String,
+    pub bucket_31_60_centimes: String,
+    pub bucket_61_90_centimes: String,
+    pub bucket_90_plus_centimes: String,
+}
+
+/// Demand velocity over the window.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VelocityDto {
+    pub units_per_day: String,
+    pub is_slow: bool,
+    pub trend_bps: Option<String>,
+}
+
+/// Full `reports.signals` response (one computation, five signals).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignalsResponseDto {
+    pub profile: String,
+    pub broken_runs: Vec<BrokenRunDto>,
+    pub dead_stock: Vec<DeadStockDto>,
+    pub velocity: Option<VelocityDto>,
+    pub model_margins: Vec<ModelMarginDto>,
+    pub aging: AgingBucketsDto,
+}

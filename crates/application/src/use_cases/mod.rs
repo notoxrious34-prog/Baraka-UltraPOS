@@ -17,6 +17,7 @@ pub mod receive_matrix;
 pub mod reports;
 pub mod returns;
 pub mod sales;
+pub mod signals;
 pub mod studio_printing;
 pub mod suppliers;
 pub mod tspl_printing;

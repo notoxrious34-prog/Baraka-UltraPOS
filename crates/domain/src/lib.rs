@@ -4,6 +4,7 @@
 //! Money is integer DZD centimes (`Money`); quantities and factors are
 //! integer micros at scale 10^4. Zero floating-point math.
 
+pub mod analytics;
 pub mod backup;
 pub mod cash;
 pub mod catalog;

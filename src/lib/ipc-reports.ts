@@ -11,15 +11,21 @@
  */
 
 import type {
+  BrokenRun,
   CashSessionHistoryRow,
   CreditOutstandingRow,
   DailySalesRow,
+  DeadStockLine,
   GrossMarginRow,
   LowStockRow,
+  ModelMarginLine,
   ReplenishmentRow,
   ReportDateRange,
   SalesByCategoryRow,
   SalesByProductRow,
+  SignalAging,
+  SignalsFeed,
+  SignalVelocity,
   StockMovementFilters,
   StockMovementRow,
   UnitMixRow,
@@ -370,4 +376,101 @@ export async function ipcUserActivity(
     oldValueJson: row.old_value_json,
     newValueJson: row.new_value_json,
   }));
+}
+
+interface BrokenCellWire {
+  axis1_value: string;
+  axis2_value: string;
+  sibling_units_sold: string;
+}
+
+interface BrokenRunWire {
+  model_id: string;
+  cells: BrokenCellWire[];
+}
+
+interface DeadStockWire {
+  product_id: string;
+  qty_on_hand_micro: string;
+  days_since_last_movement: string;
+}
+
+interface ModelMarginWire {
+  model_id: string;
+  revenue_centimes: string;
+  cogs_centimes: string;
+  margin_bps: string | null;
+}
+
+interface AgingBucketsWire {
+  bucket_0_30_centimes: string;
+  bucket_31_60_centimes: string;
+  bucket_61_90_centimes: string;
+  bucket_90_plus_centimes: string;
+}
+
+interface VelocityWire {
+  units_per_day: string;
+  is_slow: boolean;
+  trend_bps: string | null;
+}
+
+interface SignalsFeedWire {
+  profile: string;
+  broken_runs: BrokenRunWire[];
+  dead_stock: DeadStockWire[];
+  velocity: VelocityWire | null;
+  model_margins: ModelMarginWire[];
+  aging: AgingBucketsWire;
+}
+
+/** Signal-cockpit feed: five signals in one read-only computation (BRK-116). */
+export async function ipcSignals(
+  sessionToken: string,
+  windowDays?: number,
+): Promise<SignalsFeed> {
+  const wire = await call<SignalsFeedWire>("reports_signals", {
+    request: {
+      session_token: sessionToken,
+      window_days: windowDays ?? null,
+    },
+  });
+  const toRun = (run: BrokenRunWire): BrokenRun => ({
+    modelId: run.model_id,
+    cells: run.cells.map((cell) => ({
+      axis1Value: cell.axis1_value,
+      axis2Value: cell.axis2_value,
+      siblingUnitsSold: cell.sibling_units_sold,
+    })),
+  });
+  const toDead = (line: DeadStockWire): DeadStockLine => ({
+    productId: line.product_id,
+    qtyOnHandMicro: line.qty_on_hand_micro,
+    daysSinceLastMovement: line.days_since_last_movement,
+  });
+  const toMargin = (margin: ModelMarginWire): ModelMarginLine => ({
+    modelId: margin.model_id,
+    revenueCentimes: margin.revenue_centimes,
+    cogsCentimes: margin.cogs_centimes,
+    marginBps: margin.margin_bps,
+  });
+  const toVelocity = (velocity: VelocityWire): SignalVelocity => ({
+    unitsPerDay: velocity.units_per_day,
+    isSlow: velocity.is_slow,
+    trendBps: velocity.trend_bps,
+  });
+  const toAging = (aging: AgingBucketsWire): SignalAging => ({
+    bucket030Centimes: aging.bucket_0_30_centimes,
+    bucket3160Centimes: aging.bucket_31_60_centimes,
+    bucket6190Centimes: aging.bucket_61_90_centimes,
+    bucket90PlusCentimes: aging.bucket_90_plus_centimes,
+  });
+  return {
+    profile: wire.profile,
+    brokenRuns: wire.broken_runs.map(toRun),
+    deadStock: wire.dead_stock.map(toDead),
+    velocity: wire.velocity === null ? null : toVelocity(wire.velocity),
+    modelMargins: wire.model_margins.map(toMargin),
+    aging: toAging(wire.aging),
+  };
 }

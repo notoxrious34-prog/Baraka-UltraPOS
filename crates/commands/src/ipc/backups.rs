@@ -393,6 +393,7 @@ fn to_last_status_dto(status: &baraka_domain::backup::LastBackupStatus) -> LastB
         file_name: status.file_name.clone(),
         created_at: status.created_at.clone(),
         error_message: status.error_message.clone(),
+        stale_48h: status.stale_48h,
     }
 }
 
@@ -426,8 +427,16 @@ pub fn backup_hardening_status(
         .usb_destination()
         .map_err(|error| error_code(&error))?
         .map(|path| path.to_string_lossy().to_string());
+    let usb_destination_2 = state
+        .backup_hardening
+        .as_ref()
+        .usb_destinations()
+        .map_err(|error| error_code(&error))?
+        .get(1)
+        .cloned()
+        .map(|path| path.to_string_lossy().to_string());
     let last_status = LastBackupStatusUseCase::new(state.backups.as_ref())
-        .read()
+        .read(state.clock.as_ref())
         .map_err(|error| error_code(&error))?;
     let due = ScheduledBackupUseCase::new(
         state.backups.as_ref(),
@@ -439,6 +448,7 @@ pub fn backup_hardening_status(
     Ok(BackupHardeningStatusDto {
         schedule: to_backup_schedule_dto(&schedule),
         usb_destination,
+        usb_destination_2,
         last_status: to_last_status_dto(&last_status),
         due: to_scheduled_report_dto(&due),
     })
@@ -499,6 +509,16 @@ pub fn backup_hardening_configure(
         .as_ref()
         .set_usb_destination(usb.map(std::path::Path::new))
         .map_err(|error| error_code(&error))?;
+    let usb2 = request
+        .usb_destination_2
+        .as_deref()
+        .map(str::trim)
+        .filter(|text| !text.is_empty());
+    state
+        .backup_hardening
+        .as_ref()
+        .set_usb_second_destination(usb2.map(std::path::Path::new))
+        .map_err(|error| error_code(&error))?;
     Ok(to_backup_schedule_dto(&schedule))
 }
 
@@ -529,6 +549,6 @@ pub fn backup_schedule_run(
     .map_err(|error| error_code(&error))?;
     Ok(ScheduledRunOutcomeDto {
         backup: to_backup_dto(&outcome.backup),
-        usb: outcome.usb.as_ref().map(to_usb_outcome_dto),
+        usb: outcome.usb.iter().map(to_usb_outcome_dto).collect(),
     })
 }

@@ -33,6 +33,8 @@ pub mod backup_keys {
     pub const TIME: &str = "backup.time";
     /// Removable USB destination directory.
     pub const USB_DEST: &str = "backup.usb_destination";
+    /// SECONDARY removable USB destination (TASK-BRK-128, separate key).
+    pub const USB_DEST_2: &str = "backup.usb_destination_2";
 }
 
 /// Schedule + USB-mirror persistence over the shared SQLite connection.
@@ -117,12 +119,34 @@ impl BackupHardeningPort for SqliteBackupHardening {
         Ok(value.map(PathBuf::from))
     }
 
+    fn usb_destinations(&self) -> Result<Vec<PathBuf>, ApplicationError> {
+        let mut out = Vec::with_capacity(2);
+        for key in [backup_keys::USB_DEST, backup_keys::USB_DEST_2] {
+            let value = self
+                .read_key(key)
+                .map(|text| text.trim().to_string())
+                .filter(|text| !text.is_empty());
+            if let Some(dir) = value {
+                out.push(PathBuf::from(dir));
+            }
+        }
+        Ok(out)
+    }
+
     fn set_usb_destination(&self, path: Option<&Path>) -> Result<(), ApplicationError> {
         let value = match path {
             Some(dest) => dest.to_string_lossy().trim().to_string(),
             None => String::new(),
         };
         self.write_key(backup_keys::USB_DEST, &value)
+    }
+
+    fn set_usb_second_destination(&self, path: Option<&Path>) -> Result<(), ApplicationError> {
+        let value = match path {
+            Some(dest) => dest.to_string_lossy().trim().to_string(),
+            None => String::new(),
+        };
+        self.write_key(backup_keys::USB_DEST_2, &value)
     }
 
     fn copy_to_usb(

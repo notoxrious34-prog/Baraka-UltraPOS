@@ -58,7 +58,7 @@ pub struct ScheduledBackupReportDto {
     pub next_run_at: Option<String>,
 }
 
-/// Durable last-backup status (TASK-BRK-092).
+/// Durable last-backup status (TASK-BRK-092, staleness TASK-BRK-128).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LastBackupStatusDto {
     /// `SUCCESS`, `FAILED`, `CORRUPTED`, `PRUNED`, or empty.
@@ -69,6 +69,8 @@ pub struct LastBackupStatusDto {
     pub created_at: Option<String>,
     /// Failure detail, if any.
     pub error_message: Option<String>,
+    /// True when no SUCCESS backup landed in the trailing 48h (or never).
+    pub stale_48h: bool,
 }
 
 /// USB copy outcome view (TASK-BRK-092).
@@ -84,13 +86,15 @@ pub struct UsbCopyOutcomeDto {
     pub verified: bool,
 }
 
-/// Combined automatic-backup status read (TASK-BRK-092).
+/// Combined automatic-backup status read (TASK-BRK-092, dual TASK-BRK-128).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BackupHardeningStatusDto {
     /// Stored cadence + time.
     pub schedule: BackupScheduleDto,
     /// Removable destination directory, if set.
     pub usb_destination: Option<String>,
+    /// SECONDARY removable destination directory, if set.
+    pub usb_destination_2: Option<String>,
     /// Durable last-backup state (success or failure).
     pub last_status: LastBackupStatusDto,
     /// Due-check report.
@@ -108,15 +112,17 @@ pub struct BackupHardeningConfigureRequestDto {
     pub time: Option<String>,
     /// Removable USB destination directory (blank clears it).
     pub usb_destination: Option<String>,
+    /// SECONDARY removable USB destination directory (blank clears it).
+    pub usb_destination_2: Option<String>,
 }
 
-/// Scheduled-backup run outcome (TASK-BRK-092).
+/// Scheduled-backup run outcome (TASK-BRK-092, dual mirror TASK-BRK-128).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScheduledRunOutcomeDto {
     /// Verified local snapshot metadata.
     pub backup: BackupMetadataDto,
-    /// USB mirror outcome, or `None` when unset/failed.
-    pub usb: Option<UsbCopyOutcomeDto>,
+    /// USB mirror outcomes, one per configured destination (empty when none).
+    pub usb: Vec<UsbCopyOutcomeDto>,
 }
 
 /// Backup verification request (TASK-BRK-052).

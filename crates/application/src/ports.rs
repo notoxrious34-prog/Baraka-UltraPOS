@@ -2981,8 +2981,19 @@ pub trait BackupHardeningPort: Send + Sync {
     /// Removable destination directory, or `None` when unset/empty.
     fn usb_destination(&self) -> Result<Option<std::path::PathBuf>, ApplicationError>;
 
+    /// Ordered removable destinations (TASK-BRK-128): primary first,
+    /// secondary second; empty/unset entries are skipped.
+    fn usb_destinations(&self) -> Result<Vec<std::path::PathBuf>, ApplicationError>;
+
     /// Persist the removable destination directory (`None` clears it).
     fn set_usb_destination(&self, path: Option<&std::path::Path>) -> Result<(), ApplicationError>;
+
+    /// Persist the SECONDARY removable destination (`None` clears it).
+    /// Stored under a separate settings key — zero schema changes.
+    fn set_usb_second_destination(
+        &self,
+        path: Option<&std::path::Path>,
+    ) -> Result<(), ApplicationError>;
 
     /// Copy a verified local snapshot to `dest_dir` (copy, never move) and
     /// re-verify by size + SHA-256. On mismatch the copy is removed and the

@@ -75,6 +75,93 @@ export async function listBackups(sessionToken: string): Promise<BackupMetadata[
   return wire.map(toBackupMetadata);
 }
 
+/** Automatic-backup hardening status (mirrors BackupHardeningStatusDto). */
+export interface HardeningStatus {
+  cadence: string;
+  time: string | null;
+  usbDestination: string | null;
+  usbDestination2: string | null;
+  lastStatus: string;
+  lastFileName: string | null;
+  lastCreatedAt: string | null;
+  lastErrorMessage: string | null;
+  stale48h: boolean;
+  due: boolean;
+  lastBackupAt: string | null;
+  nextRunAt: string | null;
+}
+
+interface HardeningStatusWire {
+  schedule: { cadence: string; time: string | null };
+  usb_destination: string | null;
+  usb_destination_2: string | null;
+  last_status: {
+    status: string;
+    file_name: string | null;
+    created_at: string | null;
+    error_message: string | null;
+    stale_48h: boolean;
+  };
+  due: { due: boolean; last_backup_at: string | null; next_run_at: string | null };
+}
+
+/**
+ * Read-only automatic-backup status: schedule, both USB destinations,
+ * durable last state with the 48h staleness flag, and the due report.
+ */
+export async function getHardeningStatus(sessionToken: string): Promise<HardeningStatus> {
+  const wire = await call<HardeningStatusWire>("backup_hardening_status", {
+    session_token: sessionToken,
+  });
+  return {
+    cadence: wire.schedule.cadence,
+    time: wire.schedule.time,
+    usbDestination: wire.usb_destination,
+    usbDestination2: wire.usb_destination_2,
+    lastStatus: wire.last_status.status,
+    lastFileName: wire.last_status.file_name,
+    lastCreatedAt: wire.last_status.created_at,
+    lastErrorMessage: wire.last_status.error_message,
+    stale48h: wire.last_status.stale_48h,
+    due: wire.due.due,
+    lastBackupAt: wire.due.last_backup_at,
+    nextRunAt: wire.due.next_run_at,
+  };
+}
+
+/**
+ * Persist cadence + time + both USB destinations (Admin-only server-side).
+ * Blank USB strings clear the destination.
+ */
+export async function configureHardening(
+  sessionToken: string,
+  cadence: string,
+  time: string | null,
+  usbDestination: string | null,
+  usbDestination2: string | null,
+): Promise<void> {
+  await call<unknown>("backup_hardening_configure", {
+    request: {
+      session_token: sessionToken,
+      cadence,
+      time,
+      usb_destination: usbDestination,
+      usb_destination_2: usbDestination2,
+    },
+  });
+}
+
+/**
+ * Run one scheduled capture now when due, mirroring to both USB
+ * destinations (Admin-only server-side). Rejects `BACKUP_NOT_DUE`.
+ */
+export async function runScheduledBackup(sessionToken: string): Promise<number> {
+  const wire = await call<{ usb: Array<{ destination: string }> }>("backup_schedule_run", {
+    session_token: sessionToken,
+  });
+  return wire.usb.length;
+}
+
 /** Backup verification outcome (mirrors VerifyBackupResponseDto). */
 export interface VerifyBackupResponse {
   backupId: string;

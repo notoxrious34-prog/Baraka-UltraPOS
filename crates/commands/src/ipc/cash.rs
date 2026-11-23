@@ -123,16 +123,18 @@ pub fn cash_confirm_closing(
     // stranded till is worse than a missed automatic backup). A failed
     // post-close backup surfaces as a non-blocking `backup_warning` code;
     // the committed close is never rolled back.
-    let backup_warning = match CashCloseBackupUseCase::new(state.backups.as_ref()).run_after_close(
-        &session,
-        &state.backup_dir,
-        30,
-        &state.terminal_id,
-        env!("CARGO_PKG_VERSION"),
-    ) {
-        Ok(_) => None,
-        Err(error) => Some(error_code(&error)),
-    };
+    let backup_warning =
+        match CashCloseBackupUseCase::new(state.backups.as_ref(), state.backup_hardening.as_ref())
+            .run_after_close(
+                &session,
+                &state.backup_dir,
+                30,
+                &state.terminal_id,
+                env!("CARGO_PKG_VERSION"),
+            ) {
+            Ok(_) => None,
+            Err(error) => Some(error_code(&error)),
+        };
     let mut dto = to_cash_session_dto(&view);
     dto.backup_warning = backup_warning;
     Ok(dto)

@@ -14,7 +14,15 @@ import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { t, type I18nKey } from "@/lib/i18n";
 import { useSessionStore } from "@/stores/session-store";
 import type { Locale } from "@/types/pos";
-import { createBackup, listBackups, type BackupMetadata } from "@/lib/ipc";
+import {
+  configureHardening,
+  createBackup,
+  getHardeningStatus,
+  listBackups,
+  runScheduledBackup,
+  type BackupMetadata,
+  type HardeningStatus,
+} from "@/lib/ipc";
 import {
   checksumPrefix,
   formatBackupDate,
@@ -291,6 +299,187 @@ export function BackupSettingsTab({
         {t(locale, "backups.retentionNotice")}
       </p>
       <FactoryResetSection locale={locale} sessionToken={sessionToken} />
+      <HardeningSection locale={locale} sessionToken={sessionToken} />
     </div>
+  );
+}
+
+/** Automatic-backup schedule + dual-USB destinations (TASK-BRK-128). */
+function HardeningSection({
+  locale,
+  sessionToken,
+}: {
+  locale: Locale;
+  sessionToken: string;
+}): ReactElement {
+  const [status, setStatus] = useState<HardeningStatus | null>(null);
+  const [cadence, setCadence] = useState("disabled");
+  const [time, setTime] = useState("");
+  const [usb1, setUsb1] = useState("");
+  const [usb2, setUsb2] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    try {
+      const loaded = await getHardeningStatus(sessionToken);
+      setStatus(loaded);
+      setCadence(loaded.cadence);
+      setTime(loaded.time ?? "");
+      setUsb1(loaded.usbDestination ?? "");
+      setUsb2(loaded.usbDestination2 ?? "");
+    } catch {
+      setNotice({ ok: false, text: t(locale, "backups.hard.loadError") });
+    }
+  }, [sessionToken, locale]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function handleSave(): Promise<void> {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      await configureHardening(
+        sessionToken,
+        cadence,
+        time.trim() === "" ? null : time.trim(),
+        usb1.trim() === "" ? null : usb1.trim(),
+        usb2.trim() === "" ? null : usb2.trim(),
+      );
+      setNotice({ ok: true, text: t(locale, "backups.hard.saved") });
+      await refresh();
+    } catch (failure) {
+      setNotice({ ok: false, text: String(failure) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRunNow(): Promise<void> {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      const mirrors = await runScheduledBackup(sessionToken);
+      setNotice({
+        ok: true,
+        text: t(locale, "backups.hard.ranMirrors").replace("{n}", mirrors.toString()),
+      });
+      await refresh();
+    } catch (failure) {
+      setNotice({ ok: false, text: String(failure) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="flex shrink-0 flex-col gap-2 rounded-lg bg-white px-3 py-2.5 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+      <p className="text-sm font-black">{t(locale, "backups.hard.title")}</p>
+      {status !== null &&
+        (status.stale48h ? (
+          <p className="rounded-md bg-red-50 px-2 py-1.5 text-xs font-black text-red-700 dark:bg-red-900/30 dark:text-red-200">
+            ⚠ {t(locale, "backups.hard.staleAlert")}
+          </p>
+        ) : (
+          <p className="rounded-md bg-emerald-50 px-2 py-1.5 text-xs font-black text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+            ✓ {t(locale, "backups.hard.freshOk")}
+          </p>
+        ))}
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1 text-[11px] font-bold">
+          {t(locale, "backups.hard.cadence")}
+          <select
+            value={cadence}
+            onChange={(event) => {
+              setCadence(event.target.value);
+            }}
+            disabled={busy}
+            className="h-9 rounded-md bg-slate-100 px-2 dark:bg-slate-700"
+          >
+            <option value="disabled">disabled</option>
+            <option value="daily">daily</option>
+            <option value="weekly">weekly</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-[11px] font-bold">
+          {t(locale, "backups.hard.time")}
+          <input
+            value={time}
+            onChange={(event) => {
+              setTime(event.target.value);
+            }}
+            disabled={busy}
+            placeholder="02:00"
+            dir="ltr"
+            className="h-9 rounded-md bg-slate-100 px-2 font-mono dark:bg-slate-700"
+          />
+        </label>
+      </div>
+      <label className="flex flex-col gap-1 text-[11px] font-bold">
+        {t(locale, "backups.hard.usb1")}
+        <input
+          value={usb1}
+          onChange={(event) => {
+            setUsb1(event.target.value);
+          }}
+          disabled={busy}
+          dir="ltr"
+          className="h-9 rounded-md bg-slate-100 px-2 font-mono dark:bg-slate-700"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-[11px] font-bold">
+        {t(locale, "backups.hard.usb2")}
+        <input
+          value={usb2}
+          onChange={(event) => {
+            setUsb2(event.target.value);
+          }}
+          disabled={busy}
+          dir="ltr"
+          className="h-9 rounded-md bg-slate-100 px-2 font-mono dark:bg-slate-700"
+        />
+      </label>
+      {notice !== null && (
+        <p
+          className={`rounded px-2 py-1.5 text-xs font-bold ${
+            notice.ok
+              ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200"
+              : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200"
+          }`}
+        >
+          {notice.text}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            void handleSave();
+          }}
+          disabled={busy}
+          className="flex h-9 flex-1 items-center justify-center rounded-lg bg-accent-500 text-xs font-black text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+        >
+          {t(locale, "backups.hard.save")}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            void handleRunNow();
+          }}
+          disabled={busy}
+          className="flex h-9 flex-1 items-center justify-center rounded-lg bg-slate-200 text-xs font-black hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:text-slate-100"
+        >
+          {t(locale, "backups.hard.runNow")}
+        </button>
+      </div>
+    </section>
   );
 }

@@ -157,6 +157,25 @@ pub struct LastBackupStatus {
     pub created_at: Option<String>,
     /// Failure detail of the newest row, if any.
     pub error_message: Option<String>,
+    /// 48h staleness alert (TASK-BRK-128): true when no SUCCESS backup
+    /// landed inside the trailing 48h window (or none ever did).
+    pub stale_48h: bool,
+}
+
+/// Staleness alert threshold (TASK-BRK-128): a till with no SUCCESS
+/// backup inside this many trailing hours raises the home badge.
+pub const STALE_BACKUP_ALERT_HOURS: i64 = 48;
+
+/// Pure staleness rule: stale when there is no SUCCESS yet, or the
+/// newest SUCCESS instant is at least the threshold old. Boundary is
+/// inclusive — exactly 48h counts as stale (fail-alert, never
+/// fail-silent).
+#[must_use]
+pub fn backup_is_stale(last_success_at: Option<DateTime<Utc>>, now: DateTime<Utc>) -> bool {
+    match last_success_at {
+        None => true,
+        Some(instant) => now.signed_duration_since(instant).num_hours() >= STALE_BACKUP_ALERT_HOURS,
+    }
 }
 
 /// Terminal lifecycle state of a backup.
@@ -402,4 +421,29 @@ pub enum RestoreError {
     },
     /// Local I/O or lock failure before any byte moved.
     Io(String),
+}
+
+#[cfg(test)]
+mod staleness_tests {
+    use super::*;
+    use chrono::{Duration, TimeZone};
+
+    fn instant() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 10, 25, 14, 30, 0)
+            .single()
+            .expect("fixed instant")
+    }
+
+    #[test]
+    fn never_backed_up_is_stale() {
+        assert!(backup_is_stale(None, instant()));
+    }
+
+    #[test]
+    fn boundary_is_inclusive_at_48h() {
+        let now = instant();
+        assert!(!backup_is_stale(Some(now - Duration::hours(47)), now));
+        assert!(backup_is_stale(Some(now - Duration::hours(48)), now));
+        assert!(backup_is_stale(Some(now - Duration::hours(49)), now));
+    }
 }

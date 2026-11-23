@@ -268,10 +268,11 @@ fn close_hook_runs_after_close_commit_with_shift_close_backup() {
     let closed_at = closed.closed_at.clone().expect("closed_at");
 
     // Close hook runs AFTER the commit: the backup lands after the close.
-    let meta = CashCloseBackupUseCase::new(&h.backups)
+    let (meta, mirrors) = CashCloseBackupUseCase::new(&h.backups, &h.hardening)
         .run_after_close(&session(), &h.backup_dir, 30, TEST_TERMINAL, APP_VERSION)
         .expect("post-close backup");
     assert_eq!(meta.trigger_type, BackupTriggerType::ShiftClose);
+    assert!(mirrors.is_empty());
     assert!(meta.created_at.to_rfc3339() >= closed_at);
 
     let rows = h.backups.list_backups(10).expect("list");
@@ -292,7 +293,7 @@ fn close_hook_failure_warns_without_rollback() {
     // back the committed close.
     let blocker = h._dir.path().join("not-a-dir");
     std::fs::write(&blocker, b"block").expect("blocker");
-    let _ = CashCloseBackupUseCase::new(&h.backups)
+    let _ = CashCloseBackupUseCase::new(&h.backups, &h.hardening)
         .run_after_close(&session(), &blocker, 30, TEST_TERMINAL, APP_VERSION)
         .expect_err("backup must fail");
 
@@ -365,8 +366,9 @@ fn usb_copy_failure_surfaces_stable_codes() {
 #[test]
 fn last_backup_status_reads_newest_row() {
     let h = setup();
+    let clock = fixed_clock();
     let empty = LastBackupStatusUseCase::new(&h.backups)
-        .read()
+        .read(&clock)
         .expect("read");
     assert_eq!(empty.status, "");
     assert_eq!(empty.file_name, None);
@@ -382,7 +384,7 @@ fn last_backup_status_reads_newest_row() {
         )
         .expect("manual backup");
     let status = LastBackupStatusUseCase::new(&h.backups)
-        .read()
+        .read(&clock)
         .expect("read");
     assert_eq!(status.status, "SUCCESS");
     assert_eq!(status.file_name, Some(meta.file_name));

@@ -90,13 +90,13 @@ fn next_run(schedule: &BackupSchedule, now: DateTime<Utc>) -> Option<DateTime<Ut
 }
 
 /// Result of one automatic-backup attempt: the verified snapshot plus the
-/// optional (best-effort, never-blocking) USB mirror outcome.
+/// dual-USB mirror outcomes (TASK-BRK-128, best-effort, never-blocking).
 #[derive(Debug)]
 pub struct ScheduledRunOutcome {
     /// Verified local snapshot metadata.
     pub backup: baraka_domain::backup::BackupMetadata,
-    /// USB mirror outcome, or `None` when no destination is configured.
-    pub usb: Option<UsbCopyOutcome>,
+    /// USB mirror outcomes, one per configured destination (empty when none).
+    pub usb: Vec<UsbCopyOutcome>,
 }
 
 /// Scheduled-backup use case (cadence due/skip + capture + USB mirror).
@@ -181,15 +181,19 @@ where
             terminal_id,
             app_version,
         )?;
-        let usb = match self.hardening.usb_destination()? {
-            Some(destination) => {
-                let source = std::path::Path::new(&backup.file_path);
-                // Best-effort: a mirror failure is non-fatal to the backup.
-                self.hardening.copy_to_usb(source, &destination).ok()
+        // Dual mirror (TASK-BRK-128): every configured destination gets a
+        // copy; each copy is best-effort and never invalidates the snapshot.
+        let source = std::path::Path::new(&backup.file_path);
+        let mut mirrors: Vec<UsbCopyOutcome> = Vec::new();
+        for destination in self.hardening.usb_destinations()? {
+            if let Ok(outcome) = self.hardening.copy_to_usb(source, &destination) {
+                mirrors.push(outcome);
             }
-            None => None,
-        };
-        Ok(ScheduledRunOutcome { backup, usb })
+        }
+        Ok(ScheduledRunOutcome {
+            backup,
+            usb: mirrors,
+        })
     }
 
     /// On-launch due-check entry point (no operator session exists yet).
@@ -218,29 +222,33 @@ where
     }
 }
 
-/// Post-close automatic backup (TASK-BRK-092).
+/// Post-close automatic backup (TASK-BRK-092, dual mirror TASK-BRK-128).
 ///
 /// Runs AFTER the close transaction commits: the close must never be rolled
 /// back or reported failed because the automatic backup could not run. A
 /// failed post-close backup returns a stable warning code and leaves a
 /// FAILED `backups_log` row — it is visible, never silent.
-pub struct CashCloseBackupUseCase<'a, R>
+pub struct CashCloseBackupUseCase<'a, R, H>
 where
     R: ?Sized,
+    H: ?Sized,
 {
     backups: &'a R,
+    hardening: &'a H,
 }
 
-impl<'a, R> CashCloseBackupUseCase<'a, R>
+impl<'a, R, H> CashCloseBackupUseCase<'a, R, H>
 where
     R: BackupRepository + ?Sized,
+    H: BackupHardeningPort + ?Sized,
 {
-    /// Wire the use case to its port.
-    pub fn new(backups: &'a R) -> Self {
-        Self { backups }
+    /// Wire the use case to its ports.
+    pub fn new(backups: &'a R, hardening: &'a H) -> Self {
+        Self { backups, hardening }
     }
 
-    /// Capture a verified SHIFT_CLOSE backup after the close committed.
+    /// Capture a verified SHIFT_CLOSE backup after the close committed,
+    /// then mirror to every configured USB destination (best-effort).
     pub fn run_after_close(
         &self,
         session: &SessionContext,
@@ -248,15 +256,24 @@ where
         retention: usize,
         terminal_id: &str,
         app_version: &str,
-    ) -> Result<baraka_domain::backup::BackupMetadata, ApplicationError> {
-        CreateBackupUseCase::new(self.backups).execute(
+    ) -> Result<(baraka_domain::backup::BackupMetadata, Vec<UsbCopyOutcome>), ApplicationError>
+    {
+        let backup = CreateBackupUseCase::new(self.backups).execute(
             session,
             BackupTriggerType::ShiftClose,
             dest_dir,
             retention,
             terminal_id,
             app_version,
-        )
+        )?;
+        let source = std::path::Path::new(&backup.file_path);
+        let mut mirrors: Vec<UsbCopyOutcome> = Vec::new();
+        for destination in self.hardening.usb_destinations()? {
+            if let Ok(outcome) = self.hardening.copy_to_usb(source, &destination) {
+                mirrors.push(outcome);
+            }
+        }
+        Ok((backup, mirrors))
     }
 }
 
@@ -277,8 +294,17 @@ where
         Self { backups }
     }
 
-    /// Newest logged row (any status) as durable UI state.
-    pub fn read(&self) -> Result<LastBackupStatus, ApplicationError> {
+    /// Newest logged row (any status) as durable UI state, plus the 48h
+    /// staleness flag computed against the newest SUCCESS row
+    /// (TASK-BRK-128 — never-backed-up counts as stale).
+    pub fn read<C>(&self, clock: &C) -> Result<LastBackupStatus, ApplicationError>
+    where
+        C: Clock + ?Sized,
+    {
+        let stale = baraka_domain::backup::backup_is_stale(
+            newest_success(self.backups)?.map(|(_, at)| at),
+            clock.now(),
+        );
         let rows = self.backups.list_backups(1)?;
         match rows.into_iter().next() {
             None => Ok(LastBackupStatus {
@@ -286,12 +312,14 @@ where
                 file_name: None,
                 created_at: None,
                 error_message: None,
+                stale_48h: stale,
             }),
             Some(row) => Ok(LastBackupStatus {
                 status: row.status,
                 file_name: Some(row.file_name),
                 created_at: Some(row.created_at),
                 error_message: None,
+                stale_48h: stale,
             }),
         }
     }

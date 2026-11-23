@@ -1,5 +1,5 @@
 /**
- * Reports home dashboard (TASK-BRK-012B): nine analytical tiles routing to
+ * Reports home dashboard (TASK-BRK-012B): ten analytical tiles routing to
  * their dedicated screens through local view state (no router dependency,
  * consistent with the App.tsx NavRail pattern).
  */
@@ -9,6 +9,7 @@ import { t, type I18nKey } from "@/lib/i18n";
 import { usePosUiStore } from "@/stores/pos-ui-store";
 import { DailySalesReport } from "@/features/reports/DailySalesReport";
 import { SalesByProductReport } from "@/features/reports/SalesByProductReport";
+import { SignalsCockpitReport } from "@/features/reports/SignalsCockpitReport";
 import { SalesByCategoryReport } from "@/features/reports/SalesByCategoryReport";
 import { GrossMarginReport } from "@/features/reports/GrossMarginReport";
 import { CreditOutstandingReport } from "@/features/reports/CreditOutstandingReport";
@@ -26,7 +27,8 @@ type ReportKey =
   | "lowStock"
   | "movements"
   | "sessions"
-  | "activity";
+  | "activity"
+  | "signals";
 
 const TILES: Array<{ key: ReportKey; label: I18nKey }> = [
   { key: "daily", label: "rep.daily" },
@@ -38,6 +40,7 @@ const TILES: Array<{ key: ReportKey; label: I18nKey }> = [
   { key: "movements", label: "rep.movements" },
   { key: "sessions", label: "rep.sessions" },
   { key: "activity", label: "rep.activity" },
+  { key: "signals", label: "rep.signals" },
 ];
 
 export function ReportsHomeScreen(): ReactElement {
@@ -65,6 +68,7 @@ export function ReportsHomeScreen(): ReactElement {
         {active === "movements" && <StockMovementReport />}
         {active === "sessions" && <CashSessionsHistoryReport />}
         {active === "activity" && <UserActivityReport />}
+        {active === "signals" && <SignalsCockpitReport />}
       </section>
     );
   }

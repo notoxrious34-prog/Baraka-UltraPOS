@@ -233,6 +233,7 @@ fn cash_input(
         notes: None,
 
         timbre_enabled: true,
+        cart_opened_at: None,
     }
 }
 
@@ -1108,4 +1109,25 @@ fn french_checkout_persists_language() {
         .execute(&session_with(Role::Vendeur), input, TEST_TERMINAL)
         .expect("french checkout");
     assert_eq!(stored_language(&harness, &receipt.document_id), "FR");
+}
+
+#[test]
+fn fiscal_year_pins_to_cart_opening_not_commit() {
+    // XS (owner decision): a cart opened in 2024 and finalized after the
+    // New Year must take the 2024 sequence, not the commit year's.
+    let harness = setup();
+    let warehouse = seed_warehouse(&harness, "MAIN");
+    let (product, unit) = seed_product(&harness, "P1", 10_000, false);
+    seed_stock(&harness, product, warehouse, 100_000);
+    ensure_cash_session(&harness, warehouse);
+    let mut input = cash_input(warehouse, product, unit, 1, 20_500);
+    input.cart_opened_at = Some(
+        chrono::DateTime::parse_from_rfc3339("2024-12-31T23:30:00+01:00")
+            .expect("fixture stamp")
+            .with_timezone(&chrono::Utc),
+    );
+    let receipt = checkout_uc(&harness)
+        .execute(&session_with(Role::Vendeur), input, TEST_TERMINAL)
+        .expect("checkout");
+    assert_eq!(receipt.document_number, "TICK-2024-000001");
 }

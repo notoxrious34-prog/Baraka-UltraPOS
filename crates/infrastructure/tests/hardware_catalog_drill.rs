@@ -942,6 +942,7 @@ fn drill_atomic_sale_two_items_cash() {
                 notes: None,
 
                 timbre_enabled: true,
+                cart_opened_at: None,
             },
             TERMINAL_ID,
         )

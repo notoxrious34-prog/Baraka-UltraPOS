@@ -287,6 +287,7 @@ fn preview_equals_commit_tick_2026_000002_scenario() {
             notes: None,
 
             timbre_enabled: true,
+            cart_opened_at: None,
         },
         TEST_TERMINAL,
     )
@@ -442,6 +443,7 @@ fn preview_equals_commit_with_discounts_bl_no_timbre() {
             notes: None,
 
             timbre_enabled: true,
+            cart_opened_at: None,
         },
         TEST_TERMINAL,
     )

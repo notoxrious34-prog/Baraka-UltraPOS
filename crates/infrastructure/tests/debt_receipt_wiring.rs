@@ -487,6 +487,7 @@ fn commit_sale(
             notes: None,
 
             timbre_enabled: true,
+            cart_opened_at: None,
         },
         TEST_TERMINAL,
     )

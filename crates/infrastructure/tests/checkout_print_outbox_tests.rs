@@ -199,6 +199,7 @@ fn commit_ticket(
             below_cost_override: None,
             notes: None,
             timbre_enabled: true,
+            cart_opened_at: None,
         },
         TEST_TERMINAL,
     )

@@ -65,6 +65,9 @@ function defaultUnitIndex(product: CatalogProduct): number {
 
 interface CartState {
   lines: CartLine[];
+  /** Cart-opened moment (ISO) pinning the fiscal year (XS); set on the
+   * first line, cleared with the cart, refreshed on draft resume. */
+  openedAt: string | null;
   globalDiscountCentimes: string;
   customer: ActiveCustomer;
   docType: DocType;
@@ -109,6 +112,7 @@ function singleUnitResult(line: CartLine | undefined): CycleLineUnitResult {
 
 export const useCartStore = create<CartState>()((set, get) => ({
   lines: [],
+  openedAt: null,
   globalDiscountCentimes: ZERO,
   customer: { kind: "guest" },
   docType: "TICKET",
@@ -151,10 +155,25 @@ export const useCartStore = create<CartState>()((set, get) => ({
         lineDiscountCentimes: ZERO,
         breaksByUnit: {},
       };
-      return { previewMargins: [], lines: [...state.lines, line] };
+      // First line opens the cart: pin the XS fiscal-year moment once.
+      // Merges keep the original pin (state.lines already non-empty).
+      return {
+        previewMargins: [],
+        lines: [...state.lines, line],
+        openedAt: state.lines.length === 0 ? new Date().toISOString() : state.openedAt,
+      };
     }),
   removeLine: (key) =>
-    set((state) => ({ previewMargins: [], lines: state.lines.filter((line) => line.key !== key) })),
+    set((state) => {
+      const lines = state.lines.filter((line) => line.key !== key);
+      return {
+        previewMargins: [],
+        lines,
+        // Last line out closes the cart: the next first line re-opens it
+        // with a fresh XS pin.
+        openedAt: lines.length === 0 ? null : state.openedAt,
+      };
+    }),
   setLineQty: (key, qtyMicro) =>
     set((state) => ({
       previewMargins: [],
@@ -209,6 +228,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
   clearCart: () =>
     set({
       lines: [],
+      openedAt: null,
       globalDiscountCentimes: ZERO,
       customer: { kind: "guest" },
       previewMargins: [],
@@ -216,6 +236,8 @@ export const useCartStore = create<CartState>()((set, get) => ({
   loadLines: (lines, customer) =>
     set({
       lines: lines.map((line) => ({ ...line, breaksByUnit: line.breaksByUnit ?? {} })),
+      // Draft resume re-opens the cart: fresh XS pin at resume time.
+      openedAt: new Date().toISOString(),
       globalDiscountCentimes: ZERO,
       customer: customer ?? { kind: "guest" },
       previewMargins: [],

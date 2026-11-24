@@ -517,6 +517,7 @@ fn test_configurable_timbre_preview_and_checkout() {
                 below_cost_override: None,
                 notes: None,
                 timbre_enabled,
+                cart_opened_at: None,
             },
             TERMINAL,
         )

@@ -34,6 +34,33 @@ pub(crate) fn parse_document_language(text: &str) -> Result<DocumentLanguage, Ap
         .map_err(|_| ApplicationError::Validation(DomainError::InvalidDocumentLanguage))
 }
 
+/// Parse the cart-opened moment (XS fiscal-year pin).
+///
+/// Absent/blank falls back to the commit moment (`None`). Present values
+/// must be valid RFC3339 and must not lie in the future — a future stamp
+/// is a fail-closed `INVALID_CART_OPENED_AT`, never a silent clamp.
+pub(crate) fn parse_cart_opened_at(
+    text: Option<&str>,
+) -> Result<Option<chrono::DateTime<chrono::Utc>>, ApplicationError> {
+    let raw = text.map(str::trim).filter(|trimmed| !trimmed.is_empty());
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let moment = chrono::DateTime::parse_from_rfc3339(raw)
+        .map(|fixed| fixed.with_timezone(&chrono::Utc))
+        .map_err(|_| {
+            ApplicationError::Validation(DomainError::InvalidCanonicalString(
+                "INVALID_CART_OPENED_AT".to_string(),
+            ))
+        })?;
+    if moment > chrono::Utc::now() {
+        return Err(ApplicationError::Validation(
+            DomainError::InvalidCanonicalString("INVALID_CART_OPENED_AT".to_string()),
+        ));
+    }
+    Ok(Some(moment))
+}
+
 /// `sales_checkout` command (`sales.checkout`): atomic sale commit.
 #[tauri::command(rename_all = "snake_case")]
 pub fn sales_checkout(
@@ -105,6 +132,8 @@ pub fn sales_checkout(
         }),
         notes: request.notes,
         timbre_enabled: state.fiscal.timbre_enabled().unwrap_or(true),
+        cart_opened_at: parse_cart_opened_at(request.cart_opened_at.as_deref())
+            .map_err(|error| error_code(&error))?,
     };
     let receipt = CheckoutSaleUseCase::new(
         state.catalog.as_ref(),
@@ -394,4 +423,35 @@ pub fn sales_build_prep_sheet(
                 .collect(),
         })
         .collect())
+}
+
+#[cfg(test)]
+mod cart_opened_at_tests {
+    use super::parse_cart_opened_at;
+
+    #[test]
+    fn blank_and_absent_fall_back_to_commit_moment() {
+        assert!(parse_cart_opened_at(None).expect("none").is_none());
+        assert!(parse_cart_opened_at(Some("")).expect("empty").is_none());
+        assert!(parse_cart_opened_at(Some("   ")).expect("blank").is_none());
+    }
+
+    #[test]
+    fn valid_past_stamp_parses_with_year() {
+        let moment = parse_cart_opened_at(Some("2024-12-31T23:30:00+01:00"))
+            .expect("valid")
+            .expect("some");
+        assert_eq!(moment.format("%Y").to_string(), "2024");
+    }
+
+    #[test]
+    fn garbage_rejects_loudly() {
+        assert!(parse_cart_opened_at(Some("not-a-date")).is_err());
+        assert!(parse_cart_opened_at(Some("2024-13-99")).is_err());
+    }
+
+    #[test]
+    fn future_stamp_rejects_fail_closed() {
+        assert!(parse_cart_opened_at(Some("2999-01-01T00:00:00Z")).is_err());
+    }
 }

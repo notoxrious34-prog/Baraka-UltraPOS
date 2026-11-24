@@ -241,6 +241,7 @@ fn cash_checkout_input(
         notes: None,
 
         timbre_enabled: true,
+        cart_opened_at: None,
     }
 }
 

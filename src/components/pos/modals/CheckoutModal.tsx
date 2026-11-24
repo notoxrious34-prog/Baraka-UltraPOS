@@ -161,6 +161,7 @@ export function CheckoutModal(): ReactElement {
   const setLastReceipt = usePosUiStore((state) => state.setLastReceipt);
   const notify = usePosUiStore((state) => state.notify);
   const lines = useCartStore((state) => state.lines);
+  const openedAt = useCartStore((state) => state.openedAt);
   const globalDiscountCentimes = useCartStore((state) => state.globalDiscountCentimes);
   const customer = useCartStore((state) => state.customer);
   const docType = useCartStore((state) => state.docType);
@@ -455,6 +456,8 @@ export function CheckoutModal(): ReactElement {
       notes: null,
       // Cashier path: no manager override, below-cost lines stay locked.
       below_cost_override: null,
+      // XS fiscal-year pin: the moment this cart was opened.
+      cart_opened_at: openedAt,
     }));
     if (dispatch === null) {
       return;

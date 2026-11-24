@@ -747,6 +747,11 @@ pub struct CheckoutCommand {
     pub actor: UserId,
     /// Operator note, if any.
     pub notes: Option<String>,
+    /// Cart-opened moment (RFC3339, client-observed) pinning the fiscal
+    /// year (XS, owner decision: creation moment wins over finalization).
+    /// `None` (or unparseable) falls back to the commit moment — the
+    /// pre-XS behavior. The IPC edge rejects future timestamps LOUDLY.
+    pub cart_opened_at: Option<DateTime<Utc>>,
 }
 
 /// One priced cart line for persistence.

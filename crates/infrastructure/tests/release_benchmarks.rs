@@ -356,6 +356,7 @@ fn bench_m2_atomic_sale() {
             below_cost_override: None,
             notes: None,
             timbre_enabled: true,
+            cart_opened_at: None,
         };
         let start = Instant::now();
         use_case
@@ -414,6 +415,7 @@ fn bench_m3_print_job_insert() {
                 below_cost_override: None,
                 notes: None,
                 timbre_enabled: true,
+                cart_opened_at: None,
             },
             TERMINAL_ID,
         )

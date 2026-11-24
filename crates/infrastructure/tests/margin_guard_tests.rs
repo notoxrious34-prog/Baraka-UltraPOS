@@ -185,6 +185,7 @@ fn checkout_input(harness: &Harness, product: ProductId, unit: UnitId) -> Checko
         below_cost_override: None,
         notes: None,
         timbre_enabled: false,
+        cart_opened_at: None,
     }
 }
 

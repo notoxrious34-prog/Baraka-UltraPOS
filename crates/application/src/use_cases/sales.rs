@@ -15,6 +15,7 @@ use baraka_domain::sales::{
     DocumentItemView, DocumentLanguage, DocumentStatus, DocumentType, PaymentMethod, PaymentShare,
     PaymentStatus, PricedDocument, PricedLineInput,
 };
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -213,6 +214,9 @@ pub struct CheckoutInput {
     /// Fiscal stamp toggle resolved from `fiscal.timbre_enabled` at the IPC
     /// edge (ADR-092). `false` prices timbre as exactly zero.
     pub timbre_enabled: bool,
+    /// Cart-opened moment pinning the fiscal year (XS, owner decision:
+    /// creation moment wins). `None` falls back to the commit moment.
+    pub cart_opened_at: Option<DateTime<Utc>>,
 }
 
 /// Atomic sale orchestrator (pre-validates, then issues one atomic call).
@@ -470,6 +474,7 @@ where
             negative_override_permitted,
             actor: session.user_id,
             notes: input.notes.map(|note| note.trim().to_string()),
+            cart_opened_at: input.cart_opened_at,
         };
         self.checkout.checkout_atomic(&command)
     }

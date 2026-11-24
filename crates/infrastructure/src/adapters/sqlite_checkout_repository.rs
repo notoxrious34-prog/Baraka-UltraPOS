@@ -211,7 +211,14 @@ impl CheckoutRepository for SqliteCheckoutRepository {
     ) -> Result<CheckoutReceipt, ApplicationError> {
         let mut guard = self.lock()?;
         let stamp = Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true);
-        let fiscal_year = Utc::now().year();
+        // XS (owner decision): the fiscal year is pinned at cart-opening
+        // time, not at commit time. An open cart crossing midnight or New
+        // Year finalizes in the year it was opened. Absent/unparseable
+        // falls back to the commit moment (pre-XS behavior).
+        let fiscal_year = command
+            .cart_opened_at
+            .map(|moment| moment.year())
+            .unwrap_or_else(|| Utc::now().year());
         let request_hash = checksum_of(&command.request_canonical);
         let actor = command.actor.to_string();
         run_transaction(&mut guard, |tx| {

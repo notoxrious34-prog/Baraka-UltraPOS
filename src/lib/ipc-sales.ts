@@ -98,6 +98,11 @@ export interface CheckoutRequestWire {
    * fills this; the cashier path always sends `null`.
    */
   below_cost_override: { username: string; pin: string } | null;
+  /**
+   * Cart-opened moment (ISO, client-observed) pinning the fiscal year
+   * (XS). `null` falls back to the commit moment.
+   */
+  cart_opened_at: string | null;
 }
 
 /** Commit a sale atomically; rejects with a backend wire code on failure. */

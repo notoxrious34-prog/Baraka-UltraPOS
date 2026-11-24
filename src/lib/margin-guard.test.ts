@@ -67,6 +67,7 @@ function cashierRequest(): CheckoutRequestWire {
     allow_negative_stock: false,
     notes: null,
     below_cost_override: null,
+    cart_opened_at: null,
   };
 }
 

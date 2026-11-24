@@ -254,6 +254,7 @@ fn checkout(harness: &Harness, order: &SaleOrder) -> baraka_application::ports::
             below_cost_override: None,
             notes: None,
             timbre_enabled: false,
+            cart_opened_at: None,
         },
         TEST_TERMINAL,
     )

@@ -233,6 +233,7 @@ fn document_lines_break_down_to_whole_rungs() {
             below_cost_override: None,
             notes: None,
             timbre_enabled: false,
+            cart_opened_at: None,
         },
         TEST_TERMINAL,
     )

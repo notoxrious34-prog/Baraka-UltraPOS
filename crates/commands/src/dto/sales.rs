@@ -70,6 +70,10 @@ pub struct CheckoutSaleRequest {
     pub below_cost_override: Option<ManagerOverrideDto>,
     /// Operator note, if any.
     pub notes: Option<String>,
+    /// Cart-opened moment (RFC3339, client-observed) pinning the fiscal
+    /// year (XS). Absent/blank falls back to the commit moment.
+    #[serde(default)]
+    pub cart_opened_at: Option<String>,
 }
 
 /// Atomic checkout response (stored receipt shape).

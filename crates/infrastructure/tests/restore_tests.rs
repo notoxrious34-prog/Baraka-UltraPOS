@@ -1064,3 +1064,40 @@ fn precheck_missing_schema_migrations_maps_to_corrupted() {
     let restore_error = restore(&harness, &meta.file_name).expect_err("must fail");
     assert_eq!(restore_error, RestoreError::BackupCorrupted);
 }
+
+#[test]
+fn restore_auto_heals_sequence_counters_upward() {
+    // Owner decision: BRK-124 automatic. A backup whose sequence counter
+    // lags behind its stored numbers must heal on activation: the next
+    // allocation continues after the max stored number, never after drift.
+    use baraka_application::ports::DocumentSequenceRepository;
+    use baraka_infrastructure::adapters::SqliteDocumentSequenceRepository;
+    let harness = setup();
+    seed_consistent(&harness, "TICK-2026-000041");
+    // Simulate drift: the counter lags 36 behind the stored number.
+    harness
+        .db
+        .lock()
+        .expect("lock")
+        .execute(
+            "DELETE FROM document_sequences WHERE type = 'TICKET' AND fiscal_year = 2026",
+            [],
+        )
+        .expect("clear seq");
+    harness
+        .db
+        .lock()
+        .expect("lock")
+        .execute(
+            "INSERT INTO document_sequences (type, fiscal_year, last_sequence)
+             VALUES ('TICKET', 2026, 5)",
+            [],
+        )
+        .expect("drift seq");
+    let meta = create(&harness);
+    restore(&harness, &meta.file_name).expect("restore");
+    let next = SqliteDocumentSequenceRepository::new(Arc::clone(&harness.db))
+        .allocate_next("TICKET", 2026)
+        .expect("alloc");
+    assert_eq!(next, 42);
+}

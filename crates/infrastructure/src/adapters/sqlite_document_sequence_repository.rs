@@ -33,6 +33,57 @@ impl SqliteDocumentSequenceRepository {
     }
 }
 
+/// Reconcile `document_sequences` upward from stored document numbers
+/// (post-restore auto-heal; owner decision: BRK-124 automatic).
+///
+/// For every `(type, fiscal_year)` present in `documents`, parse the
+/// trailing `-NNNNNN` sequence from `number` and raise `last_sequence`
+/// to at least that maximum — never lowers, never creates gaps.
+/// Numbers that do not match `PREFIX-YEAR-SEQ` (drafts `DRAFT-…`,
+/// legacy rows) are skipped: restore must never fail because of them.
+pub fn resync_sequences_from_documents(
+    tx: &rusqlite::Transaction,
+) -> Result<(), crate::persistence::InfrastructureError> {
+    use std::collections::HashMap;
+    let mut maxima: HashMap<(String, i32), i64> = HashMap::new();
+    let mut stmt = tx.prepare("SELECT type, fiscal_year, number FROM documents")?;
+    let rows = stmt.query_map([], |row| {
+        let doc_type: String = row.get(0)?;
+        let year: i32 = row.get(1)?;
+        let number: String = row.get(2)?;
+        Ok((doc_type, year, number))
+    })?;
+    for row in rows {
+        let (doc_type, year, number) = row?;
+        if let Some(seq) = parse_trailing_sequence(&number) {
+            let slot = maxima.entry((doc_type, year)).or_insert(0);
+            if seq > *slot {
+                *slot = seq;
+            }
+        }
+    }
+    for ((doc_type, year), max_seq) in maxima {
+        tx.execute(
+            "INSERT INTO document_sequences (type, fiscal_year, last_sequence)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(type, fiscal_year) DO UPDATE
+             SET last_sequence = max(last_sequence, excluded.last_sequence)",
+            rusqlite::params![doc_type, year, max_seq],
+        )?;
+    }
+    Ok(())
+}
+
+/// Trailing `-NNNNNN` of a `PREFIX-YEAR-SEQ` number; `None` otherwise.
+fn parse_trailing_sequence(number: &str) -> Option<i64> {
+    let tail = number.rsplit('-').next()?;
+    if tail.len() != 6 || !tail.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let seq: i64 = tail.parse().ok()?;
+    (1..=999_999).contains(&seq).then_some(seq)
+}
+
 /// Allocate inside an explicit transaction handle (shared with checkout).
 pub fn allocate_in_tx(
     tx: &rusqlite::Transaction,

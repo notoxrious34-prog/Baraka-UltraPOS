@@ -1087,7 +1087,19 @@ impl SqliteBackupManager {
             run_migrations(&mut fresh)
                 .map_err(|error| format!("activation migration failure: {error}"))?;
         }
-        // R4b. Integrity of the activated copy.
+        // R4b. Auto-heal sequence counters upward from stored numbers
+        // (owner decision: BRK-124 automatic). Same-version restores can
+        // carry drift too, so this runs unconditionally — monotonic only.
+        run_transaction(&mut fresh, |tx| {
+            super::sqlite_document_sequence_repository::resync_sequences_from_documents(tx).map_err(
+                |error| InfrastructureError::Config(format!("sequence resync failure: {error}")),
+            )
+        })
+        .map_err(|error| format!("sequence resync failure: {error}"))?;
+        // R4c. Integrity of the activated copy.
+        if !backup_integrity_ok(&fresh) {
+            return Err("activation integrity failure".to_string());
+        }
         if !backup_integrity_ok(&fresh) {
             return Err("activation integrity failure".to_string());
         }

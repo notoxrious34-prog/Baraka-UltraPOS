@@ -3059,3 +3059,65 @@ impl TsplLabelRasterPort for NullLabelRaster {
         ))
     }
 }
+
+/// One imported document renumber (origin number preserved for audit).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SyncRenumber {
+    /// Human number on the origin till (stored in `origin_number`).
+    pub origin_number: String,
+    /// Gapless human number allocated from the IMPORTER's sequence.
+    pub new_number: String,
+}
+
+/// Atomic sync-import outcome (TASK-BRK-124): all-or-nothing per package.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SyncImportOutcome {
+    /// Imported document count.
+    pub imported_docs: usize,
+    /// Per-document renumbers in package order.
+    pub renumbered: Vec<SyncRenumber>,
+    /// `(sku, doc_number)` pairs that went negative on the importer side
+    /// (importer-wins numerically per ADR-123; surfaced for the radar).
+    pub negative_stock_warnings: Vec<(String, String)>,
+}
+
+/// Two-till sync export surface (TASK-BRK-124): read-only package assembly.
+pub trait SyncExportPort: Send + Sync {
+    /// Assemble the canonical v1 package (header + hashed body) of locally
+    /// created FINALIZED sale documents newer than `since_created_at`
+    /// (RFC-3339, exclusive), capped at `limit` documents. Returns
+    /// `(package_text, exported_doc_count)`. Empty selection yields a
+    /// zero-count package, never an error.
+    fn export_package(
+        &self,
+        terminal_id: &str,
+        since_created_at: &str,
+        limit: usize,
+    ) -> Result<(String, usize), ApplicationError>;
+}
+
+/// Two-till sync import surface (TASK-BRK-124): atomic verified merge.
+pub trait SyncImportPort: Send + Sync {
+    /// Verify (size cap, grammar, SHA-256) then merge the package
+    /// atomically: resolve SKUs/customer codes fail-closed, allocate the
+    /// importer's gapless numbers, preserve `origin_number`, apply stock
+    /// moves to `warehouse_id`, recompute ledger legs locally, and leave
+    /// imported payments out of every cash session (money stays put).
+    /// Re-importing the same package aborts on the sync-identity index
+    /// (fail closed, zero double-count). Unknown SKUs or customers abort
+    /// the WHOLE package — never a partial merge.
+    fn import_package(
+        &self,
+        package_text: &str,
+        warehouse_id: &str,
+        actor_user_id: &str,
+        terminal_id: &str,
+        now_rfc3339: &str,
+    ) -> Result<SyncImportOutcome, ApplicationError>;
+}
+
+/// Combined two-till sync store (export + import over one SQLite handle).
+pub trait SyncStore: SyncExportPort + SyncImportPort {}
+
+/// Blanket implementation for any store carrying both sync surfaces.
+impl<T> SyncStore for T where T: SyncExportPort + SyncImportPort {}

@@ -21,7 +21,7 @@ use baraka_infrastructure::adapters::{
     SqliteCustomerRepository, SqliteDocumentRepository, SqliteFiscalSettings,
     SqlitePrintJobRepository, SqlitePrinterSettings, SqlitePurchaseRepository,
     SqliteReportingRepository, SqliteReturnRepository, SqliteSignalRepository,
-    SqliteStockRepository, SqliteSupplierRepository, SqliteUserRepository,
+    SqliteStockRepository, SqliteSupplierRepository, SqliteSyncRepository, SqliteUserRepository,
     SqliteVariantMatrixRepository, SqliteWarehouseRepository, SystemClock,
 };
 use baraka_infrastructure::persistence::connection::{
@@ -178,6 +178,7 @@ pub fn run() {
                 purchases: Arc::new(SqlitePurchaseRepository::new(Arc::clone(&db))),
                 reports: Arc::new(SqliteReportingRepository::new(Arc::clone(&db))),
                 signals: Arc::new(SqliteSignalRepository::new(Arc::clone(&db))),
+                sync: Arc::new(SqliteSyncRepository::new(Arc::clone(&db))),
                 returns: Arc::new(SqliteReturnRepository::new(Arc::clone(&db))),
                 backups: backups.clone(),
                 backup_hardening: hardening,
@@ -360,6 +361,8 @@ pub fn run() {
             baraka_commands::ipc::reports_replenishment_radar,
             baraka_commands::ipc::reports_unit_sales_mix,
             baraka_commands::ipc::reports_signals,
+            baraka_commands::ipc::sync_export_package,
+            baraka_commands::ipc::sync_import_package,
             baraka_commands::ipc::reports_user_activity
         ])
         .build(tauri::generate_context!())

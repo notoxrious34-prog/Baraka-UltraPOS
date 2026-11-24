@@ -30,6 +30,7 @@ import {
   triggerBadgeClass,
 } from "./settings-helpers";
 import { FactoryResetSection } from "./FactoryResetSection";
+import { SyncSection } from "./SyncSection";
 
 interface BackupSettingsTabProps {
   locale: Locale;
@@ -300,6 +301,7 @@ export function BackupSettingsTab({
       </p>
       <FactoryResetSection locale={locale} sessionToken={sessionToken} />
       <HardeningSection locale={locale} sessionToken={sessionToken} />
+      <SyncSection locale={locale} sessionToken={sessionToken} />
     </div>
   );
 }

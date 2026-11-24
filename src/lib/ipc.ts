@@ -21,5 +21,6 @@ export * from "./ipc-cash";
 export * from "./ipc-suppliers";
 export * from "./ipc-reports";
 export * from "./ipc-backups";
+export * from "./ipc-sync";
 
 export type { Locale };

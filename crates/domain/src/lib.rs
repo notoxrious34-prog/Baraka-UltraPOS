@@ -16,4 +16,5 @@ pub mod printing;
 pub mod role;
 pub mod sales;
 pub mod suppliers;
+pub mod sync;
 pub mod user;

@@ -21,6 +21,7 @@ pub mod reports;
 pub mod returns;
 pub mod sales;
 pub mod suppliers;
+pub mod sync;
 
 // Kernel re-export: `AppState` and `app_health` keep their external paths
 // (`baraka_commands::ipc::AppState`); the helpers resolve the
@@ -52,6 +53,7 @@ pub use reports::*;
 pub use returns::*;
 pub use sales::*;
 pub use suppliers::*;
+pub use sync::*;
 
 // Test-only names: the hub regression tests below resolve through
 // `super::*`, exactly as before the split. Kept `#[cfg(test)]` so normal

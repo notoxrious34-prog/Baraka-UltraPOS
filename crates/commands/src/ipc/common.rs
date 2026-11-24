@@ -12,8 +12,9 @@ use baraka_application::ports::{
     FiscalSettingsPort, PasswordHasher, PrintJobRepository, PrinterSettingsPort,
     PrinterTransportPort, ProductRepository, PurchaseRepository, ReceiptRendererPort,
     ReportingRepository, ReturnRepository, SessionContext, SessionStore, SessionToken,
-    SignalRepository, StockRepository, StoreIdentityPort, SupplierRepository, TsplLabelRasterPort,
-    UserRepository, VariantMatrixRepository, VerticalProfilePort, WarehouseRepository,
+    SignalRepository, StockRepository, StoreIdentityPort, SupplierRepository, SyncStore,
+    TsplLabelRasterPort, UserRepository, VariantMatrixRepository, VerticalProfilePort,
+    WarehouseRepository,
 };
 use baraka_application::use_cases::catalog::{
     NewUnitInput, ProductDetail, ProductImportRepository, UnitUpsert,
@@ -89,6 +90,8 @@ pub struct AppState {
     pub reports: Arc<dyn ReportingRepository>,
     /// Signal-economy reads (same SQLite store, BRK-116).
     pub signals: Arc<dyn SignalRepository>,
+    /// Two-till merge persistence (same SQLite store, export+import, BRK-124).
+    pub sync: Arc<dyn SyncStore>,
     /// Return bundle persistence (cumulative reads + atomic writes).
     pub returns: Arc<dyn ReturnRepository>,
     /// Backup snapshot persistence and audit rows.

@@ -833,6 +833,26 @@ fn restore_older_schema_backup_is_migrated() {
             conn.execute("DROP TABLE IF EXISTS customer_last_prices;", [])
                 .expect("drop v22 last-price table");
         }
+        if app_version >= 26 {
+            // Genuine v25 backups predate migration 0026, so all of its
+            // artifacts must go: DROP TRIGGER first (DROP COLUMN errors
+            // while an index/trigger references the column), then the
+            // outbox table, then the partial identity index, then the
+            // `documents.origin_number` column — or replaying the ADD
+            // COLUMN / CREATE TRIGGER migrations fails with
+            // "duplicate column name" / "trigger already exists".
+            // Trigger names verified live in 0026 (2 total).
+            for trigger in ["prevent_sync_outbox_update", "prevent_sync_outbox_delete"] {
+                conn.execute(&format!("DROP TRIGGER IF EXISTS {trigger};"), [])
+                    .expect("drop v26 outbox trigger");
+            }
+            conn.execute("DROP TABLE IF EXISTS sync_outbox;", [])
+                .expect("drop v26 outbox table");
+            conn.execute("DROP INDEX IF EXISTS idx_documents_sync_identity;", [])
+                .expect("drop v26 sync identity index");
+            conn.execute("ALTER TABLE documents DROP COLUMN origin_number;", [])
+                .expect("drop v26 origin column");
+        }
     }
     repoint_logged_hash(
         &harness,

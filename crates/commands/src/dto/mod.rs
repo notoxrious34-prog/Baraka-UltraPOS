@@ -17,6 +17,7 @@ pub mod printing;
 pub mod reports;
 pub mod sales;
 pub mod suppliers;
+pub mod sync;
 
 pub use admin::*;
 pub use auth::*;
@@ -30,3 +31,4 @@ pub use printing::*;
 pub use reports::*;
 pub use sales::*;
 pub use suppliers::*;
+pub use sync::*;

@@ -20,6 +20,7 @@ pub mod sales;
 pub mod signals;
 pub mod studio_printing;
 pub mod suppliers;
+pub mod sync;
 pub mod tspl_printing;
 pub mod users;
 pub mod variant_matrix;

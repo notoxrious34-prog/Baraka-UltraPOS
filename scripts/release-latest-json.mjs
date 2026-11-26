@@ -31,7 +31,8 @@ if (!existsSync(sigPath)) {
 }
 
 const signature = readFileSync(sigPath, "utf8").trim();
-const url = `https://github.com/notoxrious34-prog/Baraka-UltraPOS/releases/download/${tag}/${encodeURIComponent(exeName)}`;
+const assetName = opt("--asset-name", exeName);
+const url = `https://github.com/notoxrious34-prog/Baraka-UltraPOS/releases/download/${tag}/${encodeURIComponent(assetName)}`;
 
 const latest = {
   version,

@@ -61,4 +61,5 @@ audit/tmp/
 # Signing keys NEVER enter the repo (local-signing.md): the live keypair
 # lives only in %USERPROFILE%\.tauri\ — repo copies are accidents.
 *.key
+*.key.pub
 .tauri/

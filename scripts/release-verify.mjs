@@ -22,7 +22,7 @@ const failures = [];
 const evidence = [];
 
 if (!existsSync(nsisDir)) {
-  failures.push(`missing nsis dir: ${nsisDir} (run: npx tauri build -j 2)`);
+  failures.push(`missing nsis dir: ${nsisDir} (run: npx tauri build)`);
 } else {
   const installers = readdirSync(nsisDir).filter((f) => f.endsWith("-setup.exe"));
   if (installers.length === 0) {

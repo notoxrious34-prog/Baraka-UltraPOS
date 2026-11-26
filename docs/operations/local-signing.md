@@ -26,7 +26,8 @@ updater dialog off (all UX lives in Settings → Update Center).
 $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$env:USERPROFILE\.tauri\baraka.key" -Raw
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""   # set only if the key has one
 npm run build
-npx tauri build -j 2
+$env:CARGO_BUILD_JOBS = "2"   # حد الربط لآلة Windows (Tauri لا يقبل -j مباشرة)
+npx tauri build
 ```
 
 Expected artifacts (`src-tauri/target/release/bundle/`):

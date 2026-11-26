@@ -11,7 +11,12 @@ import { createHash } from "node:crypto";
 import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const bundleDir = resolve(process.argv[2] ?? "src-tauri/target/release/bundle");
+const candidates = process.argv[2]
+  ? [resolve(process.argv[2])]
+  : [resolve("target/release/bundle"), resolve("src-tauri/target/release/bundle")];
+const bundleDir = candidates.find((dir) => existsSync(dir)) ?? candidates[0];
+const pkgVersion = JSON.parse(readFileSync(resolve("package.json"), "utf8")).version;
+const versionTag = `_${pkgVersion}_`;
 const nsisDir = join(bundleDir, "nsis");
 
 function sha256Hex(path) {
@@ -24,9 +29,11 @@ const evidence = [];
 if (!existsSync(nsisDir)) {
   failures.push(`missing nsis dir: ${nsisDir} (run: npx tauri build)`);
 } else {
-  const installers = readdirSync(nsisDir).filter((f) => f.endsWith("-setup.exe"));
+  const installers = readdirSync(nsisDir).filter(
+    (f) => f.endsWith("-setup.exe") && f.includes(versionTag),
+  );
   if (installers.length === 0) {
-    failures.push(`no *-setup.exe in ${nsisDir}`);
+    failures.push(`no *-setup.exe matching version ${pkgVersion} in ${nsisDir}`);
   }
   for (const exe of installers) {
     const exePath = join(nsisDir, exe);

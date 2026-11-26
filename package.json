@@ -11,7 +11,8 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "release:verify": "node scripts/release-verify.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

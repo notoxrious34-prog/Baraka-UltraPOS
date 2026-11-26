@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "tauri": "tauri",
-    "release:verify": "node scripts/release-verify.mjs"
+    "release:verify": "node scripts/release-verify.mjs",
+    "release:latest": "node scripts/release-latest-json.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

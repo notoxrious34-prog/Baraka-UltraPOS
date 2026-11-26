@@ -35,3 +35,12 @@
 - SHA-256 : `1320322f652289622e93a22b9e1867fa3e80ad04c9d8b50e1a38e55d1c9fbb68`
 - sans `.sig` (`G8-EXIT:1` : pas de `TAURI_SIGNING_PRIVATE_KEY` — installation manuelle uniquement ;
   التثبيت يدوي فقط)
+
+## Livrable signé — 2026-11-26 (remplace le livrable non signé ci-dessus)
+- `target/release/bundle/nsis/Baraka UltraPOS_1.4.0_x64-setup.exe`
+- taille : 305063988 octets (~291 Mo) / الحجم
+- SHA-256 : `bd43fa8cca3bac44ef2422928daea107298440c4ee495de4ab9016abf20730ea`
+- `.sig` : 448 octets, SHA-256 `6676ccb80f849f7e9e5b4472defbe7bbba5b77f41b876fc51a3ea5cef1cecf95`
+- `latest.json` : 758 octets, SHA-256 `dc9e552813acb239886de4267c9a7d7a6d8d254c15cf53a14555dbb5ea67abbc`
+- `G8-OK: installer + .sig + latest.json present` (`npm run release:verify`, EXIT:0)
+- المفتاح العام مضمّن في `src-tauri/tauri.conf.json` ؛ الخاص خارج المستودع أبدًا.
